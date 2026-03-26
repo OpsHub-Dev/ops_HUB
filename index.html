@@ -2003,14 +2003,24 @@ window.onload = function(){
     useLocalFallback=true;startApp(true);
   };
 
-  // Auto-connect if config saved
-  var saved=loadSavedConfig();
-  if(saved&&saved.apiKey&&saved.databaseURL){
-    document.getElementById('cfg-apikey').value=saved.apiKey;
-    document.getElementById('cfg-authdomain').value=saved.authDomain||'';
-    document.getElementById('cfg-dburl').value=saved.databaseURL;
-    document.getElementById('cfg-projectid').value=saved.projectId||'';
-    if(initFirebase(saved)){startApp();}
+  // ── HARDCODED CONFIG — auto-connects every device instantly ──
+  var HARDCODED = {
+    apiKey:      "AIzaSyB9DhSn5gDqAhpmLG9aVFAld1dSRYJWFDI",
+    authDomain:  "opshub-f802f.firebaseapp.com",
+    databaseURL: "https://opshub-f802f-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId:   "opshub-f802f"
+  };
+
+  // Fill setup fields (in case user opens setup manually)
+  document.getElementById('cfg-apikey').value    = HARDCODED.apiKey;
+  document.getElementById('cfg-authdomain').value = HARDCODED.authDomain;
+  document.getElementById('cfg-dburl').value     = HARDCODED.databaseURL;
+  document.getElementById('cfg-projectid').value = HARDCODED.projectId;
+
+  // Auto-connect directly — skip setup screen entirely
+  if(initFirebase(HARDCODED)){
+    localStorage.setItem(FB_CONFIG_KEY, JSON.stringify(HARDCODED));
+    startApp();
   }
 };
 
