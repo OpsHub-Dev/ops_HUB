@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Staff Portal — Ops Hub</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+<style>
+:root{
+  --bg:#0d1117;--bg2:#161b22;--bg3:#1c2128;--bg4:#22272e;
+  --bd:#30363d;--bd2:#3d444d;
+  --acc:#f0a500;--acc2:#f5be45;
+  --grn:#3fb950;--red:#f85149;--gold:#f0a500;--blu:#58a6ff;
+  --pur:#bc8cff;--cyn:#39c5cf;
+  --text:#e6edf3;--text2:#8b949e;--text3:#7d8590;
+  --font:'Inter',sans-serif;--mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{min-height:100%;font-family:var(--font);background:var(--bg);color:var(--text);font-size:14px;-webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:3px}
+::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px}
+
+/* SETUP */
+#setup{position:fixed;inset:0;background:var(--bg);z-index:100;display:flex;align-items:center;justify-content:center;padding:20px}
+#setup.gone{display:none}
+.setup-box{background:var(--bg2);border:1px solid var(--bd2);border-radius:16px;padding:28px;width:100%;max-width:480px;box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.setup-box h2{font-size:20px;font-weight:700;margin-bottom:6px}
+.setup-box p{font-size:12px;color:var(--text3);margin-bottom:20px;line-height:1.7}
+.inp{width:100%;background:var(--bg);border:1px solid var(--bd2);border-radius:8px;padding:10px 12px;color:var(--text);font-size:12px;font-family:var(--mono);outline:none;margin-bottom:8px;transition:border-color .2s}
+.inp:focus{border-color:var(--acc)}
+.lbl{font-size:10px;color:var(--text3);font-family:var(--mono);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:4px}
+.err{color:var(--red);font-size:11px;margin-bottom:8px;display:none;padding:8px 10px;background:rgba(248,81,73,.08);border:1px solid rgba(248,81,73,.2);border-radius:6px}
+.btn-primary{width:100%;background:linear-gradient(135deg,#f0a500,#c8700a);color:#fff;border:none;border-radius:8px;padding:12px;font-weight:700;font-size:14px;cursor:pointer;font-family:var(--font);transition:filter .15s;box-shadow:0 2px 12px rgba(240,165,0,.3)}
+.btn-primary:hover{filter:brightness(1.1)}
+.note{font-size:10px;color:var(--text3);text-align:center;margin-top:10px;font-family:var(--mono)}
+.setup-step{background:var(--bg3);border:1px solid var(--bd);border-radius:7px;padding:10px 13px;margin-bottom:8px;font-size:11.5px;color:var(--text2);line-height:1.7}
+.setup-step strong{color:var(--acc2)}
+
+/* LOADING */
+#loading{position:fixed;inset:0;background:var(--bg);z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px}
+#loading.gone{display:none}
+.spinner{width:40px;height:40px;border:3px solid var(--bd2);border-top-color:var(--acc);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* HEADER */
+.header{background:var(--bg2);border-bottom:1px solid var(--bd);padding:13px 18px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:50}
+.header-logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#f0a500,#c8700a);display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;box-shadow:0 0 12px rgba(240,165,0,.3)}
+.header-title{font-size:15px;font-weight:700;letter-spacing:-.3px}
+.header-sub{font-size:10px;color:var(--text3);margin-top:1px;font-family:var(--mono)}
+.conn-dot{width:8px;height:8px;border-radius:50%;background:var(--grn);margin-left:auto;box-shadow:0 0 8px var(--grn);animation:pulse 2s infinite;flex-shrink:0}
+.conn-dot.off{background:var(--red);box-shadow:0 0 8px var(--red);animation:none}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.clock-badge{background:var(--bg3);border:1px solid var(--bd2);border-radius:8px;padding:5px 11px;font-size:13px;font-weight:700;color:var(--acc2);font-family:var(--mono);white-space:nowrap;flex-shrink:0}
+
+/* TABS */
+.tabs{display:flex;background:var(--bg2);border-bottom:1px solid var(--bd)}
+.tab{flex:1;padding:12px 8px;border:none;background:none;color:var(--text3);font-size:13px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent;font-family:var(--font);transition:all .15s}
+.tab.on{color:var(--acc2);border-bottom-color:var(--acc)}
+.tab:hover:not(.on){color:var(--text2)}
+
+/* PAGE */
+.page{padding:16px;display:none;max-width:600px;margin:0 auto}
+.page.on{display:block}
+
+/* DATE BAR */
+.date-bar{background:linear-gradient(135deg,rgba(240,165,0,.08),rgba(240,165,0,.02));border:1px solid rgba(240,165,0,.18);border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:12px}
+.date-bar .ico{font-size:26px;flex-shrink:0}
+.date-bar .dtxt{font-size:15px;font-weight:700;color:var(--acc2)}
+.date-bar .dsub{font-size:10.5px;color:var(--text3);margin-top:2px;font-family:var(--mono)}
+
+/* CARD */
+.card{background:var(--bg3);border:1px solid var(--bd);border-radius:12px;padding:16px;margin-bottom:12px}
+.card-title{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:14px;font-family:var(--mono)}
+
+/* EMPLOYEE LIST */
+.emp-search{width:100%;background:var(--bg);border:1px solid var(--bd2);border-radius:8px;padding:10px 14px;color:var(--text);font-size:14px;outline:none;font-family:var(--font);margin-bottom:10px;transition:border-color .2s}
+.emp-search:focus{border-color:var(--acc)}
+.emp-search::placeholder{color:var(--text3)}
+.emp-list{max-height:300px;overflow-y:auto;border:1px solid var(--bd2);border-radius:9px;background:var(--bg)}
+.emp-row{padding:11px 14px;cursor:pointer;border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:12px;transition:background .1s;user-select:none}
+.emp-row:last-child{border-bottom:none}
+.emp-row:hover{background:rgba(240,165,0,.04)}
+.emp-row:active{background:rgba(240,165,0,.08)}
+.emp-row.selected{background:rgba(240,165,0,.09);border-left:3px solid var(--acc)}
+.emp-av{width:36px;height:36px;border-radius:50%;background:var(--bg4);border:1px solid var(--bd2);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;font-family:var(--mono)}
+.emp-name{font-size:13.5px;font-weight:600;line-height:1.2}
+.emp-dept{font-size:10px;color:var(--text3);margin-top:2px;font-family:var(--mono)}
+
+/* STATUS CARD */
+.status-card{border-radius:10px;padding:14px 16px;margin-bottom:14px;display:none;align-items:center;gap:14px}
+.status-card.show{display:flex}
+.status-card.present{background:rgba(63,185,80,.07);border:1px solid rgba(63,185,80,.2)}
+.status-card.late{background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.2)}
+.status-card.absent{background:rgba(248,81,73,.07);border:1px solid rgba(248,81,73,.2)}
+.status-card.leave{background:rgba(188,140,255,.07);border:1px solid rgba(188,140,255,.2)}
+.status-card.notyet{background:rgba(88,166,255,.06);border:1px solid rgba(88,166,255,.15)}
+.st-ico{font-size:32px;flex-shrink:0}
+.st-name{font-size:15px;font-weight:700;margin-bottom:4px}
+.st-info{font-size:11.5px;color:var(--text2);line-height:1.9;font-family:var(--mono)}
+
+/* ACTIONS */
+.action-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.action-btn{padding:18px 10px;border-radius:10px;border:none;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--font);display:flex;flex-direction:column;align-items:center;gap:7px;transition:all .15s;width:100%}
+.action-btn:active{transform:scale(.97)}
+.action-btn:disabled{opacity:.35;cursor:not-allowed;transform:none!important}
+.btn-in{background:rgba(63,185,80,.1);border:1px solid rgba(63,185,80,.25);color:var(--grn)}
+.btn-in:hover:not(:disabled){background:rgba(63,185,80,.17)}
+.btn-out{background:rgba(88,166,255,.1);border:1px solid rgba(88,166,255,.25);color:var(--blu)}
+.btn-out:hover:not(:disabled){background:rgba(88,166,255,.17)}
+.btn-absent{background:rgba(248,81,73,.07);border:1px solid rgba(248,81,73,.2);color:var(--red);width:100%;flex-direction:row;gap:10px;padding:12px 16px}
+.btn-absent:hover:not(:disabled){background:rgba(248,81,73,.13)}
+.btn-ico{font-size:28px}
+.btn-lbl{font-size:14px;font-weight:700}
+.btn-time{font-size:10px;opacity:.65;font-family:var(--mono);font-weight:400}
+
+/* TEAM TAB */
+.sum-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+.sum-item{background:var(--bg2);border:1px solid var(--bd);border-radius:9px;padding:11px 8px;text-align:center}
+.sum-num{font-size:24px;font-weight:300;font-family:var(--mono);line-height:1}
+.sum-lbl{font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.8px;margin-top:5px;font-family:var(--mono)}
+.team-filter{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.fbt{padding:5px 12px;border-radius:6px;border:1px solid var(--bd2);background:transparent;color:var(--text3);font-size:11px;font-weight:600;cursor:pointer;font-family:var(--font);transition:all .12s}
+.fbt:hover{color:var(--text2)}
+.fbt.on{background:rgba(240,165,0,.1);color:var(--acc);border-color:rgba(240,165,0,.3)}
+.team-card{background:var(--bg2);border:1px solid var(--bd);border-radius:9px;padding:11px 14px;margin-bottom:7px;display:flex;align-items:center;gap:12px}
+.team-card .av{width:34px;height:34px;border-radius:50%;background:var(--bg3);border:1px solid var(--bd2);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;font-family:var(--mono)}
+.team-card .info{flex:1;min-width:0}
+.team-card .nm{font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.team-card .tm{font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:2px}
+.st-pill{padding:3px 9px;border-radius:20px;font-size:9.5px;font-weight:700;font-family:var(--mono);white-space:nowrap;flex-shrink:0}
+.pill-present{background:rgba(63,185,80,.12);color:var(--grn);border:1px solid rgba(63,185,80,.2)}
+.pill-late{background:rgba(245,158,11,.12);color:var(--gold);border:1px solid rgba(245,158,11,.2)}
+.pill-absent{background:rgba(248,81,73,.12);color:var(--red);border:1px solid rgba(248,81,73,.2)}
+.pill-leave{background:rgba(188,140,255,.12);color:var(--pur);border:1px solid rgba(188,140,255,.2)}
+.pill-notyet{background:rgba(125,133,144,.1);color:var(--text3);border:1px solid rgba(125,133,144,.15)}
+
+/* EMPTY */
+.empty{text-align:center;padding:40px 20px;color:var(--text3)}
+.empty-ico{font-size:40px;margin-bottom:10px}
+.empty-txt{font-size:13px}
+
+/* TOASTS */
+#toasts{position:fixed;bottom:20px;right:16px;left:16px;z-index:999;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.toast{background:var(--bg2);border:1px solid var(--bd2);border-radius:10px;padding:11px 15px;font-size:13px;display:flex;align-items:center;gap:10px;box-shadow:0 8px 24px rgba(0,0,0,.5);animation:toastIn .25s ease;pointer-events:all}
+.toast.success{border-color:rgba(63,185,80,.3);background:rgba(63,185,80,.06)}
+.toast.error{border-color:rgba(248,81,73,.3);background:rgba(248,81,73,.06)}
+.toast.warning{border-color:rgba(245,158,11,.3);background:rgba(245,158,11,.06)}
+.toast.info{border-color:rgba(88,166,255,.3);background:rgba(88,166,255,.06)}
+@keyframes toastIn{from{transform:translateY(14px);opacity:0}to{transform:none;opacity:1}}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div id="loading">
+  <div style="font-size:40px;margin-bottom:4px">⚡</div>
+  <div class="spinner"></div>
+  <div style="font-size:12px;color:var(--text3);font-family:var(--mono);margin-top:4px">Connecting to database…</div>
+</div>
+
+<!-- SETUP -->
+<div id="setup" class="gone">
+  <div class="setup-box">
+    <div style="font-size:38px;margin-bottom:12px">👥</div>
+    <h2>Staff Portal Setup</h2>
+    <p>Enter your Firebase credentials once to connect. Settings are saved for future visits.</p>
+    <div class="setup-step"><strong>1.</strong> Go to <strong>console.firebase.google.com</strong> → your project</div>
+    <div class="setup-step"><strong>2.</strong> Project Settings → Web App → copy <strong>apiKey</strong> and <strong>databaseURL</strong></div>
+    <div style="margin-top:16px">
+      <label class="lbl">API Key *</label>
+      <input class="inp" id="cfg-api" placeholder="AIzaSy…">
+      <label class="lbl">Database URL *</label>
+      <input class="inp" id="cfg-db" placeholder="https://your-app-default-rtdb.firebaseio.com">
+      <label class="lbl">Auth Domain</label>
+      <input class="inp" id="cfg-auth" placeholder="your-app.firebaseapp.com">
+    </div>
+    <div class="err" id="setup-err">Connection failed. Please check your credentials.</div>
+    <button class="btn-primary" id="btn-connect">🔗 Connect</button>
+    <div class="note">Settings are saved in your browser automatically</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" style="display:none">
+  <div class="header">
+    <div class="header-logo">⚡</div>
+    <div>
+      <div class="header-title">Staff Portal</div>
+      <div class="header-sub" id="hdate">—</div>
+    </div>
+    <div class="conn-dot" id="conn-dot"></div>
+    <div class="clock-badge" id="clock">--:--:--</div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab on" data-tab="checkin">📋 Check-In</button>
+    <button class="tab" data-tab="team">👥 Team Status</button>
+  </div>
+
+  <!-- CHECK-IN TAB -->
+  <div class="page on" id="tab-checkin">
+    <div style="height:12px"></div>
+    <div class="date-bar">
+      <div class="ico">📅</div>
+      <div>
+        <div class="dtxt" id="date-long"></div>
+        <div class="dsub" id="date-short"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">👤 Select Your Name</div>
+      <input class="emp-search" id="emp-search" placeholder="🔍  Search your name…" autocomplete="off" autocorrect="off" spellcheck="false">
+      <div class="emp-list" id="emp-list">
+        <div class="empty"><div class="empty-ico">⏳</div><div class="empty-txt">Loading staff…</div></div>
+      </div>
+    </div>
+
+    <div class="status-card" id="status-card">
+      <div class="st-ico" id="st-ico"></div>
+      <div style="flex:1">
+        <div class="st-name" id="st-name"></div>
+        <div class="st-info" id="st-info"></div>
+      </div>
+    </div>
+
+    <div id="action-area" style="display:none">
+      <div class="action-grid">
+        <button class="action-btn btn-in" id="btn-checkin">
+          <span class="btn-ico">✅</span>
+          <span class="btn-lbl">Check In</span>
+          <span class="btn-time" id="btn-in-time">--:--</span>
+        </button>
+        <button class="action-btn btn-out" id="btn-checkout">
+          <span class="btn-ico">🚪</span>
+          <span class="btn-lbl">Check Out</span>
+          <span class="btn-time" id="btn-out-time">--:--</span>
+        </button>
+      </div>
+      <button class="action-btn btn-absent" id="btn-mark-absent">
+        <span style="font-size:20px">❌</span>
+        <span class="btn-lbl">Mark as Absent</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- TEAM TAB -->
+  <div class="page" id="tab-team">
+    <div style="height:12px"></div>
+    <div class="sum-bar">
+      <div class="sum-item"><div class="sum-num" style="color:var(--grn)" id="s-present">0</div><div class="sum-lbl">Present</div></div>
+      <div class="sum-item"><div class="sum-num" style="color:var(--gold)" id="s-late">0</div><div class="sum-lbl">Late</div></div>
+      <div class="sum-item"><div class="sum-num" style="color:var(--red)" id="s-absent">0</div><div class="sum-lbl">Absent</div></div>
+      <div class="sum-item"><div class="sum-num" style="color:var(--pur)" id="s-leave">0</div><div class="sum-lbl">On Leave</div></div>
+    </div>
+    <div class="team-filter">
+      <button class="fbt on" data-tf="all">All</button>
+      <button class="fbt" data-tf="present">✅ Present</button>
+      <button class="fbt" data-tf="late">⏰ Late</button>
+      <button class="fbt" data-tf="absent">❌ Absent</button>
+      <button class="fbt" data-tf="leave">🗓 On Leave</button>
+      <button class="fbt" data-tf="notyet">⏳ Not Yet</button>
+    </div>
+    <div id="team-list"></div>
+  </div>
+</div>
+
+<div id="toasts"></div>
+
+<script>
+// ══════════════════════════════════════════════════════════
+// 🔥 HARDCODED FIREBASE CONFIG
+// ── Paste your Firebase credentials here once.
+// ── After that, every device opens the app directly
+// ── without asking for credentials.
+// ══════════════════════════════════════════════════════════
+var FIREBASE_CONFIG = {
+  apiKey:      "AIzaSyB9DhSn5gDqAhpmLG9aVFAld1dSRYJWFDI",
+  authDomain:  "opshub-f802f.firebaseapp.com",
+  databaseURL: "https://opshub-f802f-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:   "opshub-f802f"
+};
+// ══════════════════════════════════════════════════════════
+
+var FB_KEY  = 'ops_hub_firebase_config';
+var FB_KEY2 = 'ops_staff_firebase_config';
+var db      = null;
+
+var TODAY = (function(){
+  var d = new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+})();
+var MK = TODAY.slice(0,7);
+
+var tsEmps=[], tsAtt={}, tsLeaves=[], schedule={}, staffList=[], selectedId=null, teamFilter='all';
+
+// ── SHIFT-AWARE LATE DETECTION ──────────────────────────
+// Reads each employee's shift from the Staff page (e.g. "9AM-5PM", "14:00-22:00")
+// Parses the start time and adds a 15-minute grace period.
+// Falls back to 09:00 if no shift is recorded.
+function getShiftDeadline(empId){
+  var sf=null;
+  for(var i=0;i<staffList.length;i++) if(String(staffList[i].id)===String(empId)){sf=staffList[i];break;}
+  if(!sf||!sf.shift) return '09:15'; // default grace
+
+  var raw=sf.shift.trim();
+  // Supports: "9AM-5PM"  "9:00AM"  "09:00-17:00"  "2PM"  "14:00"  "9 AM - 5 PM"
+  var m=raw.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
+  if(!m) return '09:15';
+
+  var hr=parseInt(m[1]), min=parseInt(m[2]||'0'), ampm=(m[3]||'').toLowerCase();
+  if(ampm==='pm'&&hr!==12) hr+=12;
+  if(ampm==='am'&&hr===12) hr=0;
+  // No am/pm: treat 1–7 as afternoon (e.g. "2-10" → 14:00)
+  if(!ampm&&hr>=1&&hr<=7) hr+=12;
+
+  // Add 15-min grace
+  var tot=hr*60+min+15, gh=Math.floor(tot/60)%24, gm=tot%60;
+  return String(gh).padStart(2,'0')+':'+String(gm).padStart(2,'0');
+}
+
+function isLate(empId, checkInTime){
+  return checkInTime > getShiftDeadline(empId);
+}
+
+// CLOCK
+function nowTime(){ var n=new Date(); return String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0'); }
+function tickClock(){
+  var el=document.getElementById('clock'); if(el){ var n=new Date(); el.textContent=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0')+':'+String(n.getSeconds()).padStart(2,'0'); }
+  var t=nowTime();
+  var bi=document.getElementById('btn-in-time'); if(bi) bi.textContent=t;
+  var bo=document.getElementById('btn-out-time'); if(bo) bo.textContent=t;
+}
+setInterval(tickClock,1000); tickClock();
+
+// HELPERS
+function ini(n){ var p=String(n||'').split(' '),r=''; for(var i=0;i<p.length&&r.length<2;i++) if(p[i]) r+=p[i][0].toUpperCase(); return r; }
+function dc(d){ return d==='Manager'?'#c9a84c':d==='Kitchen'?'#3d7ec8':'#4aab6e'; }
+
+function toast(msg,type){
+  var w=document.getElementById('toasts'); var el=document.createElement('div');
+  el.className='toast '+(type||'info');
+  var ico={success:'✅',error:'❌',warning:'⚠️',info:'ℹ️'};
+  el.innerHTML='<span style="font-size:16px;flex-shrink:0">'+(ico[type||'info'])+'</span><span>'+msg+'</span>';
+  w.appendChild(el);
+  setTimeout(function(){el.style.opacity='0';el.style.transition='opacity .3s';setTimeout(function(){el.remove();},350);},3200);
+}
+
+function getEmp(id){ for(var i=0;i<tsEmps.length;i++) if(String(tsEmps[i].id)===String(id)) return tsEmps[i]; return null; }
+
+function getTodayRec(eid){
+  var recs=(tsAtt[eid]&&tsAtt[eid][MK])||[];
+  if(!Array.isArray(recs)) recs=Object.values(recs).filter(Boolean);
+  for(var i=0;i<recs.length;i++) if(recs[i]&&recs[i].date===TODAY) return recs[i];
+  return null;
+}
+
+function isOnLeave(eid){
+  for(var i=0;i<tsLeaves.length;i++){
+    var l=tsLeaves[i];
+    if(String(l.empId)===String(eid)&&l.status==='approved'&&l.start<=TODAY&&l.end>=TODAY) return true;
+  }
+  return false;
+}
+
+function isScheduledOff(eid){
+  var d=new Date(TODAY+'T00:00:00'); var sun=new Date(d); sun.setDate(d.getDate()-d.getDay());
+  var yr=sun.getFullYear(); var j=new Date(yr,0,1);
+  var wn=Math.ceil(((sun-j)/86400000+j.getDay()+1)/7);
+  var wk=yr+'-W'+String(wn).padStart(2,'0');
+  var days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  var day=days[new Date(TODAY+'T00:00:00').getDay()];
+  var val=(schedule[wk]&&schedule[wk][String(eid)]&&schedule[wk][String(eid)][day])||'';
+  return val.toLowerCase()==='off'||val.toLowerCase()==='day off';
+}
+
+function saveAtt(eid,rec){
+  if(!db) return;
+  var path='tsAtt/'+eid+'/'+MK;
+  db.ref(path).once('value',function(snap){
+    var arr=snap.val()||[];
+    if(!Array.isArray(arr)) arr=Object.values(arr).filter(Boolean);
+    var found=false;
+    for(var i=0;i<arr.length;i++) if(arr[i]&&arr[i].date===TODAY){arr[i]=rec;found=true;break;}
+    if(!found) arr.push(rec);
+    db.ref(path).set(arr);
+  });
+}
+
+function writeAtt(eid,rec){
+  if(!tsAtt[eid]) tsAtt[eid]={};
+  if(!tsAtt[eid][MK]) tsAtt[eid][MK]=[];
+  var arr=tsAtt[eid][MK];
+  if(!Array.isArray(arr)) arr=Object.values(arr).filter(Boolean);
+  var found=false;
+  for(var i=0;i<arr.length;i++) if(arr[i]&&arr[i].date===TODAY){arr[i]=rec;found=true;break;}
+  if(!found) arr.push(rec);
+  tsAtt[eid][MK]=arr;
+  saveAtt(eid,rec);
+  updateStatusCard();
+  renderEmpList(document.getElementById('emp-search').value);
+  refreshTeam();
+}
+
+// RENDER EMP LIST
+function renderEmpList(filter){
+  var list=document.getElementById('emp-list');
+  var q=(filter||'').toLowerCase().trim();
+  var shown=q?tsEmps.filter(function(e){return e.name.toLowerCase().indexOf(q)>=0||(e.dept||'').toLowerCase().indexOf(q)>=0;}):tsEmps;
+  if(!shown.length){list.innerHTML='<div class="empty"><div class="empty-ico">🔍</div><div class="empty-txt">No results found</div></div>';return;}
+  list.innerHTML=shown.map(function(e){
+    var sel=String(e.id)===String(selectedId);
+    var rec=getTodayRec(e.id);
+    var badge='';
+    if(isOnLeave(e.id)||isScheduledOff(e.id)) badge='<span class="st-pill pill-leave" style="margin-left:auto">On Leave</span>';
+    else if(rec) badge='<span class="st-pill '+(rec.st==='late'?'pill-late':'pill-present')+'" style="margin-left:auto">'+(rec.co?'Done':rec.st==='late'?'Late':'In')+'</span>';
+    return '<div class="emp-row'+(sel?' selected':'')+'" data-id="'+e.id+'">'+
+      '<div class="emp-av" style="color:'+dc(e.dept||'FOH')+'">'+ini(e.name)+'</div>'+
+      '<div style="flex:1"><div class="emp-name">'+e.name+'</div><div class="emp-dept">'+(e.dept||'—')+'</div></div>'+
+      badge+'</div>';
+  }).join('');
+  list.querySelectorAll('.emp-row').forEach(function(row){
+    row.onclick=function(){selectedId=String(row.dataset.id);renderEmpList(document.getElementById('emp-search').value);updateStatusCard();};
+  });
+}
+
+// STATUS CARD
+function updateStatusCard(){
+  var sc=document.getElementById('status-card'),area=document.getElementById('action-area');
+  var ico=document.getElementById('st-ico'),nm=document.getElementById('st-name'),info=document.getElementById('st-info');
+  var bi=document.getElementById('btn-checkin'),bo=document.getElementById('btn-checkout'),ba=document.getElementById('btn-mark-absent');
+  if(!selectedId){sc.className='status-card';area.style.display='none';return;}
+  var emp=getEmp(selectedId);
+  if(!emp){sc.className='status-card';area.style.display='none';return;}
+  area.style.display='block'; ba.style.display='none'; bi.disabled=false; bo.disabled=false;
+  var rec=getTodayRec(selectedId), onLeave=isOnLeave(selectedId), offDay=isScheduledOff(selectedId);
+
+  if(onLeave||offDay){
+    sc.className='status-card show leave'; ico.textContent=onLeave?'🗓':'📴'; nm.textContent=emp.name;
+    info.innerHTML=onLeave?'On approved leave today — <strong>'+TODAY+'</strong>':'Scheduled Day Off — <strong>'+TODAY+'</strong>';
+    bi.disabled=true; bo.disabled=true;
+  } else if(!rec){
+    sc.className='status-card show notyet'; ico.textContent='⏳'; nm.textContent=emp.name;
+    info.innerHTML='No attendance recorded yet today';
+    bi.disabled=false; bo.disabled=true; ba.style.display='flex';
+  } else if(rec.st==='absent'){
+    sc.className='status-card show absent'; ico.textContent='❌'; nm.textContent=emp.name;
+    info.innerHTML='Marked absent — <strong>'+TODAY+'</strong>';
+    bi.disabled=false; bo.disabled=true;
+  } else {
+    sc.className='status-card show '+(rec.st==='late'?'late':'present');
+    ico.textContent=rec.co?'✅':'🕐'; nm.textContent=emp.name;
+    var lines='Check-in:&nbsp; <strong style="color:var(--grn)">'+(rec.ci||'—')+'</strong>';
+    if(rec.co) lines+='&emsp;Check-out: <strong style="color:var(--blu)">'+rec.co+'</strong>';
+    else lines+='&emsp;Not checked out yet';
+    lines+='<br>Status:&nbsp; '+(rec.st==='late'?'<span style="color:var(--gold);font-weight:700">Late</span>':'<span style="color:var(--grn);font-weight:700">Present</span>');
+    info.innerHTML=lines; bi.disabled=!!rec.ci; bo.disabled=!!rec.co;
+  }
+}
+
+// ACTIONS
+function doCheckIn(){
+  if(!selectedId){toast('Please select your name first','warning');return;}
+  var emp=getEmp(selectedId); if(!emp) return;
+  var rec=getTodayRec(selectedId);
+  if(rec&&rec.ci){toast('You have already checked in today','warning');return;}
+  var t=nowTime(), st=isLate(selectedId,t)?'late':'present';
+  var deadline=getShiftDeadline(selectedId);
+  writeAtt(selectedId,{date:TODAY,ci:t,co:rec?rec.co:null,st:st,note:''});
+  toast(emp.name+' — Checked in at '+t+(st==='late'?' ⏰ Late (deadline: '+deadline+')':'  ✅'),'success');
+}
+
+function doCheckOut(){
+  if(!selectedId){toast('Please select your name first','warning');return;}
+  var emp=getEmp(selectedId); var rec=getTodayRec(selectedId);
+  if(!rec||!rec.ci){toast('Please check in first','warning');return;}
+  if(rec.co){toast('You have already checked out today','warning');return;}
+  var t=nowTime();
+  writeAtt(selectedId,{date:TODAY,ci:rec.ci,co:t,st:rec.st,note:rec.note||''});
+  toast(emp.name+' — Checked out at '+t,'success');
+}
+
+function doMarkAbsent(){
+  if(!selectedId){toast('Please select a name first','warning');return;}
+  var emp=getEmp(selectedId);
+  writeAtt(selectedId,{date:TODAY,ci:null,co:null,st:'absent',note:'Manual entry'});
+  toast(emp.name+' — Marked as absent','warning');
+}
+
+// TEAM
+function getEmpStatus(eid){
+  if(isOnLeave(eid)||isScheduledOff(eid)) return 'leave';
+  var rec=getTodayRec(eid); if(!rec) return 'notyet';
+  return rec.st||'notyet';
+}
+
+function refreshTeam(){
+  var cnt={present:0,late:0,absent:0,leave:0,notyet:0};
+  tsEmps.forEach(function(e){var s=getEmpStatus(e.id);if(cnt[s]!==undefined)cnt[s]++;});
+  document.getElementById('s-present').textContent=cnt.present;
+  document.getElementById('s-late').textContent=cnt.late;
+  document.getElementById('s-absent').textContent=cnt.absent;
+  document.getElementById('s-leave').textContent=cnt.leave;
+
+  var ord={absent:0,notyet:1,late:2,present:3,leave:4};
+  var sorted=tsEmps.slice().sort(function(a,b){
+    var sa=getEmpStatus(a.id),sb=getEmpStatus(b.id);
+    if((ord[sa]||5)!==(ord[sb]||5)) return (ord[sa]||5)-(ord[sb]||5);
+    return a.name.localeCompare(b.name);
+  });
+  var filtered=teamFilter==='all'?sorted:sorted.filter(function(e){return getEmpStatus(e.id)===teamFilter;});
+
+  var stL={present:'Present',late:'Late',absent:'Absent',leave:'On Leave',notyet:'Not Yet'};
+  var stC={present:'pill-present',late:'pill-late',absent:'pill-absent',leave:'pill-leave',notyet:'pill-notyet'};
+
+  var tl=document.getElementById('team-list');
+  if(!filtered.length){tl.innerHTML='<div class="empty"><div class="empty-ico">👀</div><div class="empty-txt">No records match this filter</div></div>';return;}
+  tl.innerHTML=filtered.map(function(e){
+    var st=getEmpStatus(e.id),rec=getTodayRec(e.id);
+    var timeStr=rec&&rec.ci?'In: '+rec.ci+(rec.co?'  ·  Out: '+rec.co:''):st==='leave'?'On approved leave':'—';
+    return '<div class="team-card">'+
+      '<div class="av" style="color:'+dc(e.dept||'FOH')+'">'+ini(e.name)+'</div>'+
+      '<div class="info"><div class="nm">'+e.name+'</div><div class="tm">'+(e.dept||'')+(timeStr?' &nbsp;·&nbsp; '+timeStr:'')+'</div></div>'+
+      '<span class="st-pill '+stC[st]+'">'+stL[st]+'</span>'+
+    '</div>';
+  }).join('');
+}
+
+// FIREBASE
+function attachListeners(){
+  // Load staff list for shift-aware late detection
+  db.ref('staff').on('value',function(snap){
+    var raw=snap.val();
+    staffList=!raw?[]:(Array.isArray(raw)?raw.filter(Boolean):Object.values(raw).filter(Boolean));
+  });
+  db.ref('tsEmps').on('value',function(snap){
+    var raw=snap.val();
+    tsEmps=!raw?[]:(Array.isArray(raw)?raw.filter(Boolean):Object.values(raw).filter(Boolean));
+    tsEmps.sort(function(a,b){return a.name.localeCompare(b.name);});
+    renderEmpList(document.getElementById('emp-search').value);
+    refreshTeam();
+  });
+  db.ref('tsAtt').on('value',function(snap){
+    tsAtt=snap.val()||{};
+    updateStatusCard();
+    renderEmpList(document.getElementById('emp-search').value);
+    refreshTeam();
+  });
+  db.ref('tsLeaves').on('value',function(snap){
+    var raw=snap.val();
+    tsLeaves=!raw?[]:(Array.isArray(raw)?raw.filter(Boolean):Object.values(raw).filter(Boolean));
+    updateStatusCard(); refreshTeam();
+  });
+  db.ref('sch').on('value',function(snap){
+    schedule=snap.val()||{};
+    updateStatusCard(); refreshTeam();
+  });
+}
+
+function connectFirebase(config){
+  try{
+    if(firebase.apps.length) firebase.apps.forEach(function(a){try{a.delete();}catch(e){}});
+    firebase.initializeApp(config);
+    db=firebase.database();
+    db.ref('.info/connected').on('value',function(snap){
+      var on=!!snap.val(); var dot=document.getElementById('conn-dot');
+      if(dot) dot.className='conn-dot'+(on?'':' off');
+    });
+    localStorage.setItem(FB_KEY2,JSON.stringify(config));
+    document.getElementById('loading').classList.add('gone');
+    document.getElementById('setup').classList.add('gone');
+    document.getElementById('app').style.display='block';
+    attachListeners();
+    toast('Connected to Firebase 🔥','success');
+  }catch(e){
+    document.getElementById('loading').classList.add('gone');
+    document.getElementById('setup').classList.remove('gone');
+    var err=document.getElementById('setup-err');
+    err.style.display='block'; err.textContent='❌ '+e.message;
+  }
+}
+
+// INIT
+window.onload=function(){
+  var now=new Date();
+  document.getElementById('date-long').textContent=now.toLocaleDateString('en-GB',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  document.getElementById('date-short').textContent=now.toLocaleDateString('en-GB',{weekday:'short',day:'2-digit',month:'short',year:'numeric'});
+  document.getElementById('hdate').textContent=now.toLocaleDateString('en-GB',{weekday:'short',day:'2-digit',month:'short'});
+
+  document.querySelectorAll('.tab').forEach(function(tab){
+    tab.onclick=function(){
+      document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('on');});
+      document.querySelectorAll('.page').forEach(function(p){p.classList.remove('on');});
+      tab.classList.add('on');
+      document.getElementById('tab-'+tab.dataset.tab).classList.add('on');
+      if(tab.dataset.tab==='team') refreshTeam();
+    };
+  });
+
+  document.querySelectorAll('[data-tf]').forEach(function(b){
+    b.onclick=function(){
+      teamFilter=b.dataset.tf;
+      document.querySelectorAll('[data-tf]').forEach(function(x){x.classList.remove('on');});
+      b.classList.add('on'); refreshTeam();
+    };
+  });
+
+  document.getElementById('emp-search').oninput=function(){renderEmpList(this.value);};
+  document.getElementById('btn-checkin').onclick=doCheckIn;
+  document.getElementById('btn-checkout').onclick=doCheckOut;
+  document.getElementById('btn-mark-absent').onclick=doMarkAbsent;
+
+  document.getElementById('btn-connect').onclick=function(){
+    var api=document.getElementById('cfg-api').value.trim();
+    var dbUrl=document.getElementById('cfg-db').value.trim();
+    var auth=document.getElementById('cfg-auth').value.trim();
+    if(!api||!dbUrl){var e=document.getElementById('setup-err');e.style.display='block';e.textContent='API Key and Database URL are required.';return;}
+    connectFirebase({apiKey:api,databaseURL:dbUrl,authDomain:auth,projectId:auth.split('.')[0]||''});
+  };
+
+  // ── AUTO-CONNECT PRIORITY ───────────────────────────────
+  // 1. Use HARDCODED config if it looks valid (filled in by developer)
+  // 2. Fall back to saved config in localStorage (from main index.html)
+  // 3. Fall back to manual setup screen
+  var hc = FIREBASE_CONFIG;
+  var isHardcoded = hc && hc.apiKey && hc.apiKey.indexOf('PASTE') === -1 && hc.databaseURL && hc.databaseURL.indexOf('PASTE') === -1;
+
+  if(isHardcoded){
+    connectFirebase(hc);
+  } else {
+    var saved=null;
+    try{saved=JSON.parse(localStorage.getItem(FB_KEY)||localStorage.getItem(FB_KEY2));}catch(e){}
+    if(saved&&saved.apiKey&&saved.databaseURL){
+      connectFirebase(saved);
+    } else {
+      document.getElementById('loading').classList.add('gone');
+      document.getElementById('setup').classList.remove('gone');
+    }
+  }
+};
+</script>
+</body>
+</html>
