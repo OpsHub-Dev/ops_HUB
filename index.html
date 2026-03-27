@@ -758,11 +758,24 @@ function saveCollection(key, arr){
   fbSet(key, obj);
 }
 
-function saveItems(){ saveCollection('inv_items', items); }
+function saveItems(){
+  if(!db){ return; }
+  var obj = {};
+  items.forEach(function(item){
+    // Use code as key — sanitize special chars Firebase doesn't allow
+    var k = String(item.code).replace(/[.#$\[\]\/]/g,'_');
+    obj[k] = item;
+  });
+  fbSet('inv_items', obj);
+}
 function saveLogs(){
   if(!db){ return; }
   var obj = {};
-  logs.forEach(function(l,i){ obj['log_'+(l.date||'')+'_'+i] = l; });
+  logs.forEach(function(l,i){
+    var k = 'log_'+(l.date||'nodate')+'_'+(l.code||'x')+'_'+i;
+    k = k.replace(/[.#$\[\]\/]/g,'_');
+    obj[k] = l;
+  });
   fbSet('inv_logs', obj);
 }
 function saveOrders(){
@@ -1699,12 +1712,47 @@ function mBackup(){
       r.onload=function(ev){
         try{
           var data=JSON.parse(ev.target.result);
-          if(data.staff&&db)saveCollection('staff',data.staff);
-          if(data.sales&&db)saveCollection('sales',data.sales);
-          if(data.items&&db)saveCollection('inv_items',data.items);
-          if(data.orders&&db){var oo={};data.orders.forEach(function(o){oo[String(o.id).replace(/[.#$\[\]\/]/g,'_')]=o;});fbSet('inv_orders',oo);}
-          toast('Backup restored successfully','success');cm();
-        }catch(e){toast('Invalid backup file','error');}
+          // Restore staff & collections
+          if(data.staff&&db)  saveCollection('staff',   data.staff);
+          if(data.sales&&db)  saveCollection('sales',   data.sales);
+          if(data.pull&&db)   saveCollection('pull',    data.pull);
+          if(data.waste&&db)  saveCollection('waste',   data.waste);
+          if(data.wares&&db)  saveCollection('wares',   data.wares);
+          if(data.rem&&db)    saveCollection('rem',     data.rem);
+          if(data.pc&&db)     saveCollection('pc',      data.pc);
+          if(data.health&&db) saveCollection('health',  data.health);
+          if(data.invoices&&db) saveCollection('invoices', data.invoices);
+          if(data.tsEmps&&db) saveCollection('tsEmps',  data.tsEmps);
+          if(data.tsLeaves&&db) saveCollection('tsLeaves', data.tsLeaves);
+          // Restore inventory items — key by code
+          if(data.items&&db){
+            var iObj={};
+            data.items.forEach(function(it){
+              var k=String(it.code).replace(/[.#$\[\]\/]/g,'_');
+              iObj[k]=it;
+            });
+            fbSet('inv_items', iObj);
+          }
+          // Restore logs
+          if(data.logs&&db){
+            var lObj={};
+            data.logs.forEach(function(l,i){
+              var k=('log_'+(l.date||'x')+'_'+(l.code||'x')+'_'+i).replace(/[.#$\[\]\/]/g,'_');
+              lObj[k]=l;
+            });
+            fbSet('inv_logs', lObj);
+          }
+          // Restore orders
+          if(data.orders&&db){
+            var oObj={};
+            data.orders.forEach(function(o){
+              oObj[String(o.id).replace(/[.#$\[\]\/]/g,'_')]=o;
+            });
+            fbSet('inv_orders', oObj);
+          }
+          toast('✅ Backup restored successfully — reloading…','success');
+          setTimeout(function(){ cm(); }, 1500);
+        }catch(e){ toast('Invalid backup file: '+e.message,'error'); }
       };
       r.readAsText(f.files[0]);
     };
