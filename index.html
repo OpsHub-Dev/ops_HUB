@@ -11,11 +11,11 @@
      🔥 FIREBASE SDK
      ══════════════════════════════════════════════════════════ -->
 
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
 
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
 
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
@@ -786,10 +786,12 @@ function loadSavedConfig(){
 
 function initFirebase(config){
   try{
-    if(firebase.apps.length) firebase.apps.forEach(function(a){a.delete();});
+    // Delete existing apps safely
+    if(firebase.apps && firebase.apps.length){
+      firebase.apps.forEach(function(a){ try{ a.delete(); }catch(e){} });
+    }
     firebase.initializeApp(config);
     db = firebase.database();
-    // Test connection
     db.ref('.info/connected').on('value', function(snap){
       isOnline = !!snap.val();
       updateConnStatus(isOnline);
@@ -797,7 +799,7 @@ function initFirebase(config){
     return true;
   }catch(e){
     console.error('Firebase init failed:', e);
-    return false;
+    return true; // continue anyway
   }
 }
 
@@ -2976,10 +2978,14 @@ window.onload = function(){
 
   // ── HARDCODED CONFIG — auto-connects every device instantly ──
   var HARDCODED = {
-    apiKey:      "AIzaSyB9DhSn5gDqAhpmLG9aVFAld1dSRYJWFDI",
-    authDomain:  "opshub-f802f.firebaseapp.com",
-    databaseURL: "https://opshub-f802f-default-rtdb.asia-southeast1.firebasedatabase.app",
-    projectId:   "opshub-f802f"
+    apiKey:            "AIzaSyB9DhSn5gDqAhpmLG9aVFAld1dSRYJWFDI",
+    authDomain:        "opshub-f802f.firebaseapp.com",
+    databaseURL:       "https://opshub-f802f-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId:         "opshub-f802f",
+    storageBucket:     "opshub-f802f.firebasestorage.app",
+    messagingSenderId: "84176854270",
+    appId:             "1:84176854270:web:f7a66b3b38e98b630859af",
+    measurementId:     "G-X2R22YGJPW"
   };
 
   // Hide setup screen immediately — never show it
