@@ -2718,11 +2718,10 @@ async function sendAI(preset){
       messages: msgs
     };
 
-    // Google Apps Script requires text/plain to avoid CORS preflight
-    var resp = await fetch(AI_PROXY_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify(bodyObj),
+    // Google Apps Script - send as GET with encoded parameter (avoids all CORS issues on Safari)
+    var encoded = encodeURIComponent(JSON.stringify(bodyObj));
+    var resp = await fetch(AI_PROXY_URL + '?body=' + encoded, {
+      method: 'GET',
       redirect: 'follow'
     });
 
@@ -2732,7 +2731,7 @@ async function sendAI(preset){
 
     var txt = await resp.text();
     var data;
-    try { data = JSON.parse(txt); } catch(e){ throw new Error('Invalid response: ' + txt.slice(0,100)); }
+    try { data = JSON.parse(txt); } catch(e){ throw new Error('Bad response: ' + txt.slice(0,80)); }
     var raw = (data.content && data.content[0] && data.content[0].text) || 'Sorry, no response.';
 
     // Parse ACTION blocks
