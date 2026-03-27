@@ -11,11 +11,11 @@
      🔥 FIREBASE SDK
      ══════════════════════════════════════════════════════════ -->
 
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
@@ -786,11 +786,9 @@ function loadSavedConfig(){
 
 function initFirebase(config){
   try{
-    // Delete existing apps safely
-    if(firebase.apps && firebase.apps.length){
-      firebase.apps.forEach(function(a){ try{ a.delete(); }catch(e){} });
+    if(!firebase.apps.length){
+      firebase.initializeApp(config);
     }
-    firebase.initializeApp(config);
     db = firebase.database();
     db.ref('.info/connected').on('value', function(snap){
       isOnline = !!snap.val();
@@ -799,7 +797,7 @@ function initFirebase(config){
     return true;
   }catch(e){
     console.error('Firebase init failed:', e);
-    return true; // continue anyway
+    return true;
   }
 }
 
@@ -2990,14 +2988,15 @@ window.onload = function(){
     measurementId:     "G-X2R22YGJPW"
   };
 
-  // Hide setup screen immediately — never show it
+  // Hide setup screen immediately
   document.getElementById('setup-screen').classList.add('hidden');
-
-  // Save to localStorage so it persists
   localStorage.setItem(FB_CONFIG_KEY, JSON.stringify(HARDCODED));
 
-  // Connect and start
-  initFirebase(HARDCODED);
+  try {
+    initFirebase(HARDCODED);
+  } catch(e) {
+    console.error('Firebase error:', e);
+  }
   startApp();
 };
 
