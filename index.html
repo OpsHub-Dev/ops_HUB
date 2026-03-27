@@ -2841,6 +2841,8 @@ function saveAIKey(){
   if(prompt) prompt.remove();
   addAIMsg('bot', '✅ API key saved! You can now use the AI assistant.');
 }
+
+function aiActionLabel(act){
   var t = act.type;
   if(t==='add_sales') return 'إضافة مبيعات '+fsar(act.actual)+' — '+act.date;
   if(t==='add_pc') return 'إضافة مصروف '+fsar(act.amount)+' — '+act.description;
