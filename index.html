@@ -1869,29 +1869,36 @@ function mBackup(){
         try{
           var data=JSON.parse(ev.target.result);
 
-          // Restore staff & simple collections
-          if(data.staff&&db)    saveCollection('staff',    data.staff);
-          if(data.sales&&db)    saveCollection('sales',    data.sales);
-          if(data.pull&&db)     saveCollection('pull',     data.pull);
-          if(data.waste&&db)    saveCollection('waste',    data.waste);
-          if(data.wares&&db)    saveCollection('wares',    data.wares);
-          if(data.rem&&db)      saveCollection('rem',      data.rem);
-          if(data.pc&&db)       saveCollection('pc',       data.pc);
-          if(data.health&&db)   saveCollection('health',   data.health);
-          if(data.invoices&&db) saveCollection('invoices', data.invoices);
-          if(data.tsEmps&&db)   saveCollection('tsEmps',   data.tsEmps);
-          if(data.tsLeaves&&db) saveCollection('tsLeaves', data.tsLeaves);
+          // ── Detect backup format ────────────────────────────
+          // Format A (new): { tbl:{staff,sales,...}, inv_items:[...], inv_logs:[...] }
+          // Format B (old): { staff:[...], items:[...], sales:[...], ... }
+          var isNewFormat = data.tbl && typeof data.tbl === 'object';
 
-          // Restore inventory items in batches of 200
-          // (Firebase has ~4MB per-write limit; batching avoids silent failures)
-          if(data.items&&data.items.length&&db){
-            var allItems=data.items;
+          var tbl      = isNewFormat ? data.tbl          : data;
+          var invItems = isNewFormat ? data.inv_items     : (data.items||[]);
+          var invLogs  = isNewFormat ? data.inv_logs      : (data.logs||[]);
+          var invOrds  = isNewFormat ? data.inv_orders    : (data.orders||[]);
+
+          // ── Restore simple collections ──────────────────────
+          var cols=['staff','sales','pull','waste','wares','rem','pc','health','invoices','tsEmps','tsLeaves'];
+          cols.forEach(function(key){
+            if(tbl[key]&&tbl[key].length&&db) saveCollection(key, tbl[key]);
+          });
+
+          // Restore schedule (dict not array)
+          if(tbl.sch&&db) fbSet('sch', tbl.sch);
+
+          // Restore tsAtt (nested dict)
+          if(tbl.tsAtt&&db) fbSet('tsAtt', tbl.tsAtt);
+
+          // ── Restore inventory items in batches of 200 ───────
+          if(invItems&&invItems.length&&db){
+            var allItems=invItems;
             var BATCH=200;
-            var total2=allItems.length;
-            var batches=Math.ceil(total2/BATCH);
-            toast('Restoring '+total2+' items in '+batches+' batches…','info');
+            var totalItems=allItems.length;
+            var batches=Math.ceil(totalItems/BATCH);
+            toast('Restoring '+totalItems+' items in '+batches+' batches…','info');
 
-            // First clear existing items
             db.ref('inv_items').remove(function(){
               var done=0;
               for(var b=0;b<batches;b++){
@@ -1899,45 +1906,41 @@ function mBackup(){
                   var slice=allItems.slice(bIdx*BATCH,(bIdx+1)*BATCH);
                   var obj={};
                   slice.forEach(function(it){
-                    var k=String(it.code||it.Material||'item').replace(/[.#$\[\]\/\s]/g,'_');
-                    // Normalise field names (backup may use different keys)
+                    var k=String(it.code||'item').replace(/[.#$\[\]\/\s]/g,'_');
                     obj[k]={
-                      code: it.code||it.Material||k,
-                      name: it.name||it['Material Description']||it['Name']||'Unknown',
-                      unit: it.unit||it['Base Unit of Measure']||it['UoM']||'EA',
-                      location: it.location||it['Location']||'Dry Storage',
-                      qty:  parseFloat(it.qty||it['Qty']||0)||0,
-                      min:  parseFloat(it.min||it['Min Level']||0)||0,
-                      price:parseFloat(it.price||it['Price']||0)||0
+                      code:     it.code||k,
+                      name:     it.name||'Unknown',
+                      unit:     it.unit||'EA',
+                      location: it.location||'Dry Storage',
+                      qty:      parseFloat(it.qty)||0,
+                      min:      parseFloat(it.min)||0,
+                      price:    parseFloat(it.price)||0
                     };
                   });
-                  // Stagger writes slightly to avoid rate-limit
                   setTimeout(function(){
-                    db.ref('inv_items').update(obj, function(err){
+                    db.ref('inv_items').update(obj,function(err){
                       done++;
                       if(err) console.error('Batch '+bIdx+' error:',err);
                       if(done===batches){
-                        toast('✅ All '+total2+' items restored successfully!','success');
-                        setTimeout(function(){ cm(); go('items'); },1000);
-                      } else {
-                        // Progress toast every 5 batches
-                        if(done%5===0) toast('Restoring… '+Math.round(done/batches*100)+'%','info');
+                        toast('✅ All '+totalItems+' items restored!','success');
+                        setTimeout(function(){ cm(); go('items'); },800);
+                      } else if(done%5===0){
+                        toast('Restoring items… '+Math.round(done/batches*100)+'%','info');
                       }
                     });
-                  }, bIdx*120);
+                  }, bIdx*150);
                 })(b);
               }
             });
           }
 
-          // Restore logs in batches
-          if(data.logs&&data.logs.length&&db){
+          // ── Restore logs ────────────────────────────────────
+          if(invLogs&&invLogs.length&&db){
             db.ref('inv_logs').remove(function(){
-              var LBATCH=500;
-              var lbatches=Math.ceil(data.logs.length/LBATCH);
+              var LBATCH=500,lbatches=Math.ceil(invLogs.length/LBATCH);
               for(var b=0;b<lbatches;b++){
                 (function(bIdx){
-                  var slice=data.logs.slice(bIdx*LBATCH,(bIdx+1)*LBATCH);
+                  var slice=invLogs.slice(bIdx*LBATCH,(bIdx+1)*LBATCH);
                   var obj={};
                   slice.forEach(function(l,i){
                     var k=('log_'+(l.date||'x')+'_'+(l.code||'x')+'_'+(bIdx*LBATCH+i)).replace(/[.#$\[\]\/\s]/g,'_');
@@ -1949,18 +1952,19 @@ function mBackup(){
             });
           }
 
-          // Restore orders
-          if(data.orders&&data.orders.length&&db){
+          // ── Restore orders ──────────────────────────────────
+          if(invOrds&&invOrds.length&&db){
             var oObj={};
-            data.orders.forEach(function(o){
+            invOrds.forEach(function(o){
               oObj[String(o.id).replace(/[.#$\[\]\/\s]/g,'_')]=o;
             });
-            fbSet('inv_orders', oObj);
+            fbSet('inv_orders',oObj);
           }
 
-          if(!data.items||!data.items.length){
+          // If no items to batch, close modal now
+          if(!invItems||!invItems.length){
             toast('✅ Backup restored successfully','success');
-            setTimeout(function(){ cm(); },1500);
+            setTimeout(function(){ cm(); },1200);
           }
 
         }catch(e){
