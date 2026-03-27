@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -151,10 +152,12 @@ html,body{min-height:100%;font-family:var(--font);background:var(--bg);color:var
 .toast.info{border-color:rgba(88,166,255,.3);background:rgba(88,166,255,.06)}
 @keyframes toastIn{from{transform:translateY(14px);opacity:0}to{transform:none;opacity:1}}
 </style>
+
 </head>
 <body>
 
 <!-- LOADING -->
+
 <div id="loading">
   <div style="font-size:40px;margin-bottom:4px">⚡</div>
   <div class="spinner"></div>
@@ -162,6 +165,7 @@ html,body{min-height:100%;font-family:var(--font);background:var(--bg);color:var
 </div>
 
 <!-- SETUP -->
+
 <div id="setup" class="gone">
   <div class="setup-box">
     <div style="font-size:38px;margin-bottom:12px">👥</div>
@@ -184,6 +188,7 @@ html,body{min-height:100%;font-family:var(--font);background:var(--bg);color:var
 </div>
 
 <!-- APP -->
+
 <div id="app" style="display:none">
   <div class="header">
     <div class="header-logo">⚡</div>
@@ -193,6 +198,9 @@ html,body{min-height:100%;font-family:var(--font);background:var(--bg);color:var
     </div>
     <div class="conn-dot" id="conn-dot"></div>
     <div class="clock-badge" id="clock">--:--:--</div>
+    <button id="wa-settings-btn" onclick="openWASettings()" title="WhatsApp Settings" style="background:none;border:none;cursor:pointer;font-size:20px;padding:4px 6px;border-radius:8px;transition:background .15s;color:#25d366" onmouseover="this.style.background='rgba(37,211,102,.1)'" onmouseout="this.style.background='none'">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="#25d366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+    </button>
   </div>
 
   <div class="tabs">
@@ -201,6 +209,7 @@ html,body{min-height:100%;font-family:var(--font);background:var(--bg);color:var
   </div>
 
   <!-- CHECK-IN TAB -->
+
   <div class="page on" id="tab-checkin">
     <div style="height:12px"></div>
     <div class="date-bar">
@@ -211,43 +220,47 @@ html,body{min-height:100%;font-family:var(--font);background:var(--bg);color:var
       </div>
     </div>
 
-    <div class="card">
-      <div class="card-title">👤 Select Your Name</div>
-      <input class="emp-search" id="emp-search" placeholder="🔍  Search your name…" autocomplete="off" autocorrect="off" spellcheck="false">
-      <div class="emp-list" id="emp-list">
-        <div class="empty"><div class="empty-ico">⏳</div><div class="empty-txt">Loading staff…</div></div>
-      </div>
-    </div>
+```
+<div class="card">
+  <div class="card-title">👤 Select Your Name</div>
+  <input class="emp-search" id="emp-search" placeholder="🔍  Search your name…" autocomplete="off" autocorrect="off" spellcheck="false">
+  <div class="emp-list" id="emp-list">
+    <div class="empty"><div class="empty-ico">⏳</div><div class="empty-txt">Loading staff…</div></div>
+  </div>
+</div>
 
-    <div class="status-card" id="status-card">
-      <div class="st-ico" id="st-ico"></div>
-      <div style="flex:1">
-        <div class="st-name" id="st-name"></div>
-        <div class="st-info" id="st-info"></div>
-      </div>
-    </div>
+<div class="status-card" id="status-card">
+  <div class="st-ico" id="st-ico"></div>
+  <div style="flex:1">
+    <div class="st-name" id="st-name"></div>
+    <div class="st-info" id="st-info"></div>
+  </div>
+</div>
 
-    <div id="action-area" style="display:none">
-      <div class="action-grid">
-        <button class="action-btn btn-in" id="btn-checkin">
-          <span class="btn-ico">✅</span>
-          <span class="btn-lbl">Check In</span>
-          <span class="btn-time" id="btn-in-time">--:--</span>
-        </button>
-        <button class="action-btn btn-out" id="btn-checkout">
-          <span class="btn-ico">🚪</span>
-          <span class="btn-lbl">Check Out</span>
-          <span class="btn-time" id="btn-out-time">--:--</span>
-        </button>
-      </div>
-      <button class="action-btn btn-absent" id="btn-mark-absent">
-        <span style="font-size:20px">❌</span>
-        <span class="btn-lbl">Mark as Absent</span>
-      </button>
-    </div>
+<div id="action-area" style="display:none">
+  <div class="action-grid">
+    <button class="action-btn btn-in" id="btn-checkin">
+      <span class="btn-ico">✅</span>
+      <span class="btn-lbl">Check In</span>
+      <span class="btn-time" id="btn-in-time">--:--</span>
+    </button>
+    <button class="action-btn btn-out" id="btn-checkout">
+      <span class="btn-ico">🚪</span>
+      <span class="btn-lbl">Check Out</span>
+      <span class="btn-time" id="btn-out-time">--:--</span>
+    </button>
+  </div>
+  <button class="action-btn btn-absent" id="btn-mark-absent">
+    <span style="font-size:20px">❌</span>
+    <span class="btn-lbl">Mark as Absent</span>
+  </button>
+</div>
+```
+
   </div>
 
   <!-- TEAM TAB -->
+
   <div class="page" id="tab-team">
     <div style="height:12px"></div>
     <div class="sum-bar">
@@ -265,10 +278,77 @@ html,body{min-height:100%;font-family:var(--font);background:var(--bg);color:var
       <button class="fbt" data-tf="notyet">⏳ Not Yet</button>
     </div>
     <div id="team-list"></div>
+
+```
+<!-- End of Day WhatsApp Report -->
+<div style="margin-top:12px">
+  <button onclick="sendEODReport()" style="width:100%;padding:13px;border-radius:10px;border:1px solid rgba(37,211,102,.3);background:rgba(37,211,102,.07);color:#25d366;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font);display:flex;align-items:center;justify-content:center;gap:8px;transition:all .15s" onmouseover="this.style.background='rgba(37,211,102,.14)'" onmouseout="this.style.background='rgba(37,211,102,.07)'">
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="#25d366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+    Send End-of-Day Attendance Report
+  </button>
+</div>
+```
+
   </div>
 </div>
 
 <div id="toasts"></div>
+
+<!-- ══ WhatsApp Settings Modal ══ -->
+
+<div id="wa-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:400;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px)">
+  <div style="background:#161b22;border:1px solid #30363d;border-radius:16px;width:100%;max-width:440px;box-shadow:0 20px 60px rgba(0,0,0,.7)">
+    <div style="padding:14px 18px;border-bottom:1px solid #30363d;display:flex;align-items:center;justify-content:space-between">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="width:32px;height:32px;border-radius:9px;background:rgba(37,211,102,.15);border:1px solid rgba(37,211,102,.3);display:flex;align-items:center;justify-content:center;font-size:16px">💬</div>
+        <div style="font-size:14px;font-weight:700">WhatsApp Settings</div>
+      </div>
+      <button onclick="closeWASettings()" style="background:none;border:none;color:#7d8590;cursor:pointer;font-size:20px;padding:2px 8px;border-radius:6px">×</button>
+    </div>
+    <div style="padding:18px">
+      <div style="font-size:11.5px;color:#8b949e;margin-bottom:16px;line-height:1.7;background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:10px 13px">
+        💡 Enter the manager's number to receive absence alerts. Include country code without + <br>
+        Example: <strong style="color:#f0a500;font-family:monospace">966501234567</strong>
+      </div>
+      <div style="margin-bottom:14px">
+        <label style="font-size:10px;color:#7d8590;font-family:monospace;text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:5px">Manager WhatsApp Number</label>
+        <input id="wa-manager-num" type="tel" placeholder="966501234567" style="width:100%;background:#0d1117;border:1px solid #3d444d;border-radius:8px;padding:10px 12px;color:#e6edf3;font-size:13px;font-family:monospace;outline:none;transition:border-color .2s" onfocus="this.style.borderColor='#25d366'" onblur="this.style.borderColor='#3d444d'">
+      </div>
+      <div style="margin-bottom:16px">
+        <label style="font-size:10px;color:#7d8590;font-family:monospace;text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:8px">Message Language</label>
+        <div style="display:flex;gap:8px">
+          <button id="wa-lang-ar"   onclick="setWALang('ar')"   style="flex:1;padding:9px;border-radius:8px;border:1px solid #3d444d;background:transparent;color:#8b949e;font-size:12px;cursor:pointer;font-family:var(--font);transition:all .15s">🇸🇦 العربية</button>
+          <button id="wa-lang-en"   onclick="setWALang('en')"   style="flex:1;padding:9px;border-radius:8px;border:1px solid #3d444d;background:transparent;color:#8b949e;font-size:12px;cursor:pointer;font-family:var(--font);transition:all .15s">🇬🇧 English</button>
+          <button id="wa-lang-both" onclick="setWALang('both')" style="flex:1;padding:9px;border-radius:8px;border:1px solid #25d366;background:rgba(37,211,102,.08);color:#25d366;font-size:12px;cursor:pointer;font-family:var(--font);transition:all .15s">🌐 Both</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:10px">
+        <button onclick="saveWASettings()" style="flex:1;padding:11px;background:linear-gradient(135deg,#25d366,#128c7e);color:#fff;border:none;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font)">💾 Save</button>
+        <button onclick="testWAMessage()" style="flex:1;padding:11px;background:rgba(37,211,102,.1);color:#25d366;border:1px solid rgba(37,211,102,.3);border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font)">🧪 Test</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ WhatsApp Send Confirmation Modal ══ -->
+
+<div id="wa-confirm-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px)">
+  <div style="background:#161b22;border:1px solid #30363d;border-radius:16px;width:100%;max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,.7)">
+    <div style="padding:14px 18px;border-bottom:1px solid #30363d;display:flex;align-items:center;justify-content:space-between">
+      <div style="font-size:14px;font-weight:700">📤 Send WhatsApp Message</div>
+      <button onclick="closeWAConfirm()" style="background:none;border:none;color:#7d8590;cursor:pointer;font-size:20px;padding:2px 8px;border-radius:6px">×</button>
+    </div>
+    <div style="padding:16px 18px">
+      <label style="font-size:10px;color:#7d8590;font-family:monospace;text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:5px">Send To (number)</label>
+      <input id="wa-send-to" type="tel" placeholder="966501234567" style="width:100%;background:#0d1117;border:1px solid #3d444d;border-radius:8px;padding:9px 12px;color:#e6edf3;font-size:13px;font-family:monospace;outline:none;margin-bottom:12px" onfocus="this.style.borderColor='#25d366'" onblur="this.style.borderColor='#3d444d'">
+      <label style="font-size:10px;color:#7d8590;font-family:monospace;text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:5px">Message Preview</label>
+      <div id="wa-msg-preview" style="background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:12px;font-size:12px;color:#e6edf3;line-height:1.8;white-space:pre-wrap;max-height:220px;overflow-y:auto;font-family:monospace;margin-bottom:14px"></div>
+      <button onclick="openWhatsApp()" style="width:100%;padding:13px;background:linear-gradient(135deg,#25d366,#128c7e);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--font);display:flex;align-items:center;justify-content:center;gap:8px">
+        <span style="font-size:18px">💬</span> Open WhatsApp &amp; Send
+      </button>
+    </div>
+  </div>
+</div>
 
 <script>
 // ══════════════════════════════════════════════════════════
@@ -306,19 +386,44 @@ var tsEmps=[], tsAtt={}, tsLeaves=[], schedule={}, staffList=[], selectedId=null
 // Returns deadline string "HH:MM" (includes 15-min grace).
 // Returns null if employee is OFF or ON LEAVE today.
 
-function getTodayScheduleValue(empId){
-  // Use LIVE date (not TODAY string) to avoid any string-parse timezone issues
+// ── TODAY'S SHIFT FLAT MAP ────────────────────────────────
+var _todayMap = {};
+var _todayMapDate = '';
+
+function buildTodayMap(){
   var now = new Date();
-  var yr  = now.getFullYear();
-  var j   = new Date(yr, 0, 1);
-  // Same formula as weekKey() in ops-hub-firebase.html
-  var wn  = Math.ceil(((now - j) / 86400000 + j.getDay() + 1) / 7);
-  var wk  = yr + '-W' + String(wn).padStart(2,'0');
-  // Day name using live getDay()
-  var days    = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  var dateStr = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+  _todayMapDate = dateStr;
+  _todayMap = {};
+  if(!schedule || !Object.keys(schedule).length) return;
+
+  var days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var dayName = days[now.getDay()];
-  var val = (schedule[wk] && schedule[wk][String(empId)] && schedule[wk][String(empId)][dayName]) || '';
-  return val.trim();
+
+  // Compute week key — same formula as ops-hub-firebase.html weekKey()
+  var yr = now.getFullYear();
+  var j  = new Date(yr, 0, 1);
+  var wn = Math.ceil(((now - j) / 86400000 + j.getDay() + 1) / 7);
+  var wk = yr + '-W' + String(wn).padStart(2,'0');
+
+  var weekData = schedule[wk]
+    || schedule[yr+'-W'+String(wn-1).padStart(2,'0')]  // fallback prev week
+    || schedule[yr+'-W'+String(wn+1).padStart(2,'0')]  // fallback next week
+    || null;
+
+  if(!weekData) return;
+
+  Object.keys(weekData).forEach(function(eid){
+    var v = weekData[eid] && weekData[eid][dayName];
+    if(v) _todayMap[String(eid)] = v;
+  });
+}
+
+function getTodayScheduleValue(empId){
+  var now = new Date();
+  var dateStr = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+  if(dateStr !== _todayMapDate || Object.keys(_todayMap).length === 0) buildTodayMap();
+  return _todayMap[String(empId)] || '';
 }
 
 function parseShiftTime(raw){
@@ -615,6 +720,7 @@ function attachListeners(){
   });
   db.ref('sch').on('value',function(snap){
     schedule=snap.val()||{};
+    buildTodayMap();
     updateStatusCard(); refreshTeam();
   });
 }
@@ -700,6 +806,228 @@ window.onload=function(){
     }
   }
 };
+
+// ══════════════════════════════════════════════════════════
+// 💬 WHATSAPP INTEGRATION
+// ══════════════════════════════════════════════════════════
+var WA_KEY = 'ops_wa_settings';
+var waLang = 'both';
+var waPendingMsg = '';
+
+function loadWASettings(){
+  try{
+    var s=JSON.parse(localStorage.getItem(WA_KEY)||'{}');
+    if(s.lang) waLang=s.lang;
+    if(s.managerNum) document.getElementById('wa-manager-num').value=s.managerNum;
+    setWALang(waLang,true);
+  }catch(e){}
+}
+
+function saveWASettings(){
+  var num=document.getElementById('wa-manager-num').value.trim().replace(/\D/g,'');
+  if(!num){ toast('Please enter a valid number','warning'); return; }
+  localStorage.setItem(WA_KEY,JSON.stringify({managerNum:num,lang:waLang}));
+  toast('✅ WhatsApp settings saved!','success');
+  closeWASettings();
+}
+
+function setWALang(lang,silent){
+  waLang=lang;
+  ['ar','en','both'].forEach(function(l){
+    var btn=document.getElementById('wa-lang-'+l);
+    if(!btn)return;
+    var on=l===lang;
+    btn.style.borderColor=on?'#25d366':'#3d444d';
+    btn.style.background=on?'rgba(37,211,102,.08)':'transparent';
+    btn.style.color=on?'#25d366':'#8b949e';
+  });
+}
+
+function openWASettings(){
+  document.getElementById('wa-modal').style.display='flex';
+  loadWASettings();
+}
+function closeWASettings(){ document.getElementById('wa-modal').style.display='none'; }
+function closeWAConfirm(){  document.getElementById('wa-confirm-modal').style.display='none'; }
+
+function buildAbsenceMsg(emp){
+  var shift=getTodayScheduleValue(emp.id)||'';
+  var time=new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  var date=new Date().toLocaleDateString('en-GB',{weekday:'long',day:'2-digit',month:'short',year:'numeric'});
+  var ar='🔴 *تنبيه غياب*\n━━━━━━━━━━━━━\n👤 الموظف: *'+emp.name+'*\n🏢 القسم: '+(emp.dept||'—')+'\n'+(shift?'🕐 الوردية: '+shift+'\n':'')+'📅 التاريخ: '+date+'\n⏰ وقت التسجيل: '+time+'\n━━━━━━━━━━━━━\n_Ops Hub_';
+  var en='🔴 *Absence Alert*\n━━━━━━━━━━━━━\n👤 Staff: *'+emp.name+'*\n🏢 Dept: '+(emp.dept||'—')+'\n'+(shift?'🕐 Shift: '+shift+'\n':'')+'📅 Date: '+date+'\n⏰ Logged at: '+time+'\n━━━━━━━━━━━━━\n_Ops Hub_';
+  if(waLang==='ar')return ar;
+  if(waLang==='en')return en;
+  return ar+'\n\n'+en;
+}
+
+function buildAbsentMsgForEmp(emp){
+  var shift=getTodayScheduleValue(emp.id)||'';
+  var date=new Date().toLocaleDateString('en-GB',{weekday:'long',day:'2-digit',month:'short',year:'numeric'});
+  var firstName=emp.name.split(' ')[0];
+
+  var ar='السلام عليكم '+firstName+' 👋\n\nلقد سُجّل غيابك اليوم\n📅 *'+date+'*'+(shift?'\n🕐 الوردية: *'+shift+'*':'')+'\n\nإذا كان هناك سبب للغياب، يُرجى التواصل مع المدير المباشر.\n\n_Ops Hub_';
+
+  var en='Hello '+firstName+' 👋\n\nYour absence has been recorded for\n📅 *'+date+'*'+(shift?'\n🕐 Shift: *'+shift+'*':'')+'\n\nIf you have a reason for your absence, please contact your manager directly.\n\n_Ops Hub_';
+
+  return ar+'\n\n━━━━━━━━━━━━━\n\n'+en;
+}
+
+function getAbsentees(){
+  var mk=TODAY.slice(0,7);
+  var list=[];
+  tsEmps.forEach(function(e){
+    if(isOnLeave(e.id)||isScheduledOff(e.id))return;
+    var recs=(tsAtt[e.id]&&tsAtt[e.id][mk])||[];
+    if(!Array.isArray(recs))recs=Object.values(recs).filter(Boolean);
+    var rec=null;for(var i=0;i<recs.length;i++)if(recs[i].date===TODAY){rec=recs[i];break;}
+    if(!rec||rec.st==='absent'){
+      // Find phone from staffList
+      var sf=null;for(var j=0;j<staffList.length;j++)if(String(staffList[j].id)===String(e.id)){sf=staffList[j];break;}
+      list.push({emp:e,phone:(sf&&sf.phone)||e.phone||''});
+    }
+  });
+  return list;
+}
+
+function sendEODReport(){
+  var absentees=getAbsentees();
+  if(!absentees.length){
+    toast('✅ No absences today — everyone is accounted for!','success');
+    return;
+  }
+  // Show the EOD panel
+  showEODPanel(absentees);
+}
+
+function showEODPanel(absentees){
+  // Remove existing panel
+  var old=document.getElementById('eod-panel');if(old)old.remove();
+
+  var date=new Date().toLocaleDateString('en-GB',{weekday:'long',day:'2-digit',month:'short',year:'numeric'});
+  var panel=document.createElement('div');
+  panel.id='eod-panel';
+  panel.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:600;display:flex;align-items:flex-end;justify-content:center;padding:0;backdrop-filter:blur(4px)';
+
+  var inner='<div style="background:#161b22;border:1px solid #30363d;border-radius:16px 16px 0 0;width:100%;max-width:540px;max-height:85vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 -8px 40px rgba(0,0,0,.6)">';
+  // Header
+  inner+='<div style="padding:14px 18px;border-bottom:1px solid #30363d;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">';
+  inner+='<div><div style="font-size:14px;font-weight:700">📋 End-of-Day Absent Notifications</div><div style="font-size:11px;color:#7d8590;margin-top:2px;font-family:monospace">'+date+' · '+absentees.length+' absent</div></div>';
+  inner+='<button onclick="document.getElementById(\'eod-panel\').remove()" style="background:none;border:none;color:#7d8590;cursor:pointer;font-size:20px;padding:2px 8px;border-radius:6px">×</button>';
+  inner+='</div>';
+
+  // Scrollable list
+  inner+='<div style="overflow-y:auto;flex:1;padding:12px 16px">';
+  inner+='<div style="font-size:11px;color:#8b949e;margin-bottom:12px;line-height:1.6;background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:10px 12px">💡 Tap <strong style="color:#25d366">Send</strong> next to each employee to open WhatsApp with their personal message. Numbers are pulled from Staff records.</div>';
+
+  absentees.forEach(function(item,i){
+    var e=item.emp;
+    var phone=item.phone.replace(/\D/g,'');
+    var hasPhone=phone.length>=9;
+    var deptColor=e.dept==='Manager'?'#c9a84c':e.dept==='Kitchen'?'#3d7ec8':'#4aab6e';
+    var shift=getTodayScheduleValue(e.id)||'—';
+
+    inner+='<div style="background:#1c2128;border:1px solid #30363d;border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px">';
+    // Avatar
+    inner+='<div style="width:38px;height:38px;border-radius:50%;background:#22272e;border:1px solid #3d444d;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:'+deptColor+';flex-shrink:0;font-family:monospace">';
+    var parts=e.name.split(' ');var ini2=(parts[0]?parts[0][0]:'')+(parts[1]?parts[1][0]:'');
+    inner+=ini2+'</div>';
+    // Info
+    inner+='<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+e.name+'</div>';
+    inner+='<div style="font-size:10px;color:'+deptColor+';font-family:monospace;margin-top:2px">'+( e.dept||'')+' · Shift: '+shift+'</div>';
+    if(hasPhone){
+      inner+='<div style="font-size:10px;color:#7d8590;font-family:monospace;margin-top:2px">📱 '+item.phone+'</div>';
+    } else {
+      inner+='<div style="font-size:10px;color:#f85149;margin-top:2px">⚠️ No phone number on file</div>';
+    }
+    inner+='</div>';
+    // Send button or phone input
+    if(hasPhone){
+      inner+='<button onclick="sendAbsentToEmp(\''+e.id+'\',\''+phone+'\')" style="padding:8px 14px;background:rgba(37,211,102,.1);color:#25d366;border:1px solid rgba(37,211,102,.3);border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font);white-space:nowrap;display:flex;align-items:center;gap:5px;flex-shrink:0"><span>💬</span> Send</button>';
+    } else {
+      inner+='<div style="display:flex;gap:5px;flex-shrink:0">';
+      inner+='<input id="phone-'+e.id+'" type="tel" placeholder="966XXXXXXXXX" style="width:130px;background:#0d1117;border:1px solid #3d444d;border-radius:7px;padding:7px 9px;color:#e6edf3;font-size:11px;font-family:monospace;outline:none" onfocus="this.style.borderColor=\'#25d366\'" onblur="this.style.borderColor=\'#3d444d\'">';
+      inner+='<button onclick="sendAbsentToEmpManual(\''+e.id+'\')" style="padding:8px 10px;background:rgba(37,211,102,.1);color:#25d366;border:1px solid rgba(37,211,102,.3);border-radius:8px;font-size:12px;cursor:pointer">💬</button>';
+      inner+='</div>';
+    }
+    inner+='</div>';
+  });
+  inner+='</div>';
+
+  // Footer — Send All button
+  var allWithPhone=absentees.filter(function(a){return a.phone.replace(/\D/g,'').length>=9;});
+  if(allWithPhone.length>1){
+    inner+='<div style="padding:12px 16px;border-top:1px solid #30363d;flex-shrink:0">';
+    inner+='<button onclick="sendAllAbsent()" style="width:100%;padding:12px;background:linear-gradient(135deg,#25d366,#128c7e);color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font)">💬 Send to All ('+allWithPhone.length+') — One by One</button>';
+    inner+='</div>';
+  }
+  inner+='</div></div>';
+  panel.innerHTML=inner;
+  document.body.appendChild(panel);
+  // Store absentees for sendAll
+  window._eodAbsentees=absentees;
+}
+
+function sendAbsentToEmp(empId,phone){
+  var emp=getEmp(empId);if(!emp)return;
+  var msg=buildAbsentMsgForEmp(emp);
+  window.open('https://wa.me/'+phone+'?text='+encodeURIComponent(msg),'_blank');
+}
+
+function sendAbsentToEmpManual(empId){
+  var inp=document.getElementById('phone-'+empId);
+  if(!inp){return;}
+  var phone=inp.value.trim().replace(/\D/g,'');
+  if(phone.length<9){toast('Enter a valid number','warning');return;}
+  sendAbsentToEmp(empId,phone);
+}
+
+var _sendAllIdx=0;
+function sendAllAbsent(){
+  var list=(window._eodAbsentees||[]).filter(function(a){return a.phone.replace(/\D/g,'').length>=9;});
+  if(!list.length)return;
+  _sendAllIdx=0;
+  sendNextAbsent(list);
+}
+function sendNextAbsent(list){
+  if(_sendAllIdx>=list.length){toast('✅ All messages sent!','success');return;}
+  var item=list[_sendAllIdx];
+  var phone=item.phone.replace(/\D/g,'');
+  var msg=buildAbsentMsgForEmp(item.emp);
+  window.open('https://wa.me/'+phone+'?text='+encodeURIComponent(msg),'_blank');
+  _sendAllIdx++;
+  // Wait 2 seconds between opens to avoid popup blocking
+  if(_sendAllIdx<list.length){
+    setTimeout(function(){sendNextAbsent(list);},2000);
+  } else {
+    toast('✅ All '+list.length+' messages sent!','success');
+  }
+}
+
+// Override doMarkAbsent to offer WhatsApp to employee directly
+var _origDoMarkAbsent=doMarkAbsent;
+doMarkAbsent=function(){
+  if(!selectedId){toast('Please select a name first','warning');return;}
+  var emp=getEmp(selectedId);
+  var sf=null;for(var i=0;i<staffList.length;i++)if(String(staffList[i].id)===String(selectedId)){sf=staffList[i];break;}
+  var phone=(sf&&sf.phone||'').replace(/\D/g,'');
+  writeAtt(selectedId,{date:TODAY,ci:null,co:null,st:'absent',note:'Manual entry'});
+  toast(emp.name+' — Marked as absent','warning');
+  setTimeout(function(){
+    if(phone.length>=9){
+      if(confirm('📱 Send WhatsApp absence message to '+emp.name+'?\n\nNumber: '+sf.phone)){
+        sendAbsentToEmp(selectedId,phone);
+      }
+    } else {
+      // No phone — show mini input
+      if(confirm('📱 Send WhatsApp to '+emp.name+'? (no phone on file — you can enter it manually)')){
+        var manual=prompt('Enter '+emp.name+'\'s WhatsApp number (with country code):','966');
+        if(manual){sendAbsentToEmp(selectedId,manual.replace(/\D/g,''));}
+      }
+    }
+  },400);
+};
 </script>
+
 </body>
 </html>
