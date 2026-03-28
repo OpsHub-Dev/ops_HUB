@@ -3019,19 +3019,43 @@ badge.innerHTML=currentRole===‘admin’
 ?’🔐 Admin  <small style="font-size:9px;opacity:.7">↻</small>’
 :’👨‍🍳 Staff  <small style="font-size:9px;opacity:.7">↻</small>’;
 }
-// Use setTimeout to ensure DOM is painted before heavy render
+// Step-by-step render with error surfacing
 setTimeout(function(){
+var step=‘start’;
 try{
+step=‘ensureST’;
 ensureST();
-renderSec(curSec);
+step=‘getVars’;
+var cls=CL[curSec];
+var cl=cls[curCl[curSec]||0];
+var di=curDay[curSec]||0;
+step=‘renderTabs’;
+var tw=document.getElementById(curSec+’-cltabs’);
+if(!tw) throw new Error(‘No element: ‘+curSec+’-cltabs’);
+tw.innerHTML=’’;
+cls.forEach(function(c,i){
+var b=document.createElement(‘button’);
+b.className=‘cl-tab’+(i===(curCl[curSec]||0)?’ active’:’’);
+b.textContent=c.name;
+b.onclick=function(){curCl[curSec]=i;renderSec(curSec);};
+tw.appendChild(b);
+});
+step=‘setTitle’;
+var t=document.getElementById(curSec+’-title’);
+var s=document.getElementById(curSec+’-sub’);
+if(t) t.textContent=cl.name;
+if(s) s.textContent=cl.sub||’’;
+step=‘renderCards’;
+renderCards(curSec,cl,di);
+step=‘done’;
 }catch(e){
-console.error(‘renderSec error:’,e);
-var errDiv = document.createElement(‘div’);
-errDiv.style.cssText=‘position:fixed;top:80px;left:10px;right:10px;background:#1e293b;border:2px solid #ef4444;border-radius:12px;padding:16px;z-index:9998;color:#f1f5f9;font-family:monospace;font-size:11px’;
-errDiv.innerHTML=’<b style="color:#ef4444">Error: ‘+e.message+’</b><br><pre style="margin-top:8px;overflow:auto;max-height:150px;font-size:10px">’+e.stack+’</pre><button onclick="this.parentElement.remove()" style="margin-top:8px;padding:6px 12px;background:#3b82f6;color:#fff;border:none;border-radius:6px;cursor:pointer">Close</button>’;
+console.error(‘Login render failed at step [’+step+’]:’,e);
+var errDiv=document.createElement(‘div’);
+errDiv.style.cssText=‘position:fixed;top:80px;left:10px;right:10px;background:#1e293b;border:2px solid #ef4444;border-radius:10px;padding:16px;z-index:9999;color:#f1f5f9;font-family:monospace;font-size:12px’;
+errDiv.innerHTML=’<b style="color:#ef4444;font-size:14px">❌ Step: ‘+step+’</b><br><span style="color:#fca5a5">’+e.message+’</span><br><pre style="margin-top:6px;color:#94a3b8;font-size:10px;overflow:auto;max-height:120px">’+e.stack+’</pre><button onclick="this.parentElement.remove()" style="margin-top:8px;padding:5px 12px;background:#3b82f6;color:#fff;border:none;border-radius:5px;cursor:pointer">Close</button>’;
 document.body.appendChild(errDiv);
 }
-}, 50);
+}, 100);
 }
 
 document.addEventListener(‘DOMContentLoaded’,function(){
