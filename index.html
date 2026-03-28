@@ -797,11 +797,19 @@ var db = null;
 var isOnline = false;
 var useLocalFallback = false;
 
-function loadSavedConfig(){
-  try{ return JSON.parse(localStorage.getItem(FB_CONFIG_KEY)); }catch(e){ return null; }
-}
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyB9DhSn5gDqAhpmLG9aVFAld1dSRYJWFDI",
+  authDomain: "opshub-f802f.firebaseapp.com",
+  databaseURL: "https://opshub-f802f-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "opshub-f802f",
+  storageBucket: "opshub-f802f.firebasestorage.app",
+  messagingSenderId: "84176854270",
+  appId: "1:84176854270:web:f7a66b3b38e98b630859af",
+  measurementId: "G-X2R22YGJPW"
+};
 
-function initFirebase(config){
+function initFirebase(firebaseConfig){
   try{
     if(!firebase.apps.length){
       firebase.initializeApp(config);
