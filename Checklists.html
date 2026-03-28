@@ -1586,13 +1586,13 @@ function FO(key){ensureST();return ST[wk()]['form_chiller'][key];}
 
 // ═══════ FIREBASE INIT ═══════
 const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyBi39NLDs4zZjAZzoc4-4GwBi9S-t2qBws",
+  apiKey: "AIzaSyB9DhSn5gDqAhpmLG9aVFAld1dSRYJWFDI",
   authDomain: "opshub-f802f.firebaseapp.com",
   databaseURL: "https://opshub-f802f-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "opshub-f802f",
-  storageBucket: "opshub-f802f.appspot.com",
-  messagingSenderId: "942657831567",
-  appId: "1:942657831567:web:checklists"
+  storageBucket: "opshub-f802f.firebasestorage.app",
+  messagingSenderId: "84176854270",
+  appId: "1:84176854270:web:f7a66b3b38e98b630859af"
 };
 
 let fbApp, fbDb, fbRef;
@@ -1600,6 +1600,7 @@ let fbBranch = 'MOA'; // default, updated from meta bar
 
 function initFirebase(){
   try{
+    if(typeof firebase === 'undefined') throw new Error('Firebase SDK not loaded');
     if(!firebase.apps.length) fbApp = firebase.initializeApp(FIREBASE_CONFIG);
     else fbApp = firebase.apps[0];
     fbDb = firebase.database(fbApp);
