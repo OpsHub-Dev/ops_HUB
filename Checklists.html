@@ -2968,9 +2968,7 @@ ensureST();
 // Don’t render until user logs in
 }
 
-// Called after successful login (from doLogin)
-const _origDoLogin = doLogin;
-// Re-override doLogin to also trigger render
+// Single unified doLogin — handles auth + render
 function doLogin(){
 if(!_selectedRole) return;
 if(_selectedRole===‘admin’){
@@ -2993,10 +2991,24 @@ badge.innerHTML=currentRole===‘admin’
 ?’🔐 Admin  <small style="font-size:9px;opacity:.7">↻</small>’
 :’👨‍🍳 Staff  <small style="font-size:9px;opacity:.7">↻</small>’;
 }
+try{
 renderSec(curSec);
+}catch(e){
+console.error(‘renderSec error:’,e);
+// Show fallback content so screen isn’t black
+const cards = document.getElementById(curSec+’-cards’);
+if(cards) cards.innerHTML = ‘<div style="padding:20px;color:#e74c3c;font-size:13px">Error loading checklist: ‘+e.message+’<br><small>Please refresh the page.</small></div>’;
+}
 }
 
-document.addEventListener(‘DOMContentLoaded’,init);
+document.addEventListener(‘DOMContentLoaded’,function(){
+try{ init(); }catch(e){
+console.error(‘init error:’,e);
+// Still show the auth screen at minimum
+const auth = document.getElementById(‘authScreen’);
+if(auth) auth.classList.add(‘visible’);
+}
+});
 </script>
 
 </body>
