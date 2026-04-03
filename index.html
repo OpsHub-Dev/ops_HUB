@@ -329,7 +329,7 @@ select.fi-s{cursor:pointer}
 .cl-prog-wrap{margin:0 14px 2px;background:var(--bd);border-radius:99px;height:3px;overflow:hidden;flex-shrink:0}
 .cl-prog-bar{height:100%;background:linear-gradient(90deg,var(--blu),var(--cyn));border-radius:99px;transition:width .4s}
 .cl-prog-lbl{font-size:9px;color:var(--text3);margin:1px 14px 0;text-align:right;font-family:var(--mono);flex-shrink:0}
-.cl-day-tabs{display:flex;overflow-x:auto;gap:5px;padding:6px 12px 0;scrollbar-width:none;flex-shrink:0}
+.cl-day-tabs{display:flex;overflow-x:auto;gap:5px;padding:6px 12px 0;scrollbar-width:none;flex-shrink:0;align-items:center}
 .cl-day-tabs::-webkit-scrollbar{display:none}
 .cl-day-tab{flex-shrink:0;padding:4px 9px;border-radius:20px;border:1px solid var(--bd2);background:var(--bg3);font-size:10px;font-weight:600;cursor:pointer;color:var(--text3);transition:all .15s;white-space:nowrap;font-family:var(--mono)}
 .cl-day-tab.active{background:var(--blu);border-color:var(--blu);color:#fff}
@@ -371,7 +371,7 @@ select.fi-s{cursor:pointer}
 .cl-cmt-box textarea{width:100%;border:1px solid var(--bd2);border-radius:6px;padding:5px 7px;font-size:12px;color:var(--blu);resize:none;outline:none;min-height:36px;background:rgba(88,166,255,.05);font-family:var(--font)}
 .cl-cmt-box textarea:focus{border-color:var(--blu)}
 /* Hygiene */
-.cl-hyg-wrap{background:var(--bg2);border-radius:9px;border:1px solid var(--bd);overflow:hidden}
+.cl-hyg-wrap{background:var(--bg2);border-radius:9px;border:1px solid var(--bd);overflow:hidden;flex-shrink:0}
 .cl-hyg-tb{background:var(--bg3);padding:7px 10px;display:flex;align-items:center;justify-content:space-between}
 .cl-hyg-tb h4{color:var(--text);font-size:11.5px;font-weight:700}
 .cl-hyg-scroll{overflow-x:auto;max-height:none}
@@ -388,7 +388,7 @@ select.fi-s{cursor:pointer}
 .cl-bt-inp{border:none;background:transparent;text-align:center;font-size:12px;font-weight:600;color:var(--blu);outline:none;width:100%;font-family:var(--mono)}
 .cl-bt-inp:focus{background:rgba(88,166,255,.08);border-radius:3px}
 /* Control forms */
-.cl-cf-card{background:var(--bg2);border-radius:9px;border:1px solid var(--bd);overflow:hidden;margin-bottom:8px}
+.cl-cf-card{background:var(--bg2);border-radius:9px;border:1px solid var(--bd);overflow:hidden;margin-bottom:8px;flex-shrink:0}
 .cl-cf-hdr{background:var(--bg3);padding:7px 11px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--bd)}
 .cl-cf-hdr h4{color:var(--text);font-size:11.5px;font-weight:700}
 .cl-cf-scroll{overflow-x:auto}
@@ -417,7 +417,7 @@ select.fi-s{cursor:pointer}
 .cl-pin-inp:focus{border-color:var(--acc)}
 .cl-pin-err{font-size:10px;color:var(--red);min-height:14px;display:block}
 /* Checklist container */
-#cl-wrap{display:flex;flex-direction:column;height:100%;position:relative;overflow:hidden;contain:layout}
+#cl-wrap{display:flex;flex-direction:column;height:100%;position:relative;overflow:hidden}
 /* Print modal */
 #cl-print-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;align-items:center;justify-content:center}
 #cl-print-modal.show{display:flex}
@@ -1446,11 +1446,10 @@ function clSaveNow(){
       periodStart:(document.getElementById('cl-period-start')||{}).value||''
     };
     localStorage.setItem('cl_meta_v2',JSON.stringify(meta));
-    // Firebase immediate write (no debounce)
+    // Firebase immediate write — same path as clInitFBSync
     if(db){
-      var branch2=meta.branch||'MOA';
-      var ref='/checklists/'+branch2+'/'+clWk();
-      db.ref(ref).set({st:clST,meta:meta,savedAt:Date.now()});
+      var branch2=(meta.branch||'MOA').toUpperCase().replace(/[.#$\/\[\]]/g,'_');
+      db.ref('ops_checklists/'+branch2).set({state:clST,meta:meta,updatedAt:Date.now()});
     }
     // Update save indicator
     var ind=document.getElementById('cl-save-ind');
@@ -1468,7 +1467,7 @@ function clSave(){
       };
       var payload={state:clST,meta:meta,updatedAt:Date.now()};
       if(db){
-        var branch=meta.branch.toUpperCase().replace(/[.#$/\[\]]/g,'_');
+        var branch=(meta.branch||'MOA').toUpperCase().replace(/[.#$\/\[\]]/g,'_');
         db.ref('ops_checklists/'+branch).set(payload).then(function(){
           var el=document.getElementById('cl-fb-status');
           if(el){el.innerHTML='⚡ Saved';el.style.color='var(--grn)';setTimeout(function(){el.innerHTML='⚡ Live';},1500);}
@@ -1491,10 +1490,21 @@ function clInitFBSync(){
     if(clFbRef)clFbRef.off();
     var branch=((document.getElementById('cl-branch')||{}).value||'MOA').toUpperCase().replace(/[.#$/\[\]]/g,'_');
     clFbRef=db.ref('ops_checklists/'+branch);
-    clFbRef.on('value',function(snap){
+    // Use once() — load once on connect, don't re-render on every remote change
+    // (re-rendering on 'value' events wipes unsaved temp inputs)
+    clFbRef.once('value',function(snap){
       var d=snap.val();
       if(d&&d.state){
-        clST=d.state;
+        // Only merge if local has no data yet, to avoid overwriting unsaved inputs
+        var localHasData=Object.keys(clST).length>0;
+        if(!localHasData){
+          clST=d.state;
+        } else {
+          // Deep merge: Firebase data fills in missing keys, local data wins
+          Object.keys(d.state).forEach(function(wk){
+            if(!clST[wk]){clST[wk]=d.state[wk];}
+          });
+        }
         if(clRole&&document.getElementById('cl-wrap'))clRenderSec(clSec);
       }
       var el=document.getElementById('cl-fb-status');if(el){el.innerHTML='⚡ Live';el.style.color='var(--grn)';}
@@ -1530,6 +1540,8 @@ function clDoLogin(){
   var ps=document.getElementById('cl-period-start');
   if(ps&&!ps.value){var now=new Date();ps.value=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');}
   clWeekDates=clGetWeekDates(document.getElementById('cl-period-start').value);
+  // Load localStorage first (fastest, no network needed)
+  try{var saved=localStorage.getItem('cl_st_v2');if(saved){var parsed=JSON.parse(saved);if(parsed&&Object.keys(parsed).length)clST=parsed;}}catch(e){}
   clEnsureST();clInitFBSync();clRenderSec(clSec);
 }
 function clSwitchRole(){
@@ -1695,7 +1707,7 @@ function clRenderHygiene(cl){
   var wrap=document.getElementById('cl-cards');if(!wrap)return;wrap.innerHTML='';clEnsureST();
   var w=clWk(),hid=cl.id,hyg=clST[w][hid],di=clDay.foh;
   // Day tabs
-  var dw=document.createElement('div');dw.className='cl-day-tabs';dw.style.marginBottom='8px';
+  var dw=document.createElement('div');dw.className='cl-day-tabs';dw.style.cssText='margin-bottom:8px;flex-shrink:0';
   clWeekDates.forEach(function(d,dIdx){
     var b=document.createElement('button');b.className='cl-day-tab'+(dIdx===di?' active':'');
     b.innerHTML=CL_DAYS[d.getDay()]+' '+clFmtD(d);
@@ -1707,8 +1719,13 @@ function clRenderHygiene(cl){
   var cols=['Hair','Moustache','Nails','Physical','No Jewelry','Uniform','Name Tag','Baladiya','Blk Shoes','Belt','Ballpen','Core Val.','Mask','Temp<38','Health','Remarks'];
   var container=document.createElement('div');container.className='cl-hyg-wrap';
   var tb=document.createElement('div');tb.className='cl-hyg-tb';
+  var completeAllHygBtn = clIsAdmin()
+    ? '<button class="btn sm" style="background:rgba(63,185,80,.15);color:var(--grn);border-color:rgba(63,185,80,.3)" onclick="clHygieneCompleteAll(\''+hid+'\','+di+')">✅ Complete All</button>'
+    : '';
   tb.innerHTML='<h4>👥 '+cl.section+' — '+CL_DAYS[clWeekDates[di].getDay()]+' '+clFmtD(clWeekDates[di])+'</h4>'
-    +(clIsAdmin()?'<button class="btn sm" onclick="clAddEmployee(\''+hid+'\','+di+')">+ Add</button>':'');
+    +'<div style="display:flex;gap:6px">'
+    +(clIsAdmin()?'<button class="btn sm" onclick="clAddEmployee(\''+hid+'\','+di+')">+ Add</button>':'')+completeAllHygBtn
+    +'</div>';
   container.appendChild(tb);
   var scroll=document.createElement('div');scroll.className='cl-hyg-scroll';
   var thead='<thead><tr><th>#</th><th style="text-align:left;min-width:140px">Name</th><th>SAP</th>'
@@ -1726,6 +1743,18 @@ function clRenderHygiene(cl){
   tbody+='</tbody>';
   var table=document.createElement('table');table.className='cl-hyg-table';table.innerHTML=thead+tbody;
   scroll.appendChild(table);container.appendChild(scroll);wrap.appendChild(container);
+}
+function clHygieneCompleteAll(hid,di){
+  clEnsureST();var w=clWk();
+  if(!clST[w][hid])return;
+  var emps=clST[w][hid].employees||[];
+  if(!clST[w][hid].checks[di])clST[w][hid].checks[di]={};
+  var cols=16; // number of hygiene columns
+  emps.forEach(function(_,ei){
+    if(!clST[w][hid].checks[di][ei])clST[w][hid].checks[di][ei]={};
+    for(var ci=0;ci<cols;ci++){clST[w][hid].checks[di][ei][ci]='ok';}
+  });
+  clSaveNow();clRenderSec('foh');toast('✅ All hygiene checks marked OK','success');
 }
 function clAddEmployee(hid,di){clEnsureST();clST[clWk()][hid].employees.push({name:'',sap:''});clSave();clRenderSec('foh');}
 function clDelEmployee(hid,di,ei){
@@ -1747,7 +1776,7 @@ function clSetHyg(hid,di,ei,ci,box){
 function clRenderBartender(cl){
   var wrap=document.getElementById('cl-cards');if(!wrap)return;wrap.innerHTML='';clEnsureST();
   var w=clWk(),bt=clST[w]['foh_bartender'],di=_clBtDay;
-  var drow=document.createElement('div');drow.className='cl-day-tabs';drow.style.marginBottom='8px';
+  var drow=document.createElement('div');drow.className='cl-day-tabs';drow.style.cssText='margin-bottom:8px;flex-shrink:0';
   clWeekDates.forEach(function(d,dIdx){
     var b=document.createElement('button');b.className='cl-day-tab'+(dIdx===di?' active':'');
     b.innerHTML=CL_DAYS[d.getDay()]+' '+clFmtD(d);
@@ -1992,7 +2021,7 @@ function clRenderStockForm(wrap,fid,title,defaultCats,accent){
 
   // ── Day tabs ──
   var dayRow=document.createElement('div');
-  dayRow.style.cssText='display:flex;gap:6px;padding:0 0 8px;overflow-x:auto;scrollbar-width:none';
+  dayRow.style.cssText='display:flex;gap:6px;padding:0 0 8px;overflow-x:auto;scrollbar-width:none;flex-shrink:0';
   clWeekDates.forEach(function(d,idx){
     var b=document.createElement('button');
     b.className='cl-day-tab'+(idx===di?' active':'');
@@ -2995,6 +3024,12 @@ function clBindPage(){
     });
     cards.addEventListener('input',function(e){
       // Temp inputs
+      if(e.target.classList.contains('cl-shift-temp')){
+        var d=e.target.dataset;clSetTemp(d.clid,parseInt(d.di),d.iid,d.sh,e.target);
+      }
+    });
+    cards.addEventListener('change',function(e){
+      // Also save on change (blur after edit) for temp inputs
       if(e.target.classList.contains('cl-shift-temp')){
         var d=e.target.dataset;clSetTemp(d.clid,parseInt(d.di),d.iid,d.sh,e.target);
       }
