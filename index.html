@@ -362,7 +362,7 @@ select.fi-s{cursor:pointer}
 .cl-cb-box.ok{background:rgba(63,185,80,.18);border-color:var(--grn);color:var(--grn)}
 .cl-cb-box.no{background:rgba(248,81,73,.18);border-color:var(--red);color:var(--red)}
 .cl-cb-lbl{font-size:9px;color:var(--text3);font-weight:600;font-family:var(--mono)}
-.cl-temp-inp{border:1px solid var(--bd2);border-radius:5px;padding:3px 4px;font-size:13px;font-weight:700;color:var(--blu);text-align:center;outline:none;background:var(--bg4);width:52px}
+.cl-temp-inp{border:1px solid var(--bd2);border-radius:5px;padding:3px 6px;font-size:13px;font-weight:700;color:var(--blu);text-align:center;outline:none;background:var(--bg4);width:75px}
 .cl-temp-inp.has-val{border-color:rgba(88,166,255,.4)}
 .cl-temp-inp:focus{border-color:var(--blu)}
 .cl-cmt-btn{background:none;border:none;font-size:10px;font-weight:600;color:var(--blu);cursor:pointer;padding:2px 0 0;font-family:var(--font)}
@@ -1690,7 +1690,7 @@ function clBuildShift(cl,di,item,sh){
       +'<button class="cl-yn-btn'+(s.v==='no'?' no':'')+'" data-clid="'+cid+'" data-di="'+di+'" data-iid="'+iid+'" data-sh="'+sh+'" data-val="no">✗ NO</button>'
       +'</div></div>'
       +(item.hasTemp?'<div class="cl-ctrl-row"><span class="cl-ctrl-lbl">Temp °C</span>'
-      +'<input class="cl-temp-inp cl-shift-temp'+(s.temp?' has-val':'')+'" type="text" maxlength="6" placeholder="–" value="'+tv+'" data-clid="'+cid+'" data-di="'+di+'" data-iid="'+iid+'" data-sh="'+sh+'"></div>':'');
+      +'<input class="cl-temp-inp cl-shift-temp'+(s.temp?' has-val':'')+'" type="text" maxlength="7" placeholder="–" inputmode="decimal" value="'+tv+'" data-clid="'+cid+'" data-di="'+di+'" data-iid="'+iid+'" data-sh="'+sh+'"></div>':'');
   }else{
     c='<div class="cl-ctrl-row"><span class="cl-ctrl-lbl">Check</span><div class="cl-cb-grp">'
       +'<div class="cl-cb-item" data-clid="'+cid+'" data-di="'+di+'" data-iid="'+iid+'" data-sh="'+sh+'" data-val="ok"><div class="cl-cb-box'+(s.v==='ok'?' ok':'')+'">✓</div><span class="cl-cb-lbl">Done</span></div>'
