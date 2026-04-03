@@ -1684,8 +1684,8 @@ function clBuildShift(cl,di,item,sh){
 }
 
 function clSetV(clId,di,itemId,sh,val){clEnsureST();var s=clS(clId,di,itemId,sh);s.v=s.v===val?null:val;clSaveNow();var sec=clFindSec(clId);clRenderCards(sec,CL_DATA[sec][clCl[sec]],di);clRenderSec(sec);}
-function clSetTemp(clId,di,itemId,sh,el){clEnsureST();clS(clId,di,itemId,sh).temp=el.value;el.className='cl-temp-inp'+(el.value?' has-val':'');clSave();}
-function clSetComment(clId,di,itemId,val){clEnsureST();CL_SHIFTS.forEach(function(sh){clS(clId,di,itemId,sh).comment=val;});clSave();}
+function clSetTemp(clId,di,itemId,sh,el){clEnsureST();clS(clId,di,itemId,sh).temp=el.value;el.className='cl-temp-inp'+(el.value?' has-val':'');clSaveNow();}
+function clSetComment(clId,di,itemId,val){clEnsureST();CL_SHIFTS.forEach(function(sh){clS(clId,di,itemId,sh).comment=val;});clSaveNow();}
 function clToggleFlag(clId,di,itemId,btn){clEnsureST();clSF(clId,di,itemId).flagged=!clSF(clId,di,itemId).flagged;btn.classList.toggle('on');clSave();}
 function clToggleCmt(btn){var box=btn.nextElementSibling;box.classList.toggle('open');btn.textContent=box.classList.contains('open')?'- Hide Comment':'+ Add Comment';}
 function clFindSec(clId){for(var sec of['mod','foh','boh'])if((CL_DATA[sec]||[]).find(function(c){return c.id===clId;}))return sec;return'mod';}
@@ -1794,7 +1794,7 @@ function clRenderBartender(cl){
   foot.innerHTML='<span><b>Checked By:</b> _____________________</span><span><b>Verified by MOD:</b> _____________________</span>';
   card.appendChild(foot);wrap.appendChild(card);
 }
-function clSetBT(item,field,val){clEnsureST();var bt=clST[clWk()]['foh_bartender'];if(!bt[item])bt[item]={sl:'',uom:'',prep:{}};bt[item][field]=val;clSave();}
+function clSetBT(item,field,val){clEnsureST();var bt=clST[clWk()]['foh_bartender'];if(!bt[item])bt[item]={sl:'',uom:'',prep:{}};bt[item][field]=val;clSaveNow();}
 function clSetBTday(item,di,field,val){clEnsureST();var bt=clST[clWk()]['foh_bartender'];if(!bt[item])bt[item]={sl:'',uom:'',prep:{}};if(!bt[item].prep)bt[item].prep={};if(!bt[item].prep[di])bt[item].prep[di]={oh:'',par:'',prep:''};bt[item].prep[di][field]=val;clSave();}
 
 // ── CONTROL FORMS ──
@@ -3027,17 +3027,17 @@ function pInvDash(){
 
   var cy=new Date().getFullYear(),ly=cy-1;
   var tm=mthKey(0),lm=mthKey(-1);
-  // Week range (Mon-Sun)
+  // Week range Sat-Fri (Saudi calendar) — using LOCAL date strings (no UTC shift)
   var now=new Date();
-  var dayOfWeek=now.getDay();
-  var thisMonStart=new Date(now); thisMonStart.setDate(now.getDate()-(dayOfWeek===0?6:dayOfWeek-1));
-  var lastMonStart=new Date(thisMonStart); lastMonStart.setDate(thisMonStart.getDate()-7);
-  var lastSunEnd=new Date(thisMonStart); lastSunEnd.setDate(thisMonStart.getDate()-1);
-  function inWeek(dateStr,start,end){
-    if(!dateStr)return false;
-    return dateStr>=start.toISOString().slice(0,10)&&dateStr<=end.toISOString().slice(0,10);
-  }
-  var thisWeekEnd=new Date(now);
+  function _dsLocal(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+  var _dow=now.getDay(),_offset=_dow;  // Sun=0,Mon=1,...,Sat=6
+  var thisWkStart2=new Date(now);thisWkStart2.setDate(now.getDate()-_offset);thisWkStart2.setHours(0,0,0,0);
+  var lastWkStart2=new Date(thisWkStart2);lastWkStart2.setDate(thisWkStart2.getDate()-7);
+  var lastWkEnd2=new Date(thisWkStart2);lastWkEnd2.setDate(thisWkStart2.getDate()-1);
+  var _todayStr=_dsLocal(now);
+  var _twsStr=_dsLocal(thisWkStart2);
+  var _lwsStr=_dsLocal(lastWkStart2);
+  var _lweStr=_dsLocal(lastWkEnd2);
   var ytdA=0,ytdLY=0,tA=0,lmA=0,thisWk=0,lastWk=0;
   S.sales.forEach(function(e){
     if(!e.date)return;
@@ -3046,8 +3046,8 @@ function pInvDash(){
     if(yr===ly)ytdLY+=(+e.actual||0);
     if(e.date.indexOf(tm)===0)tA+=(+e.actual||0);
     if(e.date.indexOf(lm)===0)lmA+=(+e.actual||0);
-    if(inWeek(e.date,thisMonStart,thisWeekEnd))thisWk+=(+e.actual||0);
-    if(inWeek(e.date,lastMonStart,lastSunEnd))lastWk+=(+e.actual||0);
+    if(e.date>=_twsStr&&e.date<=_todayStr)thisWk+=(+e.actual||0);
+    if(e.date>=_lwsStr&&e.date<=_lweStr)lastWk+=(+e.actual||0);
   });
   var ytdChg=ytdLY>0?((ytdA-ytdLY)/ytdLY*100).toFixed(1):null;
   var mChg=lmA>0?((tA-lmA)/lmA*100).toFixed(1):null;
@@ -3495,8 +3495,9 @@ function pSched(){
 function pSales(){
   var now=new Date(),cy=now.getFullYear(),ly=cy-1;
   var tm=mthKey(0),lm=mthKey(-1);
-  // Week bounds Mon-Sun
-  var dow=now.getDay(),offset=dow===0?6:dow-1;
+  // Week bounds Sun-Sat
+  // getDay(): Sun=0,Mon=1,...,Sat=6  → offset = getDay()
+  var dow=now.getDay(),offset=dow;
   var thisWkStart=new Date(now);thisWkStart.setDate(now.getDate()-offset);thisWkStart.setHours(0,0,0,0);
   var lastWkStart=new Date(thisWkStart);lastWkStart.setDate(thisWkStart.getDate()-7);
   var lastWkEnd=new Date(thisWkStart);lastWkEnd.setDate(thisWkStart.getDate()-1);lastWkEnd.setHours(23,59,59,999);
