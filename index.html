@@ -1407,6 +1407,12 @@ var CL_ADMIN_PIN='1422';
 var clSec='mod', clCl={mod:0,foh:0,boh:0,forms:0}, clDay={mod:0,foh:0,boh:0}, clWeekDates=[], clST={}, clRole=null, _clSelRole=null, clFbRef=null, _clBtDay=0, _clCoolDay=0;
 
 function clWk(){return clNormWk();} // Always normalized YYYY-MM-DD
+
+// Sanitize a string for use as a Firebase Realtime Database key
+// Firebase forbids: . # $ / [ ]  — keep spaces and all other chars
+function clFbKey(str){
+  return String(str||'').replace(/[.#$\[\]\/]/g,'_');
+}
 function clFmtD(d){return d.getDate()+'-'+CL_MONTHS[d.getMonth()];}
 function clGetWeekDates(v){
   var arr=[],b=v?new Date(v+'T00:00:00'):new Date();
@@ -1439,8 +1445,9 @@ function clEnsureST(){
   });
   if(!clST[w]['foh_bartender'])clST[w]['foh_bartender']={};
   CL_BT_ITEMS.chiller.concat(CL_BT_ITEMS.bases).forEach(function(item){
-    if(!clST[w]['foh_bartender'][item])clST[w]['foh_bartender'][item]={sl:'',uom:'',prep:{}};
-    clWeekDates.forEach(function(_,di){if(!clST[w]['foh_bartender'][item].prep[di])clST[w]['foh_bartender'][item].prep[di]={oh:'',par:'',prep:''};});
+    var k=clFbKey(item);
+    if(!clST[w]['foh_bartender'][k])clST[w]['foh_bartender'][k]={sl:'',uom:'',prep:{}};
+    clWeekDates.forEach(function(_,di){if(!clST[w]['foh_bartender'][k].prep[di])clST[w]['foh_bartender'][k].prep[di]={oh:'',par:'',prep:''};});
   });
   // Forms
   ['form_chiller','form_freezer','form_cooling','form_pizzadough','form_stockroom'].forEach(function(fid){
@@ -1493,6 +1500,17 @@ function clSaveNow(){
     };
     var payload={state:clST[wk]||{},meta:meta,updatedAt:Date.now()};
     console.log('[CL] SAVE → cl_weeks/'+wk, 'keys:', Object.keys(payload.state));
+    // Deep sanitize all keys before writing to Firebase
+    function _sanitizeKeys(obj){
+      if(typeof obj!=='object'||obj===null||Array.isArray(obj))return obj;
+      var out={};
+      Object.keys(obj).forEach(function(k){
+        var sk=clFbKey(k);
+        out[sk]=_sanitizeKeys(obj[k]);
+      });
+      return out;
+    }
+    payload.state=_sanitizeKeys(payload.state);
     if(db){
       db.ref('cl_weeks/'+wk).set(payload,function(err){
         if(err){console.error('[CL] Save ERROR:',err);}
@@ -1894,7 +1912,7 @@ function clRenderBartender(cl){
   var addSect=function(sName,items){
     var cr=document.createElement('tr');cr.innerHTML='<td colspan="6" class="cat-row">'+clXe(sName)+'</td>';tbody.appendChild(cr);
     items.forEach(function(item,ri){
-      var bd=bt[item]||{sl:'',uom:'',prep:{}},pd=(bd.prep&&bd.prep[di])||{oh:'',par:'',prep:''};
+      var k=clFbKey(item);var bd=bt[k]||{sl:'',uom:'',prep:{}},pd=(bd.prep&&bd.prep[di])||{oh:'',par:'',prep:''};
       var tr=document.createElement('tr');tr.style.background=ri%2===0?'var(--bg2)':'var(--bg3)';
       // Build cells via DOM to avoid quote escaping issues
       var nameTd=document.createElement('td');nameTd.style.cssText='text-align:left;font-weight:600;font-size:11px;padding:5px 10px;color:var(--text)';nameTd.textContent=item;tr.appendChild(nameTd);
@@ -1908,7 +1926,7 @@ function clRenderBartender(cl){
       var dayFields=[['oh',pd.oh,'rgba(88,166,255,.06)','#60a5fa'],['par',pd.par,'rgba(63,185,80,.05)','var(--grn)'],['prep',pd.prep,'rgba(240,165,0,.05)','var(--gold)']];
       dayFields.forEach(function(f){
         var td=document.createElement('td');td.style.background=f[2];
-        var inp=document.createElement('input');inp.className='cl-bt-inp';inp.type='number';inp.value=f[1];inp.placeholder='0';inp.style.cssText='width:52px;color:'+f[3];
+        var inp=document.createElement('input');inp.className='cl-bt-inp';inp.type='text';inp.inputMode='decimal';inp.value=f[1];inp.placeholder='0';inp.style.cssText='width:52px;color:'+f[3];
         inp.dataset.btitem=item;inp.dataset.btday=di;inp.dataset.btfield=f[0];
         inp.oninput=function(){clSetBTday(this.dataset.btitem,parseInt(this.dataset.btday),this.dataset.btfield,this.value);};
         td.appendChild(inp);tr.appendChild(td);
@@ -1922,8 +1940,8 @@ function clRenderBartender(cl){
   foot.innerHTML='<span><b>Checked By:</b> _____________________</span><span><b>Verified by MOD:</b> _____________________</span>';
   card.appendChild(foot);wrap.appendChild(card);
 }
-function clSetBT(item,field,val){clEnsureST();var bt=clST[clWk()]['foh_bartender'];if(!bt[item])bt[item]={sl:'',uom:'',prep:{}};bt[item][field]=val;clSaveNow();}
-function clSetBTday(item,di,field,val){clEnsureST();var bt=clST[clWk()]['foh_bartender'];if(!bt[item])bt[item]={sl:'',uom:'',prep:{}};if(!bt[item].prep)bt[item].prep={};if(!bt[item].prep[di])bt[item].prep[di]={oh:'',par:'',prep:''};bt[item].prep[di][field]=val;clSaveNow();}
+function clSetBT(item,field,val){clEnsureST();var k=clFbKey(item);var bt=clST[clWk()]['foh_bartender'];if(!bt[k])bt[k]={sl:'',uom:'',prep:{}};bt[k][field]=val;clSaveNow();}
+function clSetBTday(item,di,field,val){clEnsureST();var k=clFbKey(item);var bt=clST[clWk()]['foh_bartender'];if(!bt[k])bt[k]={sl:'',uom:'',prep:{}};if(!bt[k].prep)bt[k].prep={};if(!bt[k].prep[di])bt[k].prep[di]={oh:'',par:'',prep:''};bt[k].prep[di][field]=val;clSaveNow();}
 
 // ── CONTROL FORMS ──
 function clRenderForms(){
@@ -2783,7 +2801,7 @@ function clPrintBartenderBody(cl,daysToShow){
     // Chiller section
     html+='<tr><td colspan="6" style="background:#1a2340;color:#fff;font-weight:700;font-size:9px;padding:3px 8px;text-transform:uppercase;letter-spacing:.5px">Chiller Items</td></tr>';
     chiller.forEach(function(item,ri){
-      var bd=bt[item]||{sl:'',uom:'',prep:{}},pd=(bd.prep&&bd.prep[di])||{oh:'',par:'',prep:''};
+      var k=clFbKey(item);var bd=bt[k]||{sl:'',uom:'',prep:{}},pd=(bd.prep&&bd.prep[di])||{oh:'',par:'',prep:''};
       html+='<tr style="background:'+(ri%2===0?'#fff':'#f8fafc')+'">'
         +'<td style="font-weight:600;font-size:9px;text-align:left">'+item+'</td>'
         +'<td style="font-size:9px;text-align:center">'+clXe(bd.sl||'')+'</td>'
@@ -2796,7 +2814,7 @@ function clPrintBartenderBody(cl,daysToShow){
     // Bases section
     html+='<tr><td colspan="6" style="background:#1a2340;color:#fff;font-weight:700;font-size:9px;padding:3px 8px;text-transform:uppercase;letter-spacing:.5px">Syrups & Bases</td></tr>';
     bases.forEach(function(item,ri){
-      var bd=bt[item]||{sl:'',uom:'',prep:{}},pd=(bd.prep&&bd.prep[di])||{oh:'',par:'',prep:''};
+      var k=clFbKey(item);var bd=bt[k]||{sl:'',uom:'',prep:{}},pd=(bd.prep&&bd.prep[di])||{oh:'',par:'',prep:''};
       html+='<tr style="background:'+(ri%2===0?'#fff':'#f8fafc')+'">'
         +'<td style="font-weight:600;font-size:9px;text-align:left">'+item+'</td>'
         +'<td style="font-size:9px;text-align:center">'+clXe(bd.sl||'')+'</td>'
