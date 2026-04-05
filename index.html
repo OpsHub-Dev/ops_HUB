@@ -885,21 +885,25 @@ function attachListeners(){
   });
 
   // Pre-load current week's checklist data when app starts
-  // so it's ready when user navigates to Checklists
-  var _preloadWk=(function(){
-    var now=new Date(),dow=now.getDay(),sun=new Date(now);
-    sun.setDate(now.getDate()-dow);
-    return sun.getFullYear()+'-'+String(sun.getMonth()+1).padStart(2,'0')+'-'+String(sun.getDate()).padStart(2,'0');
-  })();
-  db.ref('cl_weeks/'+_preloadWk).once('value',function(snap){
-    var d=snap.val();
-    if(d&&d.state){
-      if(!clST[_preloadWk])clST[_preloadWk]={};
-      Object.keys(d.state).forEach(function(k){clST[_preloadWk][k]=d.state[k];});
-      window.monthlyRecords[_preloadWk]={state:d.state,meta:d.meta||{}};
-      console.log('[CL] Preloaded week '+_preloadWk+' on app start');
-    }
-  });
+  try{
+    var _preloadWk=(function(){
+      var now=new Date(),dow=now.getDay(),sun=new Date(now);
+      sun.setDate(now.getDate()-dow);
+      return sun.getFullYear()+'-'+String(sun.getMonth()+1).padStart(2,'0')+'-'+String(sun.getDate()).padStart(2,'0');
+    })();
+    db.ref('cl_weeks/'+_preloadWk).once('value',function(snap){
+      try{
+        var d=snap.val();
+        if(d&&d.state){
+          if(!clST[_preloadWk])clST[_preloadWk]={};
+          Object.keys(d.state).forEach(function(k){clST[_preloadWk][k]=d.state[k];});
+          if(!window.monthlyRecords)window.monthlyRecords={};
+          window.monthlyRecords[_preloadWk]={state:d.state,meta:d.meta||{}};
+          console.log('[CL] Preloaded week '+_preloadWk);
+        }
+      }catch(e){console.warn('[CL] Preload parse error:',e);}
+    });
+  }catch(e){console.warn('[CL] Preload setup error:',e);}
 
   // Inventory
   db.ref('inv_items').on('value', function(snap){
@@ -1424,6 +1428,7 @@ var CL_SHIFTS=['AM','PM'];
 var CL_ADMIN_PIN='1422';
 
 var clSec='mod', clCl={mod:0,foh:0,boh:0,forms:0}, clDay={mod:0,foh:0,boh:0}, clWeekDates=[], clST={}, clRole=null, _clSelRole=null, clFbRef=null, _clBtDay=0, _clCoolDay=0;
+window.monthlyRecords = window.monthlyRecords || {}; // Global checklist monthly cache
 
 function clWk(){return clNormWk();} // Always normalized YYYY-MM-DD
 
@@ -1505,8 +1510,6 @@ function clWeekRef(){
   return db.ref('cl_weeks/'+clNormWk());
 }
 
-// Global monthly cache
-window.monthlyRecords = {};
 
 // ── SAVE ─────────────────────────────────────────────────────────────
 function clSaveNow(){
@@ -1566,30 +1569,32 @@ function clInitFBSync(){
   var el=document.getElementById('cl-fb-status');
   if(el){el.innerHTML='⏳ Loading...';el.style.color='var(--gold)';}
 
-  // Use .on() for real-time sync — same pattern as the rest of the app
-  if(clFbRef)clFbRef.off(); // detach previous listener
+  // Use .once() — load data once, no re-render loop on every save
+  if(clFbRef)clFbRef.off();
   clFbRef=db.ref(path);
-  clFbRef.on('value',function(snap){
+  clFbRef.once('value',function(snap){
     var d=snap.val();
-    console.log('[CL] Firebase sync for week '+wk+':', d?'HAS DATA (keys:'+Object.keys(d&&d.state||{}).join(',')+')':'EMPTY/NULL');
+    console.log('[CL] Loaded week '+wk+':', d?'HAS DATA':'EMPTY');
     if(d&&d.state&&Object.keys(d.state).length>0){
-      // Firebase is authoritative — restore this week's state fully
+      // Restore saved state into clST[wk]
       if(!clST[wk])clST[wk]={};
       Object.keys(d.state).forEach(function(k){
         clST[wk][k]=d.state[k];
       });
+      if(!window.monthlyRecords)window.monthlyRecords={};
       window.monthlyRecords[wk]={state:d.state,meta:d.meta||{}};
+      console.log('[CL] State restored. Checklist IDs:', Object.keys(clST[wk]));
     } else {
-      console.warn('[CL] No data for week '+wk+' at path cl_weeks/'+wk);
+      console.warn('[CL] No saved data for week '+wk+' — starting fresh');
     }
     clEnsureST();
-    // Only re-render if checklist page is currently visible
+    // Render once after load
     if(clRole&&document.getElementById('cl-wrap')&&S.p==='checklists'){
       clRenderSec(clSec);
     }
     if(el){el.innerHTML='⚡ Live';el.style.color='var(--grn)';}
   },function(err){
-    console.error('[CL] Firebase error:',err,'path:',path);
+    console.error('[CL] Load error:',err);
     if(el){el.innerHTML='⚠ Offline';el.style.color='var(--red)';}
     clEnsureST();
     if(clRole&&document.getElementById('cl-wrap')&&S.p==='checklists'){
@@ -1600,7 +1605,7 @@ function clInitFBSync(){
 
 // ── LOAD FULL MONTH ───────────────────────────────────────────────────
 function clLoadMonthlyData(monthYear, callback){
-  // monthYear = 'YYYY-MM'
+  if(!window.monthlyRecords)window.monthlyRecords={};
   if(!db){if(callback)callback({});return;}
   var path='cl_weeks';
   console.log('[CL] MONTHLY FETCH ← '+path+' for month:'+monthYear);
