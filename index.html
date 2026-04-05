@@ -5227,56 +5227,5 @@ updateBadges();
 }
 
 </script>
-     <!-- your existing code above -->
-
-<script>
-document.addEventListener("DOMContentLoaded", function () {
-  const setupScreen = document.getElementById("setup-screen");
-  const app = document.getElementById("app");
-
-  const savedConfig = localStorage.getItem("firebase_config");
-
-  if (savedConfig) {
-    setupScreen.classList.add("hidden");
-    app.style.display = "flex";
-  } else {
-    setupScreen.classList.remove("hidden");
-    app.style.display = "none";
-  }
-
-  const demoBtn = document.getElementById("btn-demo");
-  if (demoBtn) {
-    demoBtn.addEventListener("click", () => {
-      localStorage.setItem("firebase_config", "demo");
-      setupScreen.classList.add("hidden");
-      app.style.display = "flex";
-    });
-  }
-
-  const connectBtn = document.getElementById("btn-connect");
-  if (connectBtn) {
-    connectBtn.addEventListener("click", () => {
-      const apiKey = document.getElementById("cfg-apikey").value;
-      const dbURL = document.getElementById("cfg-dburl").value;
-
-      if (!apiKey || !dbURL) {
-        document.getElementById("setup-err").style.display = "block";
-        return;
-      }
-
-      localStorage.setItem("firebase_config", JSON.stringify({
-        apiKey: apiKey,
-        databaseURL: dbURL
-      }));
-
-      setupScreen.classList.add("hidden");
-      app.style.display = "flex";
-    });
-  }
-});
-</script>
-
-</body>
-</html>
 </body>
 </html>
