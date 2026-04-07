@@ -333,8 +333,10 @@ select.fi-s{cursor:pointer}
 .cl-day-tabs::-webkit-scrollbar{display:none}
 .cl-day-tab{flex-shrink:0;padding:4px 9px;border-radius:20px;border:1px solid var(--bd2);background:var(--bg3);font-size:10px;font-weight:600;cursor:pointer;color:var(--text3);transition:all .15s;white-space:nowrap;font-family:var(--mono)}
 .cl-day-tab.active{background:var(--blu);border-color:var(--blu);color:#fff}
-.cl-day-tab.done{border-color:var(--grn);color:var(--grn)}
-.cl-day-tab.partial{border-color:var(--gold);color:var(--gold)}
+.cl-day-tab.done{border-color:var(--grn);color:var(--grn);background:rgba(63,185,80,.12)}
+.cl-day-tab.partial{border-color:var(--gold);color:var(--gold);background:rgba(240,165,0,.1)}
+.cl-day-tab.active.done{background:var(--grn);border-color:var(--grn);color:#fff}
+.cl-day-tab.active.partial{background:var(--gold);border-color:var(--gold);color:#000}
 .cl-cards{padding:8px 12px 40px;display:flex;flex-direction:column;gap:7px;overflow-y:auto;overflow-x:hidden;flex:1;min-height:0}
 .cl-grp-div{background:linear-gradient(90deg,var(--bg4),var(--bg3));border-radius:7px;padding:6px 11px;color:var(--text3);font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;border-left:2px solid var(--blu)}
 .cl-item-card{background:var(--bg2);border-radius:9px;border:1px solid var(--bd);transition:border-color .2s}
@@ -865,6 +867,27 @@ function attachListeners(){
     if(S.p === 'ts') ren();
   });
 
+  // Pre-load current week's checklist data when app starts
+  try{
+    var _preloadWk=(function(){
+      var now=new Date(),dow=now.getDay(),sun=new Date(now);
+      sun.setDate(now.getDate()-dow);
+      return sun.getFullYear()+'-'+String(sun.getMonth()+1).padStart(2,'0')+'-'+String(sun.getDate()).padStart(2,'0');
+    })();
+    db.ref('cl_weeks/'+_preloadWk).once('value',function(snap){
+      try{
+        var d=snap.val();
+        if(d&&d.state){
+          if(!clST[_preloadWk])clST[_preloadWk]={};
+          Object.keys(d.state).forEach(function(k){clST[_preloadWk][k]=d.state[k];});
+          if(!window.monthlyRecords)window.monthlyRecords={};
+          window.monthlyRecords[_preloadWk]={state:d.state,meta:d.meta||{}};
+          console.log('[CL] Preloaded week '+_preloadWk);
+        }
+      }catch(e){console.warn('[CL] Preload parse error:',e);}
+    });
+  }catch(e){console.warn('[CL] Preload setup error:',e);}
+
   // Inventory
   db.ref('inv_items').on('value', function(snap){
     var raw = snap.val();
@@ -1235,6 +1258,7 @@ function pChecklists(){
       <span id="cl-save-ind" style="font-size:9px;color:var(--text3);font-family:var(--mono)">Auto-save on</span>
       <button class="btn sm s" onclick="clSaveNow();toast('Saved ✓','success')" title="Save Now" style="flex-shrink:0">💾 Save</button>
       <button id="cl-print-btn" class="btn sm" style="display:none" onclick="clOpenPrint()">🖨 Print</button>
+      <button class="btn sm s" style="flex-shrink:0" onclick="clPrintMonthly()">📅 Monthly</button>
       <button id="cl-edit-btn" class="btn sm s" style="display:none" onclick="clOpenEdit()">✏️ Edit Items</button>
       <button class="btn sm s" onclick="clSwitchRole()" id="cl-role-badge">👨‍🍳 Staff</button>
     </span>
@@ -1387,8 +1411,15 @@ var CL_SHIFTS=['AM','PM'];
 var CL_ADMIN_PIN='1422';
 
 var clSec='mod', clCl={mod:0,foh:0,boh:0,forms:0}, clDay={mod:0,foh:0,boh:0}, clWeekDates=[], clST={}, clRole=null, _clSelRole=null, clFbRef=null, _clBtDay=0, _clCoolDay=0;
+window.monthlyRecords = window.monthlyRecords || {}; // Global checklist monthly cache
 
-function clWk(){var el=document.getElementById('cl-period-start');return el&&el.value?el.value:'default';}
+function clWk(){return clNormWk();} // Always normalized YYYY-MM-DD
+
+// Sanitize a string for use as a Firebase Realtime Database key
+// Firebase forbids: . # $ / [ ]  — keep spaces and all other chars
+function clFbKey(str){
+  return String(str||'').replace(/[.#$\[\]\/]/g,'_');
+}
 function clFmtD(d){return d.getDate()+'-'+CL_MONTHS[d.getMonth()];}
 function clGetWeekDates(v){
   var arr=[],b=v?new Date(v+'T00:00:00'):new Date();
@@ -1421,8 +1452,9 @@ function clEnsureST(){
   });
   if(!clST[w]['foh_bartender'])clST[w]['foh_bartender']={};
   CL_BT_ITEMS.chiller.concat(CL_BT_ITEMS.bases).forEach(function(item){
-    if(!clST[w]['foh_bartender'][item])clST[w]['foh_bartender'][item]={sl:'',uom:'',prep:{}};
-    clWeekDates.forEach(function(_,di){if(!clST[w]['foh_bartender'][item].prep[di])clST[w]['foh_bartender'][item].prep[di]={oh:'',par:'',prep:''};});
+    var k=clFbKey(item);
+    if(!clST[w]['foh_bartender'][k])clST[w]['foh_bartender'][k]={sl:'',uom:'',prep:{}};
+    clWeekDates.forEach(function(_,di){if(!clST[w]['foh_bartender'][k].prep[di])clST[w]['foh_bartender'][k].prep[di]={oh:'',par:'',prep:''};});
   });
   // Forms
   ['form_chiller','form_freezer','form_cooling','form_pizzadough','form_stockroom'].forEach(function(fid){
@@ -1435,75 +1467,158 @@ function clSF(clId,di,itemId){clEnsureST();return clST[clWk()][clId][di][itemId]
 
 // ── SAVE / FB SYNC ──
 var clSaveTmr=null;
+// ══════════════════════════════════════════════════════════════════════
+// FIREBASE SAVE / LOAD — Per-week documents at:
+// Firebase path: cl_weeks/{YYYY-MM-DD}  (top-level, matches app pattern)
+// Monthly records cached in window.monthlyRecords
+// ══════════════════════════════════════════════════════════════════════
+
+// Normalize week key — always YYYY-MM-DD, never 'default'
+function clNormWk(){
+  var el=document.getElementById('cl-period-start');
+  if(el&&el.value&&el.value.match(/^\d{4}-\d{2}-\d{2}$/))return el.value;
+  // Fallback: compute Sunday of current week
+  var now=new Date();
+  var dow=now.getDay();
+  var sun=new Date(now);sun.setDate(now.getDate()-dow);
+  return sun.getFullYear()+'-'+String(sun.getMonth()+1).padStart(2,'0')+'-'+String(sun.getDate()).padStart(2,'0');
+}
+
+function clBranch(){
+  return ((document.getElementById('cl-branch')||{}).value||'MOA').toUpperCase().replace(/[.#$\/\[\]]/g,'_');
+}
+
+function clWeekRef(){
+  if(!db)return null;
+  return db.ref('cl_weeks/'+clNormWk());
+}
+
+
+// ── SAVE ─────────────────────────────────────────────────────────────
 function clSaveNow(){
-  // Firebase-only save — no localStorage for checklist state
   try{
+    var wk=clNormWk();
     var meta={
       branch:(document.getElementById('cl-branch')||{}).value||'MOA',
       modName:(document.getElementById('cl-mod-name')||{}).value||'',
-      periodStart:(document.getElementById('cl-period-start')||{}).value||''
+      weekStart:wk
     };
+    var payload={state:clST[wk]||{},meta:meta,updatedAt:Date.now()};
+    console.log('[CL] SAVE → cl_weeks/'+wk, 'keys:', Object.keys(payload.state));
+    // Deep sanitize all keys before writing to Firebase
+    function _sanitizeKeys(obj){
+      if(typeof obj!=='object'||obj===null||Array.isArray(obj))return obj;
+      var out={};
+      Object.keys(obj).forEach(function(k){
+        var sk=clFbKey(k);
+        out[sk]=_sanitizeKeys(obj[k]);
+      });
+      return out;
+    }
+    payload.state=_sanitizeKeys(payload.state);
     if(db){
-      var branch2=(meta.branch||'MOA').toUpperCase().replace(/[.#$\/\[\]]/g,'_');
-      db.ref('ops_checklists/'+branch2).set({state:clST,meta:meta,updatedAt:Date.now()});
+      db.ref('cl_weeks/'+wk).set(payload,function(err){
+        if(err){console.error('[CL] Save ERROR:',err);}
+        else{
+          console.log('[CL] Save SUCCESS for week:',wk);
+          // Update monthly cache
+          window.monthlyRecords[wk]={state:payload.state,meta:meta};
+        }
+      });
     }
     var ind=document.getElementById('cl-save-ind');
-    if(ind){ind.textContent='✓ Saved';ind.style.color='var(--grn)';setTimeout(function(){if(ind)ind.textContent='⚡ Firebase';ind.style.color='var(--text3)';},1500);}
-  }catch(e){console.warn('clSaveNow error:',e);}
-}
-function clSave(){
-  clearTimeout(clSaveTmr);
-  clSaveTmr=setTimeout(function(){
-    try{
-      var meta={
-        branch:(document.getElementById('cl-branch')||{}).value||'MOA',
-        modName:(document.getElementById('cl-mod-name')||{}).value||'',
-        periodStart:(document.getElementById('cl-period-start')||{}).value||''
-      };
-      var payload={state:clST,meta:meta,updatedAt:Date.now()};
-      if(db){
-        var branch=(meta.branch||'MOA').toUpperCase().replace(/[.#$\/\[\]]/g,'_');
-        db.ref('ops_checklists/'+branch).set(payload).then(function(){
-          var el=document.getElementById('cl-fb-status');
-          if(el){el.innerHTML='⚡ Saved';el.style.color='var(--grn)';setTimeout(function(){el.innerHTML='⚡ Live';},1500);}
-        }).catch(function(e){console.warn('CL save error:',e);});
-      }
-    }catch(e){console.warn('clSave error:',e);}
-  },700);
+    if(ind){ind.textContent='✓ Saved';ind.style.color='var(--grn)';setTimeout(function(){if(ind){ind.textContent='⚡ Live';ind.style.color='var(--text3)';}},2000);}
+  }catch(e){console.error('[CL] clSaveNow error:',e);}
 }
 
+// Debounced version (for less critical updates)
+var clSaveTmr=null;
+function clSave(){
+  clearTimeout(clSaveTmr);
+  clSaveTmr=setTimeout(clSaveNow,700);
+}
+
+// ── LOAD CURRENT WEEK ────────────────────────────────────────────────
 function clInitFBSync(){
-  // Wait for db if not ready yet
   if(!db){
     var el=document.getElementById('cl-fb-status');
     if(el){el.innerHTML='⏳ Connecting...';el.style.color='var(--gold)';}
     setTimeout(clInitFBSync,800);
     return;
   }
-  try{
-    if(clFbRef)clFbRef.off();
-    var branch=((document.getElementById('cl-branch')||{}).value||'MOA').toUpperCase().replace(/[.#$/\[\]]/g,'_');
-    clFbRef=db.ref('ops_checklists/'+branch);
-    // Use once() — load once on connect, don't re-render on every remote change
-    // (re-rendering on 'value' events wipes unsaved temp inputs)
-    clFbRef.once('value',function(snap){
-      var d=snap.val();
-      if(d&&d.state){
-        // Firebase is the single source of truth — replace in-memory state
-        clST=d.state;
-        clEnsureST(); // fill any missing structural keys
-        if(clRole&&document.getElementById('cl-wrap'))clRenderSec(clSec);
-      }
-      var el=document.getElementById('cl-fb-status');if(el){el.innerHTML='⚡ Live';el.style.color='var(--grn)';}
-    },function(err){
-      console.warn('CL FB error:',err);
-      var el=document.getElementById('cl-fb-status');if(el){el.innerHTML='⚠ Offline';el.style.color='var(--red)';}
-    });
-  }catch(e){
-    console.warn('clInitFBSync error:',e);
-    var el=document.getElementById('cl-fb-status');if(el){el.innerHTML='⚠ Error';el.style.color='var(--red)';}
-  }
+  var wk=clNormWk();
+  var path='cl_weeks/'+wk;
+  console.log('[CL] FETCH ← cl_weeks/'+wk);
+  var el=document.getElementById('cl-fb-status');
+  if(el){el.innerHTML='⏳ Loading...';el.style.color='var(--gold)';}
+
+  // Use .once() — load data once, no re-render loop on every save
+  if(clFbRef)clFbRef.off();
+  clFbRef=db.ref(path);
+  clFbRef.once('value',function(snap){
+    var d=snap.val();
+    console.log('[CL] Loaded week '+wk+':', d?'HAS DATA':'EMPTY');
+    if(d&&d.state&&Object.keys(d.state).length>0){
+      // Restore saved state into clST[wk]
+      if(!clST[wk])clST[wk]={};
+      Object.keys(d.state).forEach(function(k){
+        clST[wk][k]=d.state[k];
+      });
+      if(!window.monthlyRecords)window.monthlyRecords={};
+      window.monthlyRecords[wk]={state:d.state,meta:d.meta||{}};
+      console.log('[CL] State restored. Checklist IDs:', Object.keys(clST[wk]));
+    } else {
+      console.warn('[CL] No saved data for week '+wk+' — starting fresh');
+    }
+    clEnsureST();
+    // Render once after load
+    if(clRole&&document.getElementById('cl-wrap')&&S.p==='checklists'){
+      clRenderSec(clSec);
+    }
+    if(el){el.innerHTML='⚡ Live';el.style.color='var(--grn)';}
+  },function(err){
+    console.error('[CL] Load error:',err);
+    if(el){el.innerHTML='⚠ Offline';el.style.color='var(--red)';}
+    clEnsureST();
+    if(clRole&&document.getElementById('cl-wrap')&&S.p==='checklists'){
+      clRenderSec(clSec);
+    }
+  });
 }
+
+// ── LOAD FULL MONTH ───────────────────────────────────────────────────
+function clLoadMonthlyData(monthYear, callback){
+  if(!window.monthlyRecords)window.monthlyRecords={};
+  if(!db){if(callback)callback({});return;}
+  var path='cl_weeks';
+  console.log('[CL] MONTHLY FETCH ← '+path+' for month:'+monthYear);
+  db.ref(path).once('value',function(snap){
+    var all=snap.val()||{};
+    var monthly={};
+    Object.keys(all).forEach(function(wk){
+      if(wk.indexOf(monthYear)===0||clWeekInMonth(wk,monthYear)){
+        monthly[wk]=all[wk];
+        window.monthlyRecords[wk]=all[wk];
+      }
+    });
+    console.log('[CL] Monthly fetch complete. Weeks found:',Object.keys(monthly));
+    if(callback)callback(monthly);
+  },function(err){
+    console.error('[CL] Monthly fetch error:',err);
+    if(callback)callback({});
+  });
+}
+
+// Check if a week (YYYY-MM-DD Sunday) overlaps a month (YYYY-MM)
+function clWeekInMonth(wk,monthYear){
+  if(!wk||!wk.match(/^\d{4}-\d{2}-\d{2}$/))return false;
+  var sun=new Date(wk+'T00:00:00');
+  var sat=new Date(sun.getTime()+6*86400000);
+  var mStart=new Date(monthYear+'-01T00:00:00');
+  var mEnd=new Date(mStart.getFullYear(),mStart.getMonth()+1,0,23,59,59);
+  return sun<=mEnd&&sat>=mStart;
+}
+
 
 // ── AUTH ──
 function clSelectRole(role){
@@ -1524,8 +1639,14 @@ function clDoLogin(){
   var pb=document.getElementById('cl-print-btn');if(pb)pb.style.display=clIsAdmin()?'':'none';
   var eb=document.getElementById('cl-edit-btn');if(eb)eb.style.display=clIsAdmin()?'':'none';
   // Init period start if empty
+  // Set period-start to current Sunday (start of this week) before anything else
   var ps=document.getElementById('cl-period-start');
-  if(ps&&!ps.value){var now=new Date();ps.value=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');}
+  if(ps&&!ps.value){
+    var _now=new Date();
+    var _dow=_now.getDay();
+    var _sun=new Date(_now);_sun.setDate(_now.getDate()-_dow);
+    ps.value=_sun.getFullYear()+'-'+String(_sun.getMonth()+1).padStart(2,'0')+'-'+String(_sun.getDate()).padStart(2,'0');
+  }
   clWeekDates=clGetWeekDates(document.getElementById('cl-period-start').value);
   // clST is loaded exclusively from Firebase (no localStorage for checklist state)
   clEnsureST();
@@ -1660,31 +1781,83 @@ function clRenderCards(sec,cl,di){
       // Wire comment textarea
       var ta=card.querySelector('textarea');
       if(ta)(function(t,cid,d,iid){t.oninput=function(){clSetComment(cid,d,iid,t.value);};})(ta,cl.id,di,item.id);
+
+      // EXPLICIT .value set on temp inputs — guarantees display even if innerHTML timing issues
+      var w2=clWk();
+      card.querySelectorAll('.cl-shift-temp').forEach(function(inp){
+        var d2=inp.dataset;
+        var saved=(clST[w2]&&clST[w2][d2.clid]&&clST[w2][d2.clid][parseInt(d2.di)]&&clST[w2][d2.clid][parseInt(d2.di)][d2.iid]&&clST[w2][d2.clid][parseInt(d2.di)][d2.iid][d2.sh])||{};
+        var val=saved.temp||'';
+        inp.value=val;
+        if(val){inp.classList.add('has-val');}else{inp.classList.remove('has-val');}
+      });
     });
   });
 }
 
 function clBuildShift(cl,di,item,sh){
-  var s=clS(cl.id,di,item.id,sh),ct=cl.checkType,c='';
-  var cid=clXe(cl.id),iid=clXe(item.id),tv=clXe(s.temp||'');
+  // Read DIRECTLY from clST — bypass clS()/clEnsureST() to avoid overwriting saved values
+  var w=clWk();
+  var shiftData=(clST[w]&&clST[w][cl.id]&&clST[w][cl.id][di]&&clST[w][cl.id][di][item.id]&&clST[w][cl.id][di][item.id][sh])||{v:null,temp:'',comment:''};
+  var ct=cl.checkType,c2='';
+  var cid=clXe(cl.id),iid=clXe(item.id);
+  var tv=shiftData.temp||'';
   if(ct==='temp'){
-    c='<div class="cl-ctrl-row"><span class="cl-ctrl-lbl">Overall</span><div class="cl-yn-grp">'
-      +'<button class="cl-yn-btn'+(s.v==='yes'?' yes':'')+'" data-clid="'+cid+'" data-di="'+di+'" data-iid="'+iid+'" data-sh="'+sh+'" data-val="yes">✓ YES</button>'
-      +'<button class="cl-yn-btn'+(s.v==='no'?' no':'')+'" data-clid="'+cid+'" data-di="'+di+'" data-iid="'+iid+'" data-sh="'+sh+'" data-val="no">✗ NO</button>'
+    c2='<div class="cl-ctrl-row"><span class="cl-ctrl-lbl">Overall</span><div class="cl-yn-grp">'
+      +'<button class="cl-yn-btn'+(shiftData.v==='yes'?' yes':'')+'" data-clid="'+cid+'" data-di="'+di+'" data-iid="'+iid+'" data-sh="'+sh+'" data-val="yes">✓ YES</button>'
+      +'<button class="cl-yn-btn'+(shiftData.v==='no'?' no':'')+'" data-clid="'+cid+'" data-di="'+di+'" data-iid="'+iid+'" data-sh="'+sh+'" data-val="no">✗ NO</button>'
       +'</div></div>'
       +(item.hasTemp?'<div class="cl-ctrl-row"><span class="cl-ctrl-lbl">Temp °C</span>'
-      +'<input class="cl-temp-inp cl-shift-temp'+(s.temp?' has-val':'')+'" type="text" maxlength="7" placeholder="–" inputmode="decimal" value="'+tv+'" data-clid="'+cid+'" data-di="'+di+'" data-iid="'+iid+'" data-sh="'+sh+'"></div>':'');
+      +'<input class="cl-temp-inp cl-shift-temp'+(tv?' has-val':'')+'" type="text" maxlength="7" placeholder="–" inputmode="decimal" value="'+clXe(tv)+'" data-clid="'+cid+'" data-di="'+di+'" data-iid="'+iid+'" data-sh="'+sh+'"></div>':'');
   }else{
-    c='<div class="cl-ctrl-row"><span class="cl-ctrl-lbl">Check</span><div class="cl-cb-grp">'
-      +'<div class="cl-cb-item" data-clid="'+cid+'" data-di="'+di+'" data-iid="'+iid+'" data-sh="'+sh+'" data-val="ok"><div class="cl-cb-box'+(s.v==='ok'?' ok':'')+'">✓</div><span class="cl-cb-lbl">Done</span></div>'
-      +'<div class="cl-cb-item" data-clid="'+cid+'" data-di="'+di+'" data-iid="'+iid+'" data-sh="'+sh+'" data-val="no"><div class="cl-cb-box'+(s.v==='no'?' no':'')+'">✗</div><span class="cl-cb-lbl">Issue</span></div>'
+    c2='<div class="cl-ctrl-row"><span class="cl-ctrl-lbl">Check</span><div class="cl-cb-grp">'
+      +'<div class="cl-cb-item" data-clid="'+cid+'" data-di="'+di+'" data-iid="'+iid+'" data-sh="'+sh+'" data-val="ok"><div class="cl-cb-box'+(shiftData.v==='ok'?' ok':'')+'">✓</div><span class="cl-cb-lbl">Done</span></div>'
+      +'<div class="cl-cb-item" data-clid="'+cid+'" data-di="'+di+'" data-iid="'+iid+'" data-sh="'+sh+'" data-val="no"><div class="cl-cb-box'+(shiftData.v==='no'?' no':'')+'">✗</div><span class="cl-cb-lbl">Issue</span></div>'
       +'</div></div>';
   }
-  return '<div class="cl-shift-blk"><div class="cl-sh-title">'+sh+' SHIFT</div>'+c+'</div>';
+  return '<div class="cl-shift-blk"><div class="cl-sh-title">'+sh+' SHIFT</div>'+c2+'</div>';
 }
-
-function clSetV(clId,di,itemId,sh,val){clEnsureST();var s=clS(clId,di,itemId,sh);s.v=s.v===val?null:val;clSaveNow();var sec=clFindSec(clId);clRenderCards(sec,CL_DATA[sec][clCl[sec]],di);clRenderSec(sec);}
-function clSetTemp(clId,di,itemId,sh,el){clEnsureST();clS(clId,di,itemId,sh).temp=el.value;el.className='cl-temp-inp'+(el.value?' has-val':'');clSaveNow();}
+function clSetV(clId,di,itemId,sh,val){
+  clEnsureST();
+  var s=clS(clId,di,itemId,sh);
+  s.v=s.v===val?null:val;
+  // Save current temp values from DOM before re-render (prevent temp erasure)
+  var cards=document.getElementById('cl-cards');
+  if(cards){
+    cards.querySelectorAll('.cl-shift-temp').forEach(function(inp){
+      var d2=inp.dataset;
+      var wk=clWk();
+      if(clST[wk]&&clST[wk][d2.clid]&&clST[wk][d2.clid][parseInt(d2.di)]&&
+         clST[wk][d2.clid][parseInt(d2.di)][d2.iid]&&clST[wk][d2.clid][parseInt(d2.di)][d2.iid][d2.sh]){
+        clST[wk][d2.clid][parseInt(d2.di)][d2.iid][d2.sh].temp=inp.value;
+      }
+    });
+  }
+  clSaveNow();
+  var sec=clFindSec(clId);
+  clRenderSec(sec); // single render — clRenderSec calls clRenderCards internally
+}
+function clSetTemp(clId,di,itemId,sh,el){
+  clEnsureST();
+  // Update this specific temp value
+  var s=clS(clId,di,itemId,sh);
+  s.temp=el.value;
+  el.className='cl-temp-inp'+(el.value?' has-val':'');
+  // Also flush ALL visible temp inputs to clST to prevent any racing
+  var wk=clWk();
+  var cards=document.getElementById('cl-cards');
+  if(cards){
+    cards.querySelectorAll('.cl-shift-temp').forEach(function(inp){
+      var d2=inp.dataset;
+      if(d2.clid===clId&&parseInt(d2.di)===di&&d2.iid===itemId&&d2.sh===sh)return; // already set above
+      if(clST[wk]&&clST[wk][d2.clid]&&clST[wk][d2.clid][parseInt(d2.di)]&&
+         clST[wk][d2.clid][parseInt(d2.di)][d2.iid]&&clST[wk][d2.clid][parseInt(d2.di)][d2.iid][d2.sh]){
+        clST[wk][d2.clid][parseInt(d2.di)][d2.iid][d2.sh].temp=inp.value;
+      }
+    });
+  }
+  clSaveNow();
+}
 function clSetComment(clId,di,itemId,val){clEnsureST();CL_SHIFTS.forEach(function(sh){clS(clId,di,itemId,sh).comment=val;});clSaveNow();}
 function clToggleFlag(clId,di,itemId,btn){clEnsureST();clSF(clId,di,itemId).flagged=!clSF(clId,di,itemId).flagged;btn.classList.toggle('on');clSaveNow();}
 function clToggleCmt(btn){var box=btn.nextElementSibling;box.classList.toggle('open');btn.textContent=box.classList.contains('open')?'- Hide Comment':'+ Add Comment';}
@@ -1783,7 +1956,7 @@ function clRenderBartender(cl){
   var addSect=function(sName,items){
     var cr=document.createElement('tr');cr.innerHTML='<td colspan="6" class="cat-row">'+clXe(sName)+'</td>';tbody.appendChild(cr);
     items.forEach(function(item,ri){
-      var bd=bt[item]||{sl:'',uom:'',prep:{}},pd=(bd.prep&&bd.prep[di])||{oh:'',par:'',prep:''};
+      var k=clFbKey(item);var bd=bt[k]||{sl:'',uom:'',prep:{}},pd=(bd.prep&&bd.prep[di])||{oh:'',par:'',prep:''};
       var tr=document.createElement('tr');tr.style.background=ri%2===0?'var(--bg2)':'var(--bg3)';
       // Build cells via DOM to avoid quote escaping issues
       var nameTd=document.createElement('td');nameTd.style.cssText='text-align:left;font-weight:600;font-size:11px;padding:5px 10px;color:var(--text)';nameTd.textContent=item;tr.appendChild(nameTd);
@@ -1797,7 +1970,7 @@ function clRenderBartender(cl){
       var dayFields=[['oh',pd.oh,'rgba(88,166,255,.06)','#60a5fa'],['par',pd.par,'rgba(63,185,80,.05)','var(--grn)'],['prep',pd.prep,'rgba(240,165,0,.05)','var(--gold)']];
       dayFields.forEach(function(f){
         var td=document.createElement('td');td.style.background=f[2];
-        var inp=document.createElement('input');inp.className='cl-bt-inp';inp.type='number';inp.value=f[1];inp.placeholder='0';inp.style.cssText='width:52px;color:'+f[3];
+        var inp=document.createElement('input');inp.className='cl-bt-inp';inp.type='text';inp.inputMode='decimal';inp.value=f[1];inp.placeholder='0';inp.style.cssText='width:52px;color:'+f[3];
         inp.dataset.btitem=item;inp.dataset.btday=di;inp.dataset.btfield=f[0];
         inp.oninput=function(){clSetBTday(this.dataset.btitem,parseInt(this.dataset.btday),this.dataset.btfield,this.value);};
         td.appendChild(inp);tr.appendChild(td);
@@ -1811,8 +1984,8 @@ function clRenderBartender(cl){
   foot.innerHTML='<span><b>Checked By:</b> _____________________</span><span><b>Verified by MOD:</b> _____________________</span>';
   card.appendChild(foot);wrap.appendChild(card);
 }
-function clSetBT(item,field,val){clEnsureST();var bt=clST[clWk()]['foh_bartender'];if(!bt[item])bt[item]={sl:'',uom:'',prep:{}};bt[item][field]=val;clSaveNow();}
-function clSetBTday(item,di,field,val){clEnsureST();var bt=clST[clWk()]['foh_bartender'];if(!bt[item])bt[item]={sl:'',uom:'',prep:{}};if(!bt[item].prep)bt[item].prep={};if(!bt[item].prep[di])bt[item].prep[di]={oh:'',par:'',prep:''};bt[item].prep[di][field]=val;clSaveNow();}
+function clSetBT(item,field,val){clEnsureST();var k=clFbKey(item);var bt=clST[clWk()]['foh_bartender'];if(!bt[k])bt[k]={sl:'',uom:'',prep:{}};bt[k][field]=val;clSaveNow();}
+function clSetBTday(item,di,field,val){clEnsureST();var k=clFbKey(item);var bt=clST[clWk()]['foh_bartender'];if(!bt[k])bt[k]={sl:'',uom:'',prep:{}};if(!bt[k].prep)bt[k].prep={};if(!bt[k].prep[di])bt[k].prep[di]={oh:'',par:'',prep:''};bt[k].prep[di][field]=val;clSaveNow();}
 
 // ── CONTROL FORMS ──
 function clRenderForms(){
@@ -2672,7 +2845,7 @@ function clPrintBartenderBody(cl,daysToShow){
     // Chiller section
     html+='<tr><td colspan="6" style="background:#1a2340;color:#fff;font-weight:700;font-size:9px;padding:3px 8px;text-transform:uppercase;letter-spacing:.5px">Chiller Items</td></tr>';
     chiller.forEach(function(item,ri){
-      var bd=bt[item]||{sl:'',uom:'',prep:{}},pd=(bd.prep&&bd.prep[di])||{oh:'',par:'',prep:''};
+      var k=clFbKey(item);var bd=bt[k]||{sl:'',uom:'',prep:{}},pd=(bd.prep&&bd.prep[di])||{oh:'',par:'',prep:''};
       html+='<tr style="background:'+(ri%2===0?'#fff':'#f8fafc')+'">'
         +'<td style="font-weight:600;font-size:9px;text-align:left">'+item+'</td>'
         +'<td style="font-size:9px;text-align:center">'+clXe(bd.sl||'')+'</td>'
@@ -2685,7 +2858,7 @@ function clPrintBartenderBody(cl,daysToShow){
     // Bases section
     html+='<tr><td colspan="6" style="background:#1a2340;color:#fff;font-weight:700;font-size:9px;padding:3px 8px;text-transform:uppercase;letter-spacing:.5px">Syrups & Bases</td></tr>';
     bases.forEach(function(item,ri){
-      var bd=bt[item]||{sl:'',uom:'',prep:{}},pd=(bd.prep&&bd.prep[di])||{oh:'',par:'',prep:''};
+      var k=clFbKey(item);var bd=bt[k]||{sl:'',uom:'',prep:{}},pd=(bd.prep&&bd.prep[di])||{oh:'',par:'',prep:''};
       html+='<tr style="background:'+(ri%2===0?'#fff':'#f8fafc')+'">'
         +'<td style="font-weight:600;font-size:9px;text-align:left">'+item+'</td>'
         +'<td style="font-size:9px;text-align:center">'+clXe(bd.sl||'')+'</td>'
@@ -3001,8 +3174,14 @@ var _clPageBound=false;
 function clBindPage(){
   if(_clPageBound)return;_clPageBound=true;
   clBindSecTabs();
+  // Set period-start to current Sunday (start of this week) before anything else
   var ps=document.getElementById('cl-period-start');
-  if(ps&&!ps.value){var now=new Date();ps.value=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');}
+  if(ps&&!ps.value){
+    var _now=new Date();
+    var _dow=_now.getDay();
+    var _sun=new Date(_now);_sun.setDate(_now.getDate()-_dow);
+    ps.value=_sun.getFullYear()+'-'+String(_sun.getMonth()+1).padStart(2,'0')+'-'+String(_sun.getDate()).padStart(2,'0');
+  }
   clWeekDates=clGetWeekDates(document.getElementById('cl-period-start').value);
   // State loaded exclusively from Firebase — no localStorage for checklist
   // If user is already logged in, skip the auth screen entirely
@@ -4772,6 +4951,147 @@ function showTSAbsentWA(emp, date, status){
 }
 
 function sendTSWhatsApp(){ /* deprecated — replaced by email */ }
+
+// ── MONTHLY CHECKLIST PRINT ──────────────────────────────────────────
+function clPrintMonthly(){
+  // Determine current month from period-start
+  var ps=(document.getElementById('cl-period-start')||{}).value||'';
+  if(!ps)ps=new Date().toISOString().slice(0,10);
+  var monthYear=ps.slice(0,7); // YYYY-MM
+  var branch=(document.getElementById('cl-branch')||{}).value||'MOA';
+  var modName=(document.getElementById('cl-mod-name')||{}).value||'—';
+
+  // Show loading toast
+  toast('Loading monthly data...','warning');
+
+  clLoadMonthlyData(monthYear,function(monthly){
+    var wks=Object.keys(monthly).sort();
+    if(!wks.length){
+      // Use current week's data from clST
+      var wk=clNormWk();
+      monthly[wk]={state:clST[wk]||{},meta:{weekStart:wk}};
+      wks=[wk];
+    }
+
+    var CSS='<style>'
+      +'@page{size:A4 landscape;margin:8mm}'
+      +'*{box-sizing:border-box;margin:0;padding:0;font-family:Arial,Helvetica,sans-serif}'
+      +'body{background:#fff;color:#111;font-size:8px}'
+      +'table{width:100%;border-collapse:collapse;margin-bottom:12px}'
+      +'th,td{border:1px solid #ccc;padding:2px 4px;vertical-align:middle}'
+      +'th{background:#1e3a5f;color:#fff;font-size:8px;text-align:center}'
+      +'.hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding-bottom:6px;border-bottom:3px solid #1e3a5f}'
+      +'.hdr-brand{font-size:18px;font-weight:900;color:#1e3a5f}'
+      +'.hdr-info{text-align:right;font-size:9px;color:#555;line-height:1.6}'
+      +'.wk-hdr{background:#0f2340;color:#fff;font-weight:700;font-size:9px;padding:4px 8px;margin:8px 0 4px;border-radius:3px}'
+      +'.cat-row td{background:#1e3a5f;color:#fff;font-weight:700;font-size:8px;text-transform:uppercase;letter-spacing:.5px}'
+      +'.yes{color:#16a34a;font-weight:900;font-size:11px;text-align:center}'
+      +'.no{color:#dc2626;font-weight:900;font-size:11px;text-align:center}'
+      +'.temp{color:#1e40af;font-size:9px;font-weight:700;text-align:center}'
+      +'.foot{margin-top:16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px}'
+      +'.foot-cell{border-top:1px solid #333;padding-top:4px;text-align:center;font-size:8px;color:#555}'
+      +'@media print{.no-print{display:none}}'
+      +'</style>';
+
+    var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Monthly Checklist — '+monthYear+'</title>'+CSS+'</head><body>';
+
+    // Header
+    html+='<div class="hdr">'
+      +'<div><div class="hdr-brand">ALFA.CO</div><div style="font-size:9px;color:#666">'+branch+' Operations Checklists</div></div>'
+      +'<div style="text-align:center"><div style="font-size:14px;font-weight:800;color:#1e3a5f">Monthly Checklist Report</div>'
+      +'<div style="font-size:10px;color:#555">'+monthYear+' — All Sections</div></div>'
+      +'<div class="hdr-info"><div>Printed: '+new Date().toLocaleDateString('en-GB')+'</div><div>MOD: '+modName+'</div><div>Branch: '+branch+'</div></div>'
+      +'</div>';
+
+    // For each section (MOD, FOH, BOH)
+    ['mod','foh','boh'].forEach(function(sec){
+      var secLabel={mod:'🔱 MOD',foh:'🍽 FOH',boh:'👨‍🍳 BOH'}[sec];
+      var cls=CL_DATA[sec]||[];
+      cls.forEach(function(cl){
+        if(cl.checkType==='hygiene'||cl.checkType==='bartender')return; // skip special types
+        if(!cl.groups||!cl.groups.length)return;
+
+        // Collect all items
+        var allItems=[];
+        cl.groups.forEach(function(grp){allItems=allItems.concat((grp.items||[]).map(function(it){return{grp:grp.name,item:it};}));});
+        if(!allItems.length)return;
+
+        // Build day columns from all weeks
+        var dayCols=[];
+        wks.forEach(function(wk){
+          var wkState=monthly[wk]&&monthly[wk].state;
+          // Get 7 days of this week
+          var sun=new Date(wk+'T00:00:00');
+          for(var dd=0;dd<7;dd++){
+            var d2=new Date(sun.getTime()+dd*86400000);
+            var ds=d2.getFullYear()+'-'+String(d2.getMonth()+1).padStart(2,'0')+'-'+String(d2.getDate()).padStart(2,'0');
+            // Only include days in the selected month
+            if(ds.slice(0,7)===monthYear){
+              dayCols.push({date:d2,ds:ds,di:dd,wk:wk,wkState:wkState});
+            }
+          }
+        });
+        dayCols.sort(function(a,b){return a.ds.localeCompare(b.ds);});
+        if(!dayCols.length)return;
+
+        html+='<div class="wk-hdr">'+secLabel+' — '+cl.name+'</div>';
+        html+='<table><thead><tr>'
+          +'<th style="text-align:left;min-width:160px;font-size:8px">Item</th>'
+          +'<th style="font-size:8px">Shift</th>'
+          +dayCols.map(function(dc){
+            var DAYS2=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+            return '<th style="font-size:7px;min-width:30px">'+DAYS2[dc.date.getDay()]+'<br>'+String(dc.date.getDate()).padStart(2,'0')+'</th>';
+          }).join('')
+          +'</tr></thead><tbody>';
+
+        var lastGrp='';
+        allItems.forEach(function(ai){
+          if(ai.grp!==lastGrp){
+            html+='<tr class="cat-row"><td colspan="'+(2+dayCols.length)+'">'+ai.grp+'</td></tr>';
+            lastGrp=ai.grp;
+          }
+          CL_SHIFTS.forEach(function(sh,si){
+            html+='<tr style="background:'+(si===0?'#fff':'#f8fafc')+'">';
+            if(si===0){
+              html+='<td rowspan="'+CL_SHIFTS.length+'" style="font-weight:'+(ai.item.yellow?'700':'500')+';font-size:8px;text-align:left;padding:2px 6px;border-right:2px solid #e2e8f0">'
+                +(ai.item.yellow?'★ ':'')+ai.item.label+'</td>';
+            }
+            html+='<td style="font-size:8px;color:#888;text-align:center;font-weight:600">'+sh+'</td>';
+            dayCols.forEach(function(dc){
+              var shiftData=null;
+              if(dc.wkState&&dc.wkState[cl.id]&&dc.wkState[cl.id][dc.di]&&dc.wkState[cl.id][dc.di][ai.item.id]){
+                shiftData=dc.wkState[cl.id][dc.di][ai.item.id][sh];
+              }
+              var v=shiftData&&shiftData.v;
+              var tmp=shiftData&&shiftData.temp;
+              var cell='';
+              if(v==='yes'||v==='ok'){cell='<div class="yes">✓</div>'+(tmp?'<div class="temp">'+tmp+'°</div>':'');}
+              else if(v==='no'){cell='<div class="no">✗</div>';}
+              else{cell='<div style="color:#ccc;text-align:center">–</div>';}
+              html+='<td>'+cell+'</td>';
+            });
+            html+='</tr>';
+          });
+        });
+        html+='</tbody></table>';
+      });
+    });
+
+    html+='<div class="foot">'
+      +'<div class="foot-cell">Checked by</div>'
+      +'<div class="foot-cell">Verified by MOD</div>'
+      +'<div class="foot-cell">Date &amp; Signature</div>'
+      +'</div>'
+      +'<div class="no-print" style="text-align:center;margin-top:16px">'
+      +'<button onclick="window.print()" style="background:#1e3a5f;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:13px;font-weight:700;cursor:pointer;margin-right:8px">🖨 Print / Save PDF</button>'
+      +'<button onclick="window.close()" style="background:#f1f5f9;color:#333;border:1px solid #ddd;border-radius:8px;padding:10px 18px;font-size:13px;cursor:pointer">Close</button>'
+      +'</div>'
+      +'</body></html>';
+
+    var w=window.open('','_blank','width=1200,height=800');
+    if(w){w.document.write(html);w.document.close();}else{toast('Allow pop-ups to print','w');}
+  });
+}
 
 window.onload = function(){
   // Clock
