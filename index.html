@@ -790,7 +790,6 @@ select.fi-s option{background:var(--select-opt-bg);color:var(--text)}
       <span class="nbadge nb-r" id="badge-low" style="display:none">0</span>
     </button>
     <button data-p="report"><span class="ico">📅</span>Monthly Report</button>
-    <button data-p="import"><span class="ico">📂</span>Import Data</button>
 
     <div class="ns">Operations</div>
     <button data-p="wastage"><span class="ico">🗑</span>Wastage</button>
@@ -4332,17 +4331,17 @@ function tsPgAtt(){
     var key=vd.slice(0,7),recs=(S.tsAtt[e.id]&&S.tsAtt[e.id][key])||[],r=null;
     for(var i=0;i<recs.length;i++)if(recs[i].date===vd){r=recs[i];break;}
     if(r){if(r.st==='present'||r.st==='late')pCount++;else if(r.st==='absent')aCount++;else oCount++;}
-    attRows+='<tr><td><div style="display:flex;align-items:center;gap:8px"><div class="av">'+ini(e.name)+'</div><strong style="font-size:12px">'+xe(e.name)+'</strong></div></td><td>'+pl(e.dept||'—',dc(e.dept||'FOH'))+'</td><td style="font-size:11px;color:var(--text3);font-family:var(--mono)">'+(r&&r.ci||'—')+'</td><td style="font-size:11px;color:var(--text3);font-family:var(--mono)">'+(r&&r.co||'—')+'</td><td style="font-size:11px;font-family:var(--mono)">'+(r?tsHrs(r.ci,r.co):'—')+'</td><td>'+(r?tsBadge(r.st):'<span style="color:var(--text3);font-size:10px;font-style:italic">Not recorded</span>')+'</td><td style="font-size:11px;color:var(--text3)">'+(r&&r.note||'')+'</td></tr>';
+    attRows+='<tr><td><div style="display:flex;align-items:center;gap:8px"><div class="av">'+ini(e.name)+'</div><strong style="font-size:12px">'+xe(e.name)+'</strong></div></td><td>'+pl(e.dept||'—',dc(e.dept||'FOH'))+'</td><td style="font-size:11px;color:var(--text3);font-family:var(--mono)">'+(r&&r.ci||'—')+'</td><td style="font-size:11px;color:var(--text3);font-family:var(--mono)">'+(r&&r.co||'—')+'</td><td style="font-size:11px;color:var(--cyn);font-family:var(--mono);font-weight:600">'+(r&&r.brk||'—')+'</td><td style="font-size:11px;font-family:var(--mono)">'+(r?tsHrs(r.ci,r.co):'—')+'</td><td>'+(r?tsBadge(r.st):'<span style="color:var(--text3);font-size:10px;font-style:italic">Not recorded</span>')+'</td><td style="font-size:11px;color:var(--text3)">'+(r&&r.note||'')+'</td></tr>';
   });
   var dateLbl=vd===TODAY?'Today — '+TODAY:new Date(vd+'T00:00:00').toLocaleDateString('en-GB',{weekday:'short',day:'2-digit',month:'short',year:'numeric'});
-  return '<div class="grid g2" style="margin-bottom:16px"><div class="card"><div class="ct" style="color:var(--gold)">Manual Entry</div><div class="mfi"><label>Employee</label><select id="ts-emp">'+eo+'</select></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px"><div class="mfi"><label>Date</label><input type="date" id="ts-date" value="'+vd+'"></div><div class="mfi"><label>Check In</label><input type="time" id="ts-in"></div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px"><div class="mfi"><label>Check Out</label><input type="time" id="ts-out"></div><div class="mfi"><label>Note</label><input type="text" id="ts-note" placeholder="Optional"></div></div><div class="mfi"><label>Status</label><div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:4px">'+stBtns+'</div></div><button id="ts-save-att" class="btn" style="width:100%;margin-top:10px">Save Attendance Record</button></div><div class="card"><div class="ct" style="color:var(--gold)">Quick Check-In (Mobile)</div><p style="font-size:11px;color:var(--text3);margin-bottom:12px">Tap the 📱 QR Check-In page on any mobile device to record attendance directly from the phone.</p><div style="background:var(--bg2);border:1px solid var(--bd2);border-radius:8px;padding:14px;text-align:center"><div style="font-size:36px;margin-bottom:8px">📱</div><div style="font-size:12px;color:var(--text2);margin-bottom:10px">Share this URL with your staff</div><button class="btn" onclick="copyAppURL()">📋 Copy App URL</button></div></div></div><div class="tw"><div style="padding:11px 14px;border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--bg2)"><label style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.5px;font-family:var(--mono)">Date:</label><input type="date" id="ts-view-date" value="'+vd+'" max="'+TODAY+'" style="background:var(--bg);border:1px solid var(--bd2);border-radius:6px;padding:5px 9px;color:var(--text);font-size:11px;outline:none;font-family:var(--mono)"><button class="btn sm" id="ts-date-go">View</button>'+(vd!==TODAY?'<button class="btn sm s" id="ts-date-today">← Today</button>':'')+'<span style="flex:1"></span><span style="font-size:12px;font-weight:700;color:'+(vd===TODAY?'var(--gold)':'var(--pur)')+'">'+dateLbl+'</span><span style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-left:12px">✅ '+pCount+' present · ❌ '+aCount+' absent · 📋 '+oCount+' other</span></div><div class="tw-s"><table><thead><tr><th>Name</th><th>Dept</th><th>In</th><th>Out</th><th>Hours</th><th>Status</th><th>Note</th></tr></thead><tbody>'+(attRows||'<tr><td colspan="7" class="er">No records for this date.</td></tr>')+'</tbody></table></div></div>';
+  return '<div class="grid g2" style="margin-bottom:16px"><div class="card"><div class="ct" style="color:var(--gold)">Manual Entry</div><div class="mfi"><label>Employee</label><select id="ts-emp">'+eo+'</select></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px"><div class="mfi"><label>Date</label><input type="date" id="ts-date" value="'+vd+'"></div><div class="mfi"><label>Check In</label><input type="time" id="ts-in"></div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px"><div class="mfi"><label>Check Out</label><input type="time" id="ts-out"></div><div class="mfi"><label>Break (e.g. 30m)</label><input type="text" id="ts-brk" placeholder="e.g. 30m, 1h"></div></div><div style="display:grid;grid-template-columns:1fr;gap:10px;margin-bottom:10px"><div class="mfi"><label>Note</label><input type="text" id="ts-note" placeholder="Optional"></div></div><div class="mfi"><label>Status</label><div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:4px">'+stBtns+'</div></div><button id="ts-save-att" class="btn" style="width:100%;margin-top:10px">Save Attendance Record</button></div><div class="card"><div class="ct" style="color:var(--gold)">Quick Check-In (Mobile)</div><p style="font-size:11px;color:var(--text3);margin-bottom:12px">Tap the 📱 QR Check-In page on any mobile device to record attendance directly from the phone.</p><div style="background:var(--bg2);border:1px solid var(--bd2);border-radius:8px;padding:14px;text-align:center"><div style="font-size:36px;margin-bottom:8px">📱</div><div style="font-size:12px;color:var(--text2);margin-bottom:10px">Share this URL with your staff</div><button class="btn" onclick="copyAppURL()">📋 Copy App URL</button></div></div></div><div class="tw"><div style="padding:11px 14px;border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--bg2)"><label style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:.5px;font-family:var(--mono)">Date:</label><input type="date" id="ts-view-date" value="'+vd+'" max="'+TODAY+'" style="background:var(--bg);border:1px solid var(--bd2);border-radius:6px;padding:5px 9px;color:var(--text);font-size:11px;outline:none;font-family:var(--mono)"><button class="btn sm" id="ts-date-go">View</button>'+(vd!==TODAY?'<button class="btn sm s" id="ts-date-today">← Today</button>':'')+'<span style="flex:1"></span><span style="font-size:12px;font-weight:700;color:'+(vd===TODAY?'var(--gold)':'var(--pur)')+'">'+dateLbl+'</span><span style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-left:12px">✅ '+pCount+' present · ❌ '+aCount+' absent · 📋 '+oCount+' other</span></div><div class="tw-s"><table><thead><tr><th>Name</th><th>Dept</th><th>In</th><th>Out</th><th>Break</th><th>Hours</th><th>Status</th><th>Note</th></tr></thead><tbody>'+(attRows||'<tr><td colspan="8" class="er">No records for this date.</td></tr>')+'</tbody></table></div></div>';
 }
 
 function tsPgReport(){
   var mo=new Date().getMonth()+1,yr=new Date().getFullYear();
   var moOpts='<option value="0">— All Months —</option>'+MONTHS.map(function(m,i){return '<option value="'+(i+1)+'"'+(i+1===mo?' selected':'')+'>'+m+'</option>';}).join('');
   var eo='<option value="">— All Staff —</option>'+S.tsEmps.slice().sort(function(a,b){return a.name.localeCompare(b.name);}).map(function(e){return '<option value="'+xe(e.id)+'">'+xe(e.name)+' ('+xe(e.dept||'')+')</option>';}).join('');
-  return '<div class="card" style="margin-bottom:18px"><div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end"><div class="mfi" style="flex:2 1 160px;margin-bottom:0"><label>Employee</label><select id="ts-r-emp">'+eo+'</select></div><div class="mfi" style="flex:1 1 120px;margin-bottom:0"><label>Month</label><select id="ts-r-mo">'+moOpts+'</select></div><div class="mfi" style="flex:1 1 90px;margin-bottom:0"><label>Year</label><select id="ts-r-yr"><option '+(yr===2024?'selected':'')+'>2024</option><option '+(yr===2025?'selected':'')+'>2025</option><option '+(yr===2026?'selected':'')+'>2026</option></select></div><button id="ts-search" class="btn">Generate Report</button></div></div><div id="ts-report-out"></div>';
+  return '<div class="card" style="margin-bottom:18px"><div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end"><div class="mfi" style="flex:2 1 160px;margin-bottom:0"><label>Employee</label><select id="ts-r-emp">'+eo+'</select></div><div class="mfi" style="flex:1 1 120px;margin-bottom:0"><label>Month</label><select id="ts-r-mo">'+moOpts+'</select></div><div class="mfi" style="flex:1 1 90px;margin-bottom:0"><label>Year</label><select id="ts-r-yr"><option '+(yr===2024?'selected':'')+'>2024</option><option '+(yr===2025?'selected':'')+'>2025</option><option '+(yr===2026?'selected':'')+'>2026</option></select></div><button id="ts-search" class="btn">Generate Report</button><button id="ts-print-report" class="btn s" onclick="printTsReport()" style="display:none"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Print</button></div></div><div id="ts-report-out"></div>';
 }
 
 function tsRunReport(){
@@ -4362,6 +4361,7 @@ function tsRunReport(){
       allRows+='<tr><td><div style="display:flex;align-items:center;gap:8px"><div class="av">'+ini(emp.name)+'</div><div><div style="font-size:12px;font-weight:600">'+xe(emp.name)+'</div><div style="font-size:10px;color:'+dc(emp.dept||'FOH')+'">'+xe(emp.dept||'')+'</div></div></div></td><td style="font-family:var(--mono);text-align:center">'+tot+'</td><td style="color:#00e5ff;font-family:var(--mono);text-align:center">'+cnt.present+'</td><td style="color:#ffd166;font-family:var(--mono);text-align:center">'+cnt.late+'</td><td style="color:#e05252;font-family:var(--mono);text-align:center">'+cnt.absent+'</td><td style="color:#f97316;font-family:var(--mono);text-align:center">'+cnt.sick+'</td><td style="color:#a78bfa;font-family:var(--mono);text-align:center">'+cnt.holiday+'</td><td style="color:#34d399;font-family:var(--mono);text-align:center">'+cnt.dayoff+'</td><td style="color:'+(grandTot.total?'#4aab6e':'var(--text3)')+';font-family:var(--mono);font-weight:600;text-align:center">'+pct+'</td></tr>';
     });
     var gWorked=grandTot.present+grandTot.late,gPct=grandTot.total?Math.round(gWorked/grandTot.total*100)+'%':'—';
+    var _prb2=document.getElementById('ts-print-report');if(_prb2)_prb2.style.display='none';
     out.innerHTML='<div class="card" style="margin:14px 0 12px;border-color:rgba(201,168,76,.2)"><div style="font-size:14px;font-weight:700">All Staff Report — '+(mo===0?'Full Year':MONTHS[mo-1])+' '+yr+'</div></div><div class="tw"><div class="tw-s"><table><thead><tr><th>Employee</th><th style="text-align:center">Total</th><th style="text-align:center;color:#00e5ff">Present</th><th style="text-align:center;color:#ffd166">Late</th><th style="text-align:center;color:#e05252">Absent</th><th style="text-align:center;color:#f97316">Sick</th><th style="text-align:center;color:#a78bfa">Holiday</th><th style="text-align:center;color:#34d399">Day Off</th><th style="text-align:center">Rate</th></tr></thead><tbody>'+(allRows||'<tr><td colspan="9" class="er">No records.</td></tr>')+'</tbody></table></div></div>';
     return;
   }
@@ -4373,9 +4373,98 @@ function tsRunReport(){
   var cnt={present:0,late:0,absent:0,sick:0,holiday:0,dayoff:0};
   recs.forEach(function(r){if(cnt[r.st]!==undefined)cnt[r.st]++;});
   var tot=recs.length,worked=cnt.present+cnt.late,pct=tot?Math.round(worked/tot*100)+'%':'—';
-  var rows=recs.map(function(r){return '<tr><td style="font-family:var(--mono)">'+r.date+'</td><td style="font-size:11.5px;color:var(--text3);font-family:var(--mono)">'+(r.ci||'—')+'</td><td style="font-size:11.5px;color:var(--text3);font-family:var(--mono)">'+(r.co||'—')+'</td><td style="font-size:11.5px;font-family:var(--mono)">'+tsHrs(r.ci,r.co)+'</td><td>'+tsBadge(r.st)+'</td><td style="font-size:11.5px;color:var(--text3)">'+(r.note||'')+'</td></tr>';}).join('');
-  out.innerHTML='<div class="card" style="margin:16px 0 12px"><div style="font-size:15px;font-weight:700">'+xe(emp.name)+'</div><div style="font-size:11px;color:var(--gold);margin-top:3px;font-family:var(--mono)">'+xe(emp.dept||'')+' · '+(mo===0?'Full Year':MONTHS[mo-1])+' '+yr+'</div></div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px"><div style="text-align:center;background:var(--bg2);border:1px solid var(--bd);border-radius:8px;padding:12px"><div style="font-size:22px;font-weight:300;color:var(--text);font-family:var(--mono)">'+tot+'</div><div style="font-size:9px;color:var(--text3);margin-top:3px;text-transform:uppercase;letter-spacing:1px;font-family:var(--mono)">Total</div></div><div style="text-align:center;background:var(--bg2);border:1px solid var(--bd);border-radius:8px;padding:12px"><div style="font-size:22px;font-weight:300;color:#00e5ff;font-family:var(--mono)">'+cnt.present+'</div><div style="font-size:9px;color:var(--text3);margin-top:3px;text-transform:uppercase;letter-spacing:1px;font-family:var(--mono)">Present</div></div><div style="text-align:center;background:var(--bg2);border:1px solid var(--bd);border-radius:8px;padding:12px"><div style="font-size:22px;font-weight:300;color:#e05252;font-family:var(--mono)">'+cnt.absent+'</div><div style="font-size:9px;color:var(--text3);margin-top:3px;text-transform:uppercase;letter-spacing:1px;font-family:var(--mono)">Absent</div></div><div style="text-align:center;background:var(--bg2);border:1px solid var(--bd);border-radius:8px;padding:12px"><div style="font-size:22px;font-weight:300;color:#7ee787;font-family:var(--mono)">'+pct+'</div><div style="font-size:9px;color:var(--text3);margin-top:3px;text-transform:uppercase;letter-spacing:1px;font-family:var(--mono)">Work Rate</div></div></div>'+(rows?'<div class="tw"><div class="tw-s"><table><thead><tr><th>Date</th><th>In</th><th>Out</th><th>Hours</th><th>Status</th><th>Note</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>':'<div style="color:var(--text3);text-align:center;padding:28px;font-style:italic">No records for this period.</div>');
+  var rows=recs.map(function(r){return '<tr><td style="font-family:var(--mono)">'+r.date+'</td><td style="font-size:11.5px;color:var(--text3);font-family:var(--mono)">'+(r.ci||'—')+'</td><td style="font-size:11.5px;color:var(--text3);font-family:var(--mono)">'+(r.co||'—')+'</td><td style="font-size:11.5px;color:var(--cyn);font-family:var(--mono);font-weight:600">'+(r.brk||'—')+'</td><td style="font-size:11.5px;font-family:var(--mono)">'+tsHrs(r.ci,r.co)+'</td><td>'+tsBadge(r.st)+'</td><td style="font-size:11.5px;color:var(--text3)">'+(r.note||'')+'</td></tr>';}).join('');
+  var _prb=document.getElementById('ts-print-report');if(_prb)_prb.style.display='';
+  out.innerHTML='<div class="card" style="margin:16px 0 12px"><div style="font-size:15px;font-weight:700">'+xe(emp.name)+'</div><div style="font-size:11px;color:var(--gold);margin-top:3px;font-family:var(--mono)">'+xe(emp.dept||'')+' · '+(mo===0?'Full Year':MONTHS[mo-1])+' '+yr+'</div></div><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px"><div style="text-align:center;background:var(--bg2);border:1px solid var(--bd);border-radius:8px;padding:12px"><div style="font-size:22px;font-weight:300;color:var(--text);font-family:var(--mono)">'+tot+'</div><div style="font-size:9px;color:var(--text3);margin-top:3px;text-transform:uppercase;letter-spacing:1px;font-family:var(--mono)">Total</div></div><div style="text-align:center;background:var(--bg2);border:1px solid var(--bd);border-radius:8px;padding:12px"><div style="font-size:22px;font-weight:300;color:#00e5ff;font-family:var(--mono)">'+cnt.present+'</div><div style="font-size:9px;color:var(--text3);margin-top:3px;text-transform:uppercase;letter-spacing:1px;font-family:var(--mono)">Present</div></div><div style="text-align:center;background:var(--bg2);border:1px solid var(--bd);border-radius:8px;padding:12px"><div style="font-size:22px;font-weight:300;color:#e05252;font-family:var(--mono)">'+cnt.absent+'</div><div style="font-size:9px;color:var(--text3);margin-top:3px;text-transform:uppercase;letter-spacing:1px;font-family:var(--mono)">Absent</div></div><div style="text-align:center;background:var(--bg2);border:1px solid var(--bd);border-radius:8px;padding:12px"><div style="font-size:22px;font-weight:300;color:#7ee787;font-family:var(--mono)">'+pct+'</div><div style="font-size:9px;color:var(--text3);margin-top:3px;text-transform:uppercase;letter-spacing:1px;font-family:var(--mono)">Work Rate</div></div></div>'+(rows?'<div class="tw"><div class="tw-s"><table><thead><tr><th>Date</th><th>In</th><th>Out</th><th>Break</th><th>Hours</th><th>Status</th><th>Note</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>':'<div style="color:var(--text3);text-align:center;padding:28px;font-style:italic">No records for this period.</div>');
 }
+
+// ════════════════════════════════════════════════════════════
+// 🖨 PRINT INDIVIDUAL EMPLOYEE TIMESHEET REPORT
+// ════════════════════════════════════════════════════════════
+function printTsReport(){
+  var eid=gv('ts-r-emp'),mo=parseInt(gv('ts-r-mo')),yr=gv('ts-r-yr');
+  if(!eid){toast('Select an employee first','w');return;}
+  var emp=null;for(var i=0;i<S.tsEmps.length;i++)if(S.tsEmps[i].id===eid){emp=S.tsEmps[i];break;}
+  if(!emp){toast('Employee not found','w');return;}
+  var recs=[];
+  if(mo===0){for(var mi=1;mi<=12;mi++){var key=yr+'-'+(mi<10?'0':'')+mi;var mr=(S.tsAtt[emp.id]&&S.tsAtt[emp.id][key])||[];recs=recs.concat(mr);}}
+  else{var key=yr+'-'+(mo<10?'0':'')+mo;recs=(S.tsAtt[emp.id]&&S.tsAtt[emp.id][key])||[];}
+  var cnt={present:0,late:0,absent:0,sick:0,holiday:0,dayoff:0};
+  recs.forEach(function(r){if(cnt[r.st]!==undefined)cnt[r.st]++;});
+  var tot=recs.length,worked=cnt.present+cnt.late,pct=tot?Math.round(worked/tot*100)+'%':'—';
+  var TS_COLORS={present:'#16a34a',late:'#d97706',absent:'#dc2626',sick:'#ea580c',holiday:'#7c3aed',dayoff:'#0891b2'};
+  var TS_LABELS={present:'Present',late:'Late',absent:'Absent',sick:'Sick Leave',holiday:'Holiday',dayoff:'Day Off'};
+  var rows=recs.map(function(r,i){
+    var col=TS_COLORS[r.st]||'#888';
+    var label=TS_LABELS[r.st]||r.st;
+    return '<tr style="background:'+(i%2===0?'#fff':'#f8fafc')+'">'
+      +'<td style="padding:7px 10px;font-family:monospace;font-size:11px;color:#64748b">'+r.date+'</td>'
+      +'<td style="padding:7px 10px;text-align:center;font-weight:600;font-family:monospace;font-size:12px">'+( r.ci||'—')+'</td>'
+      +'<td style="padding:7px 10px;text-align:center;font-weight:600;font-family:monospace;font-size:12px">'+( r.co||'—')+'</td>'
+      +'<td style="padding:7px 10px;text-align:center;font-weight:600;font-family:monospace;font-size:12px;color:#0891b2">'+( r.brk||'—')+'</td>'
+      +'<td style="padding:7px 10px;text-align:center;font-weight:700;font-family:monospace;font-size:12px">'+tsHrs(r.ci,r.co)+'</td>'
+      +'<td style="padding:7px 10px;text-align:center"><span style="background:'+col+'20;color:'+col+';border:1px solid '+col+'40;border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700">'+label+'</span></td>'
+      +'<td style="padding:7px 10px;font-size:11px;color:#64748b">'+( r.note||'')+'</td>'
+      +'</tr>';
+  }).join('');
+  var moLabel=mo===0?'Full Year '+yr:MONTHS[mo-1]+' '+yr;
+  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Timesheet — '+xe(emp.name)+' — '+moLabel+'</title>'
+    +'<style>'
+    +'@page{size:A4;margin:10mm}'
+    +'*{box-sizing:border-box;margin:0;padding:0;font-family:Arial,Helvetica,sans-serif}'
+    +'body{background:#fff;color:#111;font-size:12px}'
+    +'.hdr{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:10px;margin-bottom:16px;border-bottom:3px solid #1a2340}'
+    +'.brand{font-size:20px;font-weight:900;color:#1a2340;letter-spacing:-1px}'
+    +'.brand-sub{font-size:10px;color:#64748b;margin-top:2px}'
+    +'.title h1{font-size:16px;font-weight:800;color:#1a2340;text-align:center}'
+    +'.title p{font-size:11px;color:#64748b;text-align:center;margin-top:3px}'
+    +'.meta{text-align:right;font-size:10px;color:#64748b;line-height:1.7}'
+    +'.stats{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:16px}'
+    +'.stat{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 8px;text-align:center}'
+    +'.stat-n{font-size:22px;font-weight:300;font-family:monospace}'
+    +'.stat-l{font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-top:3px}'
+    +'table{width:100%;border-collapse:collapse;margin-bottom:14px}'
+    +'th{background:#1a2340;color:#fff;padding:8px 10px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:1px}'
+    +'th.c{text-align:center}'
+    +'.foot{margin-top:20px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:30px}'
+    +'.foot-cell{border-top:1px solid #333;padding-top:5px;text-align:center;font-size:9px;color:#64748b}'
+    +'@media print{.no-print{display:none!important}}'
+    +'</style></head><body>'
+    +'<div class="hdr">'
+    +'<div><div class="brand">ALFA.CO</div><div class="brand-sub">Operations Hub — HR &amp; Attendance</div></div>'
+    +'<div class="title"><h1>Employee Timesheet Report</h1><p>'+xe(emp.name)+' &nbsp;|&nbsp; '+xe(emp.dept||'')+' &nbsp;|&nbsp; '+moLabel+'</p></div>'
+    +'<div class="meta">'
+    +'<div><b>Printed:</b> '+new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})+'</div>'
+    +'<div><b>Total Days:</b> '+tot+'</div>'
+    +'<div><b>Work Rate:</b> '+pct+'</div>'
+    +'</div></div>'
+    +'<div class="stats">'
+    +'<div class="stat"><div class="stat-n" style="color:#1a2340">'+tot+'</div><div class="stat-l">Total</div></div>'
+    +'<div class="stat"><div class="stat-n" style="color:#16a34a">'+cnt.present+'</div><div class="stat-l">Present</div></div>'
+    +'<div class="stat"><div class="stat-n" style="color:#d97706">'+cnt.late+'</div><div class="stat-l">Late</div></div>'
+    +'<div class="stat"><div class="stat-n" style="color:#dc2626">'+cnt.absent+'</div><div class="stat-l">Absent</div></div>'
+    +'<div class="stat"><div class="stat-n" style="color:#ea580c">'+cnt.sick+'</div><div class="stat-l">Sick</div></div>'
+    +'<div class="stat"><div class="stat-n" style="color:#0d9488">'+pct+'</div><div class="stat-l">Rate</div></div>'
+    +'</div>'
+    +(recs.length
+      ? '<table><thead><tr><th>Date</th><th class="c">Check In</th><th class="c">Check Out</th><th class="c">Break</th><th class="c">Hours</th><th class="c">Status</th><th>Note</th></tr></thead><tbody>'+rows+'</tbody></table>'
+      : '<div style="text-align:center;padding:30px;color:#94a3b8;font-style:italic">No records for this period.</div>'
+    )
+    +'<div class="foot">'
+    +'<div class="foot-cell">Employee Signature</div>'
+    +'<div class="foot-cell">HR / Manager</div>'
+    +'<div class="foot-cell">Date &amp; Stamp</div>'
+    +'</div>'
+    +'<div class="no-print" style="text-align:center;margin-top:20px">'
+    +'<button onclick="window.print()" style="background:#1a2340;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:13px;font-weight:700;cursor:pointer;margin-right:10px">🖨 Print / Save PDF</button>'
+    +'<button onclick="window.close()" style="background:#f1f5f9;color:#333;border:1px solid #ddd;border-radius:8px;padding:10px 18px;font-size:13px;cursor:pointer">Close</button>'
+    +'</div>'
+    +'</body></html>';
+  var w=window.open('','_blank','width=900,height=700');
+  if(w){w.document.write(html);w.document.close();}
+  else{toast('Please allow pop-ups to print','w');}
+}
+
 
 function tsPgLeave(){
   var filt=S.tsLTab==='all'?S.tsLeaves:S.tsLeaves.filter(function(l){return l.type===S.tsLTab;});
@@ -5142,7 +5231,7 @@ function bindPg(){
     // Capture status BEFORE ren() is called
     var currentStatus = S.tsSt;
     var key=dt.slice(0,7);if(!S.tsAtt[eid])S.tsAtt[eid]={};if(!S.tsAtt[eid][key])S.tsAtt[eid][key]=[];
-    var lst=S.tsAtt[eid][key],rec={date:dt,ci:ci,co:co,st:currentStatus,note:note},found=false;
+    var lst=S.tsAtt[eid][key],rec={date:dt,ci:ci,co:co,brk:document.getElementById('ts-brk')?document.getElementById('ts-brk').value.trim():'',st:currentStatus,note:note},found=false;
     for(var i=0;i<lst.length;i++)if(lst[i].date===dt){lst[i]=rec;found=true;break;}
     if(!found)lst.push(rec);lst.sort(function(a,b){return a.date.localeCompare(b.date);});
     saveTsAtt();
