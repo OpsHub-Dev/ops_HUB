@@ -5772,35 +5772,63 @@ localStorage.setItem(SESSION_KEY, JSON.stringify(Object.assign({},data,{expires:
 }catch(e){}
 }
 
-function launchApp(){
+function _doLaunch(){
+// Guard: if db not ready yet, retry up to 10 times then give up
+var _launchTries=0;
+function _attempt(){
+_launchTries++;
+if(!db){
+if(_launchTries<10){setTimeout(_attempt,500);}
+else{
+console.error(’[OpsHub] db never ready after 10 tries — returning to login’);
+showLoginScreen();
+}
+return;
+}
+// db is ready — proceed
 document.getElementById(‘login-screen’).style.display=‘none’;
 document.getElementById(‘app’).style.display=‘flex’;
 
+```
 // Update branch badge
-var bl=document.getElementById(‘branch-label’);
-var bd2=document.getElementById(‘branch-dot’);
+var bl=document.getElementById('branch-label');
+var bd2=document.getElementById('branch-dot');
 if(IS_SUPER_ADMIN){
-if(bl)bl.textContent=‘Super Admin’;
-if(bd2)bd2.style.background=’#c084fc’;
-document.getElementById(‘nav-admin-sec’).style.display=‘block’;
-document.getElementById(‘nav-admin-btn’).style.display=‘flex’;
+  if(bl)bl.textContent='Super Admin';
+  if(bd2)bd2.style.background='#c084fc';
+  var nas=document.getElementById('nav-admin-sec');
+  var nab=document.getElementById('nav-admin-btn');
+  if(nas)nas.style.display='block';
+  if(nab)nab.style.display='flex';
 } else if(CURRENT_BRANCH){
-if(bl)bl.textContent=CURRENT_BRANCH.name||CURRENT_BRANCH.id;
-if(bd2)bd2.style.background=CURRENT_BRANCH.color||‘var(–grn)’;
+  if(bl)bl.textContent=CURRENT_BRANCH.name||CURRENT_BRANCH.id;
+  if(bd2)bd2.style.background=CURRENT_BRANCH.color||'var(--grn)';
 }
 
-if(!db){setTimeout(launchApp,500);document.getElementById(‘app’).style.display=‘none’;return;}
-_listenersAttached=false; // reset so attachListeners runs fresh
-db.ref(bPath(‘sch’)).once(‘value’,function(snap){
-S.sch=snap.val()||{};
-buildTodayShiftMap();
-attachListeners();
-loadSuppliers();
-if(!IS_SUPER_ADMIN) seedIfEmpty();
-go(IS_SUPER_ADMIN ? ‘admin-branches’ : ‘inv-dash’);
-updateBadges();
+_listenersAttached=false;
+db.ref(bPath('sch')).once('value',function(snap){
+  S.sch=snap.val()||{};
+  buildTodayShiftMap();
+  attachListeners();
+  loadSuppliers();
+  if(!IS_SUPER_ADMIN) seedIfEmpty();
+  go(IS_SUPER_ADMIN ? 'admin-branches' : 'inv-dash');
+  updateBadges();
+},function(err){
+  console.error('[OpsHub] sch read error',err);
+  // Still launch — just with empty schedule
+  attachListeners();
+  loadSuppliers();
+  go(IS_SUPER_ADMIN ? 'admin-branches' : 'inv-dash');
+  updateBadges();
 });
+```
+
 }
+_attempt();
+}
+// Alias for backward compat
+function launchApp(){ _doLaunch(); }
 
 // ── Branch menu (switch / logout) ────────────────────────────
 function showBranchMenu(){
@@ -5853,13 +5881,30 @@ showLoginScreen();
 
 function showLoginScreen(){
 var ls=document.getElementById(‘login-screen’);
+if(!ls){return;} // DOM not ready
 ls.style.display=‘flex’;
+// hide main app
+var app=document.getElementById(‘app’);
+if(app) app.style.display=‘none’;
 // reset to branch step
-document.getElementById(‘login-step-branch’).style.display=‘block’;
-document.getElementById(‘login-step-pin’).style.display=‘none’;
+var stepBranch=document.getElementById(‘login-step-branch’);
+var stepPin=document.getElementById(‘login-step-pin’);
+if(stepBranch) stepBranch.style.display=‘block’;
+if(stepPin) stepPin.style.display=‘none’;
 _pendingBranch=null;
-// reload branches
-if(db) loadBranchesForLogin();
+// Load branches — retry if db not ready yet
+if(db){
+loadBranchesForLogin();
+} else {
+// poll until db is ready then load branches
+var _brTries=0;
+function _waitDb(){
+_brTries++;
+if(db){loadBranchesForLogin();}
+else if(_brTries<20){setTimeout(_waitDb,500);}
+}
+_waitDb();
+}
 }
 
 // ════════════════════════════════════════════════════════════
@@ -6169,21 +6214,28 @@ appId:             “1:84176854270:web:f7a66b3b38e98b630859af”,
 measurementId:     “G-X2R22YGJPW”
 };
 var _fbTries=0;
-function tryInitFB(){_fbTries++;var ok=initFirebase(HARDCODED);if(!ok&&_fbTries<5)setTimeout(tryInitFB,1000);else if(ok){
+// Show login screen immediately — don’t wait for Firebase
+showLoginScreen();
+function tryInitFB(){
+_fbTries++;
+var ok=initFirebase(HARDCODED);
+if(!ok&&_fbTries<8){setTimeout(tryInitFB,800);return;}
+if(!ok){console.error(’[OpsHub] Firebase init failed after retries’);return;}
 // Firebase ready — check for valid session
 var sess=null;
 try{sess=JSON.parse(localStorage.getItem(SESSION_KEY)||‘null’);}catch(e){}
-if(sess&&sess.expires>Date.now()){
-// Valid session — restore and launch
+var validSession=sess&&sess.branchId&&sess.expires&&sess.expires>Date.now();
+if(validSession){
 IS_SUPER_ADMIN=sess.isSuperAdmin||false;
 CURRENT_BRANCH=sess.branch||null;
 BRANCH_PATH=sess.isSuperAdmin?’’:(‘branches/’+(sess.branchId||’’));
-launchApp();
+_doLaunch();
 } else {
-// Show login screen
-showLoginScreen();
+try{localStorage.removeItem(SESSION_KEY);}catch(e){}
+// Login screen already showing — just populate branch list
+if(db) loadBranchesForLogin();
 }
-}}
+}
 tryInitFB();
 
 // Login screen event listeners
