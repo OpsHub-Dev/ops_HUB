@@ -1536,59 +1536,127 @@ function ren(){
 // ════════════════════════════════════════════════════════════
 function pQRCheckin(){
   var sorted=S.tsEmps.slice().sort(function(a,b){return a.name.localeCompare(b.name);});
-  var h='<div style="max-width:600px;margin:0 auto">';
-  h+='<div class="card" style="margin-bottom:16px;border-color:rgba(57,197,207,.2)">';
-  h+='<div class="ct" style="color:var(--cyn)">📱 موظف — سجل حضورك الآن</div>';
-  h+='<div style="font-size:11px;color:var(--text3);margin-bottom:14px">انقر على اسمك لتسجيل الحضور أو الانصراف بوقت الجهاز الحالي</div>';
-  h+='<div style="font-size:13px;font-weight:600;color:var(--text2);margin-bottom:10px;font-family:var(--mono)">📅 '+new Date().toLocaleDateString('ar-SA',{weekday:'long',year:'numeric',month:'long',day:'numeric'})+'</div>';
-  h+='<div id="qr-checkin-page">';
-  if(!sorted.length){ h+='<div style="color:var(--text3);font-style:italic;text-align:center;padding:20px">لا يوجد موظفون</div>'; }
-  else{
-    sorted.forEach(function(e){
+  var branchName=CURRENT_BRANCH?CURRENT_BRANCH.name:(IS_SUPER_ADMIN?'All Branches':'Branch');
+  var branchColor=CURRENT_BRANCH?CURRENT_BRANCH.color:'var(--acc)';
+  var branchIcon=CURRENT_BRANCH?(CURRENT_BRANCH.icon||'🏪'):'🏪';
+  var now=new Date();
+  var timeStr=now.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  var dateStr=now.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  var dateAr=now.toLocaleDateString('ar-SA',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  var depts=['All'].concat(DEPTS);
+  var selDept=S._qrDeptFilter||'All';
+
+  var h='<div style="max-width:640px;margin:0 auto;padding-bottom:20px">';
+
+  // ── Branch Header ──
+  h+='<div style="background:linear-gradient(135deg,'+branchColor+'22,'+branchColor+'08);border:1px solid '+branchColor+'33;border-radius:16px;padding:16px 18px;margin-bottom:14px;display:flex;align-items:center;gap:12px">';
+  h+='<div style="width:48px;height:48px;border-radius:13px;background:'+branchColor+';display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:0 4px 14px rgba(0,0,0,.3);flex-shrink:0">'+branchIcon+'</div>';
+  h+='<div style="flex:1">';
+  h+='<div style="font-size:15px;font-weight:800;color:rgba(255,255,255,.92)">'+xe(branchName)+'</div>';
+  h+='<div style="font-size:11px;color:rgba(255,255,255,.45);font-family:var(--mono);margin-top:2px">📱 Staff Check-In · '+dateStr+'</div>';
+  h+='</div>';
+  h+='<div style="text-align:right;flex-shrink:0">';
+  h+='<div style="font-size:22px;font-weight:300;color:'+branchColor+';font-family:var(--mono)" id="qr-live-clock">'+timeStr+'</div>';
+  h+='<div style="font-size:9px;color:rgba(255,255,255,.3);font-family:var(--mono);margin-top:1px">'+dateAr+'</div>';
+  h+='</div></div>';
+
+  // ── Search + Dept Filter ──
+  h+='<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">';
+  h+='<input id="qr-staff-search" placeholder="🔍 Search staff name…" value="'+xe(S._qrSearch||'')+'" style="flex:1;min-width:160px;background:var(--bg2);border:1.5px solid var(--bd2);border-radius:10px;padding:9px 12px;color:var(--text);font-size:13px;outline:none;font-family:var(--font)">';
+  h+='<div style="display:flex;gap:5px;flex-wrap:wrap">';
+  depts.forEach(function(d){
+    var active=selDept===d;
+    h+='<button class="qr-dept-btn" data-dept="'+d+'" style="padding:7px 13px;border-radius:8px;border:1.5px solid '+(active?branchColor:'var(--bd2)')+';background:'+(active?branchColor+'22':'var(--bg2)')+';color:'+(active?branchColor:'var(--text2)')+';font-size:11px;font-weight:'+(active?'700':'500')+';cursor:pointer;font-family:var(--font);white-space:nowrap">'+d+'</button>';
+  });
+  h+='</div></div>';
+
+  // ── Staff Grid ──
+  var q=(S._qrSearch||'').toLowerCase();
+  var filtered=sorted.filter(function(e){
+    if(selDept!=='All'&&e.dept!==selDept)return false;
+    if(q&&e.name.toLowerCase().indexOf(q)<0)return false;
+    return true;
+  });
+
+  h+='<div id="qr-checkin-page" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;margin-bottom:14px">';
+  if(!filtered.length){
+    h+='<div style="grid-column:1/-1;text-align:center;padding:32px;color:var(--text3);font-size:13px">'+
+       (sorted.length?'No staff match your search':'No staff registered for this branch')+'</div>';
+  } else {
+    filtered.forEach(function(e){
       var key=TODAY.slice(0,7);
       var recs=(S.tsAtt[e.id]&&S.tsAtt[e.id][key])||[];
       var rec=null; for(var i=0;i<recs.length;i++) if(recs[i].date===TODAY){rec=recs[i];break;}
-      var ci=rec&&rec.ci?rec.ci:'—';
-      var co=rec&&rec.co?rec.co:'—';
-      var hrs=rec?tsHrs(rec.ci,rec.co):'—';
-      var stBadge=rec?tsBadge(rec.st):'<span style="color:var(--text3);font-size:10px">Not recorded</span>';
-      h+='<div class="qr-emp-card" data-emp-id="'+xe(e.id)+'">';
-      h+='<div class="av" style="color:'+dc(e.dept||'FOH')+'">'+ini(e.name)+'</div>';
-      h+='<div style="flex:1"><div style="font-size:13px;font-weight:600">'+xe(e.name)+'</div>';
-      h+='<div style="font-size:10px;color:'+dc(e.dept||'FOH')+';font-family:var(--mono)">'+xe(e.dept||'')+'</div></div>';
-      h+='<div style="text-align:right"><div style="display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-bottom:4px">';
-      h+='<span style="font-size:10px;color:var(--text3);font-family:var(--mono)">In: <strong style="color:var(--grn)">'+ci+'</strong></span>';
-      h+='<span style="font-size:10px;color:var(--text3);font-family:var(--mono)">Out: <strong style="color:var(--acc)">'+co+'</strong></span>';
+      var ci=rec&&rec.ci?rec.ci:null;
+      var co=rec&&rec.co?rec.co:null;
+      var st=rec?rec.st:null;
+      // Status color
+      var stCol='rgba(255,255,255,.15)';
+      var stTxt='Not recorded';
+      if(st==='present'||st==='late'){ stCol='rgba(52,211,153,.2)'; stTxt=ci+(co?' → '+co:' (in)'); }
+      else if(st==='absent'){ stCol='rgba(248,113,113,.2)'; stTxt='Absent'; }
+      else if(st==='dayoff'||st==='holiday'){ stCol='rgba(167,139,250,.2)'; stTxt=st==='dayoff'?'Day Off':'Holiday'; }
+      else if(st==='sick'){ stCol='rgba(251,146,60,.2)'; stTxt='Sick Leave'; }
+      else if(ci){ stCol='rgba(52,211,153,.2)'; stTxt=ci+(co?' → '+co:' (in)'); }
+
+      h+='<div class="qr-emp-card" data-emp-id="'+xe(e.id)+'" style="background:var(--bg2);border:1.5px solid '+stCol.replace('.2','.35')+';border-radius:12px;padding:12px 14px;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:12px">';
+      h+='<div style="width:44px;height:44px;border-radius:11px;background:'+dc(e.dept||'FOH')+'22;border:1.5px solid '+dc(e.dept||'FOH')+'44;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;color:'+dc(e.dept||'FOH')+';flex-shrink:0;font-family:var(--mono)">'+ini(e.name)+'</div>';
+      h+='<div style="flex:1;min-width:0">';
+      h+='<div style="font-size:13px;font-weight:700;color:rgba(255,255,255,.9);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+xe(e.name)+'</div>';
+      h+='<div style="font-size:10px;color:'+dc(e.dept||'FOH')+';font-family:var(--mono);margin-top:1px">'+xe(e.dept||'')+'</div>';
       h+='</div>';
-      h+=stBadge;
+      h+='<div style="text-align:right;flex-shrink:0">';
+      h+='<div style="font-size:11px;font-weight:700;color:rgba(255,255,255,.7);font-family:var(--mono)">'+stTxt+'</div>';
+      if(ci&&!co) h+='<div style="font-size:9px;color:rgba(52,211,153,.7);margin-top:2px">● Active</div>';
       h+='</div></div>';
     });
   }
-  h+='</div></div>';
-
-  // Quick attendance form
-  h+='<div class="card">';
-  h+='<div class="ct">✏️ تسجيل سريع</div>';
-  h+='<div class="mfi" style="margin-bottom:10px"><label>الموظف</label>';
-  h+='<select id="qr-emp-sel"><option value="">— اختر الموظف —</option>';
-  sorted.forEach(function(e){ h+='<option value="'+xe(e.id)+'">'+xe(e.name)+' ('+xe(e.dept||'')+')</option>'; });
-  h+='</select></div>';
-  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">';
-  h+='<button class="btn g" id="qr-checkin-btn" style="justify-content:center">✅ Check In ('+new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})+')</button>';
-  h+='<button class="btn s" id="qr-checkout-btn" style="justify-content:center">🚪 Check Out</button>';
   h+='</div>';
-  h+='<button id="qr-break-btn" style="width:100%;padding:11px;background:linear-gradient(135deg,#f97316,#ea580c);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:10px">☕ Start Break (1 Hour Timer)</button>';
+
+  // ── Quick Action Card ──
+  h+='<div class="card" style="margin-bottom:12px">';
+  h+='<div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:12px">✏️ Quick Record</div>';
+  h+='<div class="mfi" style="margin-bottom:10px"><label>Select Staff</label>';
+  h+='<select id="qr-emp-sel" style="font-size:13px"><option value="">— Choose name —</option>';
+  sorted.forEach(function(e){ h+='<option value="'+xe(e.id)+'">'+xe(e.name)+' · '+xe(e.dept||'')+'</option>'; });
+  h+='</select></div>';
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">';
+  h+='<button class="btn g" id="qr-checkin-btn" style="justify-content:center;padding:12px">✅ Check In'+'<span style="font-size:10px;opacity:.7;margin-left:4px">'+timeStr+'</span></button>';
+  h+='<button class="btn s" id="qr-checkout-btn" style="justify-content:center;padding:12px">🚪 Check Out</button>';
+  h+='</div>';
+  h+='<button id="qr-break-btn" style="width:100%;padding:11px;background:linear-gradient(135deg,#f97316,#ea580c);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:10px;font-family:var(--font)">☕ Start Break (1 Hour Timer)</button>';
   h+='<div id="break-timer-display" style="display:none;background:rgba(249,115,22,.1);border:1px solid rgba(249,115,22,.3);border-radius:8px;padding:10px;text-align:center;margin-bottom:10px">';
   h+='<div style="font-size:10px;color:#f97316;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">☕ BREAK TIME REMAINING</div>';
   h+='<div id="break-timer-clock" style="font-size:28px;font-weight:700;color:#f97316;font-family:var(--mono)">01:00:00</div></div>';
-  h+='<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:4px">';
+  h+='<div style="font-size:10px;color:var(--text3);margin-bottom:6px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px">Status Override</div>';
+  h+='<div style="display:flex;flex-wrap:wrap;gap:5px">';
   Object.keys(TS_ST).forEach(function(s){
     var c=TS_ST[s];
-    h+='<button class="ts-st-btn" data-st="'+s+'" style="padding:5px 10px;border-radius:6px;border:1px solid '+(S.tsSt===s?c.c:'var(--bd2)')+';background:'+(S.tsSt===s?c.c+'18':'transparent')+';color:'+(S.tsSt===s?c.c:'var(--text3)')+';font-size:11px;font-weight:600;cursor:pointer;font-family:var(--font)">'+c.l+'</button>';
+    h+='<button class="ts-st-btn" data-st="'+s+'" style="padding:6px 11px;border-radius:7px;border:1.5px solid '+(S.tsSt===s?c.c:'var(--bd2)')+';background:'+(S.tsSt===s?c.c+'18':'var(--bg3)')+';color:'+(S.tsSt===s?c.c:'var(--text3)')+';font-size:11px;font-weight:'+(S.tsSt===s?'700':'500')+';cursor:pointer;font-family:var(--font)">'+c.l+'</button>';
   });
   h+='</div></div>';
+
+  // ── Today's Summary ──
+  var checkedIn=0,checkedOut=0,notRec=0;
+  sorted.forEach(function(e){
+    var key=TODAY.slice(0,7);
+    var recs=(S.tsAtt[e.id]&&S.tsAtt[e.id][key])||[];
+    var rec=null; for(var i=0;i<recs.length;i++) if(recs[i].date===TODAY){rec=recs[i];break;}
+    if(!rec)notRec++;
+    else if(rec.co)checkedOut++;
+    else if(rec.ci)checkedIn++;
+    else notRec++;
+  });
+  h+='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">';
+  h+='<div style="background:rgba(52,211,153,.08);border:1px solid rgba(52,211,153,.2);border-radius:10px;padding:12px;text-align:center"><div style="font-size:24px;font-weight:300;color:#34d399;font-family:var(--mono)">'+checkedIn+'</div><div style="font-size:9px;color:rgba(52,211,153,.6);text-transform:uppercase;letter-spacing:1px;font-family:var(--mono);margin-top:3px">Checked In</div></div>';
+  h+='<div style="background:rgba(96,165,250,.08);border:1px solid rgba(96,165,250,.2);border-radius:10px;padding:12px;text-align:center"><div style="font-size:24px;font-weight:300;color:#60a5fa;font-family:var(--mono)">'+checkedOut+'</div><div style="font-size:9px;color:rgba(96,165,250,.6);text-transform:uppercase;letter-spacing:1px;font-family:var(--mono);margin-top:3px">Checked Out</div></div>';
+  h+='<div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:12px;text-align:center"><div style="font-size:24px;font-weight:300;color:rgba(255,255,255,.4);font-family:var(--mono)">'+notRec+'</div><div style="font-size:9px;color:rgba(255,255,255,.25);text-transform:uppercase;letter-spacing:1px;font-family:var(--mono);margin-top:3px">Not Recorded</div></div>';
+  h+='</div>';
+
+  h+='</div>';
   return h;
 }
+
 
 // ════════════════════════════════════════════════════════════
 // ✅ OPERATIONS CHECKLISTS PAGE
@@ -5527,27 +5595,65 @@ function bindPg(){
   if(dz){dz.onclick=function(){document.getElementById('file-inp').click();};dz.ondragover=function(e){e.preventDefault();dz.classList.add('drag');};dz.ondragleave=function(){dz.classList.remove('drag');};dz.ondrop=function(e){e.preventDefault();dz.classList.remove('drag');handleFile(e.dataTransfer.files[0]);};}
   var fi2=document.getElementById('file-inp');if(fi2)fi2.onchange=function(){handleFile(this.files[0]);};
 
-  // QR Checkin
-  document.querySelectorAll('#qr-checkin-page .qr-emp-card').forEach(function(card){
-    card.onclick=function(){
-      var eid=card.dataset.empId;
-      document.getElementById('qr-emp-sel').value=eid;
-    };
-  });
+  // QR Checkin — branch-aware, search + dept filter + live clock
+  if(S.p==='qr-checkin'){
+    // Live clock update
+    var _qrClockInt=setInterval(function(){
+      var cl=document.getElementById('qr-live-clock');
+      if(!cl){clearInterval(_qrClockInt);return;}
+      var n=new Date();
+      cl.textContent=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');
+    },10000);
+
+    // Search
+    var qrSearch=document.getElementById('qr-staff-search');
+    if(qrSearch&&!qrSearch._wired){qrSearch._wired=true;qrSearch.oninput=function(){S._qrSearch=this.value;ren();};}
+
+    // Dept filter buttons
+    document.querySelectorAll('.qr-dept-btn').forEach(function(btn){
+      btn.onclick=function(){S._qrDeptFilter=this.dataset.dept;ren();};
+    });
+
+    // Staff card click → auto-select in dropdown
+    document.querySelectorAll('.qr-emp-card').forEach(function(card){
+      card.onclick=function(){
+        var eid=this.dataset.empId;
+        var sel=document.getElementById('qr-emp-sel');
+        if(sel){sel.value=eid;sel.scrollIntoView({behavior:'smooth',block:'nearest'});}
+        // Highlight selected
+        document.querySelectorAll('.qr-emp-card').forEach(function(c){c.style.outline='none';});
+        this.style.outline='2px solid var(--acc)';
+      };
+    });
+  }
+
   var qrci=document.getElementById('qr-checkin-btn');
   if(qrci)qrci.onclick=function(){
     var eid=document.getElementById('qr-emp-sel').value;
     if(!eid){toast('Select employee first','warning');return;}
     var now=new Date(),ts=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
-    var key=TODAY.slice(0,7),st=ts<='08:30'?'present':'late';
+    // Determine late threshold from schedule if available
+    var shiftStart=_todayShiftMap[eid]||null;
+    var graceMins=15;
+    var lateThresh='09:00';
+    if(shiftStart&&shiftStart.match(/\d+/)){
+      var hr=parseInt(shiftStart.match(/\d+/)[0]);
+      var pm=shiftStart.toLowerCase().indexOf('pm')>=0&&hr!==12;
+      if(pm)hr+=12;
+      lateThresh=String(hr).padStart(2,'0')+':'+String(graceMins).padStart(2,'0');
+    }
+    var st=ts<=lateThresh?'present':'late';
+    var key=TODAY.slice(0,7);
     if(!S.tsAtt[eid])S.tsAtt[eid]={};if(!S.tsAtt[eid][key])S.tsAtt[eid][key]=[];
     var lst=S.tsAtt[eid][key],found=false;
-    for(var i=0;i<lst.length;i++)if(lst[i].date===TODAY){lst[i].ci=lst[i].ci||ts;found=true;break;}
+    for(var i=0;i<lst.length;i++)if(lst[i].date===TODAY){if(!lst[i].ci){lst[i].ci=ts;lst[i].st=st;}found=true;break;}
     if(!found)lst.push({date:TODAY,ci:ts,co:null,st:st,note:''});
     saveTsAtt();ren();
     var emp=null;for(var i=0;i<S.tsEmps.length;i++)if(S.tsEmps[i].id===eid){emp=S.tsEmps[i];break;}
-    toast('✅ '+(emp?emp.name:'Employee')+' checked in at '+ts,'success');
+    var empName=emp?emp.name:'Employee';
+    toast('✅ '+empName+' checked in at '+ts+(st==='late'?' · Late':''),'success');
   };
+
   // Break timer button
   var brkBtn=document.getElementById('qr-break-btn');
   if(brkBtn){
@@ -5566,7 +5672,6 @@ function bindPg(){
       if(clock)clock.textContent=String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s2).padStart(2,'0');
       if(remain<=0){clearInterval(_brkInt);localStorage.removeItem(_brkKey);display.style.display='none';brkBtn.textContent='☕ Start Break (1 Hour Timer)';brkBtn.style.background='linear-gradient(135deg,#f97316,#ea580c)';toast('⏰ Break time over!','warning');}
     }
-    // Restore if break active
     if(localStorage.getItem(_brkKey)){
       document.getElementById('break-timer-display').style.display='block';
       brkBtn.textContent='🏃 End Break';brkBtn.style.background='linear-gradient(135deg,#16a34a,#15803d)';
