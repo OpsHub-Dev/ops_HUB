@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -138,6 +137,40 @@ html,body{min-height:100%;font-family:var(--font);background:var(--bg);color:var
 .pill-leave{background:rgba(188,140,255,.12);color:var(--pur);border:1px solid rgba(188,140,255,.2)}
 .pill-notyet{background:rgba(125,133,144,.1);color:var(--text3);border:1px solid rgba(125,133,144,.15)}
 
+/* BRANCH SELECTOR */
+#branch-select-screen{position:fixed;inset:0;z-index:300;display:flex;align-items:center;justify-content:center;padding:20px;
+  background:radial-gradient(ellipse at 20% 30%,rgba(99,102,241,0.30) 0%,transparent 55%),
+             radial-gradient(ellipse at 80% 70%,rgba(236,72,153,0.16) 0%,transparent 50%),
+             linear-gradient(160deg,#050810 0%,#090d1a 100%)}
+#branch-select-screen.gone{display:none}
+.bs-card{background:rgba(255,255,255,.055);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);
+  border:1px solid rgba(255,255,255,.12);border-radius:20px;padding:28px;width:100%;max-width:420px;
+  box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.bs-logo{text-align:center;margin-bottom:24px}
+.bs-logo .ico{font-size:42px;margin-bottom:6px}
+.bs-logo h2{font-size:20px;font-weight:800;color:rgba(255,255,255,.92);letter-spacing:-.5px}
+.bs-logo p{font-size:11px;color:rgba(255,255,255,.4);margin-top:3px;font-family:monospace}
+.bs-label{font-size:9px;font-weight:700;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;font-family:monospace}
+.bs-list{display:flex;flex-direction:column;gap:7px;max-height:360px;overflow-y:auto;margin-bottom:16px}
+.bs-btn{display:flex;align-items:center;gap:11px;width:100%;background:rgba(255,255,255,.04);
+  border:1px solid rgba(255,255,255,.09);border-radius:12px;padding:11px 13px;cursor:pointer;text-align:left;
+  transition:all .15s;font-family:var(--font);color:var(--text)}
+.bs-btn:hover{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.18)}
+.bs-btn .bs-icon{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;box-shadow:0 3px 10px rgba(0,0,0,.3)}
+.bs-btn .bs-name{font-size:13px;font-weight:700;color:rgba(255,255,255,.9)}
+.bs-btn .bs-sub{font-size:10px;color:rgba(255,255,255,.4);font-family:monospace;margin-top:1px}
+.bs-btn .bs-arr{font-size:16px;color:rgba(255,255,255,.2);margin-left:auto;flex-shrink:0}
+/* PIN screen */
+#pin-screen{display:none}
+#pin-screen.show{display:block}
+.pin-back{background:none;border:none;color:rgba(255,255,255,.5);font-size:13px;cursor:pointer;padding:0 0 12px;font-family:var(--font);display:flex;align-items:center;gap:6px}
+.pin-inp{width:100%;background:rgba(255,255,255,.07);border:1.5px solid rgba(255,255,255,.13);border-radius:10px;
+  padding:13px 16px;color:rgba(255,255,255,.9);font-size:22px;font-family:monospace;letter-spacing:8px;
+  text-align:center;outline:none;transition:border-color .2s;margin:8px 0 4px}
+.pin-inp:focus{border-color:var(--acc)}
+.pin-err{font-size:11px;color:var(--red);min-height:16px;margin-bottom:8px;text-align:center}
+.pin-submit{width:100%;padding:13px;background:linear-gradient(135deg,#f0a500,#d97706);color:#000;border:none;
+  border-radius:10px;font-size:14px;font-weight:800;cursor:pointer;font-family:var(--font)}
 /* EMPTY */
 .empty{text-align:center;padding:40px 20px;color:var(--text3)}
 .empty-ico{font-size:40px;margin-bottom:10px}
@@ -152,55 +185,60 @@ html,body{min-height:100%;font-family:var(--font);background:var(--bg);color:var
 .toast.info{border-color:rgba(88,166,255,.3);background:rgba(88,166,255,.06)}
 @keyframes toastIn{from{transform:translateY(14px);opacity:0}to{transform:none;opacity:1}}
 </style>
-
 </head>
 <body>
 
 <!-- LOADING -->
-
 <div id="loading">
   <div style="font-size:40px;margin-bottom:4px">⚡</div>
   <div class="spinner"></div>
-  <div style="font-size:12px;color:var(--text3);font-family:var(--mono);margin-top:4px">Connecting to database…</div>
+  <div style="font-size:12px;color:var(--text3);font-family:var(--mono);margin-top:4px">Connecting…</div>
 </div>
 
-<!-- SETUP -->
-
-<div id="setup" class="gone">
-  <div class="setup-box">
-    <div style="font-size:38px;margin-bottom:12px">👥</div>
-    <h2>Staff Portal Setup</h2>
-    <p>Enter your Firebase credentials once to connect. Settings are saved for future visits.</p>
-    <div class="setup-step"><strong>1.</strong> Go to <strong>console.firebase.google.com</strong> → your project</div>
-    <div class="setup-step"><strong>2.</strong> Project Settings → Web App → copy <strong>apiKey</strong> and <strong>databaseURL</strong></div>
-    <div style="margin-top:16px">
-      <label class="lbl">API Key *</label>
-      <input class="inp" id="cfg-api" placeholder="AIzaSy…">
-      <label class="lbl">Database URL *</label>
-      <input class="inp" id="cfg-db" placeholder="https://your-app-default-rtdb.firebaseio.com">
-      <label class="lbl">Auth Domain</label>
-      <input class="inp" id="cfg-auth" placeholder="your-app.firebaseapp.com">
+<!-- BRANCH SELECTOR -->
+<div id="branch-select-screen" class="gone">
+  <div class="bs-card">
+    <div class="bs-logo">
+      <div class="ico">📱</div>
+      <h2>Staff Check-In</h2>
+      <p>ALFA.CO · Select your branch to continue</p>
     </div>
-    <div class="err" id="setup-err">Connection failed. Please check your credentials.</div>
-    <button class="btn-primary" id="btn-connect">🔗 Connect</button>
-    <div class="note">Settings are saved in your browser automatically</div>
+
+    <!-- Branch list step -->
+    <div id="branch-list-step">
+      <div class="bs-label">Select Your Branch</div>
+      <div class="bs-list" id="bs-branch-list">
+        <div style="text-align:center;color:rgba(255,255,255,.3);padding:20px;font-size:12px">Loading branches…</div>
+      </div>
+    </div>
+
+    <!-- PIN entry step -->
+    <div id="pin-screen">
+      <button class="pin-back" id="pin-back-btn">← Back</button>
+      <div style="font-size:14px;font-weight:700;color:rgba(255,255,255,.9);margin-bottom:4px" id="pin-branch-name"></div>
+      <div style="font-size:10px;color:rgba(255,255,255,.4);font-family:monospace;margin-bottom:14px" id="pin-branch-sub"></div>
+      <div style="font-size:9px;font-weight:700;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:1px;font-family:monospace;margin-bottom:4px">Branch PIN</div>
+      <input class="pin-inp" id="pin-inp" type="password" inputmode="numeric" maxlength="8" placeholder="••••" autocomplete="off">
+      <div class="pin-err" id="pin-err"></div>
+      <button class="pin-submit" id="pin-submit-btn">Enter →</button>
+    </div>
   </div>
 </div>
 
 <!-- APP -->
-
 <div id="app" style="display:none">
   <div class="header">
-    <div class="header-logo">⚡</div>
+    <div class="header-logo" id="header-branch-icon">⚡</div>
     <div>
-      <div class="header-title">Staff Portal</div>
-      <div class="header-sub" id="hdate">—</div>
+      <div class="header-title" id="header-branch-name">Staff Portal</div>
+      <div class="header-sub" id="header-branch-sub" style="font-size:9px"></div>
     </div>
     <div class="conn-dot" id="conn-dot"></div>
     <div class="clock-badge" id="clock">--:--:--</div>
     <button id="wa-settings-btn" onclick="openWASettings()" title="WhatsApp Settings" style="background:none;border:none;cursor:pointer;font-size:20px;padding:4px 6px;border-radius:8px;transition:background .15s;color:#25d366" onmouseover="this.style.background='rgba(37,211,102,.1)'" onmouseout="this.style.background='none'">
       <svg viewBox="0 0 24 24" width="22" height="22" fill="#25d366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
     </button>
+    <button onclick="switchBranch()" title="Switch Branch" style="background:none;border:1px solid rgba(255,255,255,.12);border-radius:8px;cursor:pointer;font-size:11px;padding:5px 10px;color:rgba(255,255,255,.5);font-family:var(--font);transition:all .15s" onmouseover="this.style.borderColor='rgba(255,255,255,.3)'" onmouseout="this.style.borderColor='rgba(255,255,255,.12)'">🔀</button>
   </div>
 
   <div class="tabs">
@@ -209,7 +247,6 @@ html,body{min-height:100%;font-family:var(--font);background:var(--bg);color:var
   </div>
 
   <!-- CHECK-IN TAB -->
-
   <div class="page on" id="tab-checkin">
     <div style="height:12px"></div>
     <div class="date-bar">
@@ -220,47 +257,43 @@ html,body{min-height:100%;font-family:var(--font);background:var(--bg);color:var
       </div>
     </div>
 
-```
-<div class="card">
-  <div class="card-title">👤 Select Your Name</div>
-  <input class="emp-search" id="emp-search" placeholder="🔍  Search your name…" autocomplete="off" autocorrect="off" spellcheck="false">
-  <div class="emp-list" id="emp-list">
-    <div class="empty"><div class="empty-ico">⏳</div><div class="empty-txt">Loading staff…</div></div>
-  </div>
-</div>
+    <div class="card">
+      <div class="card-title">👤 Select Your Name</div>
+      <input class="emp-search" id="emp-search" placeholder="🔍  Search your name…" autocomplete="off" autocorrect="off" spellcheck="false">
+      <div class="emp-list" id="emp-list">
+        <div class="empty"><div class="empty-ico">⏳</div><div class="empty-txt">Loading staff…</div></div>
+      </div>
+    </div>
 
-<div class="status-card" id="status-card">
-  <div class="st-ico" id="st-ico"></div>
-  <div style="flex:1">
-    <div class="st-name" id="st-name"></div>
-    <div class="st-info" id="st-info"></div>
-  </div>
-</div>
+    <div class="status-card" id="status-card">
+      <div class="st-ico" id="st-ico"></div>
+      <div style="flex:1">
+        <div class="st-name" id="st-name"></div>
+        <div class="st-info" id="st-info"></div>
+      </div>
+    </div>
 
-<div id="action-area" style="display:none">
-  <div class="action-grid">
-    <button class="action-btn btn-in" id="btn-checkin">
-      <span class="btn-ico">✅</span>
-      <span class="btn-lbl">Check In</span>
-      <span class="btn-time" id="btn-in-time">--:--</span>
-    </button>
-    <button class="action-btn btn-out" id="btn-checkout">
-      <span class="btn-ico">🚪</span>
-      <span class="btn-lbl">Check Out</span>
-      <span class="btn-time" id="btn-out-time">--:--</span>
-    </button>
-  </div>
-  <button class="action-btn btn-absent" id="btn-mark-absent">
-    <span style="font-size:20px">❌</span>
-    <span class="btn-lbl">Mark as Absent</span>
-  </button>
-</div>
-```
-
+    <div id="action-area" style="display:none">
+      <div class="action-grid">
+        <button class="action-btn btn-in" id="btn-checkin">
+          <span class="btn-ico">✅</span>
+          <span class="btn-lbl">Check In</span>
+          <span class="btn-time" id="btn-in-time">--:--</span>
+        </button>
+        <button class="action-btn btn-out" id="btn-checkout">
+          <span class="btn-ico">🚪</span>
+          <span class="btn-lbl">Check Out</span>
+          <span class="btn-time" id="btn-out-time">--:--</span>
+        </button>
+      </div>
+      <button class="action-btn btn-absent" id="btn-mark-absent">
+        <span style="font-size:20px">❌</span>
+        <span class="btn-lbl">Mark as Absent</span>
+      </button>
+    </div>
   </div>
 
   <!-- TEAM TAB -->
-
   <div class="page" id="tab-team">
     <div style="height:12px"></div>
     <div class="sum-bar">
@@ -279,23 +312,19 @@ html,body{min-height:100%;font-family:var(--font);background:var(--bg);color:var
     </div>
     <div id="team-list"></div>
 
-```
-<!-- End of Day WhatsApp Report -->
-<div style="margin-top:12px">
-  <button onclick="sendEODReport()" style="width:100%;padding:13px;border-radius:10px;border:1px solid rgba(37,211,102,.3);background:rgba(37,211,102,.07);color:#25d366;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font);display:flex;align-items:center;justify-content:center;gap:8px;transition:all .15s" onmouseover="this.style.background='rgba(37,211,102,.14)'" onmouseout="this.style.background='rgba(37,211,102,.07)'">
-    <svg viewBox="0 0 24 24" width="18" height="18" fill="#25d366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-    Send End-of-Day Attendance Report
-  </button>
-</div>
-```
-
+    <!-- End of Day WhatsApp Report -->
+    <div style="margin-top:12px">
+      <button onclick="sendEODReport()" style="width:100%;padding:13px;border-radius:10px;border:1px solid rgba(37,211,102,.3);background:rgba(37,211,102,.07);color:#25d366;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font);display:flex;align-items:center;justify-content:center;gap:8px;transition:all .15s" onmouseover="this.style.background='rgba(37,211,102,.14)'" onmouseout="this.style.background='rgba(37,211,102,.07)'">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="#25d366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+        Send End-of-Day Attendance Report
+      </button>
+    </div>
   </div>
 </div>
 
 <div id="toasts"></div>
 
 <!-- ══ WhatsApp Settings Modal ══ -->
-
 <div id="wa-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:400;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px)">
   <div style="background:#161b22;border:1px solid #30363d;border-radius:16px;width:100%;max-width:440px;box-shadow:0 20px 60px rgba(0,0,0,.7)">
     <div style="padding:14px 18px;border-bottom:1px solid #30363d;display:flex;align-items:center;justify-content:space-between">
@@ -331,7 +360,6 @@ html,body{min-height:100%;font-family:var(--font);background:var(--bg);color:var
 </div>
 
 <!-- ══ WhatsApp Send Confirmation Modal ══ -->
-
 <div id="wa-confirm-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px)">
   <div style="background:#161b22;border:1px solid #30363d;border-radius:16px;width:100%;max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,.7)">
     <div style="padding:14px 18px;border-bottom:1px solid #30363d;display:flex;align-items:center;justify-content:space-between">
@@ -352,22 +380,39 @@ html,body{min-height:100%;font-family:var(--font);background:var(--bg);color:var
 
 <script>
 // ══════════════════════════════════════════════════════════
-// 🔥 HARDCODED FIREBASE CONFIG
-// ── Paste your Firebase credentials here once.
-// ── After that, every device opens the app directly
-// ── without asking for credentials.
+// 🔥 FIREBASE CONFIG — ALFA.CO OpsHub
 // ══════════════════════════════════════════════════════════
 var FIREBASE_CONFIG = {
   apiKey:      "AIzaSyB9DhSn5gDqAhpmLG9aVFAld1dSRYJWFDI",
   authDomain:  "opshub-f802f.firebaseapp.com",
   databaseURL: "https://opshub-f802f-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId:   "opshub-f802f"
+  projectId:   "opshub-f802f",
+  storageBucket:"opshub-f802f.firebasestorage.app",
+  messagingSenderId:"84176854270",
+  appId:       "1:84176854270:web:f7a66b3b38e98b630859af"
 };
 // ══════════════════════════════════════════════════════════
 
-var FB_KEY  = 'ops_hub_firebase_config';
-var FB_KEY2 = 'ops_staff_firebase_config';
-var db      = null;
+var STAFF_SESSION_KEY = 'opshub_staff_branch_session';
+var SUPER_ADMIN_PIN   = '1422';
+var db                = null;
+
+// ── Branch session ─────────────────────────────────────────
+var BRANCH_PATH   = '';  // e.g. 'branches/hybrid_moa'
+var CURRENT_BRANCH = null;
+
+function bPath(rel){ return BRANCH_PATH ? (BRANCH_PATH+'/'+rel) : rel; }
+
+// ── Load saved session ────────────────────────────────────
+(function(){
+  try{
+    var s=JSON.parse(localStorage.getItem(STAFF_SESSION_KEY)||'null');
+    if(s&&s.branchId&&s.expires>Date.now()){
+      CURRENT_BRANCH=s.branch||null;
+      BRANCH_PATH='branches/'+s.branchId;
+    }
+  }catch(e){}
+})();
 
 var TODAY = (function(){
   var d = new Date();
@@ -535,7 +580,7 @@ function isScheduledOff(eid){
 
 function saveAtt(eid,rec){
   if(!db) return;
-  var path='tsAtt/'+eid+'/'+MK;
+  var path=bPath('tsAtt')+'/'+eid+'/'+MK;
   db.ref(path).once('value',function(snap){
     var arr=snap.val()||[];
     if(!Array.isArray(arr)) arr=Object.values(arr).filter(Boolean);
@@ -693,58 +738,138 @@ function refreshTeam(){
   }).join('');
 }
 
-// FIREBASE
+// FIREBASE — all paths use bPath() for branch isolation
 function attachListeners(){
-  // Load staff list for shift-aware late detection
-  db.ref('staff').on('value',function(snap){
+  db.ref(bPath('staff')).on('value',function(snap){
     var raw=snap.val();
     staffList=!raw?[]:(Array.isArray(raw)?raw.filter(Boolean):Object.values(raw).filter(Boolean));
   });
-  db.ref('tsEmps').on('value',function(snap){
+  db.ref(bPath('tsEmps')).on('value',function(snap){
     var raw=snap.val();
     tsEmps=!raw?[]:(Array.isArray(raw)?raw.filter(Boolean):Object.values(raw).filter(Boolean));
     tsEmps.sort(function(a,b){return a.name.localeCompare(b.name);});
     renderEmpList(document.getElementById('emp-search').value);
     refreshTeam();
   });
-  db.ref('tsAtt').on('value',function(snap){
+  db.ref(bPath('tsAtt')).on('value',function(snap){
     tsAtt=snap.val()||{};
     updateStatusCard();
     renderEmpList(document.getElementById('emp-search').value);
     refreshTeam();
   });
-  db.ref('tsLeaves').on('value',function(snap){
+  db.ref(bPath('tsLeaves')).on('value',function(snap){
     var raw=snap.val();
     tsLeaves=!raw?[]:(Array.isArray(raw)?raw.filter(Boolean):Object.values(raw).filter(Boolean));
     updateStatusCard(); refreshTeam();
   });
-  db.ref('sch').on('value',function(snap){
+  db.ref(bPath('sch')).on('value',function(snap){
     schedule=snap.val()||{};
     buildTodayMap();
     updateStatusCard(); refreshTeam();
   });
 }
 
-function connectFirebase(config){
+// ════════════════════════════════════════════════════════════
+// 🏢 BRANCH SELECTOR
+// ════════════════════════════════════════════════════════════
+var _pendingBranch = null;
+
+function showBranchSelector(){
+  document.getElementById('loading').classList.add('gone');
+  document.getElementById('branch-select-screen').classList.remove('gone');
+  document.getElementById('app').style.display='none';
+  // Load branches from Firebase
+  db.ref('admin/branches').once('value',function(snap){
+    var raw=snap.val()||{};
+    var branches=Object.values(raw).filter(function(b){return b&&b.active!==false;});
+    branches.sort(function(a,b){return (a.name||'').localeCompare(b.name||'');});
+    renderBranchList(branches);
+  });
+}
+
+function renderBranchList(branches){
+  var el=document.getElementById('bs-branch-list');
+  if(!branches.length){
+    el.innerHTML='<div style="text-align:center;color:rgba(255,255,255,.3);padding:20px;font-size:12px">No branches found. Contact your Super Admin.</div>';
+    return;
+  }
+  el.innerHTML='';
+  branches.forEach(function(b){
+    var btn=document.createElement('button');
+    btn.className='bs-btn';
+    btn.innerHTML=
+      '<div class="bs-icon" style="background:'+( b.color||'#f0a500')+'">'+(b.icon||'🏪')+'</div>'+
+      '<div><div class="bs-name">'+(b.name||b.id)+'</div><div class="bs-sub">'+(b.brand||'')+(b.location?' · '+b.location:'')+'</div></div>'+
+      '<div class="bs-arr">›</div>';
+    btn.onclick=function(){
+      _pendingBranch=b;
+      document.getElementById('pin-branch-name').textContent=b.name||b.id;
+      document.getElementById('pin-branch-sub').textContent=(b.brand||'')+(b.location?' · '+b.location:'');
+      document.getElementById('branch-list-step').style.display='none';
+      document.getElementById('pin-screen').classList.add('show');
+      var pi=document.getElementById('pin-inp');
+      pi.value='';
+      document.getElementById('pin-err').textContent='';
+      setTimeout(function(){pi.focus();},60);
+    };
+    el.appendChild(btn);
+  });
+}
+
+function submitPin(){
+  if(!_pendingBranch) return;
+  var pin=(document.getElementById('pin-inp').value||'').trim();
+  var err=document.getElementById('pin-err');
+  if(!pin){err.textContent='Enter PIN';return;}
+  if(pin!==String(_pendingBranch.pin)){
+    err.textContent='Incorrect PIN — try again';
+    document.getElementById('pin-inp').value='';
+    document.getElementById('pin-inp').focus();
+    return;
+  }
+  // Save session (8 hours)
+  CURRENT_BRANCH=_pendingBranch;
+  BRANCH_PATH='branches/'+_pendingBranch.id;
+  try{localStorage.setItem(STAFF_SESSION_KEY,JSON.stringify({branchId:_pendingBranch.id,branch:_pendingBranch,expires:Date.now()+8*3600000}));}catch(e){}
+  launchStaffApp();
+}
+
+function launchStaffApp(){
+  // Update header with branch info
+  var htitle=document.getElementById('header-branch-name');
+  var hsub=document.getElementById('header-branch-sub');
+  var hico=document.getElementById('header-branch-icon');
+  if(htitle) htitle.textContent=CURRENT_BRANCH?CURRENT_BRANCH.name:'Staff Portal';
+  if(hsub) hsub.textContent=CURRENT_BRANCH?(CURRENT_BRANCH.brand||'')+(CURRENT_BRANCH.location?' · '+CURRENT_BRANCH.location:''):'';
+  if(hico&&CURRENT_BRANCH) hico.style.background='linear-gradient(135deg,'+(CURRENT_BRANCH.color||'#f0a500')+','+( CURRENT_BRANCH.color||'#f0a500')+'aa)';
+
+  document.getElementById('branch-select-screen').classList.add('gone');
+  document.getElementById('loading').classList.add('gone');
+  document.getElementById('app').style.display='block';
+  attachListeners();
+}
+
+function connectFirebase(){
   try{
-    if(firebase.apps.length) firebase.apps.forEach(function(a){try{a.delete();}catch(e){}});
-    firebase.initializeApp(config);
+    if(!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
     db=firebase.database();
     db.ref('.info/connected').on('value',function(snap){
       var on=!!snap.val(); var dot=document.getElementById('conn-dot');
       if(dot) dot.className='conn-dot'+(on?'':' off');
     });
-    localStorage.setItem(FB_KEY2,JSON.stringify(config));
-    document.getElementById('loading').classList.add('gone');
-    document.getElementById('setup').classList.add('gone');
-    document.getElementById('app').style.display='block';
-    attachListeners();
-    toast('Connected to Firebase 🔥','success');
+    // Check for valid saved session
+    var sess=null;
+    try{sess=JSON.parse(localStorage.getItem(STAFF_SESSION_KEY)||'null');}catch(e){}
+    if(sess&&sess.branchId&&sess.expires>Date.now()){
+      CURRENT_BRANCH=sess.branch||null;
+      BRANCH_PATH='branches/'+sess.branchId;
+      launchStaffApp();
+    } else {
+      showBranchSelector();
+    }
   }catch(e){
     document.getElementById('loading').classList.add('gone');
-    document.getElementById('setup').classList.remove('gone');
-    var err=document.getElementById('setup-err');
-    err.style.display='block'; err.textContent='❌ '+e.message;
+    toast('Firebase error: '+e.message,'error');
   }
 }
 
@@ -753,7 +878,7 @@ window.onload=function(){
   var now=new Date();
   document.getElementById('date-long').textContent=now.toLocaleDateString('en-GB',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
   document.getElementById('date-short').textContent=now.toLocaleDateString('en-GB',{weekday:'short',day:'2-digit',month:'short',year:'numeric'});
-  document.getElementById('hdate').textContent=now.toLocaleDateString('en-GB',{weekday:'short',day:'2-digit',month:'short'});
+  document.getElementById('header-branch-sub').textContent=now.toLocaleDateString('en-GB',{weekday:'short',day:'2-digit',month:'short'});
 
   document.querySelectorAll('.tab').forEach(function(tab){
     tab.onclick=function(){
@@ -778,34 +903,41 @@ window.onload=function(){
   document.getElementById('btn-checkout').onclick=doCheckOut;
   document.getElementById('btn-mark-absent').onclick=doMarkAbsent;
 
-  document.getElementById('btn-connect').onclick=function(){
-    var api=document.getElementById('cfg-api').value.trim();
-    var dbUrl=document.getElementById('cfg-db').value.trim();
-    var auth=document.getElementById('cfg-auth').value.trim();
-    if(!api||!dbUrl){var e=document.getElementById('setup-err');e.style.display='block';e.textContent='API Key and Database URL are required.';return;}
-    connectFirebase({apiKey:api,databaseURL:dbUrl,authDomain:auth,projectId:auth.split('.')[0]||''});
+  // (setup screen removed — using branch selector instead)
+
+  // PIN screen events
+  document.getElementById('pin-back-btn').onclick=function(){
+    document.getElementById('pin-screen').classList.remove('show');
+    document.getElementById('branch-list-step').style.display='block';
+    _pendingBranch=null;
   };
+  document.getElementById('pin-submit-btn').onclick=submitPin;
+  document.getElementById('pin-inp').addEventListener('keydown',function(e){
+    if(e.key==='Enter') submitPin();
+    document.getElementById('pin-err').textContent='';
+  });
 
-  // ── AUTO-CONNECT PRIORITY ───────────────────────────────
-  // 1. Use HARDCODED config if it looks valid (filled in by developer)
-  // 2. Fall back to saved config in localStorage (from main index.html)
-  // 3. Fall back to manual setup screen
-  var hc = FIREBASE_CONFIG;
-  var isHardcoded = hc && hc.apiKey && hc.apiKey.indexOf('PASTE') === -1 && hc.databaseURL && hc.databaseURL.indexOf('PASTE') === -1;
-
-  if(isHardcoded){
-    connectFirebase(hc);
-  } else {
-    var saved=null;
-    try{saved=JSON.parse(localStorage.getItem(FB_KEY)||localStorage.getItem(FB_KEY2));}catch(e){}
-    if(saved&&saved.apiKey&&saved.databaseURL){
-      connectFirebase(saved);
-    } else {
-      document.getElementById('loading').classList.add('gone');
-      document.getElementById('setup').classList.remove('gone');
-    }
-  }
+  // Auto-connect to Firebase then show branch selector
+  connectFirebase();
 };
+
+// ══════════════════════════════════════════════════════════
+// 🔀 SWITCH BRANCH
+// ══════════════════════════════════════════════════════════
+function switchBranch(){
+  // Clear session and detach listeners
+  try{localStorage.removeItem(STAFF_SESSION_KEY);}catch(e){}
+  if(db){try{db.ref().off();}catch(e){}}
+  BRANCH_PATH=''; CURRENT_BRANCH=null; _pendingBranch=null;
+  tsEmps=[]; tsAtt={}; staffList=[]; selectedId=null;
+  // Reset branch selector UI
+  document.getElementById('pin-screen').classList.remove('show');
+  document.getElementById('branch-list-step').style.display='block';
+  document.getElementById('pin-inp').value='';
+  document.getElementById('pin-err').textContent='';
+  // Show branch selector
+  showBranchSelector();
+}
 
 // ══════════════════════════════════════════════════════════
 // 💬 WHATSAPP INTEGRATION
@@ -1028,6 +1160,5 @@ doMarkAbsent=function(){
   },400);
 };
 </script>
-
 </body>
 </html>
