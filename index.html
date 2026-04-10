@@ -1827,10 +1827,41 @@ var CL_DATA = {
  ]
 };
 
-var CL_BT_ITEMS={
+var CL_BT_ITEMS_DEFAULT={
   chiller:['Fresh Lemonade + Backup on par','Fresh Iced Tea + Back up on par','Fresh Orange Juice on par','Long Life Milk on par w/expiration','Non-Alcoholic Beer on par','Aqua Panna 500 ml on par','Aqua Panna 1000 ml on par','San Pelligrino 500 ml on par','San Pelligrino 1000 ml on par','Choco Syrup Available','Strawberry Syrup Available','Whipped Cream Available','Pepsi Cans on par','7 UP Cans on par','Diet Pepsi Cans on par','Miranda Cans on par','Mountain Dew Cans on par','Aquafina 330ml on par','Aquafina 500ml on par'],
   bases:['Simple Syrup Available','Lemon Base Available','Lime Base Available','Mint Infusion Available','Mojito Base Available','Strawberry Puree Available','Blueberry Puree Available','Cucumber Mint Mix Available','Lemonade Available','Margharita Batch Available','Passionfruit Batch Available','Tropical Cooler Base','Pineapple Syrup Available','Passion Fruit Mix Available','Sweet Lime Rim Available','Red Sangria Base Available','White Sangria Base Available','Black Iced Tea Base Available']
 };
+// CL_BT_ITEMS is loaded from Firebase (branch-specific) or falls back to defaults
+var CL_BT_ITEMS = {
+  chiller: CL_BT_ITEMS_DEFAULT.chiller.slice(),
+  bases:   CL_BT_ITEMS_DEFAULT.bases.slice()
+};
+
+// Load bartender items from Firebase — called after branch login
+function clLoadBTItems(){
+  if(!db) return;
+  db.ref(bPath('cl_bt_items')).once('value', function(snap){
+    var v = snap.val();
+    if(v && v.chiller && v.bases){
+      CL_BT_ITEMS.chiller = v.chiller;
+      CL_BT_ITEMS.bases   = v.bases;
+    }
+    // Re-ensure state with updated items
+    clEnsureST();
+  });
+}
+
+// Save bartender items to Firebase
+function clSaveBTItems(){
+  if(!db) return;
+  db.ref(bPath('cl_bt_items')).set({
+    chiller: CL_BT_ITEMS.chiller,
+    bases:   CL_BT_ITEMS.bases
+  }, function(err){
+    if(!err) toast('Bartender items saved ✓','success');
+    else toast('Save error','error');
+  });
+}
 
 var CL_FORM_LIST=[
   {id:'form_chiller',name:'Chiller Log',label:'Chiller Control Form'},
@@ -1905,7 +1936,17 @@ function clEnsureST(){
   });
 }
 
-function clS(clId,di,itemId,sh){clEnsureST();try{return clST[clWk()][clId][di][itemId][sh]||{v:null,temp:'',comment:''};}catch(e){return {v:null,temp:'',comment:''};} }
+function clS(clId,di,itemId,sh){
+  clEnsureST();
+  var wk=clWk();
+  // Ensure full path exists so we return a real reference (not a copy)
+  if(!clST[wk]) clST[wk]={};
+  if(!clST[wk][clId]) clST[wk][clId]={};
+  if(!clST[wk][clId][di]) clST[wk][clId][di]={};
+  if(!clST[wk][clId][di][itemId]) clST[wk][clId][di][itemId]={flagged:false};
+  if(!clST[wk][clId][di][itemId][sh]) clST[wk][clId][di][itemId][sh]={v:null,temp:'',comment:''};
+  return clST[wk][clId][di][itemId][sh];
+}
 function clSF(clId,di,itemId){clEnsureST();try{return clST[clWk()][clId][di][itemId]||{flagged:false};}catch(e){return {flagged:false};} }
 
 // ── SAVE / FB SYNC ──
@@ -1933,7 +1974,7 @@ function clBranch(){
 
 function clWeekRef(){
   if(!db)return null;
-  return db.ref('cl_weeks/'+clNormWk());
+  return db.ref(bPath('cl_weeks')+'/'+clNormWk());
 }
 
 // Global monthly cache
@@ -2081,8 +2122,12 @@ function clDoLogin(){
   var b=document.getElementById('cl-role-badge');if(b){b.textContent=clRole==='admin'?'🔐 Admin':'👨‍🍳 Staff';}
   var pb=document.getElementById('cl-print-btn');if(pb)pb.style.display=clIsAdmin()?'':'none';
   var eb=document.getElementById('cl-edit-btn');if(eb)eb.style.display=clIsAdmin()?'':'none';
+  // Auto-fill branch from current branch session
+  var branchInp=document.getElementById('cl-branch');
+  if(branchInp&&CURRENT_BRANCH&&CURRENT_BRANCH.name){
+    branchInp.value=CURRENT_BRANCH.name;
+  }
   // Init period start if empty
-  // Set period-start to current Sunday (start of this week) before anything else
   var ps=document.getElementById('cl-period-start');
   if(ps&&!ps.value){
     var _now=new Date();
@@ -2091,8 +2136,9 @@ function clDoLogin(){
     ps.value=_sun.getFullYear()+'-'+String(_sun.getMonth()+1).padStart(2,'0')+'-'+String(_sun.getDate()).padStart(2,'0');
   }
   clWeekDates=clGetWeekDates(document.getElementById('cl-period-start').value);
-  // clST is loaded exclusively from Firebase (no localStorage for checklist state)
   clEnsureST();
+  // Load branch-specific bartender items
+  clLoadBTItems();
   // Always fetch latest state from Firebase
   clInitFBSync();
 }
@@ -3580,7 +3626,16 @@ function clOpenEdit(){
   if(!clIsAdmin()){toast('Admin access required','w');return;}
   var sec=clSec,ci=clCl[sec];
   if(sec==='forms'){toast('Form items are fixed','w');return;}
-  var cl=CL_DATA[sec][ci];if(!cl||!cl.groups){toast('This checklist cannot be edited','w');return;}
+  var cl=CL_DATA[sec][ci];
+  if(!cl){return;}
+
+  // ── Bartender's Prep Sheet — special edit ──
+  if(cl.checkType==='bartender'){
+    clOpenBartenderEdit();
+    return;
+  }
+
+  if(!cl.groups){toast('This checklist cannot be edited','w');return;}
   var body=document.getElementById('cl-edit-body');body.innerHTML='';
   var h='<div style="font-size:11px;color:var(--text3);margin-bottom:10px;font-family:var(--mono)">Editing: <strong style="color:var(--acc2)">'+cl.name+'</strong></div>';
   cl.groups.forEach(function(grp,gi){
@@ -3601,6 +3656,72 @@ function clOpenEdit(){
   });
   body.innerHTML=h;
   document.getElementById('cl-edit-modal').classList.add('show');
+}
+
+// ── BARTENDER EDIT MODAL ──────────────────────────────────
+function clOpenBartenderEdit(){
+  function renderBTList(listKey, items){
+    var h='';
+    items.forEach(function(item,i){
+      h+='<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;background:var(--bg3);border:1px solid var(--bd);border-radius:6px;padding:6px 9px">'
+        +'<span style="font-size:11px;color:var(--text3);font-family:var(--mono);min-width:20px">'+(i+1)+'.</span>'
+        +'<input type="text" value="'+clXe(item)+'" data-btlist="'+listKey+'" data-bti="'+i+'" '
+        +'style="flex:1;background:transparent;border:none;color:var(--text);font-size:11px;outline:none;font-family:var(--font)">'
+        +'<button onclick="clBTDelItem(\''+listKey+'\','+i+')" style="background:rgba(248,81,73,.12);border:1px solid var(--red);border-radius:4px;color:var(--red);cursor:pointer;font-size:11px;padding:2px 8px;flex-shrink:0">✕</button>'
+      +'</div>';
+    });
+    return h;
+  }
+
+  var body=document.getElementById('cl-edit-body');
+  var h='<div style="font-size:11px;color:var(--text3);margin-bottom:14px;background:var(--bg2);padding:8px 12px;border-radius:7px">Editing: <strong style="color:#22d3ee">Bartender\'s Prep Sheet</strong> — changes save to Firebase and affect all bartender prep sheets for this branch.</div>';
+
+  h+='<div style="font-size:11px;font-weight:700;color:var(--cyn);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">🧊 Chiller Items ('+CL_BT_ITEMS.chiller.length+')</div>';
+  h+='<div id="bt-chiller-list">'+renderBTList('chiller',CL_BT_ITEMS.chiller)+'</div>';
+  h+='<button class="btn sm" onclick="clBTAddItem(\'chiller\')" style="margin-bottom:16px;background:rgba(34,211,238,.1);border:1px solid rgba(34,211,238,.3);color:var(--cyn)">+ Add Chiller Item</button>';
+
+  h+='<div style="font-size:11px;font-weight:700;color:var(--pur);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">🍹 Bases & Syrups ('+CL_BT_ITEMS.bases.length+')</div>';
+  h+='<div id="bt-bases-list">'+renderBTList('bases',CL_BT_ITEMS.bases)+'</div>';
+  h+='<button class="btn sm" onclick="clBTAddItem(\'bases\')" style="margin-bottom:16px;background:rgba(192,132,252,.1);border:1px solid rgba(192,132,252,.3);color:var(--pur)">+ Add Base/Syrup Item</button>';
+
+  h+='<div style="display:flex;gap:8px;margin-top:8px;padding-top:12px;border-top:1px solid var(--bd)">'
+    +'<button class="btn" onclick="clSaveBTEdits()" style="flex:1;justify-content:center">💾 Save Changes</button>'
+    +'<button class="btn s" onclick="document.getElementById(\'cl-edit-modal\').classList.remove(\'show\')" style="flex:0 0 auto">Cancel</button>'
+    +'</div>';
+
+  body.innerHTML=h;
+
+  // Wire input changes live
+  body.querySelectorAll('input[data-btlist]').forEach(function(inp){
+    inp.oninput=function(){
+      var list=this.dataset.btlist,idx=parseInt(this.dataset.bti);
+      CL_BT_ITEMS[list][idx]=this.value;
+    };
+  });
+
+  document.getElementById('cl-edit-modal').classList.add('show');
+}
+
+function clBTAddItem(listKey){
+  CL_BT_ITEMS[listKey].push('New Item');
+  clOpenBartenderEdit(); // re-render
+}
+function clBTDelItem(listKey,idx){
+  CL_BT_ITEMS[listKey].splice(idx,1);
+  clEnsureST(); // rebuild state for new item list
+  clOpenBartenderEdit();
+}
+function clSaveBTEdits(){
+  // Flush any typed-but-not-saved values from inputs
+  var body=document.getElementById('cl-edit-body');
+  if(body) body.querySelectorAll('input[data-btlist]').forEach(function(inp){
+    var list=inp.dataset.btlist,idx=parseInt(inp.dataset.bti);
+    if(CL_BT_ITEMS[list]) CL_BT_ITEMS[list][idx]=inp.value;
+  });
+  clSaveBTItems();
+  clEnsureST();
+  document.getElementById('cl-edit-modal').classList.remove('show');
+  clRenderSec('foh');
 }
 function clEditItemLabel(sec,ci,gi,ii,val){CL_DATA[sec][ci].groups[gi].items[ii].label=val;}
 function clEditItemKey(sec,ci,gi,ii,val){CL_DATA[sec][ci].groups[gi].items[ii].yellow=val;}
@@ -6293,6 +6414,7 @@ function generateAllQRCodes(){
   // Load QR library dynamically
   function doGenerate(){
     var baseUrl=window.location.origin+window.location.pathname.replace('index.html','')+'staff.html';
+    var clBaseUrl=window.location.origin+window.location.pathname.replace('index.html','')+'checklists.html';
     db.ref('admin/branches').once('value',function(snap){
       var raw=snap.val()||{};
       var branches=Object.values(raw).filter(Boolean);
