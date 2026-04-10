@@ -285,17 +285,21 @@ html,body{min-height:100%;font-family:var(--font);background:var(--bg);color:var
           <span class="btn-time" id="btn-out-time">--:--</span>
         </button>
       </div>
-      <!-- Break button -->
-      <button class="action-btn" id="btn-break" style="width:100%;background:rgba(249,115,22,.08);border:1px solid rgba(249,115,22,.25);color:#f97316;margin-bottom:8px;flex-direction:row;gap:12px;padding:14px 18px;justify-content:center">
-        <span style="font-size:22px">☕</span>
-        <div style="text-align:left">
-          <div class="btn-lbl" style="color:#f97316">Start Break</div>
-          <div class="btn-time" id="break-timer-display" style="color:rgba(249,115,22,.7);font-size:11px;font-family:var(--mono)">1 hour timer</div>
-        </div>
-      </button>
       <button class="action-btn btn-absent" id="btn-mark-absent">
         <span style="font-size:20px">❌</span>
         <span class="btn-lbl">Mark as Absent</span>
+      </button>
+    </div>
+
+    <!-- Break button — always visible, no employee selection needed -->
+    <div style="margin-top:10px">
+      <button class="action-btn" id="btn-break" style="width:100%;background:rgba(249,115,22,.08);border:1px solid rgba(249,115,22,.25);color:#f97316;flex-direction:row;gap:12px;padding:16px 20px;justify-content:center;border-radius:12px">
+        <span style="font-size:24px">☕</span>
+        <div style="text-align:left">
+          <div class="btn-lbl" id="break-btn-label" style="color:#f97316;font-size:15px">Start Break</div>
+          <div class="btn-time" id="break-timer-display" style="color:rgba(249,115,22,.7);font-size:11px;font-family:var(--mono);margin-top:2px">1 hour timer</div>
+        </div>
+        <div id="break-clock" style="font-size:20px;font-weight:300;font-family:var(--mono);color:#f97316;margin-left:auto;display:none">01:00:00</div>
       </button>
     </div>
   </div>
@@ -829,8 +833,6 @@ function launchStaffApp(){
   document.getElementById('loading').classList.add('gone');
   document.getElementById('app').style.display='block';
   attachListeners();
-  // Init break timer
-  setTimeout(initBreakBtn, 100);
 }
 
 function connectFirebase(){
@@ -909,6 +911,9 @@ window.onload=function(){
   document.getElementById('btn-checkin').onclick=doCheckIn;
   document.getElementById('btn-checkout').onclick=doCheckOut;
   document.getElementById('btn-mark-absent').onclick=doMarkAbsent;
+
+  // Init break button immediately — timer persists across page loads
+  initBreakBtn();
 
   // (setup screen removed — using branch selector instead)
 
@@ -1021,53 +1026,64 @@ var _breakInt=null;
 function initBreakBtn(){
   var btn=document.getElementById('btn-break');
   var display=document.getElementById('break-timer-display');
+  var label=document.getElementById('break-btn-label');
+  var clock=document.getElementById('break-clock');
   if(!btn) return;
+
+  function setActive(active){
+    if(active){
+      btn.style.background='rgba(16,185,129,.1)';
+      btn.style.borderColor='rgba(16,185,129,.3)';
+      if(label){label.textContent='End Break';label.style.color='#10b981';}
+      if(clock) clock.style.display='block';
+    } else {
+      btn.style.background='rgba(249,115,22,.08)';
+      btn.style.borderColor='rgba(249,115,22,.25)';
+      if(label){label.textContent='Start Break';label.style.color='#f97316';}
+      if(display) display.textContent='1 hour timer';
+      if(clock){clock.textContent='01:00:00';clock.style.display='none';}
+    }
+  }
 
   function updateDisplay(){
     var st=localStorage.getItem(_breakKey);
-    if(!st){ if(_breakInt){clearInterval(_breakInt);_breakInt=null;}
-      btn.querySelector('.btn-lbl').textContent='Start Break';
-      btn.querySelector('.btn-lbl').style.color='#f97316';
-      btn.style.background='rgba(249,115,22,.08)';
-      btn.style.borderColor='rgba(249,115,22,.25)';
-      if(display) display.textContent='1 hour timer'; return; }
+    if(!st){if(_breakInt){clearInterval(_breakInt);_breakInt=null;}setActive(false);return;}
     var elapsed=Date.now()-parseInt(st);
     var remain=Math.max(0,3600000-elapsed);
     var h=Math.floor(remain/3600000);
     var m=Math.floor((remain%3600000)/60000);
     var s=Math.floor((remain%60000)/1000);
-    var label=String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
-    if(display) display.textContent=label+' remaining';
-    btn.querySelector('.btn-lbl').textContent='End Break';
-    btn.querySelector('.btn-lbl').style.color='#10b981';
-    btn.style.background='rgba(16,185,129,.08)';
-    btn.style.borderColor='rgba(16,185,129,.25)';
+    var timeStr=String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+    if(clock) clock.textContent=timeStr;
+    if(display) display.textContent=timeStr+' remaining';
+    setActive(true);
     if(remain<=0){
       clearInterval(_breakInt);_breakInt=null;
       localStorage.removeItem(_breakKey);
-      updateDisplay();
+      setActive(false);
       toast('⏰ Break time over! Please return to work.','warning');
     }
   }
 
-  // Restore active break
+  // Restore active break on page load
   if(localStorage.getItem(_breakKey)){
-    _breakInt=setInterval(updateDisplay,1000); updateDisplay();
+    setActive(true);
+    _breakInt=setInterval(updateDisplay,1000);
+    updateDisplay();
   }
 
   btn.onclick=function(){
     if(localStorage.getItem(_breakKey)){
-      // End break
       localStorage.removeItem(_breakKey);
       if(_breakInt){clearInterval(_breakInt);_breakInt=null;}
-      updateDisplay();
+      setActive(false);
       toast('Break ended — welcome back! ✅','success');
     } else {
-      // Start break
-      if(!selectedId){ toast('Select your name first','warning'); return; }
       localStorage.setItem(_breakKey,String(Date.now()));
+      setActive(true);
       if(_breakInt) clearInterval(_breakInt);
-      _breakInt=setInterval(updateDisplay,1000); updateDisplay();
+      _breakInt=setInterval(updateDisplay,1000);
+      updateDisplay();
       toast('☕ Break started — 1 hour timer running','info');
     }
   };
