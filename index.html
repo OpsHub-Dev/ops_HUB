@@ -1198,14 +1198,25 @@ function attachListeners(){
   });
 
   // Inventory
-  db.ref('shared/inv_items').on('value', function(snap){
-    var raw = snap.val();
-    if(!raw){ items = []; }
-    else if(Array.isArray(raw)){ items = raw.filter(Boolean); }
-    else{ items = Object.values(raw).filter(Boolean); }
-    updateBadges();
-    if(S.p === 'items' || S.p === 'inv-dash' || S.p === 'alerts') ren();
-  });
+  // Items: try shared/inv_items first; if empty fall back to branch path
+  function _attachItemsListener(path){
+    db.ref(path).on('value', function(snap){
+      var raw = snap.val();
+      if(raw === null || (typeof raw === 'object' && Object.keys(raw).length === 0)){
+        if(path === 'shared/inv_items' && BRANCH_PATH){
+          // shared is empty — fallback to branch path (data not migrated yet)
+          console.warn('[Items] shared/inv_items empty, falling back to '+BRANCH_PATH+'/inv_items');
+          _attachItemsListener(BRANCH_PATH+'/inv_items');
+          return;
+        }
+        items = [];
+      } else if(Array.isArray(raw)){ items = raw.filter(Boolean); }
+      else{ items = Object.values(raw).filter(Boolean); }
+      updateBadges();
+      if(S.p === 'items' || S.p === 'inv-dash' || S.p === 'alerts') ren();
+    });
+  }
+  _attachItemsListener('shared/inv_items');
 
   db.ref(bPath('inv_logs')).on('value', function(snap){
     var raw = snap.val();
@@ -3641,43 +3652,56 @@ function pInvDash(){
   h+='<div class="sc" style="'+(hExp>0?'border-color:rgba(248,81,73,.2)':'')+'"><div class="sc-lbl">Stock Value</div><div class="sc-val cb" style="font-size:28px;font-weight:300">'+Math.round(value).toLocaleString()+'</div><div class="sc-sub">SAR · '+(hExp>0?'<span style="color:var(--red)">'+hExp+' cards expired</span>':'0 cards expired')+'</div></div>';
   h+='</div>';
 
-  // ── ROW 3: Branch Tables & Seats (editable, per-branch) ─────
+  // ── ROW 3: Branch Capacity (Tables & Seats) — editable per branch ──
   var _bc=S._branchConfig||{};
-  var _bt=_bc.tables||0,_bs=_bc.seats||0;
   var _bname=CURRENT_BRANCH?CURRENT_BRANCH.name:(IS_SUPER_ADMIN?'All Branches':'Branch');
   var _bcolor=CURRENT_BRANCH?CURRENT_BRANCH.color:'var(--acc)';
-  var _bicon=CURRENT_BRANCH?CURRENT_BRANCH.icon:'🏪';
-  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">';
-  // Tables card
-  h+='<div class="card" style="padding:14px;border-color:rgba(96,165,250,.15);cursor:pointer;transition:border-color .2s" id="dash-tables-card" title="Click to edit">';
-  h+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">';
-  h+='<div style="display:flex;align-items:center;gap:8px"><div style="width:9px;height:9px;border-radius:50%;background:'+_bcolor+';box-shadow:0 0 6px '+_bcolor+'"></div><span style="font-size:13px;font-weight:700;color:var(--text)">'+_bicon+' '+xe(_bname)+'</span></div>';
-  h+='<span style="font-size:10px;color:var(--text3);font-family:var(--mono)">✏️ edit</span>';
-  h+='</div>';
-  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
-  h+='<div style="background:var(--bg2);border:1px solid var(--bd);border-radius:7px;padding:14px;text-align:center">';
-  h+='<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;font-family:var(--mono)">Tables</div>';
-  h+='<div id="dash-tables-val" style="font-size:32px;font-weight:300;color:var(--blu);font-family:var(--mono)">'+(_bt||'—')+'</div>';
-  h+='</div>';
-  h+='<div style="background:var(--bg2);border:1px solid var(--bd);border-radius:7px;padding:14px;text-align:center">';
-  h+='<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;font-family:var(--mono)">Seats</div>';
-  h+='<div id="dash-seats-val" style="font-size:32px;font-weight:300;color:var(--pur);font-family:var(--mono)">'+(_bs||'—')+'</div>';
-  h+='</div>';
-  h+='</div></div>';
-  // Branch info card
-  h+='<div class="card" style="padding:14px">';
-  h+='<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;font-family:var(--mono)">Branch Info</div>';
-  var _brd=CURRENT_BRANCH?(CURRENT_BRANCH.brand||'—'):(IS_SUPER_ADMIN?'Super Admin':'—');
+  var _bicon=CURRENT_BRANCH?(CURRENT_BRANCH.icon||'🏪'):'🏪';
+  var _brd=CURRENT_BRANCH?(CURRENT_BRANCH.brand||''):(IS_SUPER_ADMIN?'Super Admin':'');
   var _bloc=CURRENT_BRANCH?(CURRENT_BRANCH.location||'—'):'—';
   var _bmgr=CURRENT_BRANCH?(CURRENT_BRANCH.manager||'—'):'—';
-  h+='<div style="display:flex;flex-direction:column;gap:8px">';
-  h+='<div style="display:flex;justify-content:space-between;font-size:11px"><span style="color:var(--text3)">Brand</span><span style="font-weight:700;color:var(--text2)">'+xe(_brd)+'</span></div>';
-  h+='<div style="display:flex;justify-content:space-between;font-size:11px"><span style="color:var(--text3)">Location</span><span style="color:var(--text2);text-align:right;max-width:180px">'+xe(_bloc)+'</span></div>';
-  h+='<div style="display:flex;justify-content:space-between;font-size:11px"><span style="color:var(--text3)">Manager</span><span style="font-weight:600;color:var(--text2)">'+xe(_bmgr)+'</span></div>';
-  h+='<div style="display:flex;justify-content:space-between;font-size:11px"><span style="color:var(--text3)">Staff Active</span><span style="font-weight:700;color:var(--grn)">'+act+'</span></div>';
-  h+='<div style="margin-top:4px"><button class="btn sm s" style="width:100%;justify-content:center" id="dash-edit-branch-btn">✏️ Edit Branch Info</button></div>';
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">';
+
+  // ── LEFT: Branch capacity card (click to edit tables/seats) ──
+  h+='<div class="card" id="dash-tables-card" style="padding:16px;cursor:pointer;border-color:'+_bcolor+'33;transition:border-color .2s" title="Click to edit tables & seats">';
+  h+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">';
+  h+='<div style="display:flex;align-items:center;gap:8px">';
+  h+='<div style="width:10px;height:10px;border-radius:50%;background:'+_bcolor+';box-shadow:0 0 8px '+_bcolor+'"></div>';
+  h+='<span style="font-size:13px;font-weight:700;color:var(--text)">'+_bicon+' '+xe(_bname)+'</span>';
+  if(_brd) h+='<span style="font-size:10px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:1px 8px;color:var(--text3);font-family:var(--mono)">'+xe(_brd)+'</span>';
+  h+='</div>';
+  h+='<span style="font-size:10px;color:var(--text3);opacity:.7">✏️ edit</span>';
+  h+='</div>';
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+  // Tables
+  h+='<div style="background:var(--bg2);border:1px solid var(--bd);border-radius:10px;padding:16px;text-align:center">';
+  h+='<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;font-family:var(--mono)">Tables</div>';
+  h+='<div id="dash-tables-val" style="font-size:34px;font-weight:300;color:var(--gold);font-family:var(--mono)">'+(_bc.tables||'—')+'</div>';
+  h+='</div>';
+  // Seats
+  h+='<div style="background:var(--bg2);border:1px solid var(--bd);border-radius:10px;padding:16px;text-align:center">';
+  h+='<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;font-family:var(--mono)">Seats</div>';
+  h+='<div id="dash-seats-val" style="font-size:34px;font-weight:300;color:var(--blu);font-family:var(--mono)">'+(_bc.seats||'—')+'</div>';
   h+='</div>';
   h+='</div>';
+  h+='</div>';
+
+  // ── RIGHT: Branch info card ──────────────────────────────
+  h+='<div class="card" style="padding:16px">';
+  h+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">';
+  h+='<span style="font-size:12px;font-weight:700;color:var(--text2)">Branch Info</span>';
+  h+='<button class="btn sm s" id="dash-edit-branch-btn">✏️ Edit</button>';
+  h+='</div>';
+  h+='<div style="display:flex;flex-direction:column;gap:9px">';
+  h+='<div style="display:flex;justify-content:space-between;align-items:center;font-size:11px"><span style="color:var(--text3)">Brand</span><span style="font-weight:700;color:var(--text)">'+xe(_brd||'—')+'</span></div>';
+  h+='<div style="display:flex;justify-content:space-between;align-items:center;font-size:11px"><span style="color:var(--text3)">Location</span><span style="color:var(--text2);text-align:right;max-width:200px">'+xe(_bloc)+'</span></div>';
+  h+='<div style="display:flex;justify-content:space-between;align-items:center;font-size:11px"><span style="color:var(--text3)">Manager</span><span style="font-weight:600;color:var(--text2)">'+xe(_bmgr)+'</span></div>';
+  h+='<div style="display:flex;justify-content:space-between;align-items:center;font-size:11px"><span style="color:var(--text3)">Active Staff</span><span style="font-weight:700;color:var(--grn)">'+act+'</span></div>';
+  var _dineArea=_bc.area?('<div style="display:flex;justify-content:space-between;align-items:center;font-size:11px"><span style="color:var(--text3)">Dining Area</span><span style="color:var(--text2)">'+xe(_bc.area)+'</span></div>'):'';
+  h+=_dineArea;
+  h+='</div>';
+  h+='</div>';
+
   h+='</div>';
 
   // ── ROW 4: Health Cards | On Leave | By Department ────────
@@ -6193,12 +6217,13 @@ function openBranchModal(existing){
       +'<select id="bf-active"><option value="true" '+(b.active!==false?'selected':'')+'>Active</option><option value="false" '+(b.active===false?'selected':'')+'>Inactive</option></select>'
     +'</div>'
     +'<div id="bmodal-err" style="color:var(--red);font-size:11px;min-height:14px"></div>'
+    +'<div class="mfoot" style="margin-top:6px;padding-top:14px;border-top:1px solid var(--bd)">'
+    +'<button class="btn s" id="mc2">Cancel</button>'
+    +'<button class="btn" id="ms" style="min-width:130px">'+(isEdit?'Save Changes':'Create Branch')+'</button>'
+    +'</div>'
     +'</div>',
     function(){saveBranchModal();}
   );
-
-  // Set button label
-  var ms=document.getElementById('ms');if(ms)ms.textContent=isEdit?'Save Changes':'Create Branch';
 
   // Wire icon picker
   setTimeout(function(){
