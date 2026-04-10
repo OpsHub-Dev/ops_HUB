@@ -1724,13 +1724,20 @@ function clEnsureST(){
   });
   ['foh_hygiene','hoh_hygiene'].forEach(function(hid){
     if(!clST[w][hid])clST[w][hid]={employees:[],checks:{}};
+    // Guard: checks may be undefined if Firebase returned partial data
+    if(!clST[w][hid].checks)clST[w][hid].checks={};
     for(var di=0;di<7;di++){if(!clST[w][hid].checks[di])clST[w][hid].checks[di]={};}
   });
   if(!clST[w]['foh_bartender'])clST[w]['foh_bartender']={};
   CL_BT_ITEMS.chiller.concat(CL_BT_ITEMS.bases).forEach(function(item){
     var k=clFbKey(item);
     if(!clST[w]['foh_bartender'][k])clST[w]['foh_bartender'][k]={sl:'',uom:'',prep:{}};
-    clWeekDates.forEach(function(_,di){if(!clST[w]['foh_bartender'][k].prep[di])clST[w]['foh_bartender'][k].prep[di]={oh:'',par:'',prep:''};});
+    // Guard: clWeekDates may be empty before login — use 7-slot loop as fallback
+    if(clWeekDates.length){
+      clWeekDates.forEach(function(_,di){if(!clST[w]['foh_bartender'][k].prep[di])clST[w]['foh_bartender'][k].prep[di]={oh:'',par:'',prep:''};});
+    } else {
+      for(var di=0;di<7;di++){if(!clST[w]['foh_bartender'][k].prep[di])clST[w]['foh_bartender'][k].prep[di]={oh:'',par:'',prep:''};}
+    }
   });
   // Forms
   ['form_chiller','form_freezer','form_cooling','form_pizzadough','form_stockroom'].forEach(function(fid){
@@ -1738,8 +1745,8 @@ function clEnsureST(){
   });
 }
 
-function clS(clId,di,itemId,sh){clEnsureST();return clST[clWk()][clId][di][itemId][sh];}
-function clSF(clId,di,itemId){clEnsureST();return clST[clWk()][clId][di][itemId];}
+function clS(clId,di,itemId,sh){clEnsureST();try{return clST[clWk()][clId][di][itemId][sh]||{v:null,temp:'',comment:''};}catch(e){return {v:null,temp:'',comment:''};} }
+function clSF(clId,di,itemId){clEnsureST();try{return clST[clWk()][clId][di][itemId]||{flagged:false};}catch(e){return {flagged:false};} }
 
 // ── SAVE / FB SYNC ──
 var clSaveTmr=null;
@@ -1981,7 +1988,12 @@ function clRenderSec(sec){
       document.getElementById('cl-prog').style.width='0%';document.getElementById('cl-prog-lbl').textContent='';
       document.getElementById('cl-day-tabs').innerHTML='';clRenderBartender(cl);return;
     }
-    // Day tabs
+    // Day tabs — guard: clWeekDates may be empty if period-start not yet initialized
+    if(!clWeekDates.length){
+      var _ps=document.getElementById('cl-period-start');
+      if(_ps&&_ps.value){clWeekDates=clGetWeekDates(_ps.value);}
+      else{var _n=new Date(),_s=new Date(_n);_s.setDate(_n.getDate()-_n.getDay());clWeekDates=clGetWeekDates(_s.getFullYear()+'-'+String(_s.getMonth()+1).padStart(2,'0')+'-'+String(_s.getDate()).padStart(2,'0'));}
+    }
     var dw=document.getElementById('cl-day-tabs');dw.innerHTML='';
     clWeekDates.forEach(function(d,dIdx){
       var b=document.createElement('button');b.className='cl-day-tab'+(dIdx===di?' active':'');
@@ -2001,6 +2013,7 @@ function clRenderSec(sec){
 }
 
 function clDayStatus(cl,di){
+  if(!clWeekDates.length)return'empty';
   clEnsureST();var tot=0,fil=0;if(!cl.groups)return'empty';
   (cl.groups||[]).forEach(function(g){(g.items||[]).forEach(function(item){CL_SHIFTS.forEach(function(sh){tot++;var s=clS(cl.id,di,item.id,sh);if(s.v!==null)fil++;});});});
   return fil===0?'empty':fil===tot?'done':'partial';
@@ -2143,8 +2156,12 @@ function clFindSec(clId){for(var sec of['mod','foh','boh'])if((CL_DATA[sec]||[])
 function clRenderHygiene(cl){
   var wrap=document.getElementById('cl-cards');if(!wrap)return;wrap.innerHTML='';clEnsureST();
   var w=clWk(),hid=cl.id,hyg=clST[w][hid],di=clDay.foh;
+  if(!hyg){clST[w][hid]={employees:[],checks:{}};hyg=clST[w][hid];}
+  if(!hyg.checks)hyg.checks={};
+  if(!hyg.employees)hyg.employees=[];
   // Day tabs
   var dw=document.createElement('div');dw.className='cl-day-tabs';dw.style.cssText='margin-bottom:8px;flex-shrink:0';
+  if(!clWeekDates.length){var _n=new Date(),_s=new Date(_n);_s.setDate(_n.getDate()-_n.getDay());clWeekDates=clGetWeekDates(_s.getFullYear()+'-'+String(_s.getMonth()+1).padStart(2,'0')+'-'+String(_s.getDate()).padStart(2,'0'));}
   clWeekDates.forEach(function(d,dIdx){
     var b=document.createElement('button');b.className='cl-day-tab'+(dIdx===di?' active':'');
     b.innerHTML=CL_DAYS[d.getDay()]+' '+clFmtD(d);
@@ -2159,7 +2176,8 @@ function clRenderHygiene(cl){
   var completeAllHygBtn = clIsAdmin()
     ? '<button class="btn sm" style="background:rgba(63,185,80,.15);color:var(--grn);border-color:rgba(63,185,80,.3)" onclick="clHygieneCompleteAll(\''+hid+'\','+di+')">✅ Complete All</button>'
     : '';
-  tb.innerHTML='<h4>👥 '+cl.section+' — '+CL_DAYS[clWeekDates[di].getDay()]+' '+clFmtD(clWeekDates[di])+'</h4>'
+  var _hygDay=clWeekDates[di]||new Date();
+  tb.innerHTML='<h4>👥 '+cl.section+' — '+CL_DAYS[_hygDay.getDay()]+' '+clFmtD(_hygDay)+'</h4>'
     +'<div style="display:flex;gap:6px">'
     +(clIsAdmin()?'<button class="btn sm" onclick="clAddEmployee(\''+hid+'\','+di+')">+ Add</button>':'')+completeAllHygBtn
     +'</div>';
@@ -2213,6 +2231,7 @@ function clSetHyg(hid,di,ei,ci,box){
 function clRenderBartender(cl){
   var wrap=document.getElementById('cl-cards');if(!wrap)return;wrap.innerHTML='';clEnsureST();
   var w=clWk(),bt=clST[w]['foh_bartender'],di=_clBtDay;
+  if(!clWeekDates.length){var _n=new Date(),_s=new Date(_n);_s.setDate(_n.getDate()-_n.getDay());clWeekDates=clGetWeekDates(_s.getFullYear()+'-'+String(_s.getMonth()+1).padStart(2,'0')+'-'+String(_s.getDate()).padStart(2,'0'));}
   var drow=document.createElement('div');drow.className='cl-day-tabs';drow.style.cssText='margin-bottom:8px;flex-shrink:0';
   clWeekDates.forEach(function(d,dIdx){
     var b=document.createElement('button');b.className='cl-day-tab'+(dIdx===di?' active':'');
@@ -2223,7 +2242,8 @@ function clRenderBartender(cl){
   wrap.appendChild(drow);
   var card=document.createElement('div');card.className='cl-cf-card';
   var hdr=document.createElement('div');hdr.className='cl-cf-hdr';
-  hdr.innerHTML='<h4>🍸 Bartender\'s Prep Sheet — '+CL_DAYS[clWeekDates[di].getDay()]+' '+clFmtD(clWeekDates[di])+'</h4>';
+  var _btDay=clWeekDates[di]||new Date();
+  hdr.innerHTML='<h4>🍸 Bartender\'s Prep Sheet — '+CL_DAYS[_btDay.getDay()]+' '+clFmtD(_btDay)+'</h4>';
   card.appendChild(hdr);
   var scroll=document.createElement('div');scroll.className='cl-cf-scroll';
   var table=document.createElement('table');table.className='cl-cf-tbl';table.style.minWidth='420px';
