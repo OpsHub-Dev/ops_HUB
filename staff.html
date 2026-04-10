@@ -235,10 +235,9 @@ html,body{min-height:100%;font-family:var(--font);background:var(--bg);color:var
     </div>
     <div class="conn-dot" id="conn-dot"></div>
     <div class="clock-badge" id="clock">--:--:--</div>
-    <button id="wa-settings-btn" onclick="openWASettings()" title="WhatsApp Settings" style="background:none;border:none;cursor:pointer;font-size:20px;padding:4px 6px;border-radius:8px;transition:background .15s;color:#25d366" onmouseover="this.style.background='rgba(37,211,102,.1)'" onmouseout="this.style.background='none'">
-      <svg viewBox="0 0 24 24" width="22" height="22" fill="#25d366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+    <button onclick="openEmailSettings()" title="Email Settings" style="background:none;border:none;cursor:pointer;padding:5px 8px;border-radius:8px;transition:background .15s;color:#60a5fa" onmouseover="this.style.background='rgba(96,165,250,.1)'" onmouseout="this.style.background='none'">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#60a5fa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
     </button>
-    <button onclick="switchBranch()" title="Switch Branch" style="background:none;border:1px solid rgba(255,255,255,.12);border-radius:8px;cursor:pointer;font-size:11px;padding:5px 10px;color:rgba(255,255,255,.5);font-family:var(--font);transition:all .15s" onmouseover="this.style.borderColor='rgba(255,255,255,.3)'" onmouseout="this.style.borderColor='rgba(255,255,255,.12)'">🔀</button>
   </div>
 
   <div class="tabs">
@@ -286,6 +285,14 @@ html,body{min-height:100%;font-family:var(--font);background:var(--bg);color:var
           <span class="btn-time" id="btn-out-time">--:--</span>
         </button>
       </div>
+      <!-- Break button -->
+      <button class="action-btn" id="btn-break" style="width:100%;background:rgba(249,115,22,.08);border:1px solid rgba(249,115,22,.25);color:#f97316;margin-bottom:8px;flex-direction:row;gap:12px;padding:14px 18px;justify-content:center">
+        <span style="font-size:22px">☕</span>
+        <div style="text-align:left">
+          <div class="btn-lbl" style="color:#f97316">Start Break</div>
+          <div class="btn-time" id="break-timer-display" style="color:rgba(249,115,22,.7);font-size:11px;font-family:var(--mono)">1 hour timer</div>
+        </div>
+      </button>
       <button class="action-btn btn-absent" id="btn-mark-absent">
         <span style="font-size:20px">❌</span>
         <span class="btn-lbl">Mark as Absent</span>
@@ -312,11 +319,11 @@ html,body{min-height:100%;font-family:var(--font);background:var(--bg);color:var
     </div>
     <div id="team-list"></div>
 
-    <!-- End of Day WhatsApp Report -->
+    <!-- End of Day Email Report -->
     <div style="margin-top:12px">
-      <button onclick="sendEODReport()" style="width:100%;padding:13px;border-radius:10px;border:1px solid rgba(37,211,102,.3);background:rgba(37,211,102,.07);color:#25d366;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font);display:flex;align-items:center;justify-content:center;gap:8px;transition:all .15s" onmouseover="this.style.background='rgba(37,211,102,.14)'" onmouseout="this.style.background='rgba(37,211,102,.07)'">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="#25d366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-        Send End-of-Day Attendance Report
+      <button onclick="sendEODEmailReport()" style="width:100%;padding:13px;border-radius:10px;border:1px solid rgba(96,165,250,.3);background:rgba(96,165,250,.07);color:#60a5fa;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font);display:flex;align-items:center;justify-content:center;gap:8px;transition:all .15s" onmouseover="this.style.background='rgba(96,165,250,.14)'" onmouseout="this.style.background='rgba(96,165,250,.07)'">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#60a5fa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+        Send End-of-Day Attendance Report (Email)
       </button>
     </div>
   </div>
@@ -324,56 +331,28 @@ html,body{min-height:100%;font-family:var(--font);background:var(--bg);color:var
 
 <div id="toasts"></div>
 
-<!-- ══ WhatsApp Settings Modal ══ -->
-<div id="wa-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:400;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px)">
+<!-- ══ Email Settings Modal ══ -->
+<div id="email-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:400;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px)">
   <div style="background:#161b22;border:1px solid #30363d;border-radius:16px;width:100%;max-width:440px;box-shadow:0 20px 60px rgba(0,0,0,.7)">
     <div style="padding:14px 18px;border-bottom:1px solid #30363d;display:flex;align-items:center;justify-content:space-between">
       <div style="display:flex;align-items:center;gap:10px">
-        <div style="width:32px;height:32px;border-radius:9px;background:rgba(37,211,102,.15);border:1px solid rgba(37,211,102,.3);display:flex;align-items:center;justify-content:center;font-size:16px">💬</div>
-        <div style="font-size:14px;font-weight:700">WhatsApp Settings</div>
+        <div style="width:32px;height:32px;border-radius:9px;background:rgba(96,165,250,.15);border:1px solid rgba(96,165,250,.3);display:flex;align-items:center;justify-content:center;font-size:16px">✉️</div>
+        <div style="font-size:14px;font-weight:700">Email Report Settings</div>
       </div>
-      <button onclick="closeWASettings()" style="background:none;border:none;color:#7d8590;cursor:pointer;font-size:20px;padding:2px 8px;border-radius:6px">×</button>
+      <button onclick="closeEmailSettings()" style="background:none;border:none;color:#7d8590;cursor:pointer;font-size:20px;padding:2px 8px;border-radius:6px">×</button>
     </div>
     <div style="padding:18px">
       <div style="font-size:11.5px;color:#8b949e;margin-bottom:16px;line-height:1.7;background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:10px 13px">
-        💡 Enter the manager's number to receive absence alerts. Include country code without + <br>
-        Example: <strong style="color:#f0a500;font-family:monospace">966501234567</strong>
+        💡 Enter the manager's email to receive the end-of-day attendance report.
       </div>
       <div style="margin-bottom:14px">
-        <label style="font-size:10px;color:#7d8590;font-family:monospace;text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:5px">Manager WhatsApp Number</label>
-        <input id="wa-manager-num" type="tel" placeholder="966501234567" style="width:100%;background:#0d1117;border:1px solid #3d444d;border-radius:8px;padding:10px 12px;color:#e6edf3;font-size:13px;font-family:monospace;outline:none;transition:border-color .2s" onfocus="this.style.borderColor='#25d366'" onblur="this.style.borderColor='#3d444d'">
-      </div>
-      <div style="margin-bottom:16px">
-        <label style="font-size:10px;color:#7d8590;font-family:monospace;text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:8px">Message Language</label>
-        <div style="display:flex;gap:8px">
-          <button id="wa-lang-ar"   onclick="setWALang('ar')"   style="flex:1;padding:9px;border-radius:8px;border:1px solid #3d444d;background:transparent;color:#8b949e;font-size:12px;cursor:pointer;font-family:var(--font);transition:all .15s">🇸🇦 العربية</button>
-          <button id="wa-lang-en"   onclick="setWALang('en')"   style="flex:1;padding:9px;border-radius:8px;border:1px solid #3d444d;background:transparent;color:#8b949e;font-size:12px;cursor:pointer;font-family:var(--font);transition:all .15s">🇬🇧 English</button>
-          <button id="wa-lang-both" onclick="setWALang('both')" style="flex:1;padding:9px;border-radius:8px;border:1px solid #25d366;background:rgba(37,211,102,.08);color:#25d366;font-size:12px;cursor:pointer;font-family:var(--font);transition:all .15s">🌐 Both</button>
-        </div>
+        <label style="font-size:10px;color:#7d8590;font-family:monospace;text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:5px">Manager Email Address</label>
+        <input id="email-manager-addr" type="email" placeholder="manager@alfaco.com" style="width:100%;background:#0d1117;border:1px solid #3d444d;border-radius:8px;padding:10px 12px;color:#e6edf3;font-size:13px;font-family:monospace;outline:none;transition:border-color .2s" onfocus="this.style.borderColor='#60a5fa'" onblur="this.style.borderColor='#3d444d'">
       </div>
       <div style="display:flex;gap:10px">
-        <button onclick="saveWASettings()" style="flex:1;padding:11px;background:linear-gradient(135deg,#25d366,#128c7e);color:#fff;border:none;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font)">💾 Save</button>
-        <button onclick="testWAMessage()" style="flex:1;padding:11px;background:rgba(37,211,102,.1);color:#25d366;border:1px solid rgba(37,211,102,.3);border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font)">🧪 Test</button>
+        <button onclick="saveEmailSettings()" style="flex:1;padding:11px;background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:#fff;border:none;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font)">💾 Save</button>
+        <button onclick="closeEmailSettings()" style="flex:1;padding:11px;background:rgba(255,255,255,.06);color:#8b949e;border:1px solid #30363d;border-radius:9px;font-size:13px;cursor:pointer;font-family:var(--font)">Cancel</button>
       </div>
-    </div>
-  </div>
-</div>
-
-<!-- ══ WhatsApp Send Confirmation Modal ══ -->
-<div id="wa-confirm-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:500;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px)">
-  <div style="background:#161b22;border:1px solid #30363d;border-radius:16px;width:100%;max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,.7)">
-    <div style="padding:14px 18px;border-bottom:1px solid #30363d;display:flex;align-items:center;justify-content:space-between">
-      <div style="font-size:14px;font-weight:700">📤 Send WhatsApp Message</div>
-      <button onclick="closeWAConfirm()" style="background:none;border:none;color:#7d8590;cursor:pointer;font-size:20px;padding:2px 8px;border-radius:6px">×</button>
-    </div>
-    <div style="padding:16px 18px">
-      <label style="font-size:10px;color:#7d8590;font-family:monospace;text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:5px">Send To (number)</label>
-      <input id="wa-send-to" type="tel" placeholder="966501234567" style="width:100%;background:#0d1117;border:1px solid #3d444d;border-radius:8px;padding:9px 12px;color:#e6edf3;font-size:13px;font-family:monospace;outline:none;margin-bottom:12px" onfocus="this.style.borderColor='#25d366'" onblur="this.style.borderColor='#3d444d'">
-      <label style="font-size:10px;color:#7d8590;font-family:monospace;text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:5px">Message Preview</label>
-      <div id="wa-msg-preview" style="background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:12px;font-size:12px;color:#e6edf3;line-height:1.8;white-space:pre-wrap;max-height:220px;overflow-y:auto;font-family:monospace;margin-bottom:14px"></div>
-      <button onclick="openWhatsApp()" style="width:100%;padding:13px;background:linear-gradient(135deg,#25d366,#128c7e);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--font);display:flex;align-items:center;justify-content:center;gap:8px">
-        <span style="font-size:18px">💬</span> Open WhatsApp &amp; Send
-      </button>
     </div>
   </div>
 </div>
@@ -841,12 +820,17 @@ function launchStaffApp(){
   var hico=document.getElementById('header-branch-icon');
   if(htitle) htitle.textContent=CURRENT_BRANCH?CURRENT_BRANCH.name:'Staff Portal';
   if(hsub) hsub.textContent=CURRENT_BRANCH?(CURRENT_BRANCH.brand||'')+(CURRENT_BRANCH.location?' · '+CURRENT_BRANCH.location:''):'';
-  if(hico&&CURRENT_BRANCH) hico.style.background='linear-gradient(135deg,'+(CURRENT_BRANCH.color||'#f0a500')+','+( CURRENT_BRANCH.color||'#f0a500')+'aa)';
+  if(hico&&CURRENT_BRANCH){
+    hico.textContent=CURRENT_BRANCH.icon||'⚡';
+    hico.style.background='linear-gradient(135deg,'+(CURRENT_BRANCH.color||'#f0a500')+','+(CURRENT_BRANCH.color||'#f0a500')+'aa)';
+  }
 
   document.getElementById('branch-select-screen').classList.add('gone');
   document.getElementById('loading').classList.add('gone');
   document.getElementById('app').style.display='block';
   attachListeners();
+  // Init break timer
+  setTimeout(initBreakBtn, 100);
 }
 
 function connectFirebase(){
@@ -857,16 +841,39 @@ function connectFirebase(){
       var on=!!snap.val(); var dot=document.getElementById('conn-dot');
       if(dot) dot.className='conn-dot'+(on?'':' off');
     });
-    // Check for valid saved session
+
+    // ── PRIORITY 1: URL parameter ?branch=hybrid_moa (QR code scan) ──
+    var urlParams=new URLSearchParams(window.location.search);
+    var urlBranch=urlParams.get('branch')||urlParams.get('b');
+    if(urlBranch){
+      // Load branch info from Firebase and launch directly — no PIN
+      db.ref('admin/branches/'+urlBranch).once('value',function(snap){
+        var b=snap.val();
+        if(b&&b.active!==false){
+          CURRENT_BRANCH=b;
+          BRANCH_PATH='branches/'+urlBranch;
+          try{localStorage.setItem(STAFF_SESSION_KEY,JSON.stringify({branchId:urlBranch,branch:b,expires:Date.now()+10*3600000}));}catch(e){}
+          launchStaffApp();
+        } else {
+          toast('Branch not found: '+urlBranch,'error');
+          showBranchSelector();
+        }
+      },function(){showBranchSelector();});
+      return;
+    }
+
+    // ── PRIORITY 2: Valid saved session ──
     var sess=null;
     try{sess=JSON.parse(localStorage.getItem(STAFF_SESSION_KEY)||'null');}catch(e){}
     if(sess&&sess.branchId&&sess.expires>Date.now()){
       CURRENT_BRANCH=sess.branch||null;
       BRANCH_PATH='branches/'+sess.branchId;
       launchStaffApp();
-    } else {
-      showBranchSelector();
+      return;
     }
+
+    // ── PRIORITY 3: Show branch selector ──
+    showBranchSelector();
   }catch(e){
     document.getElementById('loading').classList.add('gone');
     toast('Firebase error: '+e.message,'error');
@@ -940,221 +947,161 @@ function switchBranch(){
 }
 
 // ══════════════════════════════════════════════════════════
-// 💬 WHATSAPP INTEGRATION
+// 📧 EMAIL INTEGRATION
 // ══════════════════════════════════════════════════════════
-var WA_KEY = 'ops_wa_settings';
-var waLang = 'both';
-var waPendingMsg = '';
+var EMAIL_KEY = 'opshub_email_settings';
 
-function loadWASettings(){
-  try{
-    var s=JSON.parse(localStorage.getItem(WA_KEY)||'{}');
-    if(s.lang) waLang=s.lang;
-    if(s.managerNum) document.getElementById('wa-manager-num').value=s.managerNum;
-    setWALang(waLang,true);
-  }catch(e){}
+function openEmailSettings(){
+  var s=getEmailSettings();
+  document.getElementById('email-manager-addr').value=s.addr||'';
+  document.getElementById('email-modal').style.display='flex';
+}
+function closeEmailSettings(){ document.getElementById('email-modal').style.display='none'; }
+function saveEmailSettings(){
+  var addr=document.getElementById('email-manager-addr').value.trim();
+  if(!addr||addr.indexOf('@')<0){ toast('Enter a valid email address','warning'); return; }
+  localStorage.setItem(EMAIL_KEY,JSON.stringify({addr:addr}));
+  toast('✅ Email settings saved!','success');
+  closeEmailSettings();
+}
+function getEmailSettings(){
+  try{ return JSON.parse(localStorage.getItem(EMAIL_KEY)||'{}'); }catch(e){ return {}; }
 }
 
-function saveWASettings(){
-  var num=document.getElementById('wa-manager-num').value.trim().replace(/\D/g,'');
-  if(!num){ toast('Please enter a valid number','warning'); return; }
-  localStorage.setItem(WA_KEY,JSON.stringify({managerNum:num,lang:waLang}));
-  toast('✅ WhatsApp settings saved!','success');
-  closeWASettings();
-}
+// ── END-OF-DAY EMAIL REPORT ──────────────────────────────
+function sendEODEmailReport(){
+  var s=getEmailSettings();
+  var branchName=CURRENT_BRANCH?CURRENT_BRANCH.name:'Branch';
+  var now=new Date();
+  var dateStr=now.toLocaleDateString('en-GB',{weekday:'long',day:'2-digit',month:'long',year:'numeric'});
 
-function setWALang(lang,silent){
-  waLang=lang;
-  ['ar','en','both'].forEach(function(l){
-    var btn=document.getElementById('wa-lang-'+l);
-    if(!btn)return;
-    var on=l===lang;
-    btn.style.borderColor=on?'#25d366':'#3d444d';
-    btn.style.background=on?'rgba(37,211,102,.08)':'transparent';
-    btn.style.color=on?'#25d366':'#8b949e';
-  });
-}
-
-function openWASettings(){
-  document.getElementById('wa-modal').style.display='flex';
-  loadWASettings();
-}
-function closeWASettings(){ document.getElementById('wa-modal').style.display='none'; }
-function closeWAConfirm(){  document.getElementById('wa-confirm-modal').style.display='none'; }
-
-function buildAbsenceMsg(emp){
-  var shift=getTodayScheduleValue(emp.id)||'';
-  var time=new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
-  var date=new Date().toLocaleDateString('en-GB',{weekday:'long',day:'2-digit',month:'short',year:'numeric'});
-  var ar='🔴 *تنبيه غياب*\n━━━━━━━━━━━━━\n👤 الموظف: *'+emp.name+'*\n🏢 القسم: '+(emp.dept||'—')+'\n'+(shift?'🕐 الوردية: '+shift+'\n':'')+'📅 التاريخ: '+date+'\n⏰ وقت التسجيل: '+time+'\n━━━━━━━━━━━━━\n_Ops Hub_';
-  var en='🔴 *Absence Alert*\n━━━━━━━━━━━━━\n👤 Staff: *'+emp.name+'*\n🏢 Dept: '+(emp.dept||'—')+'\n'+(shift?'🕐 Shift: '+shift+'\n':'')+'📅 Date: '+date+'\n⏰ Logged at: '+time+'\n━━━━━━━━━━━━━\n_Ops Hub_';
-  if(waLang==='ar')return ar;
-  if(waLang==='en')return en;
-  return ar+'\n\n'+en;
-}
-
-function buildAbsentMsgForEmp(emp){
-  var shift=getTodayScheduleValue(emp.id)||'';
-  var date=new Date().toLocaleDateString('en-GB',{weekday:'long',day:'2-digit',month:'short',year:'numeric'});
-  var firstName=emp.name.split(' ')[0];
-
-  var ar='السلام عليكم '+firstName+' 👋\n\nلقد سُجّل غيابك اليوم\n📅 *'+date+'*'+(shift?'\n🕐 الوردية: *'+shift+'*':'')+'\n\nإذا كان هناك سبب للغياب، يُرجى التواصل مع المدير المباشر.\n\n_Ops Hub_';
-
-  var en='Hello '+firstName+' 👋\n\nYour absence has been recorded for\n📅 *'+date+'*'+(shift?'\n🕐 Shift: *'+shift+'*':'')+'\n\nIf you have a reason for your absence, please contact your manager directly.\n\n_Ops Hub_';
-
-  return ar+'\n\n━━━━━━━━━━━━━\n\n'+en;
-}
-
-function getAbsentees(){
-  var mk=TODAY.slice(0,7);
-  var list=[];
+  // Build report text
+  var lines=['ALFA.CO — ' + branchName,'Attendance Report — '+dateStr,'',''];
+  var present=[],late=[],absent=[],leave=[],notyet=[];
   tsEmps.forEach(function(e){
-    if(isOnLeave(e.id)||isScheduledOff(e.id))return;
-    var recs=(tsAtt[e.id]&&tsAtt[e.id][mk])||[];
-    if(!Array.isArray(recs))recs=Object.values(recs).filter(Boolean);
-    var rec=null;for(var i=0;i<recs.length;i++)if(recs[i].date===TODAY){rec=recs[i];break;}
-    if(!rec||rec.st==='absent'){
-      // Find phone from staffList
-      var sf=null;for(var j=0;j<staffList.length;j++)if(String(staffList[j].id)===String(e.id)){sf=staffList[j];break;}
-      list.push({emp:e,phone:(sf&&sf.phone)||e.phone||''});
-    }
+    var st=getEmpStatus(e.id);
+    var rec=getTodayRec(e.id);
+    var timeInfo=rec&&rec.ci?(' | In: '+rec.ci+(rec.co?' Out: '+rec.co:'')):'';
+    if(st==='present') present.push(e.name+timeInfo);
+    else if(st==='late') late.push(e.name+timeInfo+' ⏰ Late');
+    else if(st==='absent') absent.push(e.name+' ❌');
+    else if(st==='leave') leave.push(e.name+' 🗓 On Leave');
+    else notyet.push(e.name+' ⏳');
   });
-  return list;
-}
 
-function sendEODReport(){
-  var absentees=getAbsentees();
-  if(!absentees.length){
-    toast('✅ No absences today — everyone is accounted for!','success');
+  var summary='Present: '+present.length+' | Late: '+late.length+' | Absent: '+absent.length+' | Leave: '+leave.length+' | Not Recorded: '+notyet.length;
+  lines.push(summary,'');
+
+  if(present.length){ lines.push('✅ PRESENT ('+present.length+')'); present.forEach(function(n){lines.push('  '+n);}); lines.push(''); }
+  if(late.length){ lines.push('⏰ LATE ('+late.length+')'); late.forEach(function(n){lines.push('  '+n);}); lines.push(''); }
+  if(absent.length){ lines.push('❌ ABSENT ('+absent.length+')'); absent.forEach(function(n){lines.push('  '+n);}); lines.push(''); }
+  if(leave.length){ lines.push('🗓 ON LEAVE ('+leave.length+')'); leave.forEach(function(n){lines.push('  '+n);}); lines.push(''); }
+  if(notyet.length){ lines.push('⏳ NOT RECORDED ('+notyet.length+')'); notyet.forEach(function(n){lines.push('  '+n);}); lines.push(''); }
+  lines.push('—','Generated by OpsHub · '+now.toLocaleTimeString('en-GB'));
+
+  var body=lines.join('\n');
+  var subject='['+branchName+'] Attendance Report — '+dateStr;
+  var addr=s.addr||'';
+
+  if(!addr){
+    toast('Set manager email first (✉️ button)','warning');
+    openEmailSettings();
     return;
   }
-  // Show the EOD panel
-  showEODPanel(absentees);
+
+  var mailto='mailto:'+encodeURIComponent(addr)+'?subject='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
+  window.location.href=mailto;
+  toast('Opening email app…','success');
 }
 
-function showEODPanel(absentees){
-  // Remove existing panel
-  var old=document.getElementById('eod-panel');if(old)old.remove();
+// ── BREAK TIMER ──────────────────────────────────────────
+var _breakKey='opshub_break_start';
+var _breakInt=null;
 
-  var date=new Date().toLocaleDateString('en-GB',{weekday:'long',day:'2-digit',month:'short',year:'numeric'});
-  var panel=document.createElement('div');
-  panel.id='eod-panel';
-  panel.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:600;display:flex;align-items:flex-end;justify-content:center;padding:0;backdrop-filter:blur(4px)';
+function initBreakBtn(){
+  var btn=document.getElementById('btn-break');
+  var display=document.getElementById('break-timer-display');
+  if(!btn) return;
 
-  var inner='<div style="background:#161b22;border:1px solid #30363d;border-radius:16px 16px 0 0;width:100%;max-width:540px;max-height:85vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 -8px 40px rgba(0,0,0,.6)">';
-  // Header
-  inner+='<div style="padding:14px 18px;border-bottom:1px solid #30363d;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">';
-  inner+='<div><div style="font-size:14px;font-weight:700">📋 End-of-Day Absent Notifications</div><div style="font-size:11px;color:#7d8590;margin-top:2px;font-family:monospace">'+date+' · '+absentees.length+' absent</div></div>';
-  inner+='<button onclick="document.getElementById(\'eod-panel\').remove()" style="background:none;border:none;color:#7d8590;cursor:pointer;font-size:20px;padding:2px 8px;border-radius:6px">×</button>';
-  inner+='</div>';
-
-  // Scrollable list
-  inner+='<div style="overflow-y:auto;flex:1;padding:12px 16px">';
-  inner+='<div style="font-size:11px;color:#8b949e;margin-bottom:12px;line-height:1.6;background:#0d1117;border:1px solid #30363d;border-radius:8px;padding:10px 12px">💡 Tap <strong style="color:#25d366">Send</strong> next to each employee to open WhatsApp with their personal message. Numbers are pulled from Staff records.</div>';
-
-  absentees.forEach(function(item,i){
-    var e=item.emp;
-    var phone=item.phone.replace(/\D/g,'');
-    var hasPhone=phone.length>=9;
-    var deptColor=e.dept==='Manager'?'#c9a84c':e.dept==='Kitchen'?'#3d7ec8':'#4aab6e';
-    var shift=getTodayScheduleValue(e.id)||'—';
-
-    inner+='<div style="background:#1c2128;border:1px solid #30363d;border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:12px">';
-    // Avatar
-    inner+='<div style="width:38px;height:38px;border-radius:50%;background:#22272e;border:1px solid #3d444d;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:'+deptColor+';flex-shrink:0;font-family:monospace">';
-    var parts=e.name.split(' ');var ini2=(parts[0]?parts[0][0]:'')+(parts[1]?parts[1][0]:'');
-    inner+=ini2+'</div>';
-    // Info
-    inner+='<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+e.name+'</div>';
-    inner+='<div style="font-size:10px;color:'+deptColor+';font-family:monospace;margin-top:2px">'+( e.dept||'')+' · Shift: '+shift+'</div>';
-    if(hasPhone){
-      inner+='<div style="font-size:10px;color:#7d8590;font-family:monospace;margin-top:2px">📱 '+item.phone+'</div>';
-    } else {
-      inner+='<div style="font-size:10px;color:#f85149;margin-top:2px">⚠️ No phone number on file</div>';
+  function updateDisplay(){
+    var st=localStorage.getItem(_breakKey);
+    if(!st){ if(_breakInt){clearInterval(_breakInt);_breakInt=null;}
+      btn.querySelector('.btn-lbl').textContent='Start Break';
+      btn.querySelector('.btn-lbl').style.color='#f97316';
+      btn.style.background='rgba(249,115,22,.08)';
+      btn.style.borderColor='rgba(249,115,22,.25)';
+      if(display) display.textContent='1 hour timer'; return; }
+    var elapsed=Date.now()-parseInt(st);
+    var remain=Math.max(0,3600000-elapsed);
+    var h=Math.floor(remain/3600000);
+    var m=Math.floor((remain%3600000)/60000);
+    var s=Math.floor((remain%60000)/1000);
+    var label=String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+    if(display) display.textContent=label+' remaining';
+    btn.querySelector('.btn-lbl').textContent='End Break';
+    btn.querySelector('.btn-lbl').style.color='#10b981';
+    btn.style.background='rgba(16,185,129,.08)';
+    btn.style.borderColor='rgba(16,185,129,.25)';
+    if(remain<=0){
+      clearInterval(_breakInt);_breakInt=null;
+      localStorage.removeItem(_breakKey);
+      updateDisplay();
+      toast('⏰ Break time over! Please return to work.','warning');
     }
-    inner+='</div>';
-    // Send button or phone input
-    if(hasPhone){
-      inner+='<button onclick="sendAbsentToEmp(\''+e.id+'\',\''+phone+'\')" style="padding:8px 14px;background:rgba(37,211,102,.1);color:#25d366;border:1px solid rgba(37,211,102,.3);border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font);white-space:nowrap;display:flex;align-items:center;gap:5px;flex-shrink:0"><span>💬</span> Send</button>';
+  }
+
+  // Restore active break
+  if(localStorage.getItem(_breakKey)){
+    _breakInt=setInterval(updateDisplay,1000); updateDisplay();
+  }
+
+  btn.onclick=function(){
+    if(localStorage.getItem(_breakKey)){
+      // End break
+      localStorage.removeItem(_breakKey);
+      if(_breakInt){clearInterval(_breakInt);_breakInt=null;}
+      updateDisplay();
+      toast('Break ended — welcome back! ✅','success');
     } else {
-      inner+='<div style="display:flex;gap:5px;flex-shrink:0">';
-      inner+='<input id="phone-'+e.id+'" type="tel" placeholder="966XXXXXXXXX" style="width:130px;background:#0d1117;border:1px solid #3d444d;border-radius:7px;padding:7px 9px;color:#e6edf3;font-size:11px;font-family:monospace;outline:none" onfocus="this.style.borderColor=\'#25d366\'" onblur="this.style.borderColor=\'#3d444d\'">';
-      inner+='<button onclick="sendAbsentToEmpManual(\''+e.id+'\')" style="padding:8px 10px;background:rgba(37,211,102,.1);color:#25d366;border:1px solid rgba(37,211,102,.3);border-radius:8px;font-size:12px;cursor:pointer">💬</button>';
-      inner+='</div>';
+      // Start break
+      if(!selectedId){ toast('Select your name first','warning'); return; }
+      localStorage.setItem(_breakKey,String(Date.now()));
+      if(_breakInt) clearInterval(_breakInt);
+      _breakInt=setInterval(updateDisplay,1000); updateDisplay();
+      toast('☕ Break started — 1 hour timer running','info');
     }
-    inner+='</div>';
-  });
-  inner+='</div>';
-
-  // Footer — Send All button
-  var allWithPhone=absentees.filter(function(a){return a.phone.replace(/\D/g,'').length>=9;});
-  if(allWithPhone.length>1){
-    inner+='<div style="padding:12px 16px;border-top:1px solid #30363d;flex-shrink:0">';
-    inner+='<button onclick="sendAllAbsent()" style="width:100%;padding:12px;background:linear-gradient(135deg,#25d366,#128c7e);color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font)">💬 Send to All ('+allWithPhone.length+') — One by One</button>';
-    inner+='</div>';
-  }
-  inner+='</div></div>';
-  panel.innerHTML=inner;
-  document.body.appendChild(panel);
-  // Store absentees for sendAll
-  window._eodAbsentees=absentees;
+  };
 }
 
-function sendAbsentToEmp(empId,phone){
-  var emp=getEmp(empId);if(!emp)return;
-  var msg=buildAbsentMsgForEmp(emp);
-  window.open('https://wa.me/'+phone+'?text='+encodeURIComponent(msg),'_blank');
+// ══════════════════════════════════════════════════════════
+// 🔀 SWITCH BRANCH
+// ══════════════════════════════════════════════════════════
+function switchBranch(){
+  try{localStorage.removeItem(STAFF_SESSION_KEY);}catch(e){}
+  if(db){try{db.ref().off();}catch(e){}}
+  BRANCH_PATH=''; CURRENT_BRANCH=null; _pendingBranch=null;
+  tsEmps=[]; tsAtt={}; staffList=[]; selectedId=null;
+  document.getElementById('pin-screen').classList.remove('show');
+  document.getElementById('branch-list-step').style.display='block';
+  showBranchSelector();
 }
 
-function sendAbsentToEmpManual(empId){
-  var inp=document.getElementById('phone-'+empId);
-  if(!inp){return;}
-  var phone=inp.value.trim().replace(/\D/g,'');
-  if(phone.length<9){toast('Enter a valid number','warning');return;}
-  sendAbsentToEmp(empId,phone);
-}
-
-var _sendAllIdx=0;
-function sendAllAbsent(){
-  var list=(window._eodAbsentees||[]).filter(function(a){return a.phone.replace(/\D/g,'').length>=9;});
-  if(!list.length)return;
-  _sendAllIdx=0;
-  sendNextAbsent(list);
-}
-function sendNextAbsent(list){
-  if(_sendAllIdx>=list.length){toast('✅ All messages sent!','success');return;}
-  var item=list[_sendAllIdx];
-  var phone=item.phone.replace(/\D/g,'');
-  var msg=buildAbsentMsgForEmp(item.emp);
-  window.open('https://wa.me/'+phone+'?text='+encodeURIComponent(msg),'_blank');
-  _sendAllIdx++;
-  // Wait 2 seconds between opens to avoid popup blocking
-  if(_sendAllIdx<list.length){
-    setTimeout(function(){sendNextAbsent(list);},2000);
-  } else {
-    toast('✅ All '+list.length+' messages sent!','success');
-  }
-}
-
-// Override doMarkAbsent to offer WhatsApp to employee directly
+// Override doMarkAbsent to offer email notification
 var _origDoMarkAbsent=doMarkAbsent;
 doMarkAbsent=function(){
   if(!selectedId){toast('Please select a name first','warning');return;}
   var emp=getEmp(selectedId);
   var sf=null;for(var i=0;i<staffList.length;i++)if(String(staffList[i].id)===String(selectedId)){sf=staffList[i];break;}
-  var phone=(sf&&sf.phone||'').replace(/\D/g,'');
+  var empEmail=(sf&&sf.email)||'';
   writeAtt(selectedId,{date:TODAY,ci:null,co:null,st:'absent',note:'Manual entry'});
   toast(emp.name+' — Marked as absent','warning');
   setTimeout(function(){
-    if(phone.length>=9){
-      if(confirm('📱 Send WhatsApp absence message to '+emp.name+'?\n\nNumber: '+sf.phone)){
-        sendAbsentToEmp(selectedId,phone);
-      }
-    } else {
-      // No phone — show mini input
-      if(confirm('📱 Send WhatsApp to '+emp.name+'? (no phone on file — you can enter it manually)')){
-        var manual=prompt('Enter '+emp.name+'\'s WhatsApp number (with country code):','966');
-        if(manual){sendAbsentToEmp(selectedId,manual.replace(/\D/g,''));}
+    if(empEmail&&empEmail.indexOf('@')>=0){
+      if(confirm('Send absence email to '+emp.name+' ('+empEmail+')?')){
+        var branchName=CURRENT_BRANCH?CURRENT_BRANCH.name:'';
+        var subj='Absence Notification — '+TODAY;
+        var body='Dear '+emp.name+',\n\nYour absence has been recorded for '+TODAY+'.\n\nIf you have a reason to share, please contact your manager.\n\nRegards,\n'+branchName+' Management\nALFA.CO';
+        window.location.href='mailto:'+encodeURIComponent(empEmail)+'?subject='+encodeURIComponent(subj)+'&body='+encodeURIComponent(body);
       }
     }
   },400);
