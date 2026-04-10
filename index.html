@@ -1198,7 +1198,7 @@ function attachListeners(){
   });
 
   // Inventory
-  db.ref(bPath('inv_items')).on('value', function(snap){
+  db.ref('shared/inv_items').on('value', function(snap){
     var raw = snap.val();
     if(!raw){ items = []; }
     else if(Array.isArray(raw)){ items = raw.filter(Boolean); }
@@ -1247,7 +1247,7 @@ function saveItems(){
     var k = String(item.code).replace(/[.#$\[\]\/]/g,'_');
     obj[k] = item;
   });
-  fbSet(bPath('inv_items'), obj);
+  fbSet('shared/inv_items', obj);
 }
 function saveLogs(){
   if(!db){ return; }
@@ -3641,22 +3641,43 @@ function pInvDash(){
   h+='<div class="sc" style="'+(hExp>0?'border-color:rgba(248,81,73,.2)':'')+'"><div class="sc-lbl">Stock Value</div><div class="sc-val cb" style="font-size:28px;font-weight:300">'+Math.round(value).toLocaleString()+'</div><div class="sc-sub">SAR · '+(hExp>0?'<span style="color:var(--red)">'+hExp+' cards expired</span>':'0 cards expired')+'</div></div>';
   h+='</div>';
 
-  // ── ROW 3: Piatto + Steak House ──────────────────────────
+  // ── ROW 3: Branch Tables & Seats (editable, per-branch) ─────
+  var _bc=S._branchConfig||{};
+  var _bt=_bc.tables||0,_bs=_bc.seats||0;
+  var _bname=CURRENT_BRANCH?CURRENT_BRANCH.name:(IS_SUPER_ADMIN?'All Branches':'Branch');
+  var _bcolor=CURRENT_BRANCH?CURRENT_BRANCH.color:'var(--acc)';
+  var _bicon=CURRENT_BRANCH?CURRENT_BRANCH.icon:'🏪';
   h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">';
-  // Piatto
-  h+='<div class="card" style="border-color:rgba(240,165,0,.2);padding:14px">';
-  h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><div style="width:9px;height:9px;border-radius:50%;background:var(--gold);box-shadow:0 0 6px var(--gold)"></div><span style="font-size:13px;font-weight:700;color:var(--gold)">Piatto</span></div>';
+  // Tables card
+  h+='<div class="card" style="padding:14px;border-color:rgba(96,165,250,.15);cursor:pointer;transition:border-color .2s" id="dash-tables-card" title="Click to edit">';
+  h+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">';
+  h+='<div style="display:flex;align-items:center;gap:8px"><div style="width:9px;height:9px;border-radius:50%;background:'+_bcolor+';box-shadow:0 0 6px '+_bcolor+'"></div><span style="font-size:13px;font-weight:700;color:var(--text)">'+_bicon+' '+xe(_bname)+'</span></div>';
+  h+='<span style="font-size:10px;color:var(--text3);font-family:var(--mono)">✏️ edit</span>';
+  h+='</div>';
   h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
-  h+='<div style="background:var(--bg2);border:1px solid var(--bd);border-radius:7px;padding:14px;text-align:center"><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;font-family:var(--mono)">Tables</div><div style="font-size:32px;font-weight:300;color:var(--gold);font-family:var(--mono)">21</div></div>';
-  h+='<div style="background:var(--bg2);border:1px solid var(--bd);border-radius:7px;padding:14px;text-align:center"><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;font-family:var(--mono)">Seats</div><div style="font-size:32px;font-weight:300;color:var(--gold);font-family:var(--mono)">86</div></div>';
+  h+='<div style="background:var(--bg2);border:1px solid var(--bd);border-radius:7px;padding:14px;text-align:center">';
+  h+='<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;font-family:var(--mono)">Tables</div>';
+  h+='<div id="dash-tables-val" style="font-size:32px;font-weight:300;color:var(--blu);font-family:var(--mono)">'+(_bt||'—')+'</div>';
+  h+='</div>';
+  h+='<div style="background:var(--bg2);border:1px solid var(--bd);border-radius:7px;padding:14px;text-align:center">';
+  h+='<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;font-family:var(--mono)">Seats</div>';
+  h+='<div id="dash-seats-val" style="font-size:32px;font-weight:300;color:var(--pur);font-family:var(--mono)">'+(_bs||'—')+'</div>';
+  h+='</div>';
   h+='</div></div>';
-  // Steak House
-  h+='<div class="card" style="border-color:rgba(88,166,255,.2);padding:14px">';
-  h+='<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><div style="width:9px;height:9px;border-radius:50%;background:var(--blu);box-shadow:0 0 6px var(--blu)"></div><span style="font-size:13px;font-weight:700;color:var(--blu)">Steak House</span></div>';
-  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
-  h+='<div style="background:var(--bg2);border:1px solid var(--bd);border-radius:7px;padding:14px;text-align:center"><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;font-family:var(--mono)">Tables</div><div style="font-size:32px;font-weight:300;color:var(--blu);font-family:var(--mono)">16</div></div>';
-  h+='<div style="background:var(--bg2);border:1px solid var(--bd);border-radius:7px;padding:14px;text-align:center"><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:6px;font-family:var(--mono)">Seats</div><div style="font-size:32px;font-weight:300;color:var(--blu);font-family:var(--mono)">74</div></div>';
-  h+='</div></div>';
+  // Branch info card
+  h+='<div class="card" style="padding:14px">';
+  h+='<div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;font-family:var(--mono)">Branch Info</div>';
+  var _brd=CURRENT_BRANCH?(CURRENT_BRANCH.brand||'—'):(IS_SUPER_ADMIN?'Super Admin':'—');
+  var _bloc=CURRENT_BRANCH?(CURRENT_BRANCH.location||'—'):'—';
+  var _bmgr=CURRENT_BRANCH?(CURRENT_BRANCH.manager||'—'):'—';
+  h+='<div style="display:flex;flex-direction:column;gap:8px">';
+  h+='<div style="display:flex;justify-content:space-between;font-size:11px"><span style="color:var(--text3)">Brand</span><span style="font-weight:700;color:var(--text2)">'+xe(_brd)+'</span></div>';
+  h+='<div style="display:flex;justify-content:space-between;font-size:11px"><span style="color:var(--text3)">Location</span><span style="color:var(--text2);text-align:right;max-width:180px">'+xe(_bloc)+'</span></div>';
+  h+='<div style="display:flex;justify-content:space-between;font-size:11px"><span style="color:var(--text3)">Manager</span><span style="font-weight:600;color:var(--text2)">'+xe(_bmgr)+'</span></div>';
+  h+='<div style="display:flex;justify-content:space-between;font-size:11px"><span style="color:var(--text3)">Staff Active</span><span style="font-weight:700;color:var(--grn)">'+act+'</span></div>';
+  h+='<div style="margin-top:4px"><button class="btn sm s" style="width:100%;justify-content:center" id="dash-edit-branch-btn">✏️ Edit Branch Info</button></div>';
+  h+='</div>';
+  h+='</div>';
   h+='</div>';
 
   // ── ROW 4: Health Cards | On Leave | By Department ────────
@@ -3766,8 +3787,11 @@ function pInvDash(){
   return h;
 }
 
+var INV_PAGE_SIZE = 50; // items per page
+
 function pItems(){
   var q=(S.q||'').toLowerCase(),loc=S.inv_loc||'',sts=S.inv_sts||'',uom=S.inv_uom||'';
+  var pg=S.inv_page||0;
   var filtered=items.filter(function(i){
     if(q&&String(i.code).toLowerCase().indexOf(q)<0&&i.name.toLowerCase().indexOf(q)<0)return false;
     if(loc&&i.location!==loc)return false;
@@ -3776,14 +3800,41 @@ function pItems(){
     if(sts==='low'&&!(i.min>0&&i.qty<=i.min))return false;
     return true;
   });
+  // reset to page 0 if filter changed
+  var totalPages=Math.max(1,Math.ceil(filtered.length/INV_PAGE_SIZE));
+  if(pg>=totalPages)pg=0;
+  var pageItems=filtered.slice(pg*INV_PAGE_SIZE,(pg+1)*INV_PAGE_SIZE);
+
   var uoms=[];items.forEach(function(i){if(uoms.indexOf(i.unit)<0)uoms.push(i.unit);});uoms.sort();
   var uomOpts='<option value="">All UoM</option>'+uoms.map(function(u){return '<option value="'+u+'"'+(u===uom?' selected':'')+'>'+u+'</option>';}).join('');
   var lBdg={'Dry Storage':'bdg-amb','Paper & Chemical':'bdg-blu','Freezer':'bdg-blu','Fridge':'bdg-blu'};
-  var rows=filtered.map(function(it){
+  var rows=pageItems.map(function(it){
     var isLow=it.min>0&&it.qty<=it.min;
     return '<tr class="'+(isLow?'tr-low':'')+'"><td style="font-weight:700;color:var(--acc);font-size:10px;font-family:var(--mono)">'+xe(it.code)+'</td><td>'+xe(it.name)+'</td><td><span class="bdg '+(lBdg[it.location]||'bdg-amb')+'">'+xe(it.location)+'</span></td><td style="font-weight:800;font-size:13px;color:'+(isLow?'var(--red)':'var(--text)')+'">'+it.qty+'</td><td><span class="bdg bdg-uom">'+it.unit+'</span></td><td style="color:var(--text2)">'+it.min+'</td><td style="color:var(--text2)">'+parseFloat(it.price||0).toFixed(2)+'</td><td><span class="bdg '+(isLow?'bdg-red':'bdg-ok')+'">'+(isLow?'Low':'OK')+'</span></td><td style="white-space:nowrap"><button class="btn sm s" data-inv-edit="'+xe(it.code)+'">✏️</button> <button class="btn sm d" data-del="items" data-id="'+xe(it.code)+'">🗑️</button></td></tr>';
   }).join('');
+
+  // Pagination controls
+  var start=pg*INV_PAGE_SIZE+1,end=Math.min((pg+1)*INV_PAGE_SIZE,filtered.length);
+  var pagCtrl='';
+  if(totalPages>1){
+    pagCtrl='<div style="display:flex;align-items:center;gap:6px">';
+    pagCtrl+='<button class="btn sm s" id="pag-first" '+(pg===0?'disabled':'')+' style="padding:4px 8px">«</button>';
+    pagCtrl+='<button class="btn sm s" id="pag-prev" '+(pg===0?'disabled':'')+' style="padding:4px 8px">‹</button>';
+    // page number buttons — show max 5
+    var pStart=Math.max(0,Math.min(pg-2,totalPages-5));
+    var pEnd=Math.min(totalPages-1,pStart+4);
+    for(var pi=pStart;pi<=pEnd;pi++){
+      pagCtrl+='<button class="btn sm '+(pi===pg?'':'s')+'" data-page="'+pi+'" style="padding:4px 10px;min-width:32px;'+(pi===pg?'background:var(--acc);color:#000;':'')+'">'+(pi+1)+'</button>';
+    }
+    pagCtrl+='<button class="btn sm s" id="pag-next" '+(pg>=totalPages-1?'disabled':'')+' style="padding:4px 8px">›</button>';
+    pagCtrl+='<button class="btn sm s" id="pag-last" '+(pg>=totalPages-1?'disabled':'')+' style="padding:4px 8px">»</button>';
+    pagCtrl+='</div>';
+  }
+
   var h='';
+  h+='<div style="background:rgba(96,165,250,.07);border:1px solid rgba(96,165,250,.15);border-radius:9px;padding:8px 12px;margin-bottom:10px;font-size:11px;color:rgba(96,165,250,.9);display:flex;align-items:center;gap:8px">';
+  h+='<span style="font-size:14px">📦</span><strong>Shared Item Catalog</strong> — This list is shared across all branches. Quantities are branch-specific.';
+  h+='</div>';
   h+='<div class="ttb" style="background:var(--bg3);border:1px solid var(--bd);border-radius:var(--r) var(--r) 0 0">';
   h+='<input class="fi-s" id="inv-q" placeholder="🔍  Search code or name…" value="'+xe(S.q||'')+'">';
   h+='<select class="fi-s" id="inv-loc"><option value="">All Locations</option><option value="Dry Storage"'+(loc==='Dry Storage'?' selected':'')+'>Dry Storage</option><option value="Paper &amp; Chemical"'+(loc==='Paper & Chemical'?' selected':'')+'>Paper & Chemical</option><option value="Freezer"'+(loc==='Freezer'?' selected':'')+'>Freezer</option><option value="Fridge"'+(loc==='Fridge'?' selected':'')+'>Fridge</option></select>';
@@ -3794,7 +3845,10 @@ function pItems(){
   h+='</div>';
   h+='<div class="tw" style="border-radius:0 0 var(--r) var(--r)">';
   h+='<div class="tw-s"><table><thead><tr><th>Code</th><th>Name</th><th>Location</th><th>Qty</th><th>UoM</th><th>Min</th><th>Price</th><th>Status</th><th></th></tr></thead><tbody>'+(rows||'<tr><td colspan="9" class="er">No items found</td></tr>')+'</tbody></table></div>';
-  h+='<div class="pag"><span class="pag-info">'+filtered.length+' items</span></div>';
+  h+='<div class="pag" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">';
+  h+='<span class="pag-info">'+filtered.length+' items · showing '+(filtered.length?start+'-'+end:'0')+(totalPages>1?' of '+totalPages+' pages':'')+' </span>';
+  h+=pagCtrl;
+  h+='</div>';
   h+='</div>';
   return h;
 }
@@ -4738,6 +4792,50 @@ function loadSuppliers(){
   });
 }
 
+// ── BRANCH CONFIG (tables, seats, extra info per branch) ────
+function loadBranchConfig(){
+  if(!db||IS_SUPER_ADMIN)return;
+  db.ref(bPath('config')).on('value',function(snap){
+    S._branchConfig=snap.val()||{};
+    if(S.p==='inv-dash')ren();
+  });
+}
+
+function saveBranchConfig(cfg){
+  if(!db||IS_SUPER_ADMIN)return;
+  db.ref(bPath('config')).update(cfg,function(err){
+    if(!err){S._branchConfig=Object.assign(S._branchConfig||{},cfg);toast('Saved ✓','success');}
+    else toast('Save error','error');
+  });
+}
+
+function openTablesSeatsModal(){
+  var cfg=S._branchConfig||{};
+  om('Edit Tables & Seats',
+    '<div style="display:flex;flex-direction:column;gap:14px">'
+    +'<div style="font-size:12px;color:var(--text3)">Set the capacity for this branch. This is saved per branch.</div>'
+    +'<div class="fr">'
+      +'<div class="fg"><label>Number of Tables</label><input id="ts-tables" type="number" min="0" value="'+(cfg.tables||0)+'" placeholder="0"></div>'
+      +'<div class="fg"><label>Number of Seats</label><input id="ts-seats" type="number" min="0" value="'+(cfg.seats||0)+'" placeholder="0"></div>'
+    +'</div>'
+    +'<div class="fg"><label>Dining Area (optional)</label><input id="ts-area" value="'+xe(cfg.area||'')+'" placeholder="e.g. Main Hall + Terrace"></div>'
+    +'</div>',
+    function(){
+      var t=parseInt(document.getElementById('ts-tables').value)||0;
+      var s=parseInt(document.getElementById('ts-seats').value)||0;
+      var a=(document.getElementById('ts-area').value||'').trim();
+      saveBranchConfig({tables:t,seats:s,area:a});
+      cm();
+      // Update DOM immediately
+      var tv=document.getElementById('dash-tables-val');
+      var sv2=document.getElementById('dash-seats-val');
+      if(tv)tv.textContent=t||'—';
+      if(sv2)sv2.textContent=s||'—';
+    }
+  );
+  var ms=document.getElementById('ms');if(ms)ms.textContent='Save';
+}
+
 function openNewOrderModal(){
   ordItems=[];populateSupplierSelect();
   document.getElementById('ord-sup').value='';
@@ -5032,7 +5130,7 @@ function mBackup(){
             var batches=Math.ceil(totalItems/BATCH);
             toast('Restoring '+totalItems+' items in '+batches+' batches…','info');
 
-            db.ref(bPath('inv_items')).remove(function(){
+            db.ref('shared/inv_items').remove(function(){
               var done=0;
               for(var b=0;b<batches;b++){
                 (function(bIdx){
@@ -5051,7 +5149,7 @@ function mBackup(){
                     };
                   });
                   setTimeout(function(){
-                    db.ref(bPath('inv_items')).update(obj,function(err){
+                    db.ref('shared/inv_items').update(obj,function(err){
                       done++;
                       if(err) console.error('Batch '+bIdx+' error:',err);
                       if(done===batches){
@@ -5393,6 +5491,52 @@ function bindPg(){
 
   // Admin branch management binding
   if(S.p==='admin-branches'){bindAdminBranches();}
+
+  // ── Items pagination ───────────────────────────────────────
+  if(S.p==='items'){
+    var invQ=document.getElementById('inv-q');
+    if(invQ&&!invQ._wired){invQ._wired=true;invQ.oninput=function(){S.q=this.value;S.inv_page=0;ren();};}
+    var invLoc=document.getElementById('inv-loc');
+    if(invLoc&&!invLoc._wired){invLoc._wired=true;invLoc.onchange=function(){S.inv_loc=this.value;S.inv_page=0;ren();};}
+    var invSts=document.getElementById('inv-sts');
+    if(invSts&&!invSts._wired){invSts._wired=true;invSts.onchange=function(){S.inv_sts=this.value;S.inv_page=0;ren();};}
+    var invUom=document.getElementById('inv-uom');
+    if(invUom&&!invUom._wired){invUom._wired=true;invUom.onchange=function(){S.inv_uom=this.value;S.inv_page=0;ren();};}
+    // Page buttons
+    var pFirst=document.getElementById('pag-first');
+    var pPrev=document.getElementById('pag-prev');
+    var pNext=document.getElementById('pag-next');
+    var pLast=document.getElementById('pag-last');
+    var totalPg=Math.max(1,Math.ceil(items.filter(function(i){
+      var q=(S.q||'').toLowerCase(),loc=S.inv_loc||'',uom=S.inv_uom||'',sts=S.inv_sts||'';
+      if(q&&String(i.code).toLowerCase().indexOf(q)<0&&i.name.toLowerCase().indexOf(q)<0)return false;
+      if(loc&&i.location!==loc)return false;
+      if(uom&&i.unit!==uom)return false;
+      if(sts==='ok'&&i.min>0&&i.qty<=i.min)return false;
+      if(sts==='low'&&!(i.min>0&&i.qty<=i.min))return false;
+      return true;
+    }).length/INV_PAGE_SIZE));
+    if(pFirst)pFirst.onclick=function(){S.inv_page=0;ren();};
+    if(pPrev)pPrev.onclick=function(){S.inv_page=Math.max(0,(S.inv_page||0)-1);ren();};
+    if(pNext)pNext.onclick=function(){S.inv_page=Math.min(totalPg-1,(S.inv_page||0)+1);ren();};
+    if(pLast)pLast.onclick=function(){S.inv_page=totalPg-1;ren();};
+    document.querySelectorAll('[data-page]').forEach(function(b){
+      b.onclick=function(){S.inv_page=parseInt(this.dataset.page);ren();};
+    });
+  }
+
+  // ── Dashboard: tables/seats edit + branch edit button ─────
+  if(S.p==='inv-dash'){
+    var dashCard=document.getElementById('dash-tables-card');
+    if(dashCard)dashCard.onclick=function(){if(!IS_SUPER_ADMIN)openTablesSeatsModal();};
+    var dashEditBranch=document.getElementById('dash-edit-branch-btn');
+    if(dashEditBranch)dashEditBranch.onclick=function(){
+      if(IS_SUPER_ADMIN){go('admin-branches');}
+      else if(CURRENT_BRANCH){
+        db.ref('admin/branches/'+CURRENT_BRANCH.id).once('value',function(snap){openBranchModal(snap.val());});
+      }
+    };
+  }
 }
 
 // ════════════════════════════════════════════════════════════
@@ -5773,6 +5917,7 @@ function _doLaunch(){
       buildTodayShiftMap();
       attachListeners();
       loadSuppliers();
+      loadBranchConfig();
       if(!IS_SUPER_ADMIN) seedIfEmpty();
       go(IS_SUPER_ADMIN ? 'admin-branches' : 'inv-dash');
       updateBadges();
