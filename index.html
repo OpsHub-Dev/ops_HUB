@@ -1198,25 +1198,23 @@ function attachListeners(){
   });
 
   // Inventory
-  // Items: try shared/inv_items first; if empty fall back to branch path
-  function _attachItemsListener(path){
-    db.ref(path).on('value', function(snap){
+  // Items: shared catalog — check shared/inv_items; fall back to branch path if shared is empty
+  // This handles both migrated (shared) and un-migrated (per-branch) setups
+  db.ref('shared/inv_items').once('value', function(sharedSnap){
+    var sharedVal = sharedSnap.val();
+    var hasShared = sharedVal && typeof sharedVal === 'object' && Object.keys(sharedVal).length > 0;
+    var itemsPath = hasShared ? 'shared/inv_items' : (BRANCH_PATH ? BRANCH_PATH+'/inv_items' : 'shared/inv_items');
+    _itemsPath = itemsPath; // store so saveItems() writes to the right place
+    console.log('[Items] Loading from: '+itemsPath+(hasShared?' (shared catalog)':' (branch fallback)'));
+    db.ref(itemsPath).on('value', function(snap){
       var raw = snap.val();
-      if(raw === null || (typeof raw === 'object' && Object.keys(raw).length === 0)){
-        if(path === 'shared/inv_items' && BRANCH_PATH){
-          // shared is empty — fallback to branch path (data not migrated yet)
-          console.warn('[Items] shared/inv_items empty, falling back to '+BRANCH_PATH+'/inv_items');
-          _attachItemsListener(BRANCH_PATH+'/inv_items');
-          return;
-        }
-        items = [];
-      } else if(Array.isArray(raw)){ items = raw.filter(Boolean); }
+      if(!raw){ items = []; }
+      else if(Array.isArray(raw)){ items = raw.filter(Boolean); }
       else{ items = Object.values(raw).filter(Boolean); }
       updateBadges();
       if(S.p === 'items' || S.p === 'inv-dash' || S.p === 'alerts') ren();
     });
-  }
-  _attachItemsListener('shared/inv_items');
+  });
 
   db.ref(bPath('inv_logs')).on('value', function(snap){
     var raw = snap.val();
@@ -1250,15 +1248,16 @@ function saveCollection(key, arr){
   fbSet(bPath(key), obj);
 }
 
+var _itemsPath = 'shared/inv_items'; // updated when items listener resolves
+
 function saveItems(){
   if(!db){ return; }
   var obj = {};
   items.forEach(function(item){
-    // Use code as key — sanitize special chars Firebase doesn't allow
     var k = String(item.code).replace(/[.#$\[\]\/]/g,'_');
     obj[k] = item;
   });
-  fbSet('shared/inv_items', obj);
+  fbSet(_itemsPath, obj);
 }
 function saveLogs(){
   if(!db){ return; }
@@ -4835,29 +4834,39 @@ function saveBranchConfig(cfg){
 
 function openTablesSeatsModal(){
   var cfg=S._branchConfig||{};
-  om('Edit Tables & Seats',
-    '<div style="display:flex;flex-direction:column;gap:14px">'
-    +'<div style="font-size:12px;color:var(--text3)">Set the capacity for this branch. This is saved per branch.</div>'
+  var _bname=CURRENT_BRANCH?CURRENT_BRANCH.name:'Branch';
+  om('Edit Tables & Seats — '+_bname,
+    '<div style="display:flex;flex-direction:column;gap:16px">'
+    +'<div style="font-size:12px;color:var(--text3);background:var(--bg2);border-radius:8px;padding:10px 12px;">Set the capacity for <strong style="color:var(--text)">'+xe(_bname)+'</strong>. Saved per branch and shown on the dashboard.</div>'
     +'<div class="fr">'
-      +'<div class="fg"><label>Number of Tables</label><input id="ts-tables" type="number" min="0" value="'+(cfg.tables||0)+'" placeholder="0"></div>'
-      +'<div class="fg"><label>Number of Seats</label><input id="ts-seats" type="number" min="0" value="'+(cfg.seats||0)+'" placeholder="0"></div>'
+      +'<div class="fg"><label>Number of Tables</label><input id="ts-tables" type="number" min="0" value="'+(cfg.tables||0)+'" style="font-size:22px;font-weight:300;text-align:center;font-family:var(--mono)"></div>'
+      +'<div class="fg"><label>Number of Seats</label><input id="ts-seats" type="number" min="0" value="'+(cfg.seats||0)+'" style="font-size:22px;font-weight:300;text-align:center;font-family:var(--mono)"></div>'
     +'</div>'
     +'<div class="fg"><label>Dining Area (optional)</label><input id="ts-area" value="'+xe(cfg.area||'')+'" placeholder="e.g. Main Hall + Terrace"></div>'
+    +'<div class="mfoot" style="border-top:1px solid var(--bd);padding-top:14px;margin-top:2px">'
+      +'<button class="btn s" onclick="cm()">Cancel</button>'
+      +'<button class="btn" id="ts-save-btn" style="min-width:140px">💾 Save Capacity</button>'
+    +'</div>'
     +'</div>',
-    function(){
-      var t=parseInt(document.getElementById('ts-tables').value)||0;
-      var s=parseInt(document.getElementById('ts-seats').value)||0;
-      var a=(document.getElementById('ts-area').value||'').trim();
-      saveBranchConfig({tables:t,seats:s,area:a});
-      cm();
-      // Update DOM immediately
-      var tv=document.getElementById('dash-tables-val');
-      var sv2=document.getElementById('dash-seats-val');
-      if(tv)tv.textContent=t||'—';
-      if(sv2)sv2.textContent=s||'—';
-    }
+    null // no _cb — we wire the button manually below
   );
-  var ms=document.getElementById('ms');if(ms)ms.textContent='Save';
+  // Wire Save button directly (not via _cb — avoids the #ms dependency)
+  setTimeout(function(){
+    var saveBtn=document.getElementById('ts-save-btn');
+    if(saveBtn){
+      saveBtn.onclick=function(){
+        var t=parseInt(document.getElementById('ts-tables').value)||0;
+        var s=parseInt(document.getElementById('ts-seats').value)||0;
+        var a=(document.getElementById('ts-area').value||'').trim();
+        saveBranchConfig({tables:t,seats:s,area:a});
+        cm();
+        var tv=document.getElementById('dash-tables-val');
+        var sv2=document.getElementById('dash-seats-val');
+        if(tv)tv.textContent=t||'—';
+        if(sv2)sv2.textContent=s||'—';
+      };
+    }
+  },30);
 }
 
 function openNewOrderModal(){
