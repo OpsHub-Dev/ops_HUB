@@ -713,7 +713,58 @@ select.fi-s option{background:var(--select-opt-bg);color:var(--text)}
 <!-- ══════════════════════════════════════════
      🔐 BRANCH LOGIN SCREEN
 ══════════════════════════════════════════ -->
-<div id="login-screen" style="display:none;position:fixed;inset:0;z-index:9999;align-items:center;justify-content:center;background:radial-gradient(ellipse at 20% 30%,rgba(99,102,241,0.35) 0%,transparent 55%),radial-gradient(ellipse at 80% 70%,rgba(236,72,153,0.20) 0%,transparent 50%),radial-gradient(ellipse at 50% 50%,rgba(20,184,166,0.12) 0%,transparent 65%),linear-gradient(160deg,#050810 0%,#090d1a 50%,#070c14 100%)">
+
+<!-- ══ STANDALONE LEAVE REQUEST SCREEN (staff QR scan) ══ -->
+<div id="leave-screen" style="display:none;position:fixed;inset:0;z-index:10000;background:linear-gradient(160deg,#050810 0%,#090d1a 50%,#070c14 100%);overflow-y:auto;padding:24px 16px">
+  <div style="max-width:480px;margin:0 auto">
+    <div style="text-align:center;margin-bottom:24px">
+      <div style="font-size:36px;margin-bottom:8px">🌴</div>
+      <div style="font-size:20px;font-weight:700;color:#fff;font-family:var(--font)">Leave Request</div>
+      <div id="leave-branch-name" style="font-size:12px;color:rgba(255,255,255,.45);margin-top:4px;font-family:var(--mono)"></div>
+    </div>
+    <div style="background:rgba(255,255,255,0.055);border:1px solid rgba(255,255,255,0.10);border-radius:14px;padding:22px;backdrop-filter:blur(20px)">
+      <div id="leave-form-wrap">
+        <div style="margin-bottom:14px">
+          <label style="font-size:10px;font-weight:700;color:rgba(255,255,255,.45);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:6px">Your Name *</label>
+          <input id="lf-name" placeholder="Enter your full name" style="width:100%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.13);border-radius:8px;padding:10px 12px;color:#fff;font-size:13px;outline:none;font-family:var(--font);box-sizing:border-box">
+        </div>
+        <div style="margin-bottom:14px">
+          <label style="font-size:10px;font-weight:700;color:rgba(255,255,255,.45);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:6px">Leave Type *</label>
+          <select id="lf-type" style="width:100%;background:#0c1120;border:1px solid rgba(255,255,255,.13);border-radius:8px;padding:10px 12px;color:#fff;font-size:13px;outline:none;font-family:var(--font)">
+            <option value="sick">Sick Leave</option>
+            <option value="holiday">Annual Holiday</option>
+            <option value="dayoff">Day Off</option>
+          </select>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+          <div>
+            <label style="font-size:10px;font-weight:700;color:rgba(255,255,255,.45);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:6px">Start Date *</label>
+            <input id="lf-start" type="date" style="width:100%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.13);border-radius:8px;padding:10px 12px;color:#fff;font-size:13px;outline:none;font-family:var(--mono);box-sizing:border-box">
+          </div>
+          <div>
+            <label style="font-size:10px;font-weight:700;color:rgba(255,255,255,.45);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:6px">End Date *</label>
+            <input id="lf-end" type="date" style="width:100%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.13);border-radius:8px;padding:10px 12px;color:#fff;font-size:13px;outline:none;font-family:var(--mono);box-sizing:border-box">
+          </div>
+        </div>
+        <div style="margin-bottom:20px">
+          <label style="font-size:10px;font-weight:700;color:rgba(255,255,255,.45);text-transform:uppercase;letter-spacing:1px;display:block;margin-bottom:6px">Reason / Notes</label>
+          <textarea id="lf-note" placeholder="Optional reason or note..." rows="3" style="width:100%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.13);border-radius:8px;padding:10px 12px;color:#fff;font-size:13px;outline:none;font-family:var(--font);resize:vertical;box-sizing:border-box"></textarea>
+        </div>
+        <div id="lf-err" style="color:#f87171;font-size:12px;min-height:16px;margin-bottom:10px"></div>
+        <button onclick="submitStandaloneLeave()" style="width:100%;background:linear-gradient(135deg,#f0a500,#f5be45);border:none;border-radius:10px;padding:13px;color:#000;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--font)">📨 Submit Leave Request</button>
+      </div>
+      <div id="leave-success-wrap" style="display:none;text-align:center;padding:20px 0">
+        <div style="font-size:48px;margin-bottom:12px">✅</div>
+        <div style="font-size:18px;font-weight:700;color:#34d399;margin-bottom:8px">Request Submitted!</div>
+        <div style="font-size:13px;color:rgba(255,255,255,.55)">Your manager will review and approve your leave request.</div>
+        <button onclick="document.getElementById('leave-form-wrap').style.display='block';document.getElementById('leave-success-wrap').style.display='none';document.getElementById('lf-name').value='';document.getElementById('lf-note').value='';" style="margin-top:20px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:10px 20px;color:#fff;font-size:13px;cursor:pointer;font-family:var(--font)">Submit Another</button>
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:16px;font-size:11px;color:rgba(255,255,255,.2)">Powered by OpsHub · ALFA.CO</div>
+  </div>
+</div>
+
+<div id="login-screen" style="display:none;position:fixed;inset:0;z-index:9999;align-items:center;justify-content:center;background:radial-gradient(ellipse at 20% 30%,rgba(99,102,241,0.35) 0%,transparent 55%),radial-gradient(ellipse at 80% 70%,rgba(236,72,153,0.20) 0%,transparent 50%),radial-gradient(ellipse at 50% 50%,rgba(20,184,166,0.12) 0%,transparent 65%),linear-gradient(160deg,#050810 0%,#090d1a 50%,#070c14 100%))">
   <div style="width:100%;max-width:440px;padding:24px;display:flex;flex-direction:column;align-items:center;gap:0">
 
     <!-- Logo -->
@@ -795,7 +846,7 @@ select.fi-s option{background:var(--select-opt-bg);color:var(--text)}
 
     <div class="ns">Operations</div>
     <button data-p="wastage"><span class="ico">🗑</span>Wastage</button>
-    <button data-p="wares"><span class="ico">🍽</span>Small Wares</button>
+    <button data-p="wares"><span class="ico">📊</span>Stock Dashboard</button>
 
     <div class="ns">Team</div>
     <button data-p="staff"><span class="ico">👥</span>Staff</button>
@@ -897,7 +948,10 @@ select.fi-s option{background:var(--select-opt-bg);color:var(--text)}
       </div>
       <div class="fr" style="margin-bottom:10px">
         <div class="fg"><label>Supplier</label>
-          <select id="f-sup"><option value="">— No Supplier —</option><option>Pepsi Co</option><option>Sitaf</option><option>Masdar Al Hayat</option><option>Al Safi</option><option>Modern Business Makers Company</option></select>
+          <div style="display:flex;gap:6px;align-items:center">
+            <select id="f-sup" style="flex:1"><option value="">— No Supplier —</option></select>
+            <button type="button" class="btn sm" onclick="addItemSupplier()" title="Add New Supplier" style="flex-shrink:0;white-space:nowrap">+ New</button>
+          </div>
         </div>
         <div class="fg"><label>Min Level</label><input id="f-min" type="number" min="0" value="0"></div>
         <div class="fg"><label>Price (SAR)</label><input id="f-price" type="number" min="0" step="0.01" value="0"></div>
@@ -1494,13 +1548,13 @@ function go(p){
 }
 
 function updTop(){
-  var T={'inv-dash':'Dashboard','items':'Items Catalog','moves':'Receive / Issue','orders':'Purchase Orders','alerts':'Low Stock Alerts','report':'Monthly Report','import':'Import Data','pullout':'Pull-Out Log','wastage':'Wastage','wares':'Small Wares','staff':'Staff','sched':'Schedule','ts':'Time Sheet','health':'Health Cards','sales':'Sales','pc':'Petty Cash','inv':'Invoices','qr-checkin':'📱 QR Check-In','checklists':'✅ Operations Checklists','admin-branches':'🏢 Branch Management'};
+  var T={'inv-dash':'Dashboard','items':'Items Catalog','moves':'Receive / Issue','orders':'Purchase Orders','alerts':'Low Stock Alerts','report':'Monthly Report','import':'Import Data','pullout':'Pull-Out Log','wastage':'Wastage','wares':'Stock Dashboard','staff':'Staff','sched':'Schedule','ts':'Time Sheet','health':'Health Cards','sales':'Sales','pc':'Petty Cash','inv':'Invoices','qr-checkin':'📱 QR Check-In','checklists':'✅ Operations Checklists','admin-branches':'🏢 Branch Management'};
   document.getElementById('ptitle').textContent=T[S.p]||S.p;
   var sw=document.getElementById('srch-wrap');
   var showS=['items','orders','staff','health','sales','pc','inv','pullout','wastage','wares'].indexOf(S.p)>=0;
   sw.style.display=showS?'block':'none';
   document.getElementById('srch').value='';
-  var AL={'inv-dash':'+ Add Item','items':'+ Add Item','pullout':'+ Log Pull-Out','wastage':'+ Log Wastage','wares':'+ Add Ware','staff':'+ Add Staff','sales':'+ Add Sales','pc':'+ Add Entry','health':'+ Add Card','inv':'+ Add Invoice'};
+  var AL={'inv-dash':'+ Add Item','items':'+ Add Item','pullout':'+ Log Pull-Out','wastage':'+ Log Wastage','staff':'+ Add Staff','sales':'+ Add Sales','pc':'+ Add Entry','health':'+ Add Card','inv':'+ Add Invoice'};
   var ab=document.getElementById('addbtn');
   ab.textContent=AL[S.p]||'';
   ab.style.display=AL[S.p]?'':'none';
@@ -4935,8 +4989,57 @@ function pWaste(){
 }
 
 function pWares(){
-  var rows=S.wares.filter(function(w){return match(w,['name','cat','loc']);}).map(function(w){var c=w.cond==='Good'?'#4aab6e':w.cond==='Fair'?'#c87941':'#e05252';return '<tr><td style="font-weight:600">'+xe(w.name)+'</td><td style="color:var(--text3)">'+xe(w.cat||'—')+'</td><td style="font-family:var(--mono)">'+w.qty+'</td><td>'+pl(w.cond,c)+'</td><td style="color:var(--text3);font-size:11.5px">'+xe(w.loc||'—')+'</td><td><button class="btn sm d" data-del="wares" data-id="'+w.id+'">Del</button></td></tr>';}).join('');
-  return '<div class="tw"><div class="tw-s"><table><thead><tr><th>Item Name</th><th>Category</th><th>Qty</th><th>Condition</th><th>Location</th><th>Del</th></tr></thead><tbody>'+(rows||'<tr><td colspan="6" class="er">No small wares recorded yet.</td></tr>')+'</tbody></table></div></div>';
+  // ── Summary cards ─────────────────────────────────────────
+  var allItems=items.slice();
+  var q=S.q?S.q.toLowerCase():'';
+  var filtered=allItems.filter(function(it){
+    if(!q)return true;
+    return (it.name||'').toLowerCase().indexOf(q)>=0||(it.code||'').toLowerCase().indexOf(q)>=0||(it.location||'').toLowerCase().indexOf(q)>=0||(it.supplier||'').toLowerCase().indexOf(q)>=0;
+  });
+  // sort by stock status: critical first, then low, then ok
+  filtered.sort(function(a,b){
+    var sa=a.qty<=0?0:(a.qty<=(a.min||0)?1:2);
+    var sb=b.qty<=0?0:(b.qty<=(b.min||0)?1:2);
+    if(sa!==sb)return sa-sb;
+    return (a.name||'').localeCompare(b.name||'');
+  });
+  var total=allItems.length;
+  var critical=allItems.filter(function(it){return it.qty<=0;}).length;
+  var low=allItems.filter(function(it){return it.qty>0&&it.qty<=(it.min||0);}).length;
+  var ok=allItems.filter(function(it){return it.qty>(it.min||0);}).length;
+
+  var cards='<div class="grid g4" style="margin-bottom:18px">'
+    +'<div class="card" style="text-align:center;border:1px solid rgba(240,165,0,.2)"><div style="font-size:26px;font-weight:300;color:var(--gold);font-family:var(--mono)">'+total+'</div><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-top:4px">Total Items</div></div>'
+    +'<div class="card" style="text-align:center;border:1px solid rgba(52,211,153,.2)"><div style="font-size:26px;font-weight:300;color:#34d399;font-family:var(--mono)">'+ok+'</div><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-top:4px">In Stock</div></div>'
+    +'<div class="card" style="text-align:center;border:1px solid rgba(240,165,0,.25)"><div style="font-size:26px;font-weight:300;color:#f0a500;font-family:var(--mono)">'+low+'</div><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-top:4px">Low Stock</div></div>'
+    +'<div class="card" style="text-align:center;border:1px solid rgba(248,113,113,.25)"><div style="font-size:26px;font-weight:300;color:#f87171;font-family:var(--mono)">'+critical+'</div><div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-top:4px">Out of Stock</div></div>'
+    +'</div>';
+
+  var rows=filtered.map(function(it){
+    var isOut=it.qty<=0;
+    var isLow=!isOut&&it.qty<=(it.min||0);
+    var qtyColor=isOut?'#f87171':isLow?'#f0a500':'#34d399';
+    var rowBg=isOut?'rgba(248,113,113,0.05)':isLow?'rgba(240,165,0,0.05)':'';
+    var badge=isOut?'<span style="font-size:9px;background:#f8717122;color:#f87171;border-radius:4px;padding:2px 6px;font-weight:700;font-family:var(--mono)">OUT</span>'
+      :isLow?'<span style="font-size:9px;background:#f0a50022;color:#f0a500;border-radius:4px;padding:2px 6px;font-weight:700;font-family:var(--mono)">LOW</span>':'';
+    return '<tr style="background:'+rowBg+'">'
+      +'<td style="font-size:10px;color:var(--text3);font-family:var(--mono)">'+xe(it.code)+'</td>'
+      +'<td style="font-weight:600">'+xe(it.name)+'</td>'
+      +'<td>'+pl(it.location||'—','#3d7ec8')+'</td>'
+      +'<td style="font-size:12px;color:var(--text3)">'+xe(it.supplier||'—')+'</td>'
+      +'<td style="font-family:var(--mono);font-weight:700;color:'+qtyColor+'">'+it.qty+' '+badge+'</td>'
+      +'<td style="font-size:11px;color:var(--text3);font-family:var(--mono)">'+(it.min||0)+'</td>'
+      +'<td style="font-family:var(--mono);font-size:11.5px">'+fsar(it.price||0)+'</td>'
+      +'<td><button class="btn sm" data-inv-edit="'+xe(it.code)+'" style="font-size:10px">Edit</button></td>'
+      +'</tr>';
+  }).join('');
+
+  return cards
+    +'<div class="tw"><div class="tw-s"><table><thead><tr>'
+    +'<th>Code</th><th>Item Name</th><th>Location</th><th>Supplier</th><th>Qty</th><th>Min</th><th>Price</th><th>Action</th>'
+    +'</tr></thead><tbody>'
+    +(rows||'<tr><td colspan="8" class="er">No items in catalog yet.</td></tr>')
+    +'</tbody></table></div></div>';
 }
 
 function pTS(){
@@ -5103,10 +5206,16 @@ function tsPgLeave(){
   var rows=filt.slice().sort(function(a,b){return b.start.localeCompare(a.start);}).map(function(l){
     var lt=TS_LT[l.type]||{l:l.type,c:'#888'};
     var emp=null;for(var i=0;i<S.tsEmps.length;i++)if(S.tsEmps[i].id===l.empId){emp=S.tsEmps[i];break;}
+    var empDisplay=emp?emp.name:(l.empName||'Unknown')+(l.empId==='guest'?' <span style="font-size:9px;background:rgba(240,165,0,.15);color:#f0a500;border-radius:4px;padding:1px 5px">Self-Service</span>':'');
     var sc=l.status==='approved'?'#4aab6e':l.status==='rejected'?'#e05252':'#ffd166';
-    return '<tr><td style="font-weight:600">'+xe(emp?emp.name:'Unknown')+'</td><td>'+pl(lt.l,lt.c)+'</td><td style="font-family:var(--mono)">'+l.start+'</td><td style="font-family:var(--mono)">'+l.end+'</td><td style="font-weight:600;font-family:var(--mono)">'+l.days+'d</td><td>'+pl(l.status,sc)+'</td><td><div style="display:flex;gap:5px">'+(l.status==='pending'?'<button class="btn sm g" data-approve-leave="'+l.id+'">Approve</button><button class="btn sm d" data-reject-leave="'+l.id+'">Reject</button>':'')+'<button class="btn sm d" data-del="tsLeaves" data-id="'+l.id+'">Del</button></div></td></tr>';
+    return '<tr><td style="font-weight:600">'+empDisplay+'</td><td>'+pl(lt.l,lt.c)+'</td><td style="font-family:var(--mono)">'+l.start+'</td><td style="font-family:var(--mono)">'+l.end+'</td><td style="font-weight:600;font-family:var(--mono)">'+l.days+'d</td><td>'+pl(l.status,sc)+'</td><td><div style="display:flex;gap:5px">'+(l.status==='pending'?'<button class="btn sm g" data-approve-leave="'+l.id+'">Approve</button><button class="btn sm d" data-reject-leave="'+l.id+'">Reject</button>':'')+'<button class="btn sm d" data-del="tsLeaves" data-id="'+l.id+'">Del</button></div></td></tr>';
   }).join('');
-  return '<div class="card" style="margin-bottom:18px"><div class="ct" style="color:var(--gold)">New Leave Request</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px"><div class="mfi" style="margin:0"><label>Employee *</label><select id="ts-lf-emp">'+eo+'</select></div><div class="mfi" style="margin:0"><label>Leave Type *</label><select id="ts-lf-type"><option value="sick">Sick Leave</option><option value="holiday">Annual Holiday</option><option value="dayoff">Day Off</option></select></div><div class="mfi" style="margin:0"><label>Start Date *</label><input type="date" id="ts-lf-start"></div><div class="mfi" style="margin:0"><label>End Date *</label><input type="date" id="ts-lf-end"></div></div><div class="mfi"><label>Notes</label><input type="text" id="ts-lf-note" placeholder="Optional reason or note"></div><button id="ts-save-leave" class="btn">Submit Leave Request</button></div>'+lbar+'<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px"><div style="text-align:center;background:var(--bg3);border:1px solid rgba(255,209,102,.18);border-radius:9px;padding:12px"><div style="font-size:24px;color:#ffd166;font-weight:300;font-family:var(--mono)">'+pend+'</div><div style="font-size:9px;color:var(--text3);margin-top:3px;text-transform:uppercase;letter-spacing:1px;font-family:var(--mono)">Pending</div></div><div style="text-align:center;background:var(--bg3);border:1px solid rgba(74,171,110,.18);border-radius:9px;padding:12px"><div style="font-size:24px;color:#4aab6e;font-weight:300;font-family:var(--mono)">'+appr+'</div><div style="font-size:9px;color:var(--text3);margin-top:3px;text-transform:uppercase;letter-spacing:1px;font-family:var(--mono)">Approved</div></div><div style="text-align:center;background:var(--bg3);border:1px solid rgba(224,82,82,.18);border-radius:9px;padding:12px"><div style="font-size:24px;color:#e05252;font-weight:300;font-family:var(--mono)">'+rej+'</div><div style="font-size:9px;color:var(--text3);margin-top:3px;text-transform:uppercase;letter-spacing:1px;font-family:var(--mono)">Rejected</div></div><div style="text-align:center;background:var(--bg3);border:1px solid var(--bd);border-radius:9px;padding:12px"><div style="font-size:24px;color:var(--text);font-weight:300;font-family:var(--mono)">'+filt.length+'</div><div style="font-size:9px;color:var(--text3);margin-top:3px;text-transform:uppercase;letter-spacing:1px;font-family:var(--mono)">Total</div></div></div><div class="tw"><div class="tw-s"><table><thead><tr><th>Employee</th><th>Type</th><th>Start</th><th>End</th><th>Days</th><th>Status</th><th>Actions</th></tr></thead><tbody>'+(rows||'<tr><td colspan="7" class="er">No leave requests yet.</td></tr>')+'</tbody></table></div></div>';
+  // QR code card for standalone staff leave request
+  var leaveUrl=window.location.href.split('?')[0]+'?leave=1&branch='+(CURRENT_BRANCH?CURRENT_BRANCH.id:'');
+  var qrApiUrl='https://api.qrserver.com/v1/create-qr-code/?size=140x140&data='+encodeURIComponent(leaveUrl);
+  var qrCard='<div class="card" style="margin-bottom:18px;border-color:rgba(192,132,252,.2)"><div class="ct" style="color:var(--pur)">📲 Staff Self-Service Leave QR</div><div style="display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap"><div style="text-align:center"><img src="'+qrApiUrl+'" style="border-radius:8px;background:#fff;padding:8px;width:140px;height:140px" alt="Leave QR"><div style="font-size:9px;color:var(--text3);margin-top:6px;font-family:var(--mono)">Scan to request leave</div></div><div style="flex:1;min-width:180px"><div style="font-size:12px;color:var(--text2);margin-bottom:10px">Share this QR code or link with your staff. They scan it to submit leave requests from their phone — no login needed. All requests appear here for manager approval.</div><button class=\"btn sm\" onclick=\"copyLeaveURL()\">📋 Copy Link</button><button class=\"btn sm\" onclick=\"window.open(window._leaveQRUrl,'_blank')\" style=\"margin-left:8px\">👁 Preview</button></div></div></div>';
+  window._leaveQRUrl=leaveUrl;
+  return qrCard+'<div class="card" style="margin-bottom:18px"><div class="ct" style="color:var(--gold)">New Leave Request</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px"><div class="mfi" style="margin:0"><label>Employee *</label><select id="ts-lf-emp">'+eo+'</select></div><div class="mfi" style="margin:0"><label>Leave Type *</label><select id="ts-lf-type"><option value="sick">Sick Leave</option><option value="holiday">Annual Holiday</option><option value="dayoff">Day Off</option></select></div><div class="mfi" style="margin:0"><label>Start Date *</label><input type="date" id="ts-lf-start"></div><div class="mfi" style="margin:0"><label>End Date *</label><input type="date" id="ts-lf-end"></div></div><div class="mfi"><label>Notes</label><input type="text" id="ts-lf-note" placeholder="Optional reason or note"></div><button id="ts-save-leave" class="btn">Submit Leave Request</button></div>'+lbar+'<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px"><div style="text-align:center;background:var(--bg3);border:1px solid rgba(255,209,102,.18);border-radius:9px;padding:12px"><div style="font-size:24px;color:#ffd166;font-weight:300;font-family:var(--mono)">'+pend+'</div><div style="font-size:9px;color:var(--text3);margin-top:3px;text-transform:uppercase;letter-spacing:1px;font-family:var(--mono)">Pending</div></div><div style="text-align:center;background:var(--bg3);border:1px solid rgba(74,171,110,.18);border-radius:9px;padding:12px"><div style="font-size:24px;color:#4aab6e;font-weight:300;font-family:var(--mono)">'+appr+'</div><div style="font-size:9px;color:var(--text3);margin-top:3px;text-transform:uppercase;letter-spacing:1px;font-family:var(--mono)">Approved</div></div><div style="text-align:center;background:var(--bg3);border:1px solid rgba(224,82,82,.18);border-radius:9px;padding:12px"><div style="font-size:24px;color:#e05252;font-weight:300;font-family:var(--mono)">'+rej+'</div><div style="font-size:9px;color:var(--text3);margin-top:3px;text-transform:uppercase;letter-spacing:1px;font-family:var(--mono)">Rejected</div></div><div style="text-align:center;background:var(--bg3);border:1px solid var(--bd);border-radius:9px;padding:12px"><div style="font-size:24px;color:var(--text);font-weight:300;font-family:var(--mono)">'+filt.length+'</div><div style="font-size:9px;color:var(--text3);margin-top:3px;text-transform:uppercase;letter-spacing:1px;font-family:var(--mono)">Total</div></div></div><div class="tw"><div class="tw-s"><table><thead><tr><th>Employee</th><th>Type</th><th>Start</th><th>End</th><th>Days</th><th>Status</th><th>Actions</th></tr></thead><tbody>'+(rows||'<tr><td colspan="7" class="er">No leave requests yet.</td></tr>')+'</tbody></table></div></div>';
 }
 
 function tsPgEmps(){
@@ -5256,7 +5365,7 @@ function openItemModal(code){
     document.getElementById('f-qty').disabled=false;
   }
   document.getElementById('item-modal').classList.remove('hide');
-}
+  populateItemSupplierSelect(isEdit?(findItem(code)||{}).supplier||'':'');
 
 function closeItemModal(){ document.getElementById('item-modal').classList.add('hide'); }
 
@@ -5332,6 +5441,32 @@ function openAddSupplierModal(){
   // Auto-select the new supplier
   var sel=document.getElementById('ord-sup');
   if(sel){sel.value=name;onSupplierChange();}
+  toast('Supplier "'+name+'" added','success');
+}
+
+function populateItemSupplierSelect(currentVal){
+  var sel=document.getElementById('f-sup');
+  if(!sel)return;
+  sel.innerHTML='<option value="">— No Supplier —</option>';
+  getSuppliers().sort().forEach(function(s){
+    var o=document.createElement('option');
+    o.value=s;o.textContent=s;
+    if(s===currentVal)o.selected=true;
+    sel.appendChild(o);
+  });
+}
+
+function addItemSupplier(){
+  var name=prompt('Enter new supplier name:');
+  if(!name||!name.trim())return;
+  name=name.trim();
+  if(!S.suppliers)S.suppliers=getSuppliers().slice();
+  if(S.suppliers.indexOf(name)>=0){toast('Supplier already exists','w');return;}
+  S.suppliers.push(name);
+  if(db)db.ref(bPath('suppliers')).set(S.suppliers);
+  populateItemSupplierSelect(name);
+  var sel=document.getElementById('f-sup');
+  if(sel)sel.value=name;
   toast('Supplier "'+name+'" added','success');
 }
 
@@ -5843,6 +5978,60 @@ function processImport(data){
 function copyAppURL(){
   var url=window.location.href;
   navigator.clipboard?navigator.clipboard.writeText(url).then(function(){toast('URL copied! Share with staff 📋','success');}):toast('URL: '+url,'info');
+}
+
+function copyLeaveURL(){
+  var url=window._leaveQRUrl||(window.location.href.split('?')[0]+'?leave=1&branch='+(CURRENT_BRANCH?CURRENT_BRANCH.id:''));
+  navigator.clipboard?navigator.clipboard.writeText(url).then(function(){toast('Leave link copied! Share with staff 📋','success');}):toast('URL: '+url,'info');
+}
+
+function checkLeaveParam(){
+  var params=new URLSearchParams(window.location.search);
+  if(params.get('leave')!=='1')return false;
+  var branchId=params.get('branch')||'';
+  var ls=document.getElementById('leave-screen');
+  if(ls) ls.style.display='block';
+  window._leaveParamBranchId=branchId;
+  // Try to load branch name — retry until Firebase is ready
+  function tryLoadBranch(tries){
+    if(db&&branchId){
+      db.ref('admin/branches/'+branchId).once('value',function(snap){
+        var b=snap.val();
+        var lbl=document.getElementById('leave-branch-name');
+        if(lbl&&b)lbl.textContent=(b.icon||'🏢')+' '+(b.name||branchId);
+      });
+    } else if(!db&&tries<20){
+      setTimeout(function(){tryLoadBranch(tries+1);},500);
+    }
+  }
+  tryLoadBranch(0);
+  return true;
+}
+
+function submitStandaloneLeave(){
+  var name=(document.getElementById('lf-name').value||'').trim();
+  var type=document.getElementById('lf-type').value;
+  var start=document.getElementById('lf-start').value;
+  var end=document.getElementById('lf-end').value;
+  var note=(document.getElementById('lf-note').value||'').trim();
+  var err=document.getElementById('lf-err');
+  if(!name){err.textContent='Please enter your name';return;}
+  if(!start||!end){err.textContent='Please select start and end dates';return;}
+  if(end<start){err.textContent='End date must be after start date';return;}
+  err.textContent='';
+  var days=Math.max(1,Math.round((new Date(end)-new Date(start))/(1000*60*60*24))+1);
+  var record={id:'LV-'+Date.now(),empId:'guest',empName:name,type:type,start:start,end:end,days:days,note:note,status:'pending',submittedAt:new Date().toISOString()};
+  var branchId=window._leaveParamBranchId||'';
+  var path=branchId?('branches/'+branchId+'/tsLeaves/'+record.id):('shared/guestLeaves/'+record.id);
+  if(db){
+    db.ref(path).set(record,function(e){
+      if(e){document.getElementById('lf-err').textContent='Failed to submit. Please try again.';return;}
+      document.getElementById('leave-form-wrap').style.display='none';
+      document.getElementById('leave-success-wrap').style.display='block';
+    });
+  } else {
+    document.getElementById('lf-err').textContent='Connection error. Please try again.';
+  }
 }
 
 // ════════════════════════════════════════════════════════════
@@ -6993,6 +7182,11 @@ function openBranchModal(existing){
   var isEdit=!!existing;
   var b=existing||{icon:'🍽',color:'#f0a500',active:true};
 
+  // Pre-initialize so saveBranchModal() never gets null state even on fast clicks
+  var _preIcon=b.icon||'🍽';
+  var _preColor=b.color||'#f0a500';
+  window._branchModalState={getIcon:function(){return _preIcon;},getColor:function(){return _preColor;}};
+
   var iconsHtml=BRANCH_ICONS.map(function(ic){
     return '<button type="button" class="icon-opt" data-ic="'+ic+'" style="font-size:20px;padding:6px 8px;background:'+(b.icon===ic?'rgba(240,165,0,.15)':'var(--bg3)')+';border:1.5px solid '+(b.icon===ic?'var(--acc)':'var(--bd)')+';border-radius:8px;cursor:pointer">'+ic+'</button>';
   }).join('');
@@ -7046,7 +7240,8 @@ function openBranchModal(existing){
         this.style.borderColor='#fff';
       };
     });
-    // Expose to saveBranchModal via closure
+    // Update state — same object already initialized above, update closure vars
+    _preIcon=_selIcon;_preColor=_selColor;
     window._branchModalState={getIcon:function(){return _selIcon;},getColor:function(){return _selColor;}};
     // Wire Save/Cancel buttons directly — don't rely on event delegation
     var msBtn=document.getElementById('ms');
@@ -7156,7 +7351,10 @@ window.onload = function(){
   };
   var _fbTries=0;
   // Show login screen immediately — don't wait for Firebase
-  showLoginScreen();
+  // But first check if this is a staff leave QR scan
+  if(!checkLeaveParam()){
+    showLoginScreen();
+  }
   function tryInitFB(){
     _fbTries++;
     var ok=initFirebase(HARDCODED);
