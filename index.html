@@ -795,7 +795,7 @@ select.fi-s option{background:var(--select-opt-bg);color:var(--text)}
 
     <div class="ns">Operations</div>
     <button data-p="wastage"><span class="ico">🗑</span>Wastage</button>
-    <button data-p="wares"><span class="ico">🍽</span>Small Wares</button>
+    <button data-p="wares"><span class="ico">📊</span>Inventory Status</button>
 
     <div class="ns">Team</div>
     <button data-p="staff"><span class="ico">👥</span>Staff</button>
@@ -897,7 +897,10 @@ select.fi-s option{background:var(--select-opt-bg);color:var(--text)}
       </div>
       <div class="fr" style="margin-bottom:10px">
         <div class="fg"><label>Supplier</label>
-          <select id="f-sup"><option value="">— No Supplier —</option><option>Pepsi Co</option><option>Sitaf</option><option>Masdar Al Hayat</option><option>Al Safi</option><option>Modern Business Makers Company</option></select>
+          <div style="display:flex;gap:6px;align-items:center">
+            <select id="f-sup" style="flex:1"></select>
+            <button type="button" class="btn sm" onclick="openAddSupplierModal();setTimeout(function(){populateItemModalSupplier();},300);" title="Add new supplier" style="flex-shrink:0;white-space:nowrap;padding:6px 10px">+ New</button>
+          </div>
         </div>
         <div class="fg"><label>Min Level</label><input id="f-min" type="number" min="0" value="0"></div>
         <div class="fg"><label>Price (SAR)</label><input id="f-price" type="number" min="0" step="0.01" value="0"></div>
@@ -1494,7 +1497,7 @@ function go(p){
 }
 
 function updTop(){
-  var T={'inv-dash':'Dashboard','items':'Items Catalog','moves':'Receive / Issue','orders':'Purchase Orders','alerts':'Low Stock Alerts','report':'Monthly Report','import':'Import Data','pullout':'Pull-Out Log','wastage':'Wastage','wares':'Small Wares','staff':'Staff','sched':'Schedule','ts':'Time Sheet','health':'Health Cards','sales':'Sales','pc':'Petty Cash','inv':'Invoices','qr-checkin':'📱 QR Check-In','checklists':'✅ Operations Checklists','admin-branches':'🏢 Branch Management'};
+  var T={'inv-dash':'Dashboard','items':'Items Catalog','moves':'Receive / Issue','orders':'Purchase Orders','alerts':'Low Stock Alerts','report':'Monthly Report','import':'Import Data','pullout':'Pull-Out Log','wastage':'Wastage','wares':'Inventory Status','staff':'Staff','sched':'Schedule','ts':'Time Sheet','health':'Health Cards','sales':'Sales','pc':'Petty Cash','inv':'Invoices','qr-checkin':'📱 QR Check-In','checklists':'✅ Operations Checklists','admin-branches':'🏢 Branch Management'};
   document.getElementById('ptitle').textContent=T[S.p]||S.p;
   var sw=document.getElementById('srch-wrap');
   var showS=['items','orders','staff','health','sales','pc','inv','pullout','wastage','wares'].indexOf(S.p)>=0;
@@ -4935,8 +4938,107 @@ function pWaste(){
 }
 
 function pWares(){
-  var rows=S.wares.filter(function(w){return match(w,['name','cat','loc']);}).map(function(w){var c=w.cond==='Good'?'#4aab6e':w.cond==='Fair'?'#c87941':'#e05252';return '<tr><td style="font-weight:600">'+xe(w.name)+'</td><td style="color:var(--text3)">'+xe(w.cat||'—')+'</td><td style="font-family:var(--mono)">'+w.qty+'</td><td>'+pl(w.cond,c)+'</td><td style="color:var(--text3);font-size:11.5px">'+xe(w.loc||'—')+'</td><td><button class="btn sm d" data-del="wares" data-id="'+w.id+'">Del</button></td></tr>';}).join('');
-  return '<div class="tw"><div class="tw-s"><table><thead><tr><th>Item Name</th><th>Category</th><th>Qty</th><th>Condition</th><th>Location</th><th>Del</th></tr></thead><tbody>'+(rows||'<tr><td colspan="6" class="er">No small wares recorded yet.</td></tr>')+'</tbody></table></div></div>';
+  // Build stat cards
+  var total=items.length;
+  var low=items.filter(function(i){return i.min>0&&i.qty<=i.min;}).length;
+  var critical=items.filter(function(i){return i.min>0&&i.qty===0;}).length;
+  var ok=total-low;
+
+  // Filters
+  var filter=S.waresFilter||'all';
+  var q=(S.q||'').toLowerCase();
+  var filtered=items.filter(function(i){
+    if(q&&String(i.code).toLowerCase().indexOf(q)<0&&i.name.toLowerCase().indexOf(q)<0&&(i.supplier||'').toLowerCase().indexOf(q)<0)return false;
+    if(filter==='low')return i.min>0&&i.qty<=i.min&&i.qty>0;
+    if(filter==='critical')return i.qty===0;
+    if(filter==='ok')return !(i.min>0&&i.qty<=i.min);
+    return true;
+  });
+
+  // Sort: critical first, then low, then ok
+  filtered.sort(function(a,b){
+    var aL=a.min>0&&a.qty<=a.min,bL=b.min>0&&b.qty<=b.min;
+    var aC=a.qty===0,bC=b.qty===0;
+    if(aC&&!bC)return -1;if(!aC&&bC)return 1;
+    if(aL&&!bL)return -1;if(!aL&&bL)return 1;
+    return a.name.localeCompare(b.name);
+  });
+
+  var h='';
+
+  // Stat cards
+  h+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px">';
+  h+='<div class="card" style="cursor:pointer;border-color:'+(filter==='all'?'var(--acc)':'var(--bd)')+'" onclick="S.waresFilter=\'all\';ren()">'
+    +'<div style="font-size:28px;font-weight:300;color:var(--text);font-family:var(--mono)">'+total+'</div>'
+    +'<div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;font-family:var(--mono);margin-top:4px">All Items</div></div>';
+  h+='<div class="card" style="cursor:pointer;border-color:'+(filter==='ok'?'var(--grn)':'rgba(52,211,153,.2)')+'" onclick="S.waresFilter=\'ok\';ren()">'
+    +'<div style="font-size:28px;font-weight:300;color:var(--grn);font-family:var(--mono)">'+ok+'</div>'
+    +'<div style="font-size:10px;color:var(--grn);opacity:.7;text-transform:uppercase;letter-spacing:1px;font-family:var(--mono);margin-top:4px">In Stock</div></div>';
+  h+='<div class="card" style="cursor:pointer;border-color:'+(filter==='low'?'var(--gold)':'rgba(240,165,0,.2)')+'" onclick="S.waresFilter=\'low\';ren()">'
+    +'<div style="font-size:28px;font-weight:300;color:var(--gold);font-family:var(--mono)">'+low+'</div>'
+    +'<div style="font-size:10px;color:var(--gold);opacity:.7;text-transform:uppercase;letter-spacing:1px;font-family:var(--mono);margin-top:4px">Low Stock</div></div>';
+  h+='<div class="card" style="cursor:pointer;border-color:'+(filter==='critical'?'var(--red)':'rgba(248,81,73,.2)')+'" onclick="S.waresFilter=\'critical\';ren()">'
+    +'<div style="font-size:28px;font-weight:300;color:var(--red);font-family:var(--mono)">'+critical+'</div>'
+    +'<div style="font-size:10px;color:var(--red);opacity:.7;text-transform:uppercase;letter-spacing:1px;font-family:var(--mono);margin-top:4px">Out of Stock</div></div>';
+  h+='</div>';
+
+  // Search bar + add button
+  h+='<div style="display:flex;gap:8px;margin-bottom:14px;align-items:center">'
+    +'<input class="fi-s" id="wares-search" placeholder="🔍  Search items…" value="'+xe(S.q||'')+'" style="flex:1">'
+    +'<button class="btn" onclick="openItemModal()">+ Add Item</button>'
+    +'<button class="btn s" onclick="S.p=\"orders\";ren()" style="white-space:nowrap">🛒 New Order</button>'
+    +'</div>';
+
+  if(!filtered.length){
+    h+='<div style="text-align:center;padding:60px;color:var(--text3)"><div style="font-size:36px;margin-bottom:10px">📦</div><div>No items match this filter</div></div>';
+    return h;
+  }
+
+  // Item grid
+  h+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px">';
+  filtered.forEach(function(it){
+    var isLow=it.min>0&&it.qty<=it.min&&it.qty>0;
+    var isCrit=it.qty===0;
+    var pct=it.min>0?Math.min(100,Math.round(it.qty/it.min*100)):100;
+    var barCol=isCrit?'var(--red)':isLow?'var(--gold)':'var(--grn)';
+    var cardBorder=isCrit?'rgba(248,81,73,.3)':isLow?'rgba(240,165,0,.3)':'var(--bd)';
+
+    h+='<div class="card" style="padding:14px;border-color:'+cardBorder+';position:relative;cursor:pointer" onclick="openItemModal(\''+xe(it.code)+'\')">';
+    // Status badge
+    if(isCrit) h+='<div style="position:absolute;top:10px;right:10px;background:rgba(248,81,73,.15);color:var(--red);border:1px solid rgba(248,81,73,.3);border-radius:20px;font-size:9px;font-weight:700;padding:2px 7px;font-family:var(--mono)">OUT</div>';
+    else if(isLow) h+='<div style="position:absolute;top:10px;right:10px;background:rgba(240,165,0,.12);color:var(--gold);border:1px solid rgba(240,165,0,.3);border-radius:20px;font-size:9px;font-weight:700;padding:2px 7px;font-family:var(--mono)">LOW</div>';
+
+    h+='<div style="font-size:9px;color:var(--text3);font-family:var(--mono);margin-bottom:3px">'+xe(it.code)+'</div>';
+    h+='<div style="font-size:13px;font-weight:700;color:var(--text);line-height:1.3;margin-bottom:8px;padding-right:40px">'+xe(it.name)+'</div>';
+
+    // Qty display
+    h+='<div style="display:flex;align-items:baseline;gap:4px;margin-bottom:6px">';
+    h+='<span style="font-size:26px;font-weight:300;color:'+barCol+';font-family:var(--mono)">'+it.qty+'</span>';
+    h+='<span style="font-size:11px;color:var(--text3)">'+xe(it.unit||'EA')+(it.min>0?' / min:'+it.min:'')+'</span>';
+    h+='</div>';
+
+    // Progress bar
+    if(it.min>0){
+      h+='<div style="background:var(--bd);border-radius:99px;height:4px;margin-bottom:8px">'
+        +'<div style="width:'+pct+'%;background:'+barCol+';height:100%;border-radius:99px;transition:width .3s"></div>'
+        +'</div>';
+    }
+
+    // Location + supplier
+    h+='<div style="display:flex;gap:6px;flex-wrap:wrap">';
+    if(it.location) h+='<span style="font-size:9px;background:var(--bg2);border:1px solid var(--bd);border-radius:4px;padding:2px 6px;color:var(--text3)">📍 '+xe(it.location)+'</span>';
+    if(it.supplier) h+='<span style="font-size:9px;background:var(--bg2);border:1px solid var(--bd);border-radius:4px;padding:2px 6px;color:var(--text3)">🏢 '+xe(it.supplier)+'</span>';
+    h+='</div>';
+
+    // Quick order button if low/critical
+    if(isLow||isCrit){
+      h+='<button onclick="event.stopPropagation();S.p=\'orders\';ren();" class="btn sm" style="width:100%;margin-top:10px;justify-content:center;background:rgba(88,166,255,.12);border-color:rgba(88,166,255,.3);color:var(--blu)">🛒 Create Order</button>';
+    }
+
+    h+='</div>';
+  });
+  h+='</div>';
+  return h;
 }
 
 function pTS(){
@@ -5106,7 +5208,66 @@ function tsPgLeave(){
     var sc=l.status==='approved'?'#4aab6e':l.status==='rejected'?'#e05252':'#ffd166';
     return '<tr><td style="font-weight:600">'+xe(emp?emp.name:'Unknown')+'</td><td>'+pl(lt.l,lt.c)+'</td><td style="font-family:var(--mono)">'+l.start+'</td><td style="font-family:var(--mono)">'+l.end+'</td><td style="font-weight:600;font-family:var(--mono)">'+l.days+'d</td><td>'+pl(l.status,sc)+'</td><td><div style="display:flex;gap:5px">'+(l.status==='pending'?'<button class="btn sm g" data-approve-leave="'+l.id+'">Approve</button><button class="btn sm d" data-reject-leave="'+l.id+'">Reject</button>':'')+'<button class="btn sm d" data-del="tsLeaves" data-id="'+l.id+'">Del</button></div></td></tr>';
   }).join('');
-  return '<div class="card" style="margin-bottom:18px"><div class="ct" style="color:var(--gold)">New Leave Request</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px"><div class="mfi" style="margin:0"><label>Employee *</label><select id="ts-lf-emp">'+eo+'</select></div><div class="mfi" style="margin:0"><label>Leave Type *</label><select id="ts-lf-type"><option value="sick">Sick Leave</option><option value="holiday">Annual Holiday</option><option value="dayoff">Day Off</option></select></div><div class="mfi" style="margin:0"><label>Start Date *</label><input type="date" id="ts-lf-start"></div><div class="mfi" style="margin:0"><label>End Date *</label><input type="date" id="ts-lf-end"></div></div><div class="mfi"><label>Notes</label><input type="text" id="ts-lf-note" placeholder="Optional reason or note"></div><button id="ts-save-leave" class="btn">Submit Leave Request</button></div>'+lbar+'<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px"><div style="text-align:center;background:var(--bg3);border:1px solid rgba(255,209,102,.18);border-radius:9px;padding:12px"><div style="font-size:24px;color:#ffd166;font-weight:300;font-family:var(--mono)">'+pend+'</div><div style="font-size:9px;color:var(--text3);margin-top:3px;text-transform:uppercase;letter-spacing:1px;font-family:var(--mono)">Pending</div></div><div style="text-align:center;background:var(--bg3);border:1px solid rgba(74,171,110,.18);border-radius:9px;padding:12px"><div style="font-size:24px;color:#4aab6e;font-weight:300;font-family:var(--mono)">'+appr+'</div><div style="font-size:9px;color:var(--text3);margin-top:3px;text-transform:uppercase;letter-spacing:1px;font-family:var(--mono)">Approved</div></div><div style="text-align:center;background:var(--bg3);border:1px solid rgba(224,82,82,.18);border-radius:9px;padding:12px"><div style="font-size:24px;color:#e05252;font-weight:300;font-family:var(--mono)">'+rej+'</div><div style="font-size:9px;color:var(--text3);margin-top:3px;text-transform:uppercase;letter-spacing:1px;font-family:var(--mono)">Rejected</div></div><div style="text-align:center;background:var(--bg3);border:1px solid var(--bd);border-radius:9px;padding:12px"><div style="font-size:24px;color:var(--text);font-weight:300;font-family:var(--mono)">'+filt.length+'</div><div style="font-size:9px;color:var(--text3);margin-top:3px;text-transform:uppercase;letter-spacing:1px;font-family:var(--mono)">Total</div></div></div><div class="tw"><div class="tw-s"><table><thead><tr><th>Employee</th><th>Type</th><th>Start</th><th>End</th><th>Days</th><th>Status</th><th>Actions</th></tr></thead><tbody>'+(rows||'<tr><td colspan="7" class="er">No leave requests yet.</td></tr>')+'</tbody></table></div></div>';
+
+  // QR self-service banner
+  var leaveUrl=(function(){var base=window.location.origin+window.location.pathname.replace('index.html','')+'leave.html';return base+(CURRENT_BRANCH?'?branch='+encodeURIComponent(CURRENT_BRANCH.id):'');})();
+  var qrBanner='<div style="background:rgba(96,165,250,.06);border:1px solid rgba(96,165,250,.2);border-radius:12px;padding:14px 16px;margin-bottom:18px;display:flex;align-items:center;gap:16px">'
+    +'<div style="font-size:32px;flex-shrink:0">📱</div>'
+    +'<div style="flex:1">'
+    +'<div style="font-size:13px;font-weight:700;color:var(--blu);margin-bottom:3px">Staff Self-Service Leave Requests</div>'
+    +'<div style="font-size:11px;color:var(--text3);line-height:1.6">Staff can submit their own leave requests by scanning the QR code below. Requests appear here for manager approval.</div>'
+    +'</div>'
+    +'<div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">'
+    +'<button class="btn sm" onclick="showLeaveQR()" style="background:rgba(96,165,250,.15);border-color:rgba(96,165,250,.3);color:var(--blu)">📱 Show QR</button>'
+    +'<button class="btn sm s" onclick="navigator.clipboard&&navigator.clipboard.writeText(\''+leaveUrl+'\').then(function(){toast(\'URL copied!\',\'success\');})">📋 Copy URL</button>'
+    +'</div>'
+    +'</div>';
+
+  return qrBanner
+    +'<div class="card" style="margin-bottom:18px"><div class="ct" style="color:var(--gold)">New Leave Request</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">'
+    +'<div class="mfi" style="margin:0"><label>Employee *</label><select id="ts-lf-emp">'+eo+'</select></div>'
+    +'<div class="mfi" style="margin:0"><label>Leave Type *</label><select id="ts-lf-type"><option value="sick">Sick Leave</option><option value="holiday">Annual Holiday</option><option value="dayoff">Day Off</option></select></div>'
+    +'<div class="mfi" style="margin:0"><label>Start Date *</label><input type="date" id="ts-lf-start"></div>'
+    +'<div class="mfi" style="margin:0"><label>End Date *</label><input type="date" id="ts-lf-end"></div>'
+    +'</div>'
+    +'<div class="mfi"><label>Notes</label><input type="text" id="ts-lf-note" placeholder="Optional reason or note"></div>'
+    +'<button id="ts-save-leave" class="btn">Submit Leave Request</button></div>'
+    +lbar
+    +'<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px">'
+    +'<div style="text-align:center;background:var(--bg3);border:1px solid rgba(255,209,102,.18);border-radius:9px;padding:12px"><div style="font-size:24px;color:#ffd166;font-weight:300;font-family:var(--mono)">'+pend+'</div><div style="font-size:9px;color:var(--text3);margin-top:3px;text-transform:uppercase;letter-spacing:1px;font-family:var(--mono)">Pending</div></div>'
+    +'<div style="text-align:center;background:var(--bg3);border:1px solid rgba(74,171,110,.18);border-radius:9px;padding:12px"><div style="font-size:24px;color:#4aab6e;font-weight:300;font-family:var(--mono)">'+appr+'</div><div style="font-size:9px;color:var(--text3);margin-top:3px;text-transform:uppercase;letter-spacing:1px;font-family:var(--mono)">Approved</div></div>'
+    +'<div style="text-align:center;background:var(--bg3);border:1px solid rgba(224,82,82,.18);border-radius:9px;padding:12px"><div style="font-size:24px;color:#e05252;font-weight:300;font-family:var(--mono)">'+rej+'</div><div style="font-size:9px;color:var(--text3);margin-top:3px;text-transform:uppercase;letter-spacing:1px;font-family:var(--mono)">Rejected</div></div>'
+    +'<div style="text-align:center;background:var(--bg3);border:1px solid var(--bd);border-radius:9px;padding:12px"><div style="font-size:24px;color:var(--text);font-weight:300;font-family:var(--mono)">'+filt.length+'</div><div style="font-size:9px;color:var(--text3);margin-top:3px;text-transform:uppercase;letter-spacing:1px;font-family:var(--mono)">Total</div></div>'
+    +'</div>'
+    +'<div class="tw"><div class="tw-s"><table><thead><tr><th>Employee</th><th>Type</th><th>Start</th><th>End</th><th>Days</th><th>Status</th><th>Actions</th></tr></thead><tbody>'+(rows||'<tr><td colspan="7" class="er">No leave requests yet.</td></tr>')+'</tbody></table></div></div>';
+}
+
+function showLeaveQR(){
+  var leaveUrl=window.location.origin+window.location.pathname.replace('index.html','')+'leave.html'+(CURRENT_BRANCH?'?branch='+encodeURIComponent(CURRENT_BRANCH.id):'');
+  function render(){
+    var d=document.createElement('div');
+    d.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:500;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(8px)';
+    d.innerHTML='<div style="background:#161b22;border:1px solid #30363d;border-radius:16px;padding:24px;max-width:320px;width:100%;text-align:center">'
+      +'<div style="font-size:16px;font-weight:700;margin-bottom:4px">📱 Leave Request QR</div>'
+      +'<div style="font-size:11px;color:#7d8590;margin-bottom:16px">Staff scan to submit leave requests</div>'
+      +'<div id="leave-qr-box" style="background:#fff;padding:10px;border-radius:8px;display:inline-block;margin-bottom:12px"></div>'
+      +'<div style="font-size:9px;color:#7d8590;font-family:monospace;word-break:break-all;margin-bottom:16px">'+leaveUrl+'</div>'
+      +'<button onclick="this.closest(\'div[style*=fixed]\').remove()" style="padding:10px 24px;background:linear-gradient(135deg,#f0a500,#d97706);color:#000;border:none;border-radius:20px;font-size:13px;font-weight:700;cursor:pointer">Close</button>'
+      +'</div>';
+    document.body.appendChild(d);
+    d.onclick=function(e){if(e.target===d)d.remove();};
+    // Generate QR
+    if(typeof QRCode!=='undefined'){
+      new QRCode(document.getElementById('leave-qr-box'),{text:leaveUrl,width:160,height:160,colorDark:'#000',colorLight:'#fff',correctLevel:QRCode.CorrectLevel.M});
+    } else {
+      var s=document.createElement('script');
+      s.src='https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+      s.onload=function(){new QRCode(document.getElementById('leave-qr-box'),{text:leaveUrl,width:160,height:160,colorDark:'#000',colorLight:'#fff',correctLevel:QRCode.CorrectLevel.M});};
+      document.head.appendChild(s);
+    }
+  }
+  render();
 }
 
 function tsPgEmps(){
@@ -5237,6 +5398,7 @@ function openItemModal(code){
   var isEdit=!!code;
   document.getElementById('item-modal-t').textContent=isEdit?'Edit Product':'Add New Product';
   document.getElementById('edit-orig').value=code||'';
+  populateItemModalSupplier(''); // populate first
   if(isEdit){
     var it=findItem(code);if(!it)return;
     document.getElementById('f-code').value=it.code;
@@ -5247,12 +5409,11 @@ function openItemModal(code){
     document.getElementById('f-price').value=it.price;
     document.getElementById('f-qty').value=it.qty;
     document.getElementById('f-qty').disabled=true;
-    document.getElementById('f-sup').value=it.supplier||'';
+    populateItemModalSupplier(it.supplier||'');
   } else {
     ['f-code','f-name','f-min','f-price','f-qty'].forEach(function(id){document.getElementById(id).value='';});
     document.getElementById('f-uom').value='EA';
     document.getElementById('f-loc').value='Dry Storage';
-    document.getElementById('f-sup').value='';
     document.getElementById('f-qty').disabled=false;
   }
   document.getElementById('item-modal').classList.remove('hide');
@@ -5308,15 +5469,32 @@ function getSuppliers(){
 }
 
 function populateSupplierSelect(){
+  // Populate order modal
   var sel=document.getElementById('ord-sup');
-  if(!sel)return;
-  var cur=sel.value;
-  sel.innerHTML='<option value="">— Select Supplier —</option>';
+  if(sel){
+    var cur=sel.value;
+    sel.innerHTML='<option value="">— Select Supplier —</option>';
+    getSuppliers().sort().forEach(function(s){
+      var o=document.createElement('option');
+      o.value=s;o.textContent=s;
+      if(s===cur)o.selected=true;
+      sel.appendChild(o);
+    });
+  }
+  // Also populate item modal supplier dropdown
+  populateItemModalSupplier();
+}
+
+function populateItemModalSupplier(selectVal){
+  var fSup=document.getElementById('f-sup');
+  if(!fSup)return;
+  var cur=selectVal!==undefined?selectVal:fSup.value;
+  fSup.innerHTML='<option value="">— No Supplier —</option>';
   getSuppliers().sort().forEach(function(s){
     var o=document.createElement('option');
     o.value=s;o.textContent=s;
     if(s===cur)o.selected=true;
-    sel.appendChild(o);
+    fSup.appendChild(o);
   });
 }
 
@@ -5329,10 +5507,13 @@ function openAddSupplierModal(){
   S.suppliers.push(name);
   if(db)db.ref(bPath('suppliers')).set(S.suppliers);
   populateSupplierSelect();
-  // Auto-select the new supplier
-  var sel=document.getElementById('ord-sup');
-  if(sel){sel.value=name;onSupplierChange();}
-  toast('Supplier "'+name+'" added','success');
+  // Auto-select in PO modal if open
+  var ordSel=document.getElementById('ord-sup');
+  if(ordSel){ordSel.value=name;onSupplierChange();}
+  // Auto-select in item modal if open
+  var itemSel=document.getElementById('f-sup');
+  if(itemSel){populateItemModalSupplier(name);}
+  toast('Supplier "'+name+'" added ✓','success');
 }
 
 function loadSuppliers(){
@@ -5892,6 +6073,7 @@ function bindPg(){
   // Orders filter
   function reOrders(){ren();}
   var oss=document.getElementById('inv-ord-search');if(oss)oss.oninput=function(){S.q=oss.value;reOrders();};
+  var ws=document.getElementById('wares-search');if(ws)ws.oninput=function(){S.q=this.value;ren();};
   var osf2=document.getElementById('inv-ord-sf');if(osf2)osf2.onchange=function(){S.inv_ord_sf=osf2.value;reOrders();};
 
   // Items filter
