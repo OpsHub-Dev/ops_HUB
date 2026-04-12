@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>Leave Request — ALFA.CO</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<style>
+
+:root{
+  --acc:#f0a500;--acc2:#f5be45;--grn:#34d399;--red:#f87171;--gold:#f0a500;--blu:#60a5fa;
+  --font:'Inter',sans-serif;--mono:'JetBrains Mono',monospace;
+  --bg:#090d1a;--bg2:rgba(255,255,255,.04);--bg3:rgba(255,255,255,.025);
+  --bd:rgba(255,255,255,.10);--bd2:rgba(255,255,255,.16);
+  --text:rgba(255,255,255,.92);--text2:rgba(255,255,255,.55);--text3:rgba(255,255,255,.36);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{min-height:100vh;font-family:var(--font);color:var(--text);font-size:14px;-webkit-font-smoothing:antialiased;
+  background:radial-gradient(ellipse at 20% 20%,rgba(99,102,241,.22) 0%,transparent 55%),
+             radial-gradient(ellipse at 80% 80%,rgba(236,72,153,.12) 0%,transparent 50%),
+             linear-gradient(160deg,#050810 0%,#090d1a 100%);}
+::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px}
+#loading{position:fixed;inset:0;background:#050810;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:300}
+#loading.gone{display:none}
+.spinner{width:36px;height:36px;border:3px solid rgba(255,255,255,.08);border-top-color:var(--acc);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#branch-screen{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;padding:20px;
+  background:radial-gradient(ellipse at 20% 30%,rgba(99,102,241,.3) 0%,transparent 55%),linear-gradient(160deg,#050810,#090d1a)}
+#branch-screen.gone{display:none}
+.bs-card{background:rgba(255,255,255,.055);backdrop-filter:blur(22px);border:1px solid rgba(255,255,255,.12);border-radius:20px;padding:28px;width:100%;max-width:400px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.bs-list{display:flex;flex-direction:column;gap:7px;max-height:360px;overflow-y:auto;margin-bottom:14px}
+.bs-btn{display:flex;align-items:center;gap:11px;width:100%;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:12px;padding:11px 13px;cursor:pointer;text-align:left;transition:all .15s;font-family:var(--font);color:var(--text)}
+.bs-btn:hover{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.18)}
+.pin-back{background:none;border:none;color:rgba(255,255,255,.5);font-size:13px;cursor:pointer;padding:0 0 12px;font-family:var(--font);display:flex;align-items:center;gap:6px}
+.pin-inp{width:100%;background:rgba(255,255,255,.07);border:1.5px solid rgba(255,255,255,.13);border-radius:10px;padding:13px 16px;color:rgba(255,255,255,.9);font-size:22px;font-family:monospace;letter-spacing:8px;text-align:center;outline:none;margin:8px 0 4px;transition:border-color .2s}
+.pin-inp:focus{border-color:var(--acc)}
+.pin-err{font-size:11px;color:var(--red);min-height:16px;margin-bottom:8px;text-align:center}
+.pin-submit{width:100%;padding:13px;background:linear-gradient(135deg,#f0a500,#d97706);color:#000;border:none;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer;font-family:var(--font)}
+#app{display:none;max-width:520px;margin:0 auto;padding:20px 16px 40px}
+.hdr{display:flex;align-items:center;gap:12px;margin-bottom:24px;padding-bottom:16px;border-bottom:1px solid var(--bd)}
+.hdr-logo{width:40px;height:40px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;background:linear-gradient(135deg,#f0a500,#c8700a)}
+.card{background:rgba(255,255,255,.04);border:1px solid var(--bd);border-radius:14px;padding:20px;margin-bottom:14px}
+.card-title{font-size:13px;font-weight:700;color:var(--text);margin-bottom:16px}
+.fg{display:flex;flex-direction:column;gap:5px;margin-bottom:14px}
+.fg label{font-size:9.5px;color:var(--text3);font-weight:700;text-transform:uppercase;letter-spacing:.7px;font-family:var(--mono)}
+.fg input,.fg select,.fg textarea{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:9px;padding:10px 13px;color:var(--text);font-size:13px;outline:none;font-family:var(--font);transition:border-color .2s;width:100%;-webkit-appearance:none}
+.fg input:focus,.fg select:focus,.fg textarea:focus{border-color:var(--acc)}
+.fg textarea{min-height:72px;resize:vertical}
+.lt-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:4px}
+.lt-btn{padding:14px 8px;border-radius:10px;border:1.5px solid var(--bd);background:var(--bg3);color:var(--text3);cursor:pointer;font-family:var(--font);font-size:12px;font-weight:600;text-align:center;transition:all .15s;user-select:none;line-height:1.6}
+.lt-btn.sel-sick{background:rgba(249,115,22,.12);border-color:#f97316;color:#f97316}
+.lt-btn.sel-holiday{background:rgba(167,139,250,.12);border-color:#a78bfa;color:#a78bfa}
+.lt-btn.sel-dayoff{background:rgba(52,211,153,.12);border-color:var(--grn);color:var(--grn)}
+.btn-primary{width:100%;padding:14px;background:linear-gradient(135deg,#f0a500,#d97706);color:#000;border:none;border-radius:11px;font-size:15px;font-weight:800;cursor:pointer;font-family:var(--font);transition:opacity .15s;margin-top:4px}
+.btn-primary:hover{opacity:.88}
+.btn-primary:disabled{opacity:.4;cursor:not-allowed}
+.days-bar{background:rgba(240,165,0,.08);border:1px solid rgba(240,165,0,.2);border-radius:8px;padding:10px 13px;font-size:12px;color:var(--acc2);font-family:var(--mono)}
+.leave-row{background:var(--bg2);border:1px solid var(--bd);border-radius:9px;padding:12px 14px;margin-bottom:8px}
+.sp{display:inline-block;font-size:9px;font-weight:700;padding:2px 8px;border-radius:20px;font-family:var(--mono);text-transform:uppercase;letter-spacing:.4px}
+.sp-p{background:rgba(255,209,102,.12);color:#ffd166;border:1px solid rgba(255,209,102,.25)}
+.sp-a{background:rgba(52,211,153,.12);color:var(--grn);border:1px solid rgba(52,211,153,.25)}
+.sp-r{background:rgba(248,113,113,.12);color:var(--red);border:1px solid rgba(248,113,113,.25)}
+#toasts{position:fixed;bottom:20px;right:16px;left:16px;z-index:999;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.toast{background:rgba(22,27,34,.95);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:11px 15px;font-size:13px;display:flex;align-items:center;gap:10px;box-shadow:0 8px 24px rgba(0,0,0,.5);animation:tIn .25s ease;pointer-events:all}
+.toast.success{border-color:rgba(52,211,153,.3);background:rgba(52,211,153,.06)}
+.toast.error{border-color:rgba(248,113,113,.3);background:rgba(248,113,113,.06)}
+.toast.warning{border-color:rgba(240,165,0,.3);background:rgba(240,165,0,.06)}
+@keyframes tIn{from{transform:translateY(12px);opacity:0}to{transform:none;opacity:1}}
+#success-screen{display:none;text-align:center;padding:40px 20px}
+.btn-reset{padding:13px 32px;background:rgba(255,255,255,.07);border:1px solid var(--bd2);color:var(--text2);border-radius:10px;font-size:14px;cursor:pointer;font-family:var(--font)}
+
+</style>
+</head>
+<body>
+<div id="loading">
+  <div style="font-size:36px;margin-bottom:4px">📋</div>
+  <div class="spinner"></div>
+  <div style="font-size:11px;color:rgba(255,255,255,.3);font-family:monospace;margin-top:4px">Connecting…</div>
+</div>
+
+<div id="branch-screen" class="gone">
+  <div class="bs-card">
+    <div style="text-align:center;margin-bottom:20px">
+      <div style="font-size:36px;margin-bottom:6px">📋</div>
+      <div style="font-size:17px;font-weight:800;color:rgba(255,255,255,.92)">Leave Request</div>
+      <div style="font-size:11px;color:rgba(255,255,255,.4);margin-top:3px;font-family:monospace">ALFA.CO · Select your branch</div>
+    </div>
+    <div id="branch-list-step">
+      <div style="font-size:9px;font-weight:700;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:1px;font-family:monospace;margin-bottom:8px">Select Branch</div>
+      <div class="bs-list" id="bs-branch-list">
+        <div style="text-align:center;color:rgba(255,255,255,.3);padding:20px;font-size:12px">Loading…</div>
+      </div>
+    </div>
+    <div id="pin-screen" style="display:none">
+      <button class="pin-back" id="pin-back-btn">← Back</button>
+      <div style="font-size:14px;font-weight:700;color:rgba(255,255,255,.9);margin-bottom:2px" id="pin-branch-name"></div>
+      <div style="font-size:10px;color:rgba(255,255,255,.4);font-family:monospace;margin-bottom:12px" id="pin-branch-sub"></div>
+      <div style="font-size:9px;font-weight:700;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:1px;font-family:monospace;margin-bottom:4px">Branch PIN</div>
+      <input class="pin-inp" id="pin-inp" type="password" inputmode="numeric" maxlength="8" placeholder="••••" autocomplete="off">
+      <div class="pin-err" id="pin-err"></div>
+      <button class="pin-submit" id="pin-submit-btn">Enter →</button>
+    </div>
+  </div>
+</div>
+
+<div id="app">
+  <div class="hdr">
+    <div class="hdr-logo" id="hdr-logo">📋</div>
+    <div>
+      <div style="font-size:16px;font-weight:800;color:var(--text)" id="hdr-branch">Leave Request</div>
+      <div style="font-size:10px;color:var(--text3);font-family:var(--mono)" id="hdr-sub">Submit your leave request below</div>
+    </div>
+  </div>
+
+  <div id="leave-form-wrap">
+    <div class="card">
+      <div class="card-title">📋 New Leave Request</div>
+
+      <div class="fg">
+        <label>Your Name *</label>
+        <select id="lv-emp">
+          <option value="">— Select your name —</option>
+        </select>
+      </div>
+
+      <div class="fg">
+        <label>Leave Type *</label>
+        <div class="lt-grid">
+          <div class="lt-btn sel-sick" data-lt="sick" onclick="selLeaveType(this)">🤒<br>Sick Leave</div>
+          <div class="lt-btn" data-lt="holiday" onclick="selLeaveType(this)">🏖<br>Annual Holiday</div>
+          <div class="lt-btn" data-lt="dayoff" onclick="selLeaveType(this)">📴<br>Day Off</div>
+        </div>
+        <input type="hidden" id="lv-type" value="sick">
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="fg"><label>Start Date *</label><input type="date" id="lv-start" oninput="updateDays()"></div>
+        <div class="fg"><label>End Date *</label><input type="date" id="lv-end" oninput="updateDays()"></div>
+      </div>
+      <div id="days-preview" style="display:none;margin-bottom:14px">
+        <div class="days-bar">📅 Duration: <strong id="days-count">—</strong> day(s)</div>
+      </div>
+
+      <div class="fg">
+        <label>Reason / Notes (Optional)</label>
+        <textarea id="lv-note" placeholder="Optional reason or additional info…"></textarea>
+      </div>
+
+      <button class="btn-primary" id="btn-submit" onclick="submitLeave()">📤 Submit Leave Request</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🕓 My Previous Requests</div>
+      <div id="my-leaves-list">
+        <div style="text-align:center;color:var(--text3);padding:16px;font-size:12px">Select your name above to see your requests</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="success-screen">
+    <div style="font-size:56px;margin-bottom:16px">✅</div>
+    <h2 style="font-size:20px;font-weight:800;margin-bottom:8px">Request Submitted!</h2>
+    <p style="font-size:13px;color:var(--text3);line-height:1.7;margin-bottom:24px">Your leave request has been sent.<br>Your manager will review and approve it.</p>
+    <button class="btn-reset" onclick="resetForm()">← Submit Another Request</button>
+  </div>
+</div>
+
+<div id="toasts"></div>
+
+<script>
+var FIREBASE_CONFIG={apiKey:"AIzaSyB9DhSn5gDqAhpmLG9aVFAld1dSRYJWFDI",authDomain:"opshub-f802f.firebaseapp.com",databaseURL:"https://opshub-f802f-default-rtdb.asia-southeast1.firebasedatabase.app",projectId:"opshub-f802f",storageBucket:"opshub-f802f.firebasestorage.app",messagingSenderId:"84176854270",appId:"1:84176854270:web:f7a66b3b38e98b630859af"};
+var LEAVE_KEY='opshub_leave_branch_session';
+var db=null,BRANCH_PATH='',CURRENT_BRANCH=null,_pendingBranch=null;
+var tsEmps=[],allLeaves=[];
+var TODAY=(function(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');})();
+function bPath(r){return BRANCH_PATH?(BRANCH_PATH+'/'+r):r;}
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
+
+function toast(msg,type){
+  var w=document.getElementById('toasts');if(!w)return;
+  var el=document.createElement('div');el.className='toast '+(type||'info');
+  var ic={success:'✅',error:'❌',warning:'⚠️',info:'ℹ️'};
+  el.innerHTML='<span style="font-size:16px;flex-shrink:0">'+(ic[type]||'ℹ️')+'</span><span>'+msg+'</span>';
+  w.appendChild(el);
+  setTimeout(function(){el.style.opacity='0';el.style.transition='opacity .3s';setTimeout(function(){el.remove();},350);},3500);
+}
+
+function selLeaveType(btn){
+  document.querySelectorAll('.lt-btn').forEach(function(x){x.className='lt-btn';});
+  btn.classList.add('sel-'+btn.dataset.lt);
+  document.getElementById('lv-type').value=btn.dataset.lt;
+}
+
+function updateDays(){
+  var s=document.getElementById('lv-start').value;
+  var e=document.getElementById('lv-end').value;
+  var p=document.getElementById('days-preview');
+  if(s&&e&&e>=s){
+    var days=Math.round((new Date(e)-new Date(s))/86400000)+1;
+    document.getElementById('days-count').textContent=days;
+    p.style.display='block';
+  } else {p.style.display='none';}
+}
+
+function showBranchScreen(){
+  document.getElementById('loading').classList.add('gone');
+  document.getElementById('branch-screen').classList.remove('gone');
+  db.ref('admin/branches').once('value',function(snap){
+    var raw=snap.val()||{};
+    var branches=Object.values(raw).filter(function(b){return b&&b.active!==false;});
+    branches.sort(function(a,b){return (a.name||'').localeCompare(b.name||'');});
+    var el=document.getElementById('bs-branch-list');el.innerHTML='';
+    if(!branches.length){el.innerHTML='<div style="text-align:center;color:rgba(255,255,255,.3);padding:20px;font-size:12px">No branches found.</div>';return;}
+    branches.forEach(function(b){
+      var btn=document.createElement('button');btn.className='bs-btn';
+      btn.innerHTML='<div style="width:34px;height:34px;border-radius:9px;background:'+(b.color||'#f0a500')+';display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">'+(b.icon||'🏪')+'</div>'
+        +'<div style="flex:1"><div style="font-size:13px;font-weight:700;color:rgba(255,255,255,.9)">'+(b.name||b.id)+'</div>'
+        +'<div style="font-size:10px;color:rgba(255,255,255,.4);font-family:monospace">'+(b.brand||'')+(b.location?' · '+b.location:'')+'</div></div>'
+        +'<div style="font-size:16px;color:rgba(255,255,255,.2)">›</div>';
+      btn.onclick=function(){
+        _pendingBranch=b;
+        document.getElementById('pin-branch-name').textContent=b.name||b.id;
+        document.getElementById('pin-branch-sub').textContent=(b.brand||'')+(b.location?' · '+b.location:'');
+        document.getElementById('branch-list-step').style.display='none';
+        document.getElementById('pin-screen').style.display='block';
+        var pi=document.getElementById('pin-inp');pi.value='';
+        document.getElementById('pin-err').textContent='';
+        setTimeout(function(){pi.focus();},60);
+      };
+      el.appendChild(btn);
+    });
+  });
+}
+
+function submitPinLeave(){
+  if(!_pendingBranch)return;
+  var pin=(document.getElementById('pin-inp').value||'').trim();
+  if(!pin){document.getElementById('pin-err').textContent='Enter PIN';return;}
+  if(pin!==String(_pendingBranch.pin)){document.getElementById('pin-err').textContent='Incorrect PIN';document.getElementById('pin-inp').value='';document.getElementById('pin-inp').focus();return;}
+  CURRENT_BRANCH=_pendingBranch;BRANCH_PATH='branches/'+_pendingBranch.id;
+  try{localStorage.setItem(LEAVE_KEY,JSON.stringify({branchId:_pendingBranch.id,branch:_pendingBranch,expires:Date.now()+8*3600000}));}catch(e){}
+  launchLeave();
+}
+
+function launchLeave(){
+  var hlo=document.getElementById('hdr-logo');
+  var hn=document.getElementById('hdr-branch');
+  var hs=document.getElementById('hdr-sub');
+  if(CURRENT_BRANCH){
+    if(hlo){hlo.textContent=CURRENT_BRANCH.icon||'📋';hlo.style.background='linear-gradient(135deg,'+(CURRENT_BRANCH.color||'#f0a500')+','+(CURRENT_BRANCH.color||'#f0a500')+'aa)';}
+    if(hn) hn.textContent=CURRENT_BRANCH.name||'Leave Request';
+    if(hs) hs.textContent=(CURRENT_BRANCH.brand||'')+(CURRENT_BRANCH.location?' · '+CURRENT_BRANCH.location:'');
+  }
+  document.getElementById('branch-screen').classList.add('gone');
+  document.getElementById('loading').classList.add('gone');
+  document.getElementById('app').style.display='block';
+
+  // Set default dates
+  var si=document.getElementById('lv-start');
+  var ei=document.getElementById('lv-end');
+  if(si&&!si.value)si.value=TODAY;
+  if(ei&&!ei.value)ei.value=TODAY;
+
+  // Load staff
+  db.ref(bPath('tsEmps')).once('value',function(snap){
+    var raw=snap.val()||[];
+    tsEmps=Array.isArray(raw)?raw.filter(Boolean):Object.values(raw).filter(Boolean);
+    tsEmps.sort(function(a,b){return a.name.localeCompare(b.name);});
+    var sel=document.getElementById('lv-emp');
+    sel.innerHTML='<option value="">— Select your name —</option>';
+    tsEmps.forEach(function(e){var o=document.createElement('option');o.value=e.id;o.textContent=e.name+(e.dept?' ('+e.dept+')':'');sel.appendChild(o);});
+  });
+
+  // Live load leaves
+  db.ref(bPath('tsLeaves')).on('value',function(snap){
+    var raw=snap.val()||[];
+    allLeaves=Array.isArray(raw)?raw.filter(Boolean):Object.values(raw).filter(Boolean);
+    updateMyLeaves();
+  });
+
+  document.getElementById('lv-emp').addEventListener('change',updateMyLeaves);
+}
+
+function updateMyLeaves(){
+  var empId=document.getElementById('lv-emp').value;
+  var el=document.getElementById('my-leaves-list');
+  if(!empId){el.innerHTML='<div style="text-align:center;color:var(--text3);padding:16px;font-size:12px">Select your name above</div>';return;}
+  var my=allLeaves.filter(function(l){return l.empId===empId;}).sort(function(a,b){return b.start.localeCompare(a.start);});
+  if(!my.length){el.innerHTML='<div style="text-align:center;color:var(--text3);padding:16px;font-size:12px">No leave requests yet</div>';return;}
+  var ltL={sick:'🤒 Sick Leave',holiday:'🏖 Annual Holiday',dayoff:'📴 Day Off'};
+  el.innerHTML=my.map(function(l){
+    var sc=l.status==='approved'?'sp-a':l.status==='rejected'?'sp-r':'sp-p';
+    var stL=l.status==='approved'?'Approved':l.status==='rejected'?'Rejected':'Pending';
+    return '<div class="leave-row"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px"><span style="font-size:12px;font-weight:600">'+(ltL[l.type]||l.type)+'</span><span class="sp '+sc+'">'+stL+'</span></div>'
+      +'<div style="font-size:11px;color:var(--text3);font-family:var(--mono)">'+l.start+' → '+l.end+' · '+l.days+'d'+(l.note?' · '+l.note:'')+'</div></div>';
+  }).join('');
+}
+
+function submitLeave(){
+  var empId=document.getElementById('lv-emp').value;
+  var type=document.getElementById('lv-type').value;
+  var start=document.getElementById('lv-start').value;
+  var end=document.getElementById('lv-end').value;
+  var note=(document.getElementById('lv-note').value||'').trim();
+  if(!empId){toast('Please select your name','warning');return;}
+  if(!start||!end){toast('Please select dates','warning');return;}
+  if(end<start){toast('End date must be after start date','warning');return;}
+  var days=Math.round((new Date(end)-new Date(start))/86400000)+1;
+  var emp=null;for(var i=0;i<tsEmps.length;i++)if(tsEmps[i].id===empId){emp=tsEmps[i];break;}
+  var record={id:uid(),empId:empId,empName:emp?emp.name:'Unknown',type:type,start:start,end:end,days:days,note:note,status:'pending',submittedAt:Date.now(),submittedFrom:'self-service'};
+  var btn=document.getElementById('btn-submit');
+  btn.disabled=true;btn.textContent='Submitting…';
+  db.ref(bPath('tsLeaves')).once('value',function(snap){
+    var raw=snap.val()||[];
+    var arr=Array.isArray(raw)?raw.filter(Boolean):Object.values(raw).filter(Boolean);
+    arr.push(record);
+    db.ref(bPath('tsLeaves')).set(arr,function(err){
+      btn.disabled=false;btn.textContent='📤 Submit Leave Request';
+      if(err){toast('Error — please try again','error');return;}
+      document.getElementById('leave-form-wrap').style.display='none';
+      document.getElementById('success-screen').style.display='block';
+    });
+  });
+}
+
+function resetForm(){
+  document.getElementById('leave-form-wrap').style.display='block';
+  document.getElementById('success-screen').style.display='none';
+  document.getElementById('lv-emp').value='';
+  document.getElementById('lv-note').value='';
+  document.getElementById('lv-start').value=TODAY;
+  document.getElementById('lv-end').value=TODAY;
+  document.getElementById('days-preview').style.display='none';
+  document.querySelectorAll('.lt-btn').forEach(function(x){x.className='lt-btn';});
+  document.querySelector('[data-lt="sick"]').classList.add('sel-sick');
+  document.getElementById('lv-type').value='sick';
+  updateMyLeaves();
+}
+
+window.onload=function(){
+  try{if(!firebase.apps.length)firebase.initializeApp(FIREBASE_CONFIG);db=firebase.database();}catch(e){document.getElementById('loading').classList.add('gone');toast('Firebase error: '+e.message,'error');return;}
+  document.getElementById('pin-back-btn').onclick=function(){document.getElementById('pin-screen').style.display='none';document.getElementById('branch-list-step').style.display='block';_pendingBranch=null;};
+  document.getElementById('pin-submit-btn').onclick=submitPinLeave;
+  document.getElementById('pin-inp').addEventListener('keydown',function(e){if(e.key==='Enter')submitPinLeave();document.getElementById('pin-err').textContent='';});
+  var urlParams=new URLSearchParams(window.location.search);
+  var urlBranch=urlParams.get('branch')||urlParams.get('b');
+  if(urlBranch){
+    db.ref('admin/branches/'+urlBranch).once('value',function(snap){
+      var b=snap.val();
+      if(b&&b.active!==false){CURRENT_BRANCH=b;BRANCH_PATH='branches/'+urlBranch;try{localStorage.setItem(LEAVE_KEY,JSON.stringify({branchId:urlBranch,branch:b,expires:Date.now()+8*3600000}));}catch(ex){}launchLeave();}
+      else{showBranchScreen();}
+    },function(){showBranchScreen();});
+    return;
+  }
+  var sess=null;try{sess=JSON.parse(localStorage.getItem(LEAVE_KEY)||'null');}catch(e){}
+  if(sess&&sess.branchId&&sess.expires>Date.now()){CURRENT_BRANCH=sess.branch||null;BRANCH_PATH='branches/'+sess.branchId;launchLeave();return;}
+  showBranchScreen();
+};
+</script>
+</body>
+</html>
