@@ -6840,6 +6840,7 @@ function pAdminBranches(){
       +'</div>'
       +'<div style="display:flex;gap:8px">'
         +'<button class="btn s" id="btn-show-qr">📱 QR Codes</button>'
+        +'<button class="btn s" id="btn-fix-locs" style="background:rgba(52,211,153,.12);border-color:rgba(52,211,153,.3);color:#34d399">📍 Fix Item Locations</button>'
         +'<button class="btn" id="btn-add-branch">+ Add Branch</button>'
       +'</div>'
     +'</div>'
@@ -6864,9 +6865,7 @@ function pAdminBranches(){
     +'</div>'
 
     +'<div style="margin-top:24px;background:var(--bg2);border:1px solid var(--bd);border-radius:12px;padding:18px">'
-      +'<div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:10px">📊 All Branches Overview</div>'
-      +'<div id="branches-overview-table">Loading…</div>'
-    +'</div>'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'      +'<div style="font-size:12px;font-weight:700;color:var(--text2)">📊 All Branches Overview</div>'      +'<div style="display:flex;gap:6px">'        +'<button id="sales-view-month" style="padding:4px 10px;border-radius:6px;border:1px solid var(--acc);background:rgba(240,165,0,.15);color:var(--acc);font-size:10px;font-weight:700;cursor:pointer;font-family:var(--font)">Month</button>'        +'<button id="sales-view-week" style="padding:4px 10px;border-radius:6px;border:1px solid var(--bd);background:transparent;color:var(--text3);font-size:10px;font-weight:600;cursor:pointer;font-family:var(--font)">Week</button>'        +'<button id="sales-view-ytd" style="padding:4px 10px;border-radius:6px;border:1px solid var(--bd);background:transparent;color:var(--text3);font-size:10px;font-weight:600;cursor:pointer;font-family:var(--font)">YTD</button>'      +'</div>'    +'</div>'    +'<div id="branches-overview-table">Loading…</div>'    +'</div>'    +'<div style="margin-top:14px;background:var(--bg2);border:1px solid var(--bd);border-radius:12px;padding:18px">'      +'<div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:12px">📈 Sales Comparison — All Branches</div>'      +'<div id="sales-comp-dash"><div style="text-align:center;color:var(--text3);padding:20px;font-size:12px">Loading sales data…</div></div>'    +'</div>'
   +'</div>';
 }
 
@@ -6874,6 +6873,8 @@ function bindAdminBranches(){
   if(!IS_SUPER_ADMIN)return;
   var btn=document.getElementById('btn-add-branch');
   if(btn)btn.onclick=function(){openBranchModal(null);};
+  var fixBtn=document.getElementById('btn-fix-locs');
+  if(fixBtn)fixBtn.onclick=function(){fixItemLocations();};
   var qrBtn=document.getElementById('btn-show-qr');
   if(qrBtn)qrBtn.onclick=function(){
     var panel=document.getElementById('qr-panel');
@@ -7163,6 +7164,7 @@ function renderBranchesOverview(branches){
   });
   html+='</tbody></table>';
   el.innerHTML=html;
+  loadSalesComparison();
 }
 
 // ── Branch Modal (Add / Edit) ─────────────────────────────────
@@ -7217,6 +7219,7 @@ function openBranchModal(existing){
     document.querySelectorAll('.icon-opt').forEach(function(btn){
       btn.onclick=function(){
         _selIcon=this.dataset.ic;
+        window._bms_icon=_selIcon;
         document.querySelectorAll('.icon-opt').forEach(function(x){x.style.background='var(--bg3)';x.style.borderColor='var(--bd)';});
         this.style.background='rgba(240,165,0,.15)';this.style.borderColor='var(--acc)';
       };
@@ -7224,11 +7227,14 @@ function openBranchModal(existing){
     document.querySelectorAll('.col-opt').forEach(function(btn){
       btn.onclick=function(){
         _selColor=this.dataset.col;
+        window._bms_color=_selColor;
         document.querySelectorAll('.col-opt').forEach(function(x){x.style.borderColor='transparent';});
         this.style.borderColor='#fff';
       };
     });
-    window._branchModalState={getIcon:function(){return _selIcon;},getColor:function(){return _selColor;}};
+    window._bms_icon=_selIcon;
+    window._bms_color=_selColor;
+    window._branchModalState={getIcon:function(){return window._bms_icon;},getColor:function(){return window._bms_color;}};
   },50);
 }
 
@@ -7273,6 +7279,250 @@ function saveBranchModal(){
       if(bd2) bd2.style.background=b.color||'var(--grn)';
     }
   });
+}
+
+// ═══════════════════════════════════════════════════════════
+// 📍 FIX ITEM LOCATIONS — updates shared/inv_items from Excel map
+// ═══════════════════════════════════════════════════════════
+var LOCATION_MAP = {"BEV-146": "Beverage Storage", "BEV-145": "Beverage Storage", "BEV-148": "Beverage Storage", "BEV-07": "Dry Storage", "BEV-93": "Beverage Storage", "BEV-121": "Dry Storage", "BEV-139": "Beverage Storage", "BEV-6040": "Beverage Storage", "BEV-90": "Beverage Storage", "BEV-6039": "Beverage Storage", "BEV-92": "Beverage Storage", "BEV-62": "Beverage Storage", "BEV-63": "Beverage Storage", "BEV-66": "Beverage Storage", "BEV-67": "Beverage Storage", "BEV-65": "Beverage Storage", "BEV-29": "Beverage Storage", "BEV-28": "Beverage Storage", "BEV-30": "Beverage Storage", "BEV-32": "Beverage Storage", "BEV-31": "Beverage Storage", "BEV-141": "Beverage Storage", "BEV-140": "Beverage Storage", "BEV-142": "Dry Storage", "BEV-135": "Walk-in Chiller", "BEV-11": "Beverage Storage", "BEV-09": "Dry Storage", "BEV-60": "Beverage Storage", "BEV-6004": "Beverage Storage", "BEVPREP-7": "Beverage Storage", "BEV-114": "Beverage Storage", "BEV-111": "Beverage Storage", "BEV-143": "Dry Storage", "BEV-134": "Walk-in Chiller", "ASORRCM145": "Beverage Storage", "APORRFD081": "Beverage Storage", "APORRCM317": "Beverage Storage", "PP-401": "Beverage Storage", "PP-361": "Chemical Storage", "NP-697": "Dry Storage", "NP-589": "Dry Storage", "PP-364": "Chemical Storage", "APORRCM381": "Beverage Storage", "NP-599": "Beverage Storage", "BEV-36": "Beverage Storage", "BEV-158": "Beverage Storage", "APORRAP061": "Production Cooler", "PR-01": "Dry Storage", "ASORRCM367": "Production Cooler", "PR-41": "Walk-in Chiller", "PR-43": "Production Cooler", "PR-117": "Walk-in Chiller", "PR-78": "Walk-in Chiller", "PR-119": "Production Cooler", "PR-39": "Walk-in Chiller", "PR-20": "Walk-in Chiller", "ASORRCM292": "Production Cooler", "PR-02": "Walk-in Chiller", "PR-84": "Walk-in Chiller", "PR-03": "Walk-in Chiller", "PR-115": "Walk-in Chiller", "ASORRCM005": "Production Cooler", "AKORRCM223": "Walk-in Freezer", "AKORRCM219A": "Production Cooler", "AFORRCM009": "Production Cooler", "APORRCM443": "Production Cooler", "ASORRCM1971": "Production Cooler", "ASORRCM1973": "Production Cooler", "ASORRCM1971-A": "Production Cooler", "ASORRCM1972": "Production Cooler", "ASORRSP051": "Unassigned", "PR-32": "Walk-in Chiller", "PR-04": "Walk-in Chiller", "PR-111": "Walk-in Chiller", "PR-68": "Walk-in Chiller", "PR-79": "Dry Storage", "PR-83": "Production Cooler", "PR-26": "Walk-in Chiller", "PR-50": "Walk-in Chiller", "PR-122": "Walk-in Chiller", "PR-125": "Production Cooler", "PR-30": "Dry Storage", "PR-05": "Walk-in Chiller", "PR-116": "Walk-in Chiller", "PR-07": "Walk-in Chiller", "PR-109": "Production Cooler", "PR-37": "Walk-in Chiller", "PR-112": "Walk-in Chiller", "PR-81": "Production Cooler", "PR-42": "Walk-in Chiller", "PR-09": "Walk-in Chiller", "PR-10": "Dry Storage", "ASORRCM287": "Production Cooler", "PR-08": "Walk-in Chiller", "APORRCM326": "Production Cooler", "ASORRSB432-1": "Production Cooler", "APORRCM343": "Production Cooler", "ASORRCM257": "Production Cooler", "ABORRCM064": "Production Cooler", "APORRCM291": "General Storage", "ASORRCM070": "Production Cooler", "ASORRCM277": "Production Cooler", "ASORRCM272": "Production Cooler", "APORRCM419": "Production Cooler", "APORRCM210": "Front Line", "APORRSB150A": "Production Cooler", "APORRCM299": "Production Cooler", "ASORRCM366": "Production Cooler", "APORRCM057": "Front Line", "APORRCM254": "Production Cooler", "APORRCM213": "Production Cooler", "APORRCM014": "Front Line", "APORRCM012": "Production Cooler", "APORRCM232": "Production Cooler", "APORRCM158": "Production Cooler", "APORRCM167": "Front Line", "APORRCK031": "Production Cooler", "APORRCM075": "Production Cooler", "APORRCM221": "Production Cooler", "APORRCM083": "Production Cooler", "APORRCM122": "Front Line", "APORRCM004": "Production Cooler", "APORRCM052": "Production Cooler", "APORRCM434": "Production Cooler", "APORRCM019": "Production Cooler", "APORRCM059": "Walk-in Chiller", "APORRCM050": "Production Cooler", "APORRFP011": "Front Line", "APORRCM070": "Production Cooler", "APORRCM415": "Production Cooler", "APORRCM179": "Front Line", "APORRCM257": "Production Cooler", "APORRCM286": "Front Line", "APORRCM029": "Production Cooler", "APORRCM161": "Production Cooler", "APORRCM107": "Production Cooler", "APORRCM001": "Production Cooler", "APORRSP021": "Production Cooler", "APORRCM403": "Production Cooler", "APORRCM009": "Front Line", "APORRCM198": "Production Cooler", "APORRCM422": "Production Cooler", "APORRCM206": "Production Cooler", "APORRCM010": "Production Cooler", "APORRCK011": "Production Cooler", "APORRCM041": "Production Cooler", "APORRCM274": "Production Cooler", "APORRCM042": "Production Cooler", "APORRCM016": "Production Cooler", "APORRCM263": "Production Cooler", "APORRCM108": "Front Line", "APORRCM036": "Front Line", "APORRCM121": "Production Cooler", "APORRCM118": "Production Cooler", "APORRCM110": "Production Cooler", "APORRCM290": "Production Cooler", "APORRCM421": "Production Cooler", "APORRCM427": "Production Cooler", "APORRCM024": "Front Line", "APORRCM423": "Production Cooler", "APORRCM175": "Production Cooler", "ASORRCM387": "Production Cooler", "ASORRSB141": "Production Cooler", "ASORRFD083": "Production Cooler", "ASORRCM076": "Production Cooler", "ASORRSB162": "Production Cooler", "ASORRCM007": "Production Cooler", "ASORRSB061": "Production Cooler", "ASORRSB091": "Production Cooler", "ASORRCM128": "Production Cooler", "ASORRCM147": "Production Cooler", "ASORRCM210": "Production Cooler", "ASORRCM211": "Production Cooler", "ASORRCM133": "Production Cooler", "ASORRCM137": "Production Cooler", "ASORRSB392": "Production Cooler", "ASORRCM206": "Production Cooler", "ASORRCM176": "Production Cooler", "ASORRSB439": "Production Cooler", "ASORRSB442": "Production Cooler", "ASORRCM172": "Production Cooler", "ASORRCM171": "Production Cooler", "ASORRCM144": "Production Cooler", "ASORRCM284": "Production Cooler", "ASORRSB122": "Production Cooler", "ASORRSB121": "Production Cooler", "ASORRCM006": "Production Cooler", "ASORRCM269": "Production Cooler", "ASORRSB222": "Production Cooler", "ASORRCM204": "Production Cooler", "ASORRCM180": "Production Cooler", "ASORRSB443": "Production Cooler", "ASORRCM051": "Production Cooler", "ASORRCM207": "Production Cooler", "ASORRCM175": "Production Cooler", "ASORRCM174": "Production Cooler", "ASORRCM140": "Production Cooler", "ASORRCM001": "Production Cooler", "ASORRCM004": "Production Cooler", "ASORRSB457": "Production Cooler", "ASORRSB163": "Production Cooler", "ASORRSB440": "Production Cooler", "ASORRSP181A": "Unassigned", "ASORRCM139": "Production Cooler", "ASORRCM177": "Production Cooler", "ASORRCM155": "Production Cooler", "ASORRSB101": "Production Cooler", "ASORRSB448": "Production Cooler", "ABORRCM055": "Production Cooler", "ASORRSB447": "Production Cooler", "DG-5157": "Dry Storage", "PAP-347": "Small Wares", "DINN-040": "Small Wares", "DINN-067": "Small Wares", "UNIF-410": "Small Wares", "UNIF-412": "Small Wares", "KIT-174": "Small Wares", "KIT-117": "Chemical Storage", "CL-121": "Chemical Storage", "DINN-077": "Small Wares", "DINN-097": "Small Wares", "CHINA-041": "Small Wares", "KIT-037": "Small Wares", "UTKT-0191": "Small Wares", "KIT-113": "Small Wares", "KIT-112": "Small Wares", "KIT-040": "Small Wares", "SPDN-0066": "Small Wares", "SPDN-0069": "Small Wares", "KIT-103": "Small Wares", "KIT-104": "Small Wares", "KIT-102": "Small Wares", "SPDN-0090": "Small Wares", "KIT-137": "Small Wares", "UTBR-0040": "Small Wares", "CL-75": "Chemical Storage", "KIT-239": "Small Wares", "CL-95": "Small Wares", "CL-86": "Chemical Storage", "OEGL-0002": "Small Wares", "SEA-29": "Walk-in Freezer", "UTKT-0173": "Small Wares", "DINN-058": "Small Wares", "KIT-240": "Small Wares", "CLEAN-19": "Small Wares", "SPDN-0050": "Small Wares", "KIT-071": "Small Wares", "CL-103": "Chemical Storage", "SPDN-0015": "Small Wares", "CHINA-032": "Small Wares", "CL-115": "Chemical Storage", "OECH-0013": "Small Wares", "CL-122": "Small Wares", "UTBR-0069": "Small Wares", "KIT-020": "Small Wares", "CHINA-040": "Small Wares", "OECH-0018": "Small Wares", "UTKT-0176": "Small Wares", "DINN-120": "Small Wares", "UNIF-026": "Small Wares", "UNIF-027": "Small Wares", "UNIF-028": "Small Wares", "UNIF-029": "Small Wares", "CL-120": "Chemical Storage", "CHINA-027": "Small Wares", "CHINA-011": "Small Wares", "CHINA-034": "Small Wares", "CL-76": "Chemical Storage", "CL-78": "Small Wares", "OECH-0012": "Small Wares", "DINN-076": "Small Wares", "CL-64": "Small Wares", "CHINA-009": "Small Wares", "CL-112": "Small Wares", "CL-111": "Chemical Storage", "CL-85": "Chemical Storage", "CL-79": "Chemical Storage", "CL-72": "Chemical Storage", "CL-102": "Chemical Storage", "CL-113": "Chemical Storage", "CL-81": "Chemical Storage", "CL-110": "Chemical Storage", "CL-77": "Chemical Storage", "KIT-035": "Small Wares", "CL-83": "Chemical Storage", "KIT-005": "Small Wares", "FG-05": "Small Wares", "CL-119": "Chemical Storage", "CL-108": "Chemical Storage", "DG-126": "Unassigned", "BEVPREP-1": "Unassigned", "NP-450": "Unassigned", "NP-554": "Unassigned", "DR-7001": "Unassigned", "101210101": "Unassigned", "AKORRJS020": "Unassigned", "NP-609": "Unassigned", "NP-525": "Unassigned", "DG-141": "Unassigned", "PR-96": "Unassigned", "APORRSB140B": "Unassigned", "APORRCM411": "Unassigned", "APORRCM416": "Unassigned", "APORRSS080": "Unassigned", "APORRCM148": "Unassigned", "APORRCM164": "Unassigned", "APORRCM045": "Unassigned", "APORRCM020": "Unassigned", "APORRCM264": "Unassigned", "APORRCM227": "Unassigned", "APORRCM077": "Unassigned", "APORRCM176": "Unassigned", "APORRSB140": "Unassigned", "APORRCM163": "Unassigned", "APORRCM061": "Unassigned", "APORRCM251": "Unassigned", "APORRCM225": "Unassigned", "APORRSP041": "Unassigned", "APORRCM278": "Unassigned", "APORRCM325": "Unassigned", "APORRCM079": "Unassigned", "APORRCM054": "Unassigned", "APORRCM375": "Unassigned", "APORRCM106": "Unassigned", "APORRCM011": "Unassigned", "APORRSB120": "Unassigned", "APORRCM202": "Unassigned", "APORRCM105": "Unassigned", "APORRCM127": "Unassigned", "APORRCM292": "Unassigned", "APORRCM270": "Unassigned", "APORRCM172": "Unassigned", "APORRSB040": "Unassigned", "APORRCM412": "Unassigned", "NP-552": "Unassigned", "ASORRSP011": "Unassigned", "ABORRCM060": "Unassigned", "ASORRCM273": "Unassigned", "ASORRCM270": "Unassigned", "ADORRCM002": "Unassigned", "NP-553": "Unassigned", "NP-340": "Unassigned", "PP-172": "Unassigned", "ASORRCM025": "Unassigned", "ASORRSP031": "Unassigned", "ASORRCM181": "Unassigned", "ASORRCM250-A": "Unassigned", "ASORRCM131": "Unassigned", "ASORRCM132": "Unassigned", "ASORRCM168": "Unassigned", "ASORRCM156": "Unassigned", "ASORRSP0911": "Unassigned", "PR-64": "Unassigned", "PAP-144": "Unassigned", "AWORRCM034": "Unassigned", "AWORRSD002": "Unassigned", "AWORRCM033": "Unassigned", "ASORRLT340": "Unassigned", "DR-7053": "Unassigned", "APORRCM471": "Unassigned", "APORRCM475": "Unassigned", "ASORRCM316": "Unassigned", "APORRCM472": "Unassigned", "BEVPREP-5": "Unassigned", "AKORRCM380": "Unassigned", "NP-53": "Unassigned", "PL-07": "Unassigned", "DS-54": "Unassigned", "AIORRCM014": "Unassigned", "AFORRCM025": "Unassigned", "AKORRCM307": "Unassigned", "ASORRFJ010": "Unassigned", "AKORRCM111": "Unassigned", "AKORRCM067": "Unassigned", "AKORRCM312": "Unassigned", "AKORRCM069": "Unassigned", "AFORRCM065": "Unassigned", "AKORRCM430": "Unassigned", "ASORRCM201": "Unassigned", "AKORRCM175": "Unassigned", "ADORRCM001": "Unassigned", "ADORRCM008": "Unassigned", "NP-307": "Unassigned", "AFORRCM018": "Unassigned", "AFORRCM006": "Unassigned", "AFORRCM019": "Unassigned", "AFORRCM029": "Unassigned", "AFORRCM030": "Unassigned", "AFORRCM014": "Unassigned", "AFORRCM001": "Unassigned", "AFORRCM002": "Unassigned", "PP-430": "Unassigned", "PP-427": "Unassigned", "PP-52": "Unassigned", "NP-885": "Unassigned", "NP-441": "Unassigned", "SEA-17": "Unassigned", "AIORRCM039": "Unassigned", "ASORRCM297": "Unassigned", "ASORRCM388": "Unassigned", "APORRCM379": "Unassigned", "ASORRCM344": "Unassigned", "APORRCM195": "Unassigned", "ASORRCM288": "Unassigned", "ASORRCM334": "Unassigned", "ASORRCM294": "Unassigned", "APORRLT1701": "Unassigned", "A-PR-70": "Unassigned", "ASORRCM293": "Unassigned", "ASORRCM364": "Unassigned", "APORRCM380": "Unassigned", "APORRCM457": "Unassigned", "APORRCM455": "Unassigned", "APORRCM468": "Unassigned", "APORRSB250": "Unassigned", "APORRCM465": "Unassigned", "APORRCM464": "Unassigned", "APORRCM651": "Unassigned", "APORRSB220": "Unassigned", "APORRCM390": "Unassigned", "APORRSB270": "Unassigned", "APORRCM459": "Unassigned", "APORRCM466": "Unassigned", "APORRCM463": "Unassigned", "APORRCM447": "Unassigned", "APORRCM448": "Unassigned", "APORRCM212": "Unassigned", "APORRCM385": "Unassigned", "APORRCM461": "Unassigned", "APORRCM458": "Unassigned", "APORRCM456": "Unassigned", "APORRCM454": "Unassigned", "APORRCM470": "Unassigned", "101910015": "Unassigned", "NP-669": "Unassigned", "ASORRCM559": "Unassigned", "ASORRCM326": "Unassigned", "ASORRCM420": "Unassigned", "ASORRCM510": "Unassigned", "ASORRCM459": "Unassigned", "ASORRSP131": "Unassigned", "ASORRCM280": "Unassigned", "ASORRCM540": "Unassigned", "ASORRCM530": "Unassigned", "ASORRCM332": "Unassigned", "ASORRCM299": "Unassigned", "ASORRCM342": "Unassigned", "ASORRSB453": "Unassigned", "ASORRCM542": "Unassigned", "ASORRCM558": "Unassigned", "ASORRCM325": "Unassigned", "ASORRCM552": "Unassigned", "ASORRFD041": "Unassigned", "ASORRCM386": "Unassigned", "ASORRCM556": "Unassigned", "ASORRCM555": "Unassigned", "ASORRCM315": "Unassigned", "ASORRCM307": "Unassigned", "ASORRCM531": "Unassigned", "ASORRCM336": "Unassigned", "ASORRCM470": "Unassigned", "ASORRCM551": "Unassigned", "ASORRCM333": "Unassigned", "ASORRSB456": "Unassigned", "ASORRCM557": "Unassigned", "ASORRCM460": "Unassigned", "ASORRCM553": "Unassigned", "ASORRCM341": "Unassigned", "ASORRCM490": "Unassigned", "ASORRCM400": "Unassigned", "ASORRRD133": "Unassigned", "ASORRCM550": "Unassigned", "ASORRCM541": "Unassigned", "ASORRCM298": "Unassigned", "APORRSP050R": "Unassigned", "ABORRCM011": "Unassigned", "ABORRCM023": "Unassigned", "ABORRCM022": "Unassigned", "ABORRCM020": "Unassigned", "ABORRCM003": "Unassigned", "ABORRCM017": "Unassigned", "ABORRCM057": "Unassigned", "ABORRCM035": "Unassigned", "NP-627": "Unassigned", "AKORRJS040": "Unassigned", "AZORRCM032": "Unassigned", "AZORRCM040": "Unassigned", "AZORRCM036": "Unassigned", "AZORRCM039": "Unassigned", "AZORRCM012": "Unassigned", "AZORRCM006-N": "Unassigned", "AZORRCM035": "Unassigned", "AWORRCM017": "Unassigned", "PP-352": "Chemical Storage", "PP-353": "Chemical Storage", "PP-367": "Chemical Storage", "PP-399": "Chemical Storage", "PAP-355": "Chemical Storage", "PP-396": "Chemical Storage", "PP-448": "Chemical Storage", "PP-359": "General Storage", "PP-431": "Chemical Storage", "PP-432": "Chemical Storage", "PP-11038": "General Storage", "PP-16": "Chemical Storage", "PAP-003": "Chemical Storage", "PAP-021": "Chemical Storage", "PP-376": "Chemical Storage", "CLEAN-06": "Chemical Storage", "PP-394": "Chemical Storage", "CLEAN-07": "Chemical Storage", "PP-19": "Chemical Storage", "PP-435": "Chemical Storage", "PP-436": "Chemical Storage", "PP-368": "Chemical Storage", "PP-366": "Dry Storage", "PP-553": "Chemical Storage", "PAP-343": "Chemical Storage", "PP-358": "Chemical Storage", "PP-13": "Chemical Storage", "PP-395": "Chemical Storage", "PP-357": "Chemical Storage", "PAP-10087": "General Storage", "CLEAN-18": "Chemical Storage", "CLEAN-09": "Chemical Storage", "CLEAN-03": "Chemical Storage", "CLEAN-016": "Chemical Storage", "PP-11014": "Dry Storage", "PP-330": "General Storage", "PP-39": "Chemical Storage", "PP-148": "Chemical Storage", "PAP-353": "Chemical Storage", "PAP-10099": "Chemical Storage", "PP-04": "General Storage", "APORRCM324": "Chemical Storage", "PAP-354": "Chemical Storage", "PP-400": "Chemical Storage", "PP-110": "Chemical Storage", "PP-96": "General Storage", "PP-11050": "Chemical Storage", "PP-184": "Chemical Storage", "CLEAN-04": "Chemical Storage", "PP-387": "Chemical Storage", "PP-388": "Chemical Storage", "PP-389": "Chemical Storage", "CLEAN-05": "Chemical Storage", "PP-311": "Chemical Storage", "PP-307": "Chemical Storage", "PP-312": "Chemical Storage", "PP-306": "Chemical Storage", "PP-310": "Chemical Storage", "PP-308": "Chemical Storage", "PP-309": "Chemical Storage", "PP-68": "Chemical Storage", "PP-22": "Chemical Storage", "PAP-308": "Chemical Storage", "PAP-304": "Chemical Storage", "PAP-309": "Chemical Storage", "PAP-024": "Chemical Storage", "PAP-307": "Chemical Storage", "PAP-305": "Chemical Storage", "PAP-306": "Chemical Storage", "PAP-006": "Chemical Storage", "PP-424": "General Storage", "PP-360": "Chemical Storage", "PP-412": "Chemical Storage", "PP-449": "Chemical Storage", "PP-372": "Chemical Storage", "PP-351": "Chemical Storage", "PP-468": "Chemical Storage", "PP-398": "Chemical Storage", "PP-228": "Chemical Storage", "PP-371": "Chemical Storage", "CL-107": "Chemical Storage", "CL-118": "Chemical Storage", "CL-116": "Chemical Storage", "PP-11054": "Chemical Storage", "PP-381": "Chemical Storage", "PP-421": "General Storage", "PAP-379": "Chemical Storage", "CL-9014": "Chemical Storage", "PP-467": "Dry Storage", "NP-648": "Dry Storage", "NP-708": "Walk-in Chiller", "NP-717": "Dry Storage", "NP-715": "Dry Storage", "NP-687": "Dry Storage", "NP-721": "Dry Storage", "DG-5067": "Dry Storage", "NP-626": "Dry Storage", "NP-712": "Dry Storage", "NP-640": "Dry Storage", "NP-676": "Dry Storage", "NP-716": "Dry Storage", "NP-696": "Dry Storage", "NP-718": "Dry Storage", "NP-671": "Dry Storage", "DG-5096": "Dry Storage", "NP-660": "Dry Storage", "NP-680": "Dry Storage", "NP-684": "Dry Storage", "NP-59": "Dry Storage", "NP-644": "Dry Storage", "NP-667": "Dry Storage", "NP-713": "Dry Storage", "NP-602": "Dry Storage", "NP-729": "Dry Storage", "NP-646": "Dry Storage", "DS-72": "Dry Storage", "NP-607": "Dry Storage", "NP-577": "Dry Storage", "NP-576": "Dry Storage", "DG-5330": "Dry Storage", "NP-467": "General Storage", "NP-683": "Dry Storage", "NP-456": "Dry Storage", "NP-228": "Dry Storage", "NP-462": "Dry Storage", "NP-454": "Dry Storage", "NP-464": "Dry Storage", "NP-457": "Dry Storage", "NP-587": "Dry Storage", "NP-520": "Dry Storage", "NP-453": "Dry Storage", "NP-468": "Dry Storage", "NP-451": "Dry Storage", "NP-458": "General Storage", "NP-465": "Dry Storage", "NP-235": "Dry Storage", "NP-588": "Dry Storage", "NP-460": "Dry Storage", "NP-459": "Dry Storage", "NP-452": "Dry Storage", "DG-5034": "Dry Storage", "DG-5180": "Dry Storage", "NP-363": "Walk-in Chiller", "NP-429": "Dry Storage", "NP-681": "Dry Storage", "NP-705": "Dry Storage", "DS-80": "Dry Storage", "NP-659": "Dry Storage", "NP-549": "Dry Storage", "DG-5314": "Dry Storage", "NP-658": "Dry Storage", "NP-314": "Dry Storage", "NP-227": "Dry Storage", "NP-226": "Dry Storage", "DS-40": "Dry Storage", "DS-39": "Dry Storage", "DG-5119": "General Storage", "NP-362": "Dry Storage", "NP-183": "Dry Storage", "NP-320": "Dry Storage", "NP-172": "Dry Storage", "NP-89": "Dry Storage", "NP-197": "Dry Storage", "NP-463": "Dry Storage", "DG-5051": "Dry Storage", "NP-631": "Dry Storage", "NP-630": "Dry Storage", "NP-629": "Dry Storage", "NP-632": "Dry Storage", "DG-5068": "Dry Storage", "NP-701": "Dry Storage", "NP-633": "Dry Storage", "DS-41": "Dry Storage", "NP-785": "Dry Storage", "NP-642": "Dry Storage", "NP-654": "Dry Storage", "NP-685": "Dry Storage", "NP-688": "Dry Storage", "NP-597": "Dry Storage", "NP-645": "Dry Storage", "NP-727": "Dry Storage", "NP-653": "Dry Storage", "NP-656": "Dry Storage", "NP-655": "Dry Storage", "DG-5193": "Dry Storage", "BR-51": "General Storage", "NP-709": "Dry Storage", "NP-784": "Dry Storage", "NP-731": "Dry Storage", "DG-5094": "Dry Storage", "NP-682": "Dry Storage", "NP-598": "Dry Storage", "BEV-6009": "Dry Storage", "NP-663": "Dry Storage", "BEV-157": "Dry Storage", "NP-674": "Dry Storage", "NP-734": "Dry Storage", "NP-471": "Dry Storage", "NP-636": "Dry Storage", "NP-519": "Dry Storage", "DS-78": "Dry Storage", "NP-184": "Dry Storage", "NP-692": "Dry Storage", "NP-678": "Dry Storage", "NP-601": "Dry Storage", "NP-675": "Walk-in Chiller", "NP-444": "Walk-in Freezer", "NP-586": "General Storage", "NP-704": "Dry Storage", "NP-666": "Dry Storage", "NP-90": "Dry Storage", "NP-485": "Dry Storage", "NP-707": "Dry Storage", "DG-5091": "Dry Storage", "NP-670": "Dry Storage", "NP-719": "Dry Storage", "DS-68": "Dry Storage", "DS-73": "General Storage", "NP-92": "Dry Storage", "NP-310": "Dry Storage", "DS-79": "Dry Storage", "BEV-178": "Dry Storage", "DS-81": "Dry Storage", "NP-856": "Dry Storage", "NP-689": "Dry Storage", "NP-16": "Dry Storage", "PR-44": "Dry Storage", "PR-70": "Dry Storage", "PR-16": "Dry Storage", "PR-29": "Dry Storage", "DG-5133": "Dry Storage", "PR-86": "Dry Storage", "PR-45": "Dry Storage", "PR-63": "Dry Storage", "PR-82": "Dry Storage", "PR-14": "Dry Storage", "PR-204": "Dry Storage", "NP-229": "Dry Storage", "BEV-144": "Dry Storage", "NP-780": "Dry Storage", "NP-804": "Dry Storage", "NP-182": "Dry Storage", "BEV-61": "Dry Storage", "NP-461": "Dry Storage", "PP-333": "Dry Storage", "NP-849": "Dry Storage", "NP-616": "Dry Storage", "NP-529": "Dry Storage", "NP-886": "General Storage", "PP-260": "Dry Storage", "DG-5195": "Dry Storage", "BEV-155": "Dry Storage", "NP-672": "Dry Storage", "NP-840": "Dry Storage", "NP-472": "Dry Storage", "NP-368": "Dry Storage", "DG-5191": "Dry Storage", "BEV-161": "Dry Storage", "PP-374": "General Storage", "PP-375": "Dry Storage", "NP-908": "Dry Storage", "DG-125": "Walk-in Freezer", "DG-5293": "Dry Storage", "DG-5117": "Dry Storage", "PP-554": "Dry Storage", "NP-702": "Dry Storage", "PP-514": "Dry Storage", "DG-5137": "Dry Storage", "NP-612": "Dry Storage", "NP-122": "Dry Storage", "NP-38": "Dry Storage", "NP-695": "Dry Storage", "BEV-6058": "Dry Storage", "MEAT-39": "Walk-in Freezer", "MEAT-16": "Walk-in Freezer", "SEA-4026": "Walk-in Freezer", "SEA-18": "Front Line", "MEAT-49": "Walk-in Freezer", "MEAT-54": "Walk-in Freezer", "MEAT-52": "Walk-in Freezer", "MEAT-05": "Walk-in Chiller", "MEAT-13": "Walk-in Chiller", "MEAT-71": "Front Line", "MEAT-68": "Walk-in Freezer", "MEAT-69": "Walk-in Freezer", "NP-722": "Front Line", "NP-179": "Walk-in Chiller", "NP-75": "Front Line", "NP-315": "Walk-in Chiller", "NP-143": "Front Line", "NP-370": "Walk-in Freezer", "NP-86": "Walk-in Chiller", "NP-811": "Walk-in Chiller", "NP-610": "Walk-in Chiller", "NP-649": "Walk-in Chiller", "NP-650": "Walk-in Chiller", "NP-404": "Walk-in Chiller", "DR-7012": "Walk-in Chiller", "DR-7008": "Front Line", "NP-603": "Walk-in Chiller", "DR-7011": "Walk-in Chiller", "NP-639": "Walk-in Chiller", "NP-641": "Walk-in Chiller", "NP-699": "Walk-in Chiller", "NP-84": "Walk-in Chiller", "NP-608": "Walk-in Chiller", "NP-643": "Walk-in Chiller", "NP-196": "Walk-in Chiller", "NP-483": "Walk-in Chiller", "NP-725": "Walk-in Chiller", "NP-88": "Walk-in Chiller", "NP-415": "Walk-in Freezer", "NP-351": "Walk-in Freezer", "NP-677": "Walk-in Chiller", "SEA-218": "Walk-in Chiller", "PL-02": "Front Line", "PL-3015": "Walk-in Freezer", "BEV-86": "Walk-in Chiller", "BEV-118": "Walk-in Chiller", "PR-11": "Walk-in Chiller", "PR-100": "Walk-in Chiller", "PR-33": "Walk-in Chiller", "PR-110": "Walk-in Chiller", "PR-49": "Front Line", "DG-5089": "Walk-in Chiller", "NP-857": "Walk-in Chiller", "PR-126": "Walk-in Chiller", "PR-91": "Walk-in Chiller", "PR-38": "Walk-in Chiller", "PR-34": "Walk-in Chiller", "PR-61": "Walk-in Chiller", "APORRCM418": "Walk-in Chiller", "PR-17": "Walk-in Chiller", "PR-89": "Walk-in Chiller", "PR-51": "Walk-in Chiller", "PR-18": "Walk-in Chiller", "PR-114": "Walk-in Chiller", "PR-124": "Walk-in Chiller", "PR-40": "Walk-in Chiller", "PR-121": "Walk-in Chiller", "PR-48": "Walk-in Chiller", "PR-118": "Walk-in Chiller", "PR-19": "Walk-in Chiller", "PR-76": "Walk-in Chiller", "PR-60": "Walk-in Chiller", "PR-36": "Walk-in Chiller", "DR-7017": "Walk-in Chiller", "MEAT-53": "Walk-in Freezer", "PR-101": "Walk-in Chiller", "PR-146": "Walk-in Chiller", "PR-99": "Walk-in Chiller", "DG-0001": "Walk-in Chiller", "NP-915": "Walk-in Chiller", "PR-120": "Walk-in Chiller", "NP-372": "Walk-in Chiller", "ABORRCM047": "Walk-in Chiller", "NP-265": "Walk-in Chiller", "MEAT-2001": "Walk-in Freezer", "MEAT-2006": "Front Line", "MEAT-50": "Walk-in Freezer", "MEAT-08": "Walk-in Freezer", "MEAT-26": "Walk-in Freezer", "BR-12": "Walk-in Freezer", "BR-22": "Walk-in Freezer", "PL-13": "Walk-in Freezer", "NP-723": "Walk-in Freezer", "NP-726": "Walk-in Freezer", "BEV-119": "Walk-in Freezer", "PL-26": "Walk-in Freezer", "DS-16": "Walk-in Freezer", "SEA-31": "Front Line", "BR-50": "Walk-in Freezer", "BR-08": "Walk-in Freezer", "BR-48": "Walk-in Freezer", "BEV-102": "Walk-in Freezer", "FV-1049": "Walk-in Freezer", "FV-1089": "Walk-in Freezer", "SEA-13": "Front Line", "APORRCM131": "Walk-in Freezer", "NP-478": "Walk-in Freezer", "FV-1069": "Walk-in Freezer", "MEAT-07": "Walk-in Freezer", "NP-859": "Walk-in Freezer", "BEV-133": "Walk-in Freezer", "APORRAP041": "Walk-in Freezer", "APORRCM136": "Walk-in Freezer", "APORRCM207": "Front Line", "APORRCM063": "Walk-in Freezer", "APORRCM137": "Walk-in Freezer", "APORRCM129": "Walk-in Freezer", "APORRCM133": "Walk-in Freezer", "AKORRCM133": "Walk-in Freezer", "APORRCM288": "Front Line", "APORRCM135": "Walk-in Freezer", "APORRCM160": "Walk-in Freezer", "APORRCM140": "Walk-in Freezer", "APORRCM146": "Walk-in Freezer", "AKORRCM278": "Walk-in Freezer", "NP-796": "Walk-in Freezer", "NP-797": "Walk-in Freezer", "NP-798": "Walk-in Freezer", "ASORRCM212": "Walk-in Freezer", "ASORRCM195": "Walk-in Freezer", "SEA-28": "Walk-in Freezer", "FV-1087": "Walk-in Freezer", "NP-883": "Walk-in Freezer", "MEAT-97": "Walk-in Freezer", "NP-724": "Walk-in Freezer", "BEV-120": "Walk-in Freezer", "SEA-34": "Walk-in Freezer", "PL-28": "Walk-in Freezer", "APORRCM134": "Walk-in Freezer", "MEAT-11": "Walk-in Freezer", "DR-7013": "Walk-in Freezer", "MEAT-82": "Walk-in Freezer", "MEAT-73": "Walk-in Freezer", "MEAT-62": "Walk-in Freezer", "MEAT-55": "Walk-in Freezer", "BR-47": "Walk-in Freezer", "BR-37": "Walk-in Freezer", "AKORRCM320": "Walk-in Freezer", "PR-56": "Walk-in Freezer", "NP-781": "Walk-in Freezer", "BR-55": "Walk-in Freezer", "BEV-160": "Walk-in Freezer", "NP-909": "Walk-in Freezer", "NP-893": "Walk-in Freezer", "BR-65": "Walk-in Freezer", "NP-892": "Walk-in Freezer", "MEAT-101": "Walk-in Freezer", "DR-7052": "Front Line", "APORRAP0611": "General Storage", "APORRSB260": "Front Line", "NP-446": "General Storage", "NP-613": "General Storage", "APORRWH041": "General Storage", "APORRCM117": "General Storage", "APORRSB240": "General Storage", "APORRCM266": "General Storage", "APORRCM293": "General Storage", "APORRCM124": "General Storage", "APORRCM084": "General Storage", "APORRCM323": "General Storage", "APORRCM279": "General Storage", "APORRCM283": "General Storage", "APORRCM315": "General Storage", "APORRCK032": "General Storage", "APORRCM038": "General Storage", "APORRSB130": "General Storage", "APORRCM177": "General Storage", "APORRCM219": "General Storage", "APORRSB070": "General Storage", "APORRCM345": "General Storage", "APORRCM405": "General Storage", "APORRSB050": "General Storage", "APORRSB140A": "General Storage", "APORRCM346": "General Storage", "APORRCM327": "General Storage", "APORRCM404": "General Storage", "APORRCM298": "General Storage", "PP-469": "General Storage", "A-PR-01": "General Storage", "A-PR-43": "General Storage", "A-PR-78": "General Storage", "ASORRCM112": "General Storage", "A-PR-39": "General Storage", "A-PR-20": "General Storage", "A-PR-02": "General Storage", "A-PR-84": "General Storage", "A-PR-03": "General Storage", "A-PR-32": "General Storage", "A-PR-04": "General Storage", "A-PR-68": "General Storage", "ASORRCM173": "General Storage", "A-PR-79": "General Storage", "A-PR-50": "General Storage", "ASORRCM329": "General Storage", "A-PR-30": "General Storage", "A-PR-05": "General Storage", "A-PR-07": "General Storage", "A-PR-37": "General Storage", "A-PR-81": "General Storage", "A-PR-42": "General Storage", "A-PR-09": "General Storage", "A-PR-08": "General Storage", "A-PR-11": "General Storage", "A-PR-100": "General Storage", "A-PR-117": "General Storage", "A-PR-111": "General Storage", "A-PR-116": "General Storage", "A-PR-112": "General Storage", "A-PR-110": "General Storage", "A-PR-114": "General Storage", "A-PR-118": "General Storage", "A-PR-28": "General Storage", "A-PR-38": "General Storage", "A-PR-34": "General Storage", "A-PR-61": "General Storage", "A-PR-16": "General Storage", "A-PR-17": "General Storage", "A-PR-89": "General Storage", "A-PR-29": "General Storage", "A-PR-18": "General Storage", "A-PR-40": "General Storage", "ASORRCM240": "General Storage", "ASORRCM164": "General Storage", "A-PR-86": "General Storage", "A-SEA-18": "General Storage", "A-PR-64": "General Storage", "A-PR-63": "General Storage", "A-PR-19": "General Storage", "A-PR-60": "General Storage", "A-PR-14": "General Storage", "A-PR-36": "General Storage", "AFORRCM068": "General Storage", "ASORRCM271": "General Storage", "APORRCM319": "General Storage", "APORRCM318": "General Storage", "NP-558": "General Storage", "PAP-374": "General Storage", "PAP-373": "General Storage", "NP-486": "General Storage", "ASORRCM384": "General Storage", "ASORRSP041": "General Storage", "ASORRCM368": "General Storage", "ASORRCM227": "General Storage", "ASORRCM229": "General Storage", "ASORRCM178": "General Storage", "ASORRCM220": "General Storage", "ASORRCM261": "General Storage", "ASORRCM117": "General Storage", "ASORRCM231": "General Storage", "ASORRSP171A": "General Storage", "ASORRCM221": "General Storage", "ASORRCM243": "General Storage", "ASORRCM119": "General Storage", "ASORRCM260": "General Storage", "ASORRCB090": "General Storage", "ASORRSB133": "General Storage", "ASORRCM083": "General Storage", "ASORRJS061": "General Storage", "ASORRCM090": "General Storage", "ASORRCM109": "General Storage", "ASORRSB081": "General Storage", "ASORRFD081": "General Storage", "ASORRCM249": "General Storage", "ASORRCM235": "General Storage", "ASORRCM224": "General Storage", "ASORRCM042": "General Storage", "ASORRSB221": "General Storage", "ASORRCM238": "General Storage", "ASORRCM162": "General Storage", "ASORRSL011": "General Storage", "ASORRSB082": "General Storage", "ASORRCM256": "General Storage", "ASORRCM241": "General Storage", "ASORRSB241": "General Storage", "ASORRCM072": "General Storage", "ASORRCM244": "General Storage", "ASORRCM374": "General Storage", "ASORRSP151A": "General Storage", "ASORRSP080A": "General Storage", "ASORRSP161": "General Storage", "NP-800": "General Storage", "NP-377": "General Storage", "DG-5148": "General Storage", "NP-514": "General Storage", "PP-391": "General Storage", "PAP-273": "General Storage", "PAP-340": "General Storage", "PP-324": "General Storage", "PP-321": "General Storage", "A-MEAT-13-TRIM-COM": "General Storage", "PP-507": "General Storage", "NP-436": "General Storage", "PP-425": "General Storage", "PAP-383": "General Storage", "PP-549": "General Storage", "PAP-393": "General Storage", "PAP-392": "General Storage", "APORRCM491": "General Storage", "APORRCM495": "General Storage", "APORRCM493": "General Storage", "APORRCM486": "General Storage", "APORRCM496": "General Storage", "APORRCM490": "General Storage", "APORRCM494": "General Storage", "APORRCM492": "General Storage", "AKORRCM267": "General Storage", "AKORRCM272": "General Storage", "ASORRCM353": "General Storage", "PP-496": "General Storage", "PP-527": "General Storage", "ASORRCM118-B": "General Storage", "NP-861": "General Storage", "APORRCM391": "General Storage", "PP-326": "General Storage", "PP-325": "General Storage", "PAP-310": "General Storage", "PAP-311": "General Storage"};
+
+function fixItemLocations(){
+  if(!IS_SUPER_ADMIN){toast('Super Admin only','error');return;}
+  if(!confirm('This will update the location field of all matching items in shared/inv_items to match the Excel setup file. Continue?'))return;
+
+  var fixBtn=document.getElementById('btn-fix-locs');
+  if(fixBtn){fixBtn.textContent='⏳ Fixing…';fixBtn.disabled=true;}
+
+  db.ref('shared/inv_items').once('value', function(snap){
+    var raw=snap.val()||{};
+    var updates={};
+    var updated=0, skipped=0;
+
+    Object.keys(raw).forEach(function(key){
+      var item=raw[key];
+      if(!item||!item.code) return;
+      var newLoc=LOCATION_MAP[item.code];
+      if(newLoc && newLoc!==item.location){
+        updates['shared/inv_items/'+key+'/location']=newLoc;
+        updated++;
+      } else {
+        skipped++;
+      }
+    });
+
+    if(Object.keys(updates).length===0){
+      toast('All locations already up to date ('+skipped+' items)','success');
+      if(fixBtn){fixBtn.textContent='📍 Fix Item Locations';fixBtn.disabled=false;}
+      return;
+    }
+
+    db.ref().update(updates, function(err){
+      if(err){
+        toast('Error updating locations: '+err.message,'error');
+      } else {
+        toast('✅ Updated '+updated+' item locations ('+skipped+' unchanged)','success');
+      }
+      if(fixBtn){fixBtn.textContent='📍 Fix Item Locations';fixBtn.disabled=false;}
+    });
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// 📈 CROSS-BRANCH SALES COMPARISON (Super Admin)
+// ═══════════════════════════════════════════════════════════
+var _salesView = 'month'; // 'month' | 'week' | 'ytd'
+var _salesCompData = {}; // branchId -> {name, color, sales[]}
+
+function loadSalesComparison(){
+  if(!IS_SUPER_ADMIN) return;
+  var el=document.getElementById('sales-comp-dash');
+  if(!el) return;
+
+  // Get date ranges
+  var now=new Date();
+  function dsOf(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+  var todayStr=dsOf(now);
+  var mthPfx=todayStr.slice(0,7);
+  var dow=now.getDay();
+  var wkStart=new Date(now);wkStart.setDate(now.getDate()-dow);
+  var wkStartStr=dsOf(wkStart);
+  var cy=String(now.getFullYear());
+
+  db.ref('admin/branches').once('value', function(bSnap){
+    var branches=bSnap.val()||{};
+    var bList=Object.values(branches).filter(function(b){return b&&b.active!==false;});
+    if(!bList.length){el.innerHTML='<div style="color:var(--text3);font-size:12px;text-align:center;padding:20px">No active branches</div>';return;}
+
+    var pending=bList.length;
+    _salesCompData={};
+
+    bList.forEach(function(b){
+      db.ref('branches/'+b.id+'/sales').once('value', function(sSnap){
+        var raw=sSnap.val()||{};
+        var salesArr=[];
+        if(Array.isArray(raw)){
+          salesArr=raw.filter(Boolean);
+        } else {
+          Object.values(raw).forEach(function(v){if(v&&v.date)salesArr.push(v);});
+        }
+        _salesCompData[b.id]={name:b.name||b.id,color:b.color||'#f0a500',sales:salesArr,brand:b.brand||''};
+        pending--;
+        if(pending===0) renderSalesComparison();
+      });
+    });
+  });
+}
+
+function renderSalesComparison(){
+  var el=document.getElementById('sales-comp-dash');
+  if(!el) return;
+
+  var now=new Date();
+  function dsOf(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+  var todayStr=dsOf(now);
+  var mthPfx=todayStr.slice(0,7);
+  var dow=now.getDay();
+  var wkStart=new Date(now);wkStart.setDate(now.getDate()-dow);
+  var wkStartStr=dsOf(wkStart);
+  var cy=String(now.getFullYear());
+
+  var branches=Object.keys(_salesCompData);
+  if(!branches.length){el.innerHTML='<div style="color:var(--text3);font-size:12px;text-align:center;padding:20px">No data</div>';return;}
+
+  // Compute totals per branch for current view
+  var totals=[];
+  branches.forEach(function(bid){
+    var d=_salesCompData[bid];
+    var actual=0, target=0;
+    d.sales.forEach(function(e){
+      if(!e||!e.date)return;
+      var a=parseFloat(e.actual)||0, t=parseFloat(e.target)||0;
+      if(_salesView==='month'&&e.date.indexOf(mthPfx)===0){actual+=a;target+=t;}
+      else if(_salesView==='week'&&e.date>=wkStartStr&&e.date<=todayStr){actual+=a;target+=t;}
+      else if(_salesView==='ytd'&&e.date.slice(0,4)===cy){actual+=a;target+=t;}
+    });
+    totals.push({bid:bid,name:d.name,color:d.color,brand:d.brand,actual:actual,target:target});
+  });
+
+  // Sort by actual desc
+  totals.sort(function(a,b){return b.actual-a.actual;});
+  var maxVal=Math.max.apply(null,totals.map(function(t){return t.actual;}))||1;
+
+  function fsar(n){
+    if(n>=1000000)return 'SAR '+(n/1000000).toFixed(2)+'M';
+    if(n>=1000)return 'SAR '+(n/1000).toFixed(1)+'K';
+    return 'SAR '+n.toFixed(0);
+  }
+
+  // Label for current view
+  var viewLabel = _salesView==='month'?mthPfx.replace('-',' / ') : _salesView==='week'?'This Week':'YTD '+cy;
+
+  // Build KPI row + bar chart
+  var kpiHtml='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;margin-bottom:16px">';
+  var grandTotal=0;
+  totals.forEach(function(t){grandTotal+=t.actual;});
+
+  totals.forEach(function(t, i){
+    var share=grandTotal>0?(t.actual/grandTotal*100).toFixed(1):0;
+    var pctTarget=t.target>0?(t.actual/t.target*100).toFixed(1):null;
+    kpiHtml+='<div style="background:var(--bg3);border:1px solid var(--bd);border-radius:10px;padding:12px;border-left:3px solid '+t.color+'">'
+      +'<div style="font-size:10px;font-weight:700;color:var(--text2);margin-bottom:4px">'+(i===0?'🏆 ':'')+t.name+'</div>'
+      +'<div style="font-size:16px;font-weight:800;color:'+t.color+';font-family:var(--mono)">'+fsar(t.actual)+'</div>'
+      +'<div style="font-size:9px;color:var(--text3);margin-top:3px">'+(pctTarget?pctTarget+'% of target · ':'')+'Share: '+share+'%</div>'
+      +'<div style="height:4px;background:var(--bg2);border-radius:99px;margin-top:6px;overflow:hidden">'
+        +'<div style="height:100%;width:'+(t.actual/maxVal*100).toFixed(1)+'%;background:'+t.color+';border-radius:99px"></div>'
+      +'</div>'
+    +'</div>';
+  });
+  kpiHtml+='</div>';
+
+  // Bar chart — last 30 days across all branches
+  var last30Days=[];
+  for(var i=29;i>=0;i--){var d=new Date(now.getTime()-i*86400000);last30Days.push({ds:dsOf(d),byBranch:{}});}
+  
+  totals.forEach(function(t){
+    _salesCompData[t.bid].sales.forEach(function(e){
+      if(!e||!e.date)return;
+      var idx=last30Days.findIndex(function(d){return d.ds===e.date;});
+      if(idx>=0){last30Days[idx].byBranch[t.bid]=(last30Days[idx].byBranch[t.bid]||0)+(parseFloat(e.actual)||0);}
+    });
+  });
+
+  var allDayVals=last30Days.map(function(d){return Object.values(d.byBranch).reduce(function(s,v){return s+v;},0);});
+  var maxDay=Math.max.apply(null,allDayVals)||1;
+
+  // Stacked mini bars
+  var chartHtml='<div style="margin-top:4px">'
+    +'<div style="font-size:10px;font-weight:700;color:var(--text2);margin-bottom:8px">Daily Sales — Last 30 Days</div>'
+    +'<div style="display:flex;align-items:flex-end;gap:2px;height:80px">';
+  
+  last30Days.forEach(function(day, i){
+    var total=allDayVals[i];
+    var pct=total/maxDay;
+    var isToday=day.ds===todayStr;
+    var stackHtml='';
+    var yOff=0;
+    totals.forEach(function(t){
+      var v=day.byBranch[t.bid]||0;
+      var h=(v/maxDay*80).toFixed(1);
+      if(v>0)stackHtml='<div style="width:100%;height:'+h+'px;background:'+t.color+';flex-shrink:0"></div>'+stackHtml;
+    });
+    chartHtml+='<div style="flex:1;display:flex;flex-direction:column;align-items:center;position:relative" title="'+day.ds+'\n'+fsar(total)+'">'
+      +'<div style="width:100%;display:flex;flex-direction:column;justify-content:flex-end;height:80px;border-radius:2px 2px 0 0;overflow:hidden;'+(isToday?'outline:2px solid var(--acc);outline-offset:1px':'')+'">'
+        +stackHtml
+      +'</div>'
+    +'</div>';
+  });
+  chartHtml+='</div>';
+
+  // X-axis labels every 5 days
+  chartHtml+='<div style="display:flex;gap:2px;margin-top:4px">';
+  last30Days.forEach(function(day,i){
+    var show=(i%5===0||i===29);
+    chartHtml+='<div style="flex:1;font-size:8px;color:var(--text3);font-family:var(--mono);text-align:center;overflow:hidden">'+(show?day.ds.slice(5):'')+'</div>';
+  });
+  chartHtml+='</div>';
+
+  // Legend
+  var legendHtml='<div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:10px">';
+  totals.forEach(function(t){
+    legendHtml+='<div style="display:flex;align-items:center;gap:5px">'
+      +'<div style="width:10px;height:10px;border-radius:2px;background:'+t.color+'"></div>'
+      +'<div style="font-size:10px;color:var(--text2)">'+t.name+'</div>'
+    +'</div>';
+  });
+  legendHtml+='</div></div>';
+
+  // Grand total
+  var summaryHtml='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">'
+    +'<div style="font-size:11px;color:var(--text3)">Period: <span style="color:var(--text2);font-weight:700">'+viewLabel+'</span></div>'
+    +'<div style="font-size:13px;font-weight:800;color:var(--acc);font-family:var(--mono)">Total: '+fsar(grandTotal)+'</div>'
+  +'</div>';
+
+  el.innerHTML = summaryHtml + kpiHtml + chartHtml + legendHtml;
+
+  // Wire view toggle buttons
+  setTimeout(function(){
+    ['month','week','ytd'].forEach(function(v){
+      var b=document.getElementById('sales-view-'+v);
+      if(!b)return;
+      b.style.background=_salesView===v?'rgba(240,165,0,.15)':'transparent';
+      b.style.borderColor=_salesView===v?'var(--acc)':'var(--bd)';
+      b.style.color=_salesView===v?'var(--acc)':'var(--text3)';
+      b.onclick=function(){
+        _salesView=v;
+        renderSalesComparison();
+        // re-wire all buttons
+        ['month','week','ytd'].forEach(function(vv){
+          var bb=document.getElementById('sales-view-'+vv);
+          if(!bb)return;
+          bb.style.background=_salesView===vv?'rgba(240,165,0,.15)':'transparent';
+          bb.style.borderColor=_salesView===vv?'var(--acc)':'var(--bd)';
+          bb.style.color=_salesView===vv?'var(--acc)':'var(--text3)';
+        });
+      };
+    });
+  },50);
 }
 
 window.onload = function(){
