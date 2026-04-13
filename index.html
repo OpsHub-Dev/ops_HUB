@@ -346,7 +346,7 @@ select.fi-s option{background:var(--select-opt-bg);color:var(--text)}
 .pb.act{background:var(--acc);color:#000;border-color:var(--acc)}
 
 /* ══ MODALS ══ */
-#mo{position:fixed;inset:0;background:var(--overlay-bg);z-index:500;display:none;align-items:center;justify-content:center;backdrop-filter:blur(8px)}
+#mo{position:fixed;inset:0;background:var(--overlay-bg);z-index:300;display:none;align-items:center;justify-content:center;backdrop-filter:blur(8px)}
 #mo.show{display:flex}
 #mb{
   background:var(--modal-bg);
@@ -892,19 +892,14 @@ select.fi-s option{background:var(--select-opt-bg);color:var(--text)}
       <div class="fr" style="margin-bottom:10px">
         <div class="fg"><label>UoM</label><input id="f-uom" value="EA"></div>
         <div class="fg"><label>Location</label>
-          <div style="display:flex;gap:6px;align-items:center">
-            <select id="f-loc" style="flex:1"></select>
-            <button type="button" class="btn sm" onclick="openSubModal(openAddLocationModal)" style="flex-shrink:0;white-space:nowrap;padding:6px 10px">+ New</button>
-            <button type="button" class="btn sm d" onclick="openSubModal(openDeleteLocationModal)" style="flex-shrink:0;padding:6px 10px">🗑</button>
-          </div>
+          <select id="f-loc"><option>Dry Storage</option><option>Paper &amp; Chemical</option><option>Freezer</option><option>Fridge</option></select>
         </div>
       </div>
       <div class="fr" style="margin-bottom:10px">
         <div class="fg"><label>Supplier</label>
           <div style="display:flex;gap:6px;align-items:center">
             <select id="f-sup" style="flex:1"></select>
-            <button type="button" class="btn sm" onclick="openSubModal(function(){openAddSupplierModal();setTimeout(function(){populateItemModalSupplier();},300);})" style="flex-shrink:0;white-space:nowrap;padding:6px 10px">+ New</button>
-            <button type="button" class="btn sm d" onclick="openSubModal(openDeleteSupplierModal)" style="flex-shrink:0;padding:6px 10px">🗑</button>
+            <button type="button" class="btn sm" onclick="openAddSupplierModal();setTimeout(function(){populateItemModalSupplier();},300);" title="Add new supplier" style="flex-shrink:0;white-space:nowrap;padding:6px 10px">+ New</button>
           </div>
         </div>
         <div class="fg"><label>Min Level</label><input id="f-min" type="number" min="0" value="0"></div>
@@ -3854,6 +3849,52 @@ function pInvDash(){
   var mChg=lmA>0?((tA-lmA)/lmA*100).toFixed(1):null;
   var wChg=lastWk>0?((thisWk-lastWk)/lastWk*100).toFixed(1):null;
 
+  // ── FOOD COST CALCULATION ──────────────────────────────────
+  var _bc2=S._branchConfig||{};
+  var fcTarget=parseFloat(_bc2.fcTarget)||30;
+
+  // Food invoices this month + last month
+  var foodSpendMonth=0,foodSpendLM=0;
+  S.invoices.forEach(function(inv){
+    if(!inv.invoiceDate)return;
+    var a=parseFloat(inv.amount)||0;
+    var isFood=(inv.category==='Food & Beverage')||(inv.category&&inv.category.toLowerCase().indexOf('food')>=0);
+    if(!isFood)return;
+    if(inv.invoiceDate.indexOf(tm)===0)foodSpendMonth+=a;
+    if(inv.invoiceDate.indexOf(lm)===0)foodSpendLM+=a;
+  });
+  // Wastage this month + last month
+  var wasteMonth=0,wasteLM=0;
+  S.waste.forEach(function(w){
+    if(!w.date)return;
+    if(w.date.indexOf(tm)===0)wasteMonth+=(+w.value||0);
+    if(w.date.indexOf(lm)===0)wasteLM+=(+w.value||0);
+  });
+  var totalFCMonth=foodSpendMonth+wasteMonth;
+  var totalFCLM=foodSpendLM+wasteLM;
+  var fcPct=tA>0?(totalFCMonth/tA*100):0;
+  var fcPctLM=lmA>0?(totalFCLM/lmA*100):0;
+  var fcDelta=fcPctLM>0?(fcPct-fcPctLM):null;
+  var fcOk=fcPct>0&&fcPct<=fcTarget;
+  var fcHigh=fcPct>fcTarget&&fcPct<=fcTarget*1.1;
+  var fcColor=fcPct===0?'var(--text3)':fcOk?'var(--grn)':fcHigh?'var(--gold)':'var(--red)';
+
+  // 3-month trend
+  var fcMonths=[];
+  for(var _mi=2;_mi>=0;_mi--){
+    var _mpfx=mthKey(-_mi);
+    var _ms=0,_mv=0,_mw=0;
+    S.invoices.forEach(function(inv){
+      if(!inv.invoiceDate||inv.invoiceDate.indexOf(_mpfx)!==0)return;
+      var isFood=(inv.category==='Food & Beverage')||(inv.category&&inv.category.toLowerCase().indexOf('food')>=0);
+      if(isFood)_ms+=(parseFloat(inv.amount)||0);
+    });
+    S.sales.forEach(function(e){if(e.date&&e.date.indexOf(_mpfx)===0)_mv+=(+e.actual||0);});
+    S.waste.forEach(function(w){if(w.date&&w.date.indexOf(_mpfx)===0)_mw+=(+w.value||0);});
+    var _mpct=_mv>0?((_ms+_mw)/_mv*100):0;
+    fcMonths.push({pfx:_mpfx,pct:_mpct,spend:_ms+_mw,sales:_mv});
+  }
+
   var pn=S.rem.filter(function(r){return !r.done;}).sort(function(a,b){return new Date(a.date)-new Date(b.date);});
   var hExp=0,hSoon=0,hOk=0,hExpList=[];
   S.health.forEach(function(h2){
@@ -3896,6 +3937,84 @@ function pInvDash(){
   // Stock Value
   h+='<div class="sc" style="'+(hExp>0?'border-color:rgba(248,81,73,.2)':'')+'"><div class="sc-lbl">Stock Value</div><div class="sc-val cb" style="font-size:28px;font-weight:300">'+Math.round(value).toLocaleString()+'</div><div class="sc-sub">SAR · '+(hExp>0?'<span style="color:var(--red)">'+hExp+' cards expired</span>':'0 cards expired')+'</div></div>';
   h+='</div>';
+
+  // ── FOOD COST PANEL ─────────────────────────────────────
+  h+='<div class="card" style="padding:16px;margin-bottom:10px">';
+  // Header row
+  h+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">';
+  h+='<div style="display:flex;align-items:center;gap:10px">';
+  h+='<span style="font-size:13px;font-weight:700">🍽️ Food Cost</span>';
+  h+='<span style="font-size:10px;background:var(--bg2);border:1px solid var(--bd);border-radius:20px;padding:2px 8px;color:var(--text3);font-family:var(--mono)">'+tm+'</span>';
+  if(fcDelta!==null){var fcUp=fcDelta>0;h+='<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:'+(fcUp?'rgba(239,68,68,.1)':'rgba(52,211,153,.1)')+';color:'+(fcUp?'var(--red)':'var(--grn)')+'">'+(fcUp?'▲':'▼')+Math.abs(fcDelta).toFixed(1)+'% vs last mo</span>';}
+  h+='</div>';
+  h+='<button class="btn sm s" onclick="openFoodCostTargetModal()" style="font-size:10px">⚙️ Target: '+fcTarget+'%</button>';
+  h+='</div>';
+
+  // 3-column layout: gauge | breakdown | trend
+  h+='<div style="display:grid;grid-template-columns:auto 1fr auto;gap:16px;align-items:start">';
+
+  // LEFT: SVG gauge
+  var _gr=44,_gc=2*Math.PI*_gr;
+  var _gFill=Math.min(100,fcPct)/100;
+  h+='<div style="display:flex;flex-direction:column;align-items:center;gap:6px">';
+  h+='<svg width="110" height="110" viewBox="0 0 110 110">';
+  h+='<circle cx="55" cy="55" r="'+_gr+'" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="10"/>';
+  var _tFill=(Math.min(100,fcTarget)/100)*_gc;
+  h+='<circle cx="55" cy="55" r="'+_gr+'" fill="none" stroke="rgba(240,165,0,.2)" stroke-width="10" stroke-dasharray="'+_tFill.toFixed(1)+' '+_gc.toFixed(1)+'" stroke-dashoffset="'+(_gc/4).toFixed(1)+'" stroke-linecap="round"/>';
+  if(fcPct>0){var _aFill=_gFill*_gc;h+='<circle cx="55" cy="55" r="'+_gr+'" fill="none" stroke="'+fcColor+'" stroke-width="10" stroke-dasharray="'+_aFill.toFixed(1)+' '+_gc.toFixed(1)+'" stroke-dashoffset="'+(_gc/4).toFixed(1)+'" stroke-linecap="round"/>';}
+  h+='<text x="55" y="50" text-anchor="middle" fill="'+fcColor+'" font-size="18" font-weight="800" font-family="var(--mono)">'+fcPct.toFixed(1)+'%</text>';
+  h+='<text x="55" y="65" text-anchor="middle" fill="rgba(255,255,255,.4)" font-size="9" font-family="var(--mono)">FOOD COST</text>';
+  h+='</svg>';
+  var _sLbl=fcPct===0?'No Data':fcOk?'✅ On Track':fcHigh?'⚠️ Caution':'🔴 Over Target';
+  var _sBg=fcPct===0?'rgba(255,255,255,.06)':fcOk?'rgba(52,211,153,.12)':fcHigh?'rgba(240,165,0,.12)':'rgba(239,68,68,.12)';
+  h+='<div style="font-size:9px;font-weight:700;padding:3px 10px;border-radius:20px;background:'+_sBg+';color:'+fcColor+'">'+_sLbl+'</div>';
+  h+='</div>';
+
+  // CENTER: Breakdown cards
+  h+='<div style="display:flex;flex-direction:column;gap:8px">';
+  h+='<div style="background:var(--bg2);border:1px solid var(--bd);border-radius:9px;padding:11px 13px">';
+  h+='<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;font-family:var(--mono)">Food Invoices This Month</div>';
+  h+='<div style="font-size:16px;font-weight:700;color:var(--text);font-family:var(--mono)">'+fsar(foodSpendMonth)+'</div>';
+  h+='<div style="font-size:9px;color:var(--text3);margin-top:2px">'+(tA>0?(foodSpendMonth/tA*100).toFixed(1)+'% of sales':'No sales recorded')+'</div>';
+  h+='</div>';
+  h+='<div style="background:var(--bg2);border:1px solid var(--bd);border-radius:9px;padding:11px 13px">';
+  h+='<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;font-family:var(--mono)">Wastage This Month</div>';
+  h+='<div style="font-size:16px;font-weight:700;color:'+(wasteMonth>0?'var(--red)':'var(--text)')+';font-family:var(--mono)">'+fsar(wasteMonth)+'</div>';
+  h+='<div style="font-size:9px;color:var(--text3);margin-top:2px">'+(tA>0?(wasteMonth/tA*100).toFixed(1)+'% of sales':'—')+'</div>';
+  h+='</div>';
+  h+='<div style="background:var(--bg2);border:1px solid var(--bd);border-radius:9px;padding:11px 13px">';
+  h+='<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;font-family:var(--mono)">Total Food Cost vs Sales</div>';
+  h+='<div style="display:flex;align-items:baseline;gap:6px"><div style="font-size:16px;font-weight:700;color:'+fcColor+';font-family:var(--mono)">'+fsar(totalFCMonth)+'</div><div style="font-size:10px;color:var(--text3)">/ '+fsar(tA)+' sales</div></div>';
+  h+='<div style="height:5px;background:var(--bg3);border-radius:99px;overflow:hidden;margin-top:7px"><div style="height:100%;width:'+Math.min(100,fcPct).toFixed(1)+'%;background:'+fcColor+';border-radius:99px"></div></div>';
+  h+='<div style="display:flex;justify-content:space-between;font-size:8px;color:var(--text3);margin-top:3px;font-family:var(--mono)"><span>0%</span><span style="color:var(--gold)">Target '+fcTarget+'%</span><span>100%</span></div>';
+  h+='</div>';
+  h+='</div>';
+
+  // RIGHT: 3-month trend bars
+  h+='<div style="display:flex;flex-direction:column;gap:6px;min-width:120px">';
+  h+='<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;font-family:var(--mono)">3-Month Trend</div>';
+  var _maxFC=Math.max(fcTarget*1.2,Math.max.apply(null,fcMonths.map(function(m){return m.pct;}))||1);
+  var _mNames=['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  fcMonths.forEach(function(m,i){
+    var _isCur=(i===2);
+    var _bW=_maxFC>0?Math.max(4,m.pct/_maxFC*100):0;
+    var _bCol=m.pct===0?'rgba(255,255,255,.1)':m.pct<=fcTarget?'var(--grn)':m.pct<=fcTarget*1.1?'var(--gold)':'var(--red)';
+    var _mLbl=_mNames[parseInt(m.pfx.slice(5))]||m.pfx.slice(5);
+    var _tX=(fcTarget/_maxFC*100).toFixed(1);
+    h+='<div style="display:flex;align-items:center;gap:8px">';
+    h+='<div style="font-size:9px;color:'+(  _isCur?'var(--text)':'var(--text3)')+';font-family:var(--mono);width:26px;text-align:right;font-weight:'+(_isCur?'700':'400')+'">'+_mLbl+'</div>';
+    h+='<div style="flex:1;height:16px;background:var(--bg2);border-radius:4px;overflow:hidden;position:relative">';
+    h+='<div style="position:absolute;top:0;left:0;height:100%;width:'+_bW.toFixed(1)+'%;background:'+_bCol+';border-radius:4px"></div>';
+    h+='<div style="position:absolute;top:0;left:'+_tX+'%;height:100%;width:1.5px;background:rgba(240,165,0,.5)"></div>';
+    h+='</div>';
+    h+='<div style="font-size:9px;font-family:var(--mono);color:'+(m.pct===0?'var(--text3)':_bCol)+';width:34px;text-align:right;font-weight:700">'+(m.pct>0?m.pct.toFixed(1)+'%':'—')+'</div>';
+    h+='</div>';
+  });
+  h+='<div style="margin-top:6px;display:flex;align-items:center;gap:4px;font-size:8px;color:var(--text3)"><div style="width:12px;height:1.5px;background:rgba(240,165,0,.5)"></div><span>Target '+fcTarget+'%</span></div>';
+  h+='</div>';
+
+  h+='</div>'; // end grid
+  h+='</div>'; // end card
 
   // ── ROW 3: Branch Capacity (Tables & Seats) — editable per branch ──
   var _bc=S._branchConfig||{};
@@ -5403,14 +5522,13 @@ function openItemModal(code){
   var isEdit=!!code;
   document.getElementById('item-modal-t').textContent=isEdit?'Edit Product':'Add New Product';
   document.getElementById('edit-orig').value=code||'';
-  populateItemModalSupplier('');
-  populateItemModalLocation('');
+  populateItemModalSupplier(''); // populate first
   if(isEdit){
     var it=findItem(code);if(!it)return;
     document.getElementById('f-code').value=it.code;
     document.getElementById('f-name').value=it.name;
     document.getElementById('f-uom').value=it.unit;
-    populateItemModalLocation(it.location);
+    document.getElementById('f-loc').value=it.location;
     document.getElementById('f-min').value=it.min;
     document.getElementById('f-price').value=it.price;
     document.getElementById('f-qty').value=it.qty;
@@ -5419,7 +5537,7 @@ function openItemModal(code){
   } else {
     ['f-code','f-name','f-min','f-price','f-qty'].forEach(function(id){document.getElementById(id).value='';});
     document.getElementById('f-uom').value='EA';
-    populateItemModalLocation('Dry Storage');
+    document.getElementById('f-loc').value='Dry Storage';
     document.getElementById('f-qty').disabled=false;
   }
   document.getElementById('item-modal').classList.remove('hide');
@@ -5522,139 +5640,6 @@ function openAddSupplierModal(){
   toast('Supplier "'+name+'" added ✓','success');
 }
 
-// ── Sub-modal helper: hides item modal so om() appears on top ─
-function openSubModal(fn){
-  var itemM=document.getElementById('item-modal');
-  var orderM=document.getElementById('order-modal');
-  var wasItem=itemM&&!itemM.classList.contains('hide');
-  var wasOrder=orderM&&!orderM.classList.contains('hide');
-  if(wasItem)itemM.classList.add('hide');
-  if(wasOrder)orderM.classList.add('hide');
-  var _origCm=window.cm;
-  window.cm=function(){
-    window.cm=_origCm;
-    _origCm();
-    if(wasItem)itemM.classList.remove('hide');
-    if(wasOrder)orderM.classList.remove('hide');
-  };
-  fn();
-}
-
-// ── Location Management ──────────────────────────────────────
-var DEFAULT_LOCATIONS=['Dry Storage','Beverage Storage','Production Cooler','Walk-in Chiller','Walk-in Freezer','Chemical Storage','Small Wares','Front Line','General Storage','Unassigned'];
-
-function getLocations(){
-  if(S.locations&&S.locations.length)return S.locations;
-  return DEFAULT_LOCATIONS.slice();
-}
-
-function loadLocations(){
-  if(!db)return;
-  db.ref(bPath('locations')).on('value',function(snap){
-    var v=snap.val();
-    S.locations=(v&&Array.isArray(v))?v:DEFAULT_LOCATIONS.slice();
-    populateItemModalLocation();
-  });
-}
-
-function populateItemModalLocation(selectVal){
-  var el=document.getElementById('f-loc');
-  if(!el)return;
-  var cur=selectVal!==undefined?selectVal:el.value;
-  el.innerHTML='';
-  getLocations().slice().sort().forEach(function(l){
-    var o=document.createElement('option');
-    o.value=l;o.textContent=l;
-    if(l===cur)o.selected=true;
-    el.appendChild(o);
-  });
-  // If nothing matched, select first option
-  if(!el.value&&el.options.length)el.selectedIndex=0;
-}
-
-function openAddLocationModal(){
-  om('➕ Add New Location',
-    '<div style="display:flex;flex-direction:column;gap:14px;padding:4px 0">'    +'<div class="fg"><label>Location Name *</label>'    +'<input id="new-loc-inp" placeholder="e.g. Prep Room" style="width:100%"></div>'    +'<div class="mfoot" style="margin-top:4px;padding-top:12px;border-top:1px solid var(--bd)">'    +'<button class="btn s" onclick="cm()">Cancel</button>'    +'<button class="btn" onclick="confirmAddLocation()">Add Location</button>'    +'</div></div>',null);
-  setTimeout(function(){var el=document.getElementById('new-loc-inp');if(el){el.focus();}},80);
-}
-
-function confirmAddLocation(){
-  var inp=document.getElementById('new-loc-inp');
-  var name=(inp?inp.value:'').trim();
-  if(!name){toast('Enter a location name','w');return;}
-  if(!S.locations)S.locations=getLocations().slice();
-  if(S.locations.indexOf(name)>=0){toast('Location already exists','w');return;}
-  S.locations.push(name);
-  if(db)db.ref(bPath('locations')).set(S.locations);
-  cm();
-  setTimeout(function(){populateItemModalLocation(name);},50);
-  toast('"'+name+'" added ✓','success');
-}
-
-function openDeleteLocationModal(){
-  var locs=getLocations().slice().sort();
-  if(!locs.length){toast('No locations','w');return;}
-  var cur=(document.getElementById('f-loc')||{}).value||'';
-  var opts=locs.map(function(l){return '<option value="'+xe(l)+'"'+(l===cur?' selected':'')+'>'+xe(l)+'</option>';}).join('');
-  om('🗑 Delete Location',
-    '<div style="display:flex;flex-direction:column;gap:14px;padding:4px 0">'    +'<div class="fg"><label>Select Location to Delete</label>'    +'<select id="del-loc-sel" style="width:100%"><option value="">— Choose —</option>'+opts+'</select></div>'    +'<div style="font-size:11px;color:var(--red);background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:8px;padding:10px">'    +'⚠️ Items in this location will be moved to <strong>Dry Storage</strong>.'    +'</div>'    +'<div class="mfoot" style="margin-top:4px;padding-top:12px;border-top:1px solid var(--bd)">'    +'<button class="btn s" onclick="cm()">Cancel</button>'    +'<button class="btn d" onclick="confirmDeleteLocation()">Delete</button>'    +'</div></div>',null);
-}
-
-function confirmDeleteLocation(){
-  var sel=document.getElementById('del-loc-sel');
-  if(!sel||!sel.value){toast('Select a location','w');return;}
-  var name=sel.value;
-  if(!S.locations)S.locations=getLocations().slice();
-  var i=S.locations.indexOf(name);
-  if(i<0){toast('Not found','error');return;}
-  S.locations.splice(i,1);
-  if(db)db.ref(bPath('locations')).set(S.locations);
-  var fallback=S.locations.indexOf('Dry Storage')>=0?'Dry Storage':(S.locations[0]||'Dry Storage');
-  var updates={};
-  items.forEach(function(it){
-    if(it.location===name){
-      it.location=fallback;
-      updates['shared/inv_items/'+String(it.code).replace(/[.#$\[\]\/]/g,'_')+'/location']=fallback;
-    }
-  });
-  if(db&&Object.keys(updates).length)db.ref().update(updates);
-  cm();
-  setTimeout(function(){populateItemModalLocation(fallback);},50);
-  toast('"'+name+'" deleted — items moved to "'+fallback+'"','success');
-}
-
-// ── Delete Supplier ──────────────────────────────────────────
-function openDeleteSupplierModal(){
-  var sups=getSuppliers().slice().sort();
-  if(!sups.length){toast('No suppliers','w');return;}
-  var cur=(document.getElementById('f-sup')||{}).value||'';
-  var opts=sups.map(function(s){return '<option value="'+xe(s)+'"'+(s===cur?' selected':'')+'>'+xe(s)+'</option>';}).join('');
-  om('🗑 Delete Supplier',
-    '<div style="display:flex;flex-direction:column;gap:14px;padding:4px 0">'    +'<div class="fg"><label>Select Supplier to Delete</label>'    +'<select id="del-sup-sel" style="width:100%"><option value="">— Choose —</option>'+opts+'</select></div>'    +'<div style="font-size:11px;color:var(--red);background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:8px;padding:10px">'    +'⚠️ Items linked to this supplier will have their supplier cleared.'    +'</div>'    +'<div class="mfoot" style="margin-top:4px;padding-top:12px;border-top:1px solid var(--bd)">'    +'<button class="btn s" onclick="cm()">Cancel</button>'    +'<button class="btn d" onclick="confirmDeleteSupplier()">Delete</button>'    +'</div></div>',null);
-}
-
-function confirmDeleteSupplier(){
-  var sel=document.getElementById('del-sup-sel');
-  if(!sel||!sel.value){toast('Select a supplier','w');return;}
-  var name=sel.value;
-  if(!S.suppliers)S.suppliers=getSuppliers().slice();
-  var i=S.suppliers.indexOf(name);
-  if(i<0){toast('Not found','error');return;}
-  S.suppliers.splice(i,1);
-  if(db)db.ref(bPath('suppliers')).set(S.suppliers);
-  var updates={};
-  items.forEach(function(it){
-    if(it.supplier===name){
-      it.supplier='';
-      updates['shared/inv_items/'+String(it.code).replace(/[.#$\[\]\/]/g,'_')+'/supplier']='';
-    }
-  });
-  if(db&&Object.keys(updates).length)db.ref().update(updates);
-  populateSupplierSelect();
-  cm();
-  toast('"'+name+'" deleted','success');
-}
-
 function loadSuppliers(){
   if(!db)return;
   db.ref(bPath('suppliers')).on('value',function(snap){
@@ -5679,6 +5664,22 @@ function saveBranchConfig(cfg){
     if(!err){S._branchConfig=Object.assign(S._branchConfig||{},cfg);toast('Saved ✓','success');}
     else toast('Save error','error');
   });
+}
+
+function openFoodCostTargetModal(){
+  var cfg=S._branchConfig||{};
+  var cur=parseFloat(cfg.fcTarget)||30;
+  om('⚙️ Food Cost Target',
+    '<div style="display:flex;flex-direction:column;gap:16px;padding:4px 0">'    +'<div style="font-size:12px;color:var(--text3);background:var(--bg2);border-radius:8px;padding:10px 12px">'    +'Set the monthly food cost target % for this branch. Dashboard gauge shows green / amber / red based on this target.'    +'</div>'    +'<div class="fg"><label>Food Cost Target (%)</label>'    +'<input id="fc-target-inp" type="number" min="1" max="100" step="0.5" value="'+cur+'" style="font-size:28px;font-weight:300;text-align:center;font-family:var(--mono)">'    +'</div>'    +'<div style="display:flex;gap:8px;flex-wrap:wrap">'    +['25','28','30','32','35'].map(function(v){return '<button type="button" onclick="document.getElementById(\'fc-target-inp\').value=\''+v+'\'" style="padding:6px 14px;border-radius:8px;border:1px solid var(--bd);background:var(--bg2);color:var(--text2);font-size:12px;cursor:pointer;font-family:var(--mono)">'+v+'%</button>';}).join('')    +'</div>'    +'<div style="font-size:10px;color:var(--text3);background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.15);border-radius:8px;padding:10px 12px">'    +'✅ <strong style="color:var(--grn)">On Track</strong> = at or below target &nbsp;·&nbsp; '    +'⚠️ <strong style="color:var(--gold)">Caution</strong> = up to 10% over &nbsp;·&nbsp; '    +'🔴 <strong style="color:var(--red)">Over Target</strong> = more than 10% over'    +'</div>'    +'<div class="mfoot" style="margin-top:4px;padding-top:12px;border-top:1px solid var(--bd)">'    +'<button class="btn s" onclick="cm()">Cancel</button>'    +'<button class="btn" onclick="saveFoodCostTarget()">Save Target</button>'    +'</div>'    +'</div>', null);
+}
+
+function saveFoodCostTarget(){
+  var inp=document.getElementById('fc-target-inp');
+  var v=parseFloat(inp?inp.value:0)||30;
+  if(v<1||v>100){toast('Target must be 1–100%','w');return;}
+  saveBranchConfig({fcTarget:v});
+  cm();
+  if(S.p==='inv-dash')ren();
 }
 
 function openTablesSeatsModal(){
@@ -6869,7 +6870,6 @@ function _doLaunch(){
       buildTodayShiftMap();
       attachListeners();
       loadSuppliers();
-      loadLocations();
       loadBranchConfig();
       attachTransferListener();
       if(!IS_SUPER_ADMIN) seedIfEmpty();
