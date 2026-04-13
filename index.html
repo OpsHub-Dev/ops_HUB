@@ -3849,6 +3849,52 @@ function pInvDash(){
   var mChg=lmA>0?((tA-lmA)/lmA*100).toFixed(1):null;
   var wChg=lastWk>0?((thisWk-lastWk)/lastWk*100).toFixed(1):null;
 
+  // ── FOOD COST CALCULATION ──────────────────────────────────
+  var _bc2=S._branchConfig||{};
+  var fcTarget=parseFloat(_bc2.fcTarget)||30;
+
+  // Food invoices this month + last month
+  var foodSpendMonth=0,foodSpendLM=0;
+  S.invoices.forEach(function(inv){
+    if(!inv.invoiceDate)return;
+    var a=parseFloat(inv.amount)||0;
+    var isFood=(inv.category==='Food & Beverage')||(inv.category&&inv.category.toLowerCase().indexOf('food')>=0);
+    if(!isFood)return;
+    if(inv.invoiceDate.indexOf(tm)===0)foodSpendMonth+=a;
+    if(inv.invoiceDate.indexOf(lm)===0)foodSpendLM+=a;
+  });
+  // Wastage this month + last month
+  var wasteMonth=0,wasteLM=0;
+  S.waste.forEach(function(w){
+    if(!w.date)return;
+    if(w.date.indexOf(tm)===0)wasteMonth+=(+w.value||0);
+    if(w.date.indexOf(lm)===0)wasteLM+=(+w.value||0);
+  });
+  var totalFCMonth=foodSpendMonth+wasteMonth;
+  var totalFCLM=foodSpendLM+wasteLM;
+  var fcPct=tA>0?(totalFCMonth/tA*100):0;
+  var fcPctLM=lmA>0?(totalFCLM/lmA*100):0;
+  var fcDelta=fcPctLM>0?(fcPct-fcPctLM):null;
+  var fcOk=fcPct>0&&fcPct<=fcTarget;
+  var fcHigh=fcPct>fcTarget&&fcPct<=fcTarget*1.1;
+  var fcColor=fcPct===0?'var(--text3)':fcOk?'var(--grn)':fcHigh?'var(--gold)':'var(--red)';
+
+  // 3-month trend
+  var fcMonths=[];
+  for(var _mi=2;_mi>=0;_mi--){
+    var _mpfx=mthKey(-_mi);
+    var _ms=0,_mv=0,_mw=0;
+    S.invoices.forEach(function(inv){
+      if(!inv.invoiceDate||inv.invoiceDate.indexOf(_mpfx)!==0)return;
+      var isFood=(inv.category==='Food & Beverage')||(inv.category&&inv.category.toLowerCase().indexOf('food')>=0);
+      if(isFood)_ms+=(parseFloat(inv.amount)||0);
+    });
+    S.sales.forEach(function(e){if(e.date&&e.date.indexOf(_mpfx)===0)_mv+=(+e.actual||0);});
+    S.waste.forEach(function(w){if(w.date&&w.date.indexOf(_mpfx)===0)_mw+=(+w.value||0);});
+    var _mpct=_mv>0?((_ms+_mw)/_mv*100):0;
+    fcMonths.push({pfx:_mpfx,pct:_mpct,spend:_ms+_mw,sales:_mv});
+  }
+
   var pn=S.rem.filter(function(r){return !r.done;}).sort(function(a,b){return new Date(a.date)-new Date(b.date);});
   var hExp=0,hSoon=0,hOk=0,hExpList=[];
   S.health.forEach(function(h2){
@@ -3891,6 +3937,84 @@ function pInvDash(){
   // Stock Value
   h+='<div class="sc" style="'+(hExp>0?'border-color:rgba(248,81,73,.2)':'')+'"><div class="sc-lbl">Stock Value</div><div class="sc-val cb" style="font-size:28px;font-weight:300">'+Math.round(value).toLocaleString()+'</div><div class="sc-sub">SAR · '+(hExp>0?'<span style="color:var(--red)">'+hExp+' cards expired</span>':'0 cards expired')+'</div></div>';
   h+='</div>';
+
+  // ── FOOD COST PANEL ─────────────────────────────────────
+  h+='<div class="card" style="padding:16px;margin-bottom:10px">';
+  // Header row
+  h+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">';
+  h+='<div style="display:flex;align-items:center;gap:10px">';
+  h+='<span style="font-size:13px;font-weight:700">🍽️ Food Cost</span>';
+  h+='<span style="font-size:10px;background:var(--bg2);border:1px solid var(--bd);border-radius:20px;padding:2px 8px;color:var(--text3);font-family:var(--mono)">'+tm+'</span>';
+  if(fcDelta!==null){var fcUp=fcDelta>0;h+='<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:'+(fcUp?'rgba(239,68,68,.1)':'rgba(52,211,153,.1)')+';color:'+(fcUp?'var(--red)':'var(--grn)')+'">'+(fcUp?'▲':'▼')+Math.abs(fcDelta).toFixed(1)+'% vs last mo</span>';}
+  h+='</div>';
+  h+='<button class="btn sm s" onclick="openFoodCostTargetModal()" style="font-size:10px">⚙️ Target: '+fcTarget+'%</button>';
+  h+='</div>';
+
+  // 3-column layout: gauge | breakdown | trend
+  h+='<div style="display:grid;grid-template-columns:auto 1fr auto;gap:16px;align-items:start">';
+
+  // LEFT: SVG gauge
+  var _gr=44,_gc=2*Math.PI*_gr;
+  var _gFill=Math.min(100,fcPct)/100;
+  h+='<div style="display:flex;flex-direction:column;align-items:center;gap:6px">';
+  h+='<svg width="110" height="110" viewBox="0 0 110 110">';
+  h+='<circle cx="55" cy="55" r="'+_gr+'" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="10"/>';
+  var _tFill=(Math.min(100,fcTarget)/100)*_gc;
+  h+='<circle cx="55" cy="55" r="'+_gr+'" fill="none" stroke="rgba(240,165,0,.2)" stroke-width="10" stroke-dasharray="'+_tFill.toFixed(1)+' '+_gc.toFixed(1)+'" stroke-dashoffset="'+(_gc/4).toFixed(1)+'" stroke-linecap="round"/>';
+  if(fcPct>0){var _aFill=_gFill*_gc;h+='<circle cx="55" cy="55" r="'+_gr+'" fill="none" stroke="'+fcColor+'" stroke-width="10" stroke-dasharray="'+_aFill.toFixed(1)+' '+_gc.toFixed(1)+'" stroke-dashoffset="'+(_gc/4).toFixed(1)+'" stroke-linecap="round"/>';}
+  h+='<text x="55" y="50" text-anchor="middle" fill="'+fcColor+'" font-size="18" font-weight="800" font-family="var(--mono)">'+fcPct.toFixed(1)+'%</text>';
+  h+='<text x="55" y="65" text-anchor="middle" fill="rgba(255,255,255,.4)" font-size="9" font-family="var(--mono)">FOOD COST</text>';
+  h+='</svg>';
+  var _sLbl=fcPct===0?'No Data':fcOk?'✅ On Track':fcHigh?'⚠️ Caution':'🔴 Over Target';
+  var _sBg=fcPct===0?'rgba(255,255,255,.06)':fcOk?'rgba(52,211,153,.12)':fcHigh?'rgba(240,165,0,.12)':'rgba(239,68,68,.12)';
+  h+='<div style="font-size:9px;font-weight:700;padding:3px 10px;border-radius:20px;background:'+_sBg+';color:'+fcColor+'">'+_sLbl+'</div>';
+  h+='</div>';
+
+  // CENTER: Breakdown cards
+  h+='<div style="display:flex;flex-direction:column;gap:8px">';
+  h+='<div style="background:var(--bg2);border:1px solid var(--bd);border-radius:9px;padding:11px 13px">';
+  h+='<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;font-family:var(--mono)">Food Invoices This Month</div>';
+  h+='<div style="font-size:16px;font-weight:700;color:var(--text);font-family:var(--mono)">'+fsar(foodSpendMonth)+'</div>';
+  h+='<div style="font-size:9px;color:var(--text3);margin-top:2px">'+(tA>0?(foodSpendMonth/tA*100).toFixed(1)+'% of sales':'No sales recorded')+'</div>';
+  h+='</div>';
+  h+='<div style="background:var(--bg2);border:1px solid var(--bd);border-radius:9px;padding:11px 13px">';
+  h+='<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;font-family:var(--mono)">Wastage This Month</div>';
+  h+='<div style="font-size:16px;font-weight:700;color:'+(wasteMonth>0?'var(--red)':'var(--text)')+';font-family:var(--mono)">'+fsar(wasteMonth)+'</div>';
+  h+='<div style="font-size:9px;color:var(--text3);margin-top:2px">'+(tA>0?(wasteMonth/tA*100).toFixed(1)+'% of sales':'—')+'</div>';
+  h+='</div>';
+  h+='<div style="background:var(--bg2);border:1px solid var(--bd);border-radius:9px;padding:11px 13px">';
+  h+='<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;font-family:var(--mono)">Total Food Cost vs Sales</div>';
+  h+='<div style="display:flex;align-items:baseline;gap:6px"><div style="font-size:16px;font-weight:700;color:'+fcColor+';font-family:var(--mono)">'+fsar(totalFCMonth)+'</div><div style="font-size:10px;color:var(--text3)">/ '+fsar(tA)+' sales</div></div>';
+  h+='<div style="height:5px;background:var(--bg3);border-radius:99px;overflow:hidden;margin-top:7px"><div style="height:100%;width:'+Math.min(100,fcPct).toFixed(1)+'%;background:'+fcColor+';border-radius:99px"></div></div>';
+  h+='<div style="display:flex;justify-content:space-between;font-size:8px;color:var(--text3);margin-top:3px;font-family:var(--mono)"><span>0%</span><span style="color:var(--gold)">Target '+fcTarget+'%</span><span>100%</span></div>';
+  h+='</div>';
+  h+='</div>';
+
+  // RIGHT: 3-month trend bars
+  h+='<div style="display:flex;flex-direction:column;gap:6px;min-width:120px">';
+  h+='<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;font-family:var(--mono)">3-Month Trend</div>';
+  var _maxFC=Math.max(fcTarget*1.2,Math.max.apply(null,fcMonths.map(function(m){return m.pct;}))||1);
+  var _mNames=['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  fcMonths.forEach(function(m,i){
+    var _isCur=(i===2);
+    var _bW=_maxFC>0?Math.max(4,m.pct/_maxFC*100):0;
+    var _bCol=m.pct===0?'rgba(255,255,255,.1)':m.pct<=fcTarget?'var(--grn)':m.pct<=fcTarget*1.1?'var(--gold)':'var(--red)';
+    var _mLbl=_mNames[parseInt(m.pfx.slice(5))]||m.pfx.slice(5);
+    var _tX=(fcTarget/_maxFC*100).toFixed(1);
+    h+='<div style="display:flex;align-items:center;gap:8px">';
+    h+='<div style="font-size:9px;color:'+(  _isCur?'var(--text)':'var(--text3)')+';font-family:var(--mono);width:26px;text-align:right;font-weight:'+(_isCur?'700':'400')+'">'+_mLbl+'</div>';
+    h+='<div style="flex:1;height:16px;background:var(--bg2);border-radius:4px;overflow:hidden;position:relative">';
+    h+='<div style="position:absolute;top:0;left:0;height:100%;width:'+_bW.toFixed(1)+'%;background:'+_bCol+';border-radius:4px"></div>';
+    h+='<div style="position:absolute;top:0;left:'+_tX+'%;height:100%;width:1.5px;background:rgba(240,165,0,.5)"></div>';
+    h+='</div>';
+    h+='<div style="font-size:9px;font-family:var(--mono);color:'+(m.pct===0?'var(--text3)':_bCol)+';width:34px;text-align:right;font-weight:700">'+(m.pct>0?m.pct.toFixed(1)+'%':'—')+'</div>';
+    h+='</div>';
+  });
+  h+='<div style="margin-top:6px;display:flex;align-items:center;gap:4px;font-size:8px;color:var(--text3)"><div style="width:12px;height:1.5px;background:rgba(240,165,0,.5)"></div><span>Target '+fcTarget+'%</span></div>';
+  h+='</div>';
+
+  h+='</div>'; // end grid
+  h+='</div>'; // end card
 
   // ── ROW 3: Branch Capacity (Tables & Seats) — editable per branch ──
   var _bc=S._branchConfig||{};
@@ -5542,6 +5666,22 @@ function saveBranchConfig(cfg){
   });
 }
 
+function openFoodCostTargetModal(){
+  var cfg=S._branchConfig||{};
+  var cur=parseFloat(cfg.fcTarget)||30;
+  om('⚙️ Food Cost Target',
+    '<div style="display:flex;flex-direction:column;gap:16px;padding:4px 0">'    +'<div style="font-size:12px;color:var(--text3);background:var(--bg2);border-radius:8px;padding:10px 12px">'    +'Set the monthly food cost target % for this branch. Dashboard gauge shows green / amber / red based on this target.'    +'</div>'    +'<div class="fg"><label>Food Cost Target (%)</label>'    +'<input id="fc-target-inp" type="number" min="1" max="100" step="0.5" value="'+cur+'" style="font-size:28px;font-weight:300;text-align:center;font-family:var(--mono)">'    +'</div>'    +'<div style="display:flex;gap:8px;flex-wrap:wrap">'    +['25','28','30','32','35'].map(function(v){return '<button type="button" onclick="document.getElementById(\'fc-target-inp\').value=\''+v+'\'" style="padding:6px 14px;border-radius:8px;border:1px solid var(--bd);background:var(--bg2);color:var(--text2);font-size:12px;cursor:pointer;font-family:var(--mono)">'+v+'%</button>';}).join('')    +'</div>'    +'<div style="font-size:10px;color:var(--text3);background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.15);border-radius:8px;padding:10px 12px">'    +'✅ <strong style="color:var(--grn)">On Track</strong> = at or below target &nbsp;·&nbsp; '    +'⚠️ <strong style="color:var(--gold)">Caution</strong> = up to 10% over &nbsp;·&nbsp; '    +'🔴 <strong style="color:var(--red)">Over Target</strong> = more than 10% over'    +'</div>'    +'<div class="mfoot" style="margin-top:4px;padding-top:12px;border-top:1px solid var(--bd)">'    +'<button class="btn s" onclick="cm()">Cancel</button>'    +'<button class="btn" onclick="saveFoodCostTarget()">Save Target</button>'    +'</div>'    +'</div>', null);
+}
+
+function saveFoodCostTarget(){
+  var inp=document.getElementById('fc-target-inp');
+  var v=parseFloat(inp?inp.value:0)||30;
+  if(v<1||v>100){toast('Target must be 1–100%','w');return;}
+  saveBranchConfig({fcTarget:v});
+  cm();
+  if(S.p==='inv-dash')ren();
+}
+
 function openTablesSeatsModal(){
   var cfg=S._branchConfig||{};
   var _bname=CURRENT_BRANCH?CURRENT_BRANCH.name:'Branch';
@@ -6867,7 +7007,7 @@ function pAdminBranches(){
       +'<div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:10px">📊 All Branches Overview</div>'
       +'<div id="branches-overview-table">Loading…</div>'
     +'</div>'
-    +'<div style="margin-top:14px;background:var(--bg2);border:1px solid var(--bd);border-radius:12px;padding:18px">'      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'        +'<div>'          +'<div style="font-size:13px;font-weight:700;color:var(--text)">📈 Sales Comparison — All Branches</div>'          +'<div style="font-size:10px;color:var(--text3);margin-top:2px">Live revenue data across all active branches</div>'        +'</div>'        +'<div style="display:flex;gap:6px">'          +'<button id="sc-view-month" style="padding:5px 12px;border-radius:7px;border:1px solid var(--acc);background:rgba(240,165,0,.15);color:var(--acc);font-size:10px;font-weight:700;cursor:pointer;font-family:var(--font)">Month</button>'          +'<button id="sc-view-week" style="padding:5px 12px;border-radius:7px;border:1px solid var(--bd);background:transparent;color:var(--text3);font-size:10px;font-weight:600;cursor:pointer;font-family:var(--font)">Week</button>'          +'<button id="sc-view-ytd" style="padding:5px 12px;border-radius:7px;border:1px solid var(--bd);background:transparent;color:var(--text3);font-size:10px;font-weight:600;cursor:pointer;font-family:var(--font)">YTD</button>'        +'</div>'      +'</div>'      +'<div id="sales-comp-dash"><div style="text-align:center;color:var(--text3);padding:30px;font-size:12px">⏳ Loading sales data from all branches…</div></div>'    +'</div>'  +'</div>';
+  +'</div>';
 }
 
 function bindAdminBranches(){
@@ -7163,7 +7303,6 @@ function renderBranchesOverview(branches){
   });
   html+='</tbody></table>';
   el.innerHTML=html;
-  loadSalesComparison();
 }
 
 // ── Branch Modal (Add / Edit) ─────────────────────────────────
@@ -7274,196 +7413,6 @@ function saveBranchModal(){
       if(bd2) bd2.style.background=b.color||'var(--grn)';
     }
   });
-}
-
-// ═══════════════════════════════════════════════════════════
-// 📈 CROSS-BRANCH SALES COMPARISON (Super Admin)
-// ═══════════════════════════════════════════════════════════
-var _scView = 'month'; // 'month' | 'week' | 'ytd'
-var _scData  = {};     // branchId -> {name, color, sales[]}
-
-function loadSalesComparison(){
-  if(!IS_SUPER_ADMIN) return;
-  var el = document.getElementById('sales-comp-dash');
-  if(!el) return;
-
-  var now = new Date();
-  function dsOf(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
-  var today = dsOf(now);
-  var mthPfx = today.slice(0,7);
-  var dow = now.getDay();
-  var wkS = new Date(now); wkS.setDate(now.getDate()-dow);
-  var wkStr = dsOf(wkS);
-  var cy = String(now.getFullYear());
-
-  db.ref('admin/branches').once('value', function(bSnap){
-    var raw = bSnap.val()||{};
-    var bList = Object.values(raw).filter(function(b){ return b && b.active!==false; });
-    if(!bList.length){
-      el.innerHTML='<div style="text-align:center;color:var(--text3);padding:20px;font-size:12px">No active branches found</div>';
-      return;
-    }
-
-    _scData = {};
-    var pending = bList.length;
-
-    bList.forEach(function(b){
-      db.ref('branches/'+b.id+'/sales').once('value', function(sSnap){
-        var raw2 = sSnap.val()||{};
-        var arr = Array.isArray(raw2) ? raw2.filter(Boolean) : Object.values(raw2).filter(function(v){ return v&&v.date; });
-        _scData[b.id] = { name: b.name||b.id, color: b.color||'#f0a500', brand: b.brand||'', sales: arr };
-        pending--;
-        if(pending === 0) renderSalesComparison();
-      });
-    });
-  });
-}
-
-function renderSalesComparison(){
-  var el = document.getElementById('sales-comp-dash');
-  if(!el) return;
-
-  var now = new Date();
-  function dsOf(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
-  var today = dsOf(now);
-  var mthPfx = today.slice(0,7);
-  var dow = now.getDay();
-  var wkS = new Date(now); wkS.setDate(now.getDate()-dow);
-  var wkStr = dsOf(wkS);
-  var cy = String(now.getFullYear());
-
-  var bids = Object.keys(_scData);
-  if(!bids.length){ el.innerHTML='<div style="color:var(--text3);font-size:12px;text-align:center;padding:20px">No data yet</div>'; return; }
-
-  // Compute totals per branch for selected view
-  var totals = bids.map(function(bid){
-    var d = _scData[bid];
-    var actual=0, target=0;
-    d.sales.forEach(function(e){
-      if(!e||!e.date) return;
-      var a=parseFloat(e.actual)||0, t=parseFloat(e.target)||0;
-      if(_scView==='month' && e.date.indexOf(mthPfx)===0){ actual+=a; target+=t; }
-      else if(_scView==='week' && e.date>=wkStr && e.date<=today){ actual+=a; target+=t; }
-      else if(_scView==='ytd' && e.date.slice(0,4)===cy){ actual+=a; target+=t; }
-    });
-    return { bid:bid, name:d.name, color:d.color, brand:d.brand, actual:actual, target:target };
-  });
-  totals.sort(function(a,b){ return b.actual - a.actual; });
-
-  var grandTotal = totals.reduce(function(s,t){ return s+t.actual; }, 0);
-  var maxVal = Math.max.apply(null, totals.map(function(t){ return t.actual; })) || 1;
-
-  // Month label
-  var monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  var viewLabel = _scView==='month' ? monthNames[now.getMonth()]+' '+cy
-                : _scView==='week'  ? 'This Week'
-                : 'YTD '+cy;
-
-  // ── Header summary bar ──
-  var html = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">'
-    +'<div style="font-size:10px;color:var(--text3)">Period: <span style="color:var(--text2);font-weight:700">'+viewLabel+'</span></div>'
-    +'<div style="font-size:15px;font-weight:800;color:var(--acc);font-family:var(--mono)">Total: '+fsar(grandTotal)+'</div>'
-    +'</div>';
-
-  // ── KPI cards per branch ──
-  html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-bottom:16px">';
-  totals.forEach(function(t, i){
-    var share = grandTotal>0 ? (t.actual/grandTotal*100).toFixed(1) : 0;
-    var pctT  = t.target>0  ? (t.actual/t.target*100).toFixed(1)   : null;
-    var barW  = (t.actual/maxVal*100).toFixed(1);
-    html += '<div style="background:var(--bg3);border:1px solid var(--bd);border-radius:10px;padding:12px;border-left:3px solid '+t.color+'">'
-      +'<div style="font-size:10px;font-weight:700;color:var(--text2);margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(i===0?'🏆 ':'')+t.name+'</div>'
-      +'<div style="font-size:17px;font-weight:800;color:'+t.color+';font-family:var(--mono)">'+fsar(t.actual)+'</div>'
-      +'<div style="font-size:9px;color:var(--text3);margin-top:3px">'
-        +(pctT ? pctT+'% of target · ' : '')+'Share: '+share+'%'
-      +'</div>'
-      +'<div style="height:4px;background:var(--bg2);border-radius:99px;margin-top:7px;overflow:hidden">'
-        +'<div style="height:100%;width:'+barW+'%;background:'+t.color+';border-radius:99px;transition:width .5s"></div>'
-      +'</div>'
-    +'</div>';
-  });
-  html += '</div>';
-
-  // ── Stacked bar chart — last 30 days ──
-  var last30 = [];
-  for(var i=29; i>=0; i--){
-    var d2 = new Date(now.getTime()-i*86400000);
-    last30.push({ ds:dsOf(d2), byB:{} });
-  }
-  totals.forEach(function(t){
-    _scData[t.bid].sales.forEach(function(e){
-      if(!e||!e.date) return;
-      var idx2 = last30.findIndex(function(d){ return d.ds===e.date; });
-      if(idx2>=0){ last30[idx2].byB[t.bid] = (last30[idx2].byB[t.bid]||0)+(parseFloat(e.actual)||0); }
-    });
-  });
-
-  var dayTotals = last30.map(function(d){ return Object.values(d.byB).reduce(function(s,v){return s+v;},0); });
-  var maxDay = Math.max.apply(null, dayTotals)||1;
-
-  html += '<div style="margin-bottom:4px;font-size:10px;font-weight:700;color:var(--text2)">Daily Sales — Last 30 Days</div>';
-  html += '<div style="display:flex;align-items:flex-end;gap:2px;height:70px">';
-  last30.forEach(function(day, i){
-    var isToday = day.ds===today;
-    var dayTotal = dayTotals[i];
-    // Build stacked bar from bottom up
-    var stackHtml = '';
-    var yUsed = 0;
-    totals.forEach(function(t){
-      var v = day.byB[t.bid]||0;
-      if(v<=0) return;
-      var h2 = (v/maxDay*70).toFixed(1);
-      stackHtml += '<div style="width:100%;height:'+h2+'px;background:'+t.color+';flex-shrink:0"></div>';
-    });
-    html += '<div style="flex:1;display:flex;flex-direction:column;align-items:center;cursor:default" title="'+day.ds+'&#10;'+fsar(dayTotal)+'">'
-      +'<div style="width:100%;display:flex;flex-direction:column;justify-content:flex-end;height:70px;border-radius:2px 2px 0 0;overflow:hidden;'+(isToday?'outline:2px solid var(--acc);outline-offset:1px':'')+'">'
-        +stackHtml
-      +'</div>'
-    +'</div>';
-  });
-  html += '</div>';
-
-  // X-axis date labels every 5 days
-  html += '<div style="display:flex;gap:2px;margin-top:4px;margin-bottom:12px">';
-  last30.forEach(function(day, i){
-    var show = (i%5===0||i===29);
-    html += '<div style="flex:1;font-size:7.5px;color:var(--text3);font-family:var(--mono);text-align:center;overflow:hidden">'+(show?day.ds.slice(5):'')+'</div>';
-  });
-  html += '</div>';
-
-  // ── Legend ──
-  html += '<div style="display:flex;gap:12px;flex-wrap:wrap">';
-  totals.forEach(function(t){
-    html += '<div style="display:flex;align-items:center;gap:5px">'
-      +'<div style="width:10px;height:10px;border-radius:2px;background:'+t.color+'"></div>'
-      +'<div style="font-size:10px;color:var(--text2)">'+xe(t.name)+'</div>'
-    +'</div>';
-  });
-  html += '</div>';
-
-  el.innerHTML = html;
-
-  // Wire view toggle buttons
-  setTimeout(function(){
-    ['month','week','ytd'].forEach(function(v){
-      var btn = document.getElementById('sc-view-'+v);
-      if(!btn) return;
-      btn.style.background = _scView===v ? 'rgba(240,165,0,.15)' : 'transparent';
-      btn.style.borderColor = _scView===v ? 'var(--acc)' : 'var(--bd)';
-      btn.style.color       = _scView===v ? 'var(--acc)' : 'var(--text3)';
-      btn.onclick = function(){
-        _scView = v;
-        renderSalesComparison();
-        ['month','week','ytd'].forEach(function(vv){
-          var bb = document.getElementById('sc-view-'+vv);
-          if(!bb) return;
-          bb.style.background = _scView===vv ? 'rgba(240,165,0,.15)' : 'transparent';
-          bb.style.borderColor = _scView===vv ? 'var(--acc)' : 'var(--bd)';
-          bb.style.color       = _scView===vv ? 'var(--acc)' : 'var(--text3)';
-        });
-      };
-    });
-  }, 50);
 }
 
 window.onload = function(){
