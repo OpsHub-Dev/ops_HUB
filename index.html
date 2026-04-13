@@ -346,7 +346,7 @@ select.fi-s option{background:var(--select-opt-bg);color:var(--text)}
 .pb.act{background:var(--acc);color:#000;border-color:var(--acc)}
 
 /* ══ MODALS ══ */
-#mo{position:fixed;inset:0;background:var(--overlay-bg);z-index:500;display:none;align-items:center;justify-content:center;backdrop-filter:blur(8px)}
+#mo{position:fixed;inset:0;background:var(--overlay-bg);z-index:300;display:none;align-items:center;justify-content:center;backdrop-filter:blur(8px)}
 #mo.show{display:flex}
 #mb{
   background:var(--modal-bg);
@@ -892,19 +892,14 @@ select.fi-s option{background:var(--select-opt-bg);color:var(--text)}
       <div class="fr" style="margin-bottom:10px">
         <div class="fg"><label>UoM</label><input id="f-uom" value="EA"></div>
         <div class="fg"><label>Location</label>
-          <div style="display:flex;gap:6px;align-items:center">
-            <select id="f-loc" style="flex:1"></select>
-            <button type="button" class="btn sm" onclick="openSubModal(openAddLocationModal)" title="Add new location" style="flex-shrink:0;white-space:nowrap;padding:6px 10px">+ New</button>
-            <button type="button" class="btn sm d" onclick="openSubModal(openDeleteLocationModal)" title="Delete location" style="flex-shrink:0;white-space:nowrap;padding:6px 10px">🗑</button>
-          </div>
+          <select id="f-loc"><option>Dry Storage</option><option>Paper &amp; Chemical</option><option>Freezer</option><option>Fridge</option></select>
         </div>
       </div>
       <div class="fr" style="margin-bottom:10px">
         <div class="fg"><label>Supplier</label>
           <div style="display:flex;gap:6px;align-items:center">
             <select id="f-sup" style="flex:1"></select>
-            <button type="button" class="btn sm" onclick="openSubModal(function(){openAddSupplierModal();setTimeout(function(){populateItemModalSupplier();},300);})" title="Add new supplier" style="flex-shrink:0;white-space:nowrap;padding:6px 10px">+ New</button>
-            <button type="button" class="btn sm d" onclick="openSubModal(openDeleteSupplierModal)" title="Delete supplier" style="flex-shrink:0;white-space:nowrap;padding:6px 10px">🗑</button>
+            <button type="button" class="btn sm" onclick="openAddSupplierModal();setTimeout(function(){populateItemModalSupplier();},300);" title="Add new supplier" style="flex-shrink:0;white-space:nowrap;padding:6px 10px">+ New</button>
           </div>
         </div>
         <div class="fg"><label>Min Level</label><input id="f-min" type="number" min="0" value="0"></div>
@@ -5292,27 +5287,6 @@ function tsPgEmps(){
 // ════════════════════════════════════════════════════════════
 var _cb=null;
 function om(t,h,cb){document.getElementById('mtit').textContent=t;document.getElementById('mbod').innerHTML=h;document.getElementById('mo').className='show';_cb=cb;}
-// ── Sub-modal helper: temporarily hides item/order modal while om() is open ──
-function openSubModal(fn){
-  // Hide the item modal (and order modal if open) so #mo sits on top cleanly
-  var itemM=document.getElementById('item-modal');
-  var orderM=document.getElementById('order-modal');
-  var wasItem=itemM&&!itemM.classList.contains('hide');
-  var wasOrder=orderM&&!orderM.classList.contains('hide');
-  if(wasItem)itemM.classList.add('hide');
-  if(wasOrder)orderM.classList.add('hide');
-  // Patch cm to restore after close
-  var _origCm=window._cmPatched?null:null; // guard
-  var _oldCm=window.cm;
-  window.cm=function(){
-    window.cm=_oldCm; // restore original cm
-    _oldCm();         // close the om() modal
-    if(wasItem)itemM.classList.remove('hide');
-    if(wasOrder)orderM.classList.remove('hide');
-  };
-  fn();
-}
-
 function cm(){document.getElementById('mo').className='';_cb=null;}
 
 function mStaff(ex){
@@ -5425,13 +5399,12 @@ function openItemModal(code){
   document.getElementById('item-modal-t').textContent=isEdit?'Edit Product':'Add New Product';
   document.getElementById('edit-orig').value=code||'';
   populateItemModalSupplier(''); // populate first
-  populateItemModalLocation('');  // populate locations
   if(isEdit){
     var it=findItem(code);if(!it)return;
     document.getElementById('f-code').value=it.code;
     document.getElementById('f-name').value=it.name;
     document.getElementById('f-uom').value=it.unit;
-    populateItemModalLocation(it.location);
+    document.getElementById('f-loc').value=it.location;
     document.getElementById('f-min').value=it.min;
     document.getElementById('f-price').value=it.price;
     document.getElementById('f-qty').value=it.qty;
@@ -5440,7 +5413,7 @@ function openItemModal(code){
   } else {
     ['f-code','f-name','f-min','f-price','f-qty'].forEach(function(id){document.getElementById(id).value='';});
     document.getElementById('f-uom').value='EA';
-    populateItemModalLocation('Dry Storage');
+    document.getElementById('f-loc').value='Dry Storage';
     document.getElementById('f-qty').disabled=false;
   }
   document.getElementById('item-modal').classList.remove('hide');
@@ -5541,146 +5514,6 @@ function openAddSupplierModal(){
   var itemSel=document.getElementById('f-sup');
   if(itemSel){populateItemModalSupplier(name);}
   toast('Supplier "'+name+'" added ✓','success');
-}
-
-// ── Delete Supplier ────────────────────────────────────────
-function openDeleteSupplierModal(){
-  var sups=getSuppliers().slice().sort();
-  if(!sups.length){toast('No suppliers to delete','w');return;}
-  var curSel=document.getElementById('f-sup');
-  var cur=curSel?curSel.value:'';
-  var opts=sups.map(function(s){return '<option value="'+xe(s)+'"'+(s===cur?' selected':'')+'>'+xe(s)+'</option>';}).join('');
-  om('Delete Supplier',
-    '<div style="display:flex;flex-direction:column;gap:14px;padding:4px 0">'
-    +'<div class="fg"><label>Select Supplier to Delete</label>'
-    +'<select id="del-sup-sel" style="width:100%"><option value="">— Choose —</option>'+opts+'</select></div>'
-    +'<div style="font-size:11px;color:var(--red);background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:8px;padding:10px">⚠️ Items linked to this supplier will have their supplier cleared.</div>'
-    +'<div class="mfoot" style="margin-top:4px;padding-top:12px;border-top:1px solid var(--bd)">'
-    +'<button class="btn s" onclick="cm()">Cancel</button>'
-    +'<button class="btn d" onclick="confirmDeleteSupplier()">Delete Supplier</button>'
-    +'</div></div>',null);
-}
-
-function confirmDeleteSupplier(){
-  var sel=document.getElementById('del-sup-sel');
-  if(!sel||!sel.value){toast('Please select a supplier','w');return;}
-  var name=sel.value;
-  if(!S.suppliers)S.suppliers=getSuppliers().slice();
-  var idx=S.suppliers.indexOf(name);
-  if(idx<0){toast('Supplier not found','error');return;}
-  S.suppliers.splice(idx,1);
-  if(db)db.ref(bPath('suppliers')).set(S.suppliers);
-  var updates={};
-  items.forEach(function(it){
-    if(it.supplier===name){
-      it.supplier='';
-      var ck=String(it.code).replace(/[.#$\[\]\/]/g,'_');
-      updates['shared/inv_items/'+ck+'/supplier']='';
-    }
-  });
-  if(db&&Object.keys(updates).length)db.ref().update(updates);
-  populateSupplierSelect();
-  cm();
-  toast('Supplier "'+name+'" deleted','success');
-}
-
-// ── Location Management ────────────────────────────────────
-var DEFAULT_LOCATIONS=['Dry Storage','Beverage Storage','Production Cooler','Walk-in Chiller','Walk-in Freezer','Chemical Storage','Small Wares','Front Line','General Storage','Unassigned'];
-
-function getLocations(){
-  if(S.locations&&S.locations.length)return S.locations;
-  return DEFAULT_LOCATIONS.slice();
-}
-
-function loadLocations(){
-  if(!db)return;
-  db.ref(bPath('locations')).on('value',function(snap){
-    var v=snap.val();
-    if(v&&Array.isArray(v))S.locations=v;
-    else S.locations=DEFAULT_LOCATIONS.slice();
-    populateItemModalLocation();
-  });
-}
-
-function populateItemModalLocation(selectVal){
-  var fLoc=document.getElementById('f-loc');
-  if(!fLoc)return;
-  var cur=selectVal!==undefined?selectVal:fLoc.value;
-  fLoc.innerHTML='';
-  getLocations().sort().forEach(function(l){
-    var o=document.createElement('option');
-    o.value=l;o.textContent=l;
-    if(l===cur)o.selected=true;
-    fLoc.appendChild(o);
-  });
-  if(!fLoc.value&&fLoc.options.length)fLoc.selectedIndex=0;
-}
-
-function openAddLocationModal(){
-  om('Add New Location',
-    '<div style="display:flex;flex-direction:column;gap:14px;padding:4px 0">'
-    +'<div class="fg"><label>Location Name *</label>'
-    +'<input id="new-loc-inp" placeholder="e.g. Bakery Storage" style="width:100%"></div>'
-    +'<div class="mfoot" style="margin-top:4px;padding-top:12px;border-top:1px solid var(--bd)">'
-    +'<button class="btn s" onclick="cm()">Cancel</button>'
-    +'<button class="btn" onclick="confirmAddLocation()">Add Location</button>'
-    +'</div></div>',null);
-  setTimeout(function(){var el=document.getElementById('new-loc-inp');if(el)el.focus();},80);
-}
-
-function confirmAddLocation(){
-  var inp=document.getElementById('new-loc-inp');
-  if(!inp||!inp.value.trim()){toast('Enter a location name','w');return;}
-  var name=inp.value.trim();
-  if(!S.locations)S.locations=getLocations().slice();
-  if(S.locations.indexOf(name)>=0){toast('Location already exists','w');return;}
-  S.locations.push(name);
-  if(db)db.ref(bPath('locations')).set(S.locations);
-  cm();
-  setTimeout(function(){populateItemModalLocation(name);},50);
-  toast('Location "'+name+'" added ✓','success');
-}
-
-function openDeleteLocationModal(){
-  var locs=getLocations().slice().sort();
-  if(!locs.length){toast('No locations to delete','w');return;}
-  var curSel=document.getElementById('f-loc');
-  var cur=curSel?curSel.value:'';
-  var opts=locs.map(function(l){return '<option value="'+xe(l)+'"'+(l===cur?' selected':'')+'>'+xe(l)+'</option>';}).join('');
-  om('Delete Location',
-    '<div style="display:flex;flex-direction:column;gap:14px;padding:4px 0">'
-    +'<div class="fg"><label>Select Location to Delete</label>'
-    +'<select id="del-loc-sel" style="width:100%"><option value="">— Choose —</option>'+opts+'</select></div>'
-    +'<div style="font-size:11px;color:var(--red);background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:8px;padding:10px">⚠️ Items assigned to this location will be moved to "Dry Storage".</div>'
-    +'<div class="mfoot" style="margin-top:4px;padding-top:12px;border-top:1px solid var(--bd)">'
-    +'<button class="btn s" onclick="cm()">Cancel</button>'
-    +'<button class="btn d" onclick="confirmDeleteLocation()">Delete Location</button>'
-    +'</div></div>',null);
-}
-
-function confirmDeleteLocation(){
-  var sel=document.getElementById('del-loc-sel');
-  if(!sel||!sel.value){toast('Please select a location','w');return;}
-  var name=sel.value;
-  if(!S.locations)S.locations=getLocations().slice();
-  var idx=S.locations.indexOf(name);
-  if(idx<0){toast('Location not found','error');return;}
-  S.locations.splice(idx,1);
-  if(db)db.ref(bPath('locations')).set(S.locations);
-  var fallback='Dry Storage';
-  if(S.locations.indexOf(fallback)<0&&S.locations.length)fallback=S.locations[0];
-  var updates={};
-  items.forEach(function(it){
-    if(it.location===name){
-      it.location=fallback;
-      var ck=String(it.code).replace(/[.#$\[\]\/]/g,'_');
-      updates['shared/inv_items/'+ck+'/location']=fallback;
-    }
-  });
-  if(db&&Object.keys(updates).length)db.ref().update(updates);
-  cm();
-  setTimeout(function(){populateItemModalLocation(fallback);},50);
-  toast('Location "'+name+'" deleted. Items moved to "'+fallback+'"','success');
 }
 
 function loadSuppliers(){
@@ -6897,7 +6730,6 @@ function _doLaunch(){
       buildTodayShiftMap();
       attachListeners();
       loadSuppliers();
-      loadLocations();
       loadBranchConfig();
       attachTransferListener();
       if(!IS_SUPER_ADMIN) seedIfEmpty();
@@ -7035,7 +6867,7 @@ function pAdminBranches(){
       +'<div style="font-size:12px;font-weight:700;color:var(--text2);margin-bottom:10px">📊 All Branches Overview</div>'
       +'<div id="branches-overview-table">Loading…</div>'
     +'</div>'
-  +'</div>';
+    +'<div style="margin-top:14px;background:var(--bg2);border:1px solid var(--bd);border-radius:12px;padding:18px">'      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'        +'<div>'          +'<div style="font-size:13px;font-weight:700;color:var(--text)">📈 Sales Comparison — All Branches</div>'          +'<div style="font-size:10px;color:var(--text3);margin-top:2px">Live revenue data across all active branches</div>'        +'</div>'        +'<div style="display:flex;gap:6px">'          +'<button id="sc-view-month" style="padding:5px 12px;border-radius:7px;border:1px solid var(--acc);background:rgba(240,165,0,.15);color:var(--acc);font-size:10px;font-weight:700;cursor:pointer;font-family:var(--font)">Month</button>'          +'<button id="sc-view-week" style="padding:5px 12px;border-radius:7px;border:1px solid var(--bd);background:transparent;color:var(--text3);font-size:10px;font-weight:600;cursor:pointer;font-family:var(--font)">Week</button>'          +'<button id="sc-view-ytd" style="padding:5px 12px;border-radius:7px;border:1px solid var(--bd);background:transparent;color:var(--text3);font-size:10px;font-weight:600;cursor:pointer;font-family:var(--font)">YTD</button>'        +'</div>'      +'</div>'      +'<div id="sales-comp-dash"><div style="text-align:center;color:var(--text3);padding:30px;font-size:12px">⏳ Loading sales data from all branches…</div></div>'    +'</div>'  +'</div>';
 }
 
 function bindAdminBranches(){
@@ -7331,6 +7163,7 @@ function renderBranchesOverview(branches){
   });
   html+='</tbody></table>';
   el.innerHTML=html;
+  loadSalesComparison();
 }
 
 // ── Branch Modal (Add / Edit) ─────────────────────────────────
@@ -7441,6 +7274,196 @@ function saveBranchModal(){
       if(bd2) bd2.style.background=b.color||'var(--grn)';
     }
   });
+}
+
+// ═══════════════════════════════════════════════════════════
+// 📈 CROSS-BRANCH SALES COMPARISON (Super Admin)
+// ═══════════════════════════════════════════════════════════
+var _scView = 'month'; // 'month' | 'week' | 'ytd'
+var _scData  = {};     // branchId -> {name, color, sales[]}
+
+function loadSalesComparison(){
+  if(!IS_SUPER_ADMIN) return;
+  var el = document.getElementById('sales-comp-dash');
+  if(!el) return;
+
+  var now = new Date();
+  function dsOf(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+  var today = dsOf(now);
+  var mthPfx = today.slice(0,7);
+  var dow = now.getDay();
+  var wkS = new Date(now); wkS.setDate(now.getDate()-dow);
+  var wkStr = dsOf(wkS);
+  var cy = String(now.getFullYear());
+
+  db.ref('admin/branches').once('value', function(bSnap){
+    var raw = bSnap.val()||{};
+    var bList = Object.values(raw).filter(function(b){ return b && b.active!==false; });
+    if(!bList.length){
+      el.innerHTML='<div style="text-align:center;color:var(--text3);padding:20px;font-size:12px">No active branches found</div>';
+      return;
+    }
+
+    _scData = {};
+    var pending = bList.length;
+
+    bList.forEach(function(b){
+      db.ref('branches/'+b.id+'/sales').once('value', function(sSnap){
+        var raw2 = sSnap.val()||{};
+        var arr = Array.isArray(raw2) ? raw2.filter(Boolean) : Object.values(raw2).filter(function(v){ return v&&v.date; });
+        _scData[b.id] = { name: b.name||b.id, color: b.color||'#f0a500', brand: b.brand||'', sales: arr };
+        pending--;
+        if(pending === 0) renderSalesComparison();
+      });
+    });
+  });
+}
+
+function renderSalesComparison(){
+  var el = document.getElementById('sales-comp-dash');
+  if(!el) return;
+
+  var now = new Date();
+  function dsOf(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+  var today = dsOf(now);
+  var mthPfx = today.slice(0,7);
+  var dow = now.getDay();
+  var wkS = new Date(now); wkS.setDate(now.getDate()-dow);
+  var wkStr = dsOf(wkS);
+  var cy = String(now.getFullYear());
+
+  var bids = Object.keys(_scData);
+  if(!bids.length){ el.innerHTML='<div style="color:var(--text3);font-size:12px;text-align:center;padding:20px">No data yet</div>'; return; }
+
+  // Compute totals per branch for selected view
+  var totals = bids.map(function(bid){
+    var d = _scData[bid];
+    var actual=0, target=0;
+    d.sales.forEach(function(e){
+      if(!e||!e.date) return;
+      var a=parseFloat(e.actual)||0, t=parseFloat(e.target)||0;
+      if(_scView==='month' && e.date.indexOf(mthPfx)===0){ actual+=a; target+=t; }
+      else if(_scView==='week' && e.date>=wkStr && e.date<=today){ actual+=a; target+=t; }
+      else if(_scView==='ytd' && e.date.slice(0,4)===cy){ actual+=a; target+=t; }
+    });
+    return { bid:bid, name:d.name, color:d.color, brand:d.brand, actual:actual, target:target };
+  });
+  totals.sort(function(a,b){ return b.actual - a.actual; });
+
+  var grandTotal = totals.reduce(function(s,t){ return s+t.actual; }, 0);
+  var maxVal = Math.max.apply(null, totals.map(function(t){ return t.actual; })) || 1;
+
+  // Month label
+  var monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var viewLabel = _scView==='month' ? monthNames[now.getMonth()]+' '+cy
+                : _scView==='week'  ? 'This Week'
+                : 'YTD '+cy;
+
+  // ── Header summary bar ──
+  var html = '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">'
+    +'<div style="font-size:10px;color:var(--text3)">Period: <span style="color:var(--text2);font-weight:700">'+viewLabel+'</span></div>'
+    +'<div style="font-size:15px;font-weight:800;color:var(--acc);font-family:var(--mono)">Total: '+fsar(grandTotal)+'</div>'
+    +'</div>';
+
+  // ── KPI cards per branch ──
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-bottom:16px">';
+  totals.forEach(function(t, i){
+    var share = grandTotal>0 ? (t.actual/grandTotal*100).toFixed(1) : 0;
+    var pctT  = t.target>0  ? (t.actual/t.target*100).toFixed(1)   : null;
+    var barW  = (t.actual/maxVal*100).toFixed(1);
+    html += '<div style="background:var(--bg3);border:1px solid var(--bd);border-radius:10px;padding:12px;border-left:3px solid '+t.color+'">'
+      +'<div style="font-size:10px;font-weight:700;color:var(--text2);margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(i===0?'🏆 ':'')+t.name+'</div>'
+      +'<div style="font-size:17px;font-weight:800;color:'+t.color+';font-family:var(--mono)">'+fsar(t.actual)+'</div>'
+      +'<div style="font-size:9px;color:var(--text3);margin-top:3px">'
+        +(pctT ? pctT+'% of target · ' : '')+'Share: '+share+'%'
+      +'</div>'
+      +'<div style="height:4px;background:var(--bg2);border-radius:99px;margin-top:7px;overflow:hidden">'
+        +'<div style="height:100%;width:'+barW+'%;background:'+t.color+';border-radius:99px;transition:width .5s"></div>'
+      +'</div>'
+    +'</div>';
+  });
+  html += '</div>';
+
+  // ── Stacked bar chart — last 30 days ──
+  var last30 = [];
+  for(var i=29; i>=0; i--){
+    var d2 = new Date(now.getTime()-i*86400000);
+    last30.push({ ds:dsOf(d2), byB:{} });
+  }
+  totals.forEach(function(t){
+    _scData[t.bid].sales.forEach(function(e){
+      if(!e||!e.date) return;
+      var idx2 = last30.findIndex(function(d){ return d.ds===e.date; });
+      if(idx2>=0){ last30[idx2].byB[t.bid] = (last30[idx2].byB[t.bid]||0)+(parseFloat(e.actual)||0); }
+    });
+  });
+
+  var dayTotals = last30.map(function(d){ return Object.values(d.byB).reduce(function(s,v){return s+v;},0); });
+  var maxDay = Math.max.apply(null, dayTotals)||1;
+
+  html += '<div style="margin-bottom:4px;font-size:10px;font-weight:700;color:var(--text2)">Daily Sales — Last 30 Days</div>';
+  html += '<div style="display:flex;align-items:flex-end;gap:2px;height:70px">';
+  last30.forEach(function(day, i){
+    var isToday = day.ds===today;
+    var dayTotal = dayTotals[i];
+    // Build stacked bar from bottom up
+    var stackHtml = '';
+    var yUsed = 0;
+    totals.forEach(function(t){
+      var v = day.byB[t.bid]||0;
+      if(v<=0) return;
+      var h2 = (v/maxDay*70).toFixed(1);
+      stackHtml += '<div style="width:100%;height:'+h2+'px;background:'+t.color+';flex-shrink:0"></div>';
+    });
+    html += '<div style="flex:1;display:flex;flex-direction:column;align-items:center;cursor:default" title="'+day.ds+'&#10;'+fsar(dayTotal)+'">'
+      +'<div style="width:100%;display:flex;flex-direction:column;justify-content:flex-end;height:70px;border-radius:2px 2px 0 0;overflow:hidden;'+(isToday?'outline:2px solid var(--acc);outline-offset:1px':'')+'">'
+        +stackHtml
+      +'</div>'
+    +'</div>';
+  });
+  html += '</div>';
+
+  // X-axis date labels every 5 days
+  html += '<div style="display:flex;gap:2px;margin-top:4px;margin-bottom:12px">';
+  last30.forEach(function(day, i){
+    var show = (i%5===0||i===29);
+    html += '<div style="flex:1;font-size:7.5px;color:var(--text3);font-family:var(--mono);text-align:center;overflow:hidden">'+(show?day.ds.slice(5):'')+'</div>';
+  });
+  html += '</div>';
+
+  // ── Legend ──
+  html += '<div style="display:flex;gap:12px;flex-wrap:wrap">';
+  totals.forEach(function(t){
+    html += '<div style="display:flex;align-items:center;gap:5px">'
+      +'<div style="width:10px;height:10px;border-radius:2px;background:'+t.color+'"></div>'
+      +'<div style="font-size:10px;color:var(--text2)">'+xe(t.name)+'</div>'
+    +'</div>';
+  });
+  html += '</div>';
+
+  el.innerHTML = html;
+
+  // Wire view toggle buttons
+  setTimeout(function(){
+    ['month','week','ytd'].forEach(function(v){
+      var btn = document.getElementById('sc-view-'+v);
+      if(!btn) return;
+      btn.style.background = _scView===v ? 'rgba(240,165,0,.15)' : 'transparent';
+      btn.style.borderColor = _scView===v ? 'var(--acc)' : 'var(--bd)';
+      btn.style.color       = _scView===v ? 'var(--acc)' : 'var(--text3)';
+      btn.onclick = function(){
+        _scView = v;
+        renderSalesComparison();
+        ['month','week','ytd'].forEach(function(vv){
+          var bb = document.getElementById('sc-view-'+vv);
+          if(!bb) return;
+          bb.style.background = _scView===vv ? 'rgba(240,165,0,.15)' : 'transparent';
+          bb.style.borderColor = _scView===vv ? 'var(--acc)' : 'var(--bd)';
+          bb.style.color       = _scView===vv ? 'var(--acc)' : 'var(--text3)';
+        });
+      };
+    });
+  }, 50);
 }
 
 window.onload = function(){
