@@ -892,11 +892,7 @@ select.fi-s option{background:var(--select-opt-bg);color:var(--text)}
       <div class="fr" style="margin-bottom:10px">
         <div class="fg"><label>UoM</label><input id="f-uom" value="EA"></div>
         <div class="fg"><label>Location</label>
-          <div style="display:flex;gap:6px;align-items:center">
-            <select id="f-loc" style="flex:1"></select>
-            <button type="button" class="btn sm" onclick="openAddLocationModal()" title="Add new location" style="flex-shrink:0;white-space:nowrap;padding:6px 10px">+ New</button>
-            <button type="button" class="btn sm d" onclick="openDeleteLocationModal()" title="Delete location" style="flex-shrink:0;white-space:nowrap;padding:6px 10px">🗑</button>
-          </div>
+          <select id="f-loc"><option>Dry Storage</option><option>Paper &amp; Chemical</option><option>Freezer</option><option>Fridge</option></select>
         </div>
       </div>
       <div class="fr" style="margin-bottom:10px">
@@ -904,7 +900,6 @@ select.fi-s option{background:var(--select-opt-bg);color:var(--text)}
           <div style="display:flex;gap:6px;align-items:center">
             <select id="f-sup" style="flex:1"></select>
             <button type="button" class="btn sm" onclick="openAddSupplierModal();setTimeout(function(){populateItemModalSupplier();},300);" title="Add new supplier" style="flex-shrink:0;white-space:nowrap;padding:6px 10px">+ New</button>
-            <button type="button" class="btn sm d" onclick="openDeleteSupplierModal()" title="Delete supplier" style="flex-shrink:0;white-space:nowrap;padding:6px 10px">🗑</button>
           </div>
         </div>
         <div class="fg"><label>Min Level</label><input id="f-min" type="number" min="0" value="0"></div>
@@ -3854,6 +3849,54 @@ function pInvDash(){
   var mChg=lmA>0?((tA-lmA)/lmA*100).toFixed(1):null;
   var wChg=lastWk>0?((thisWk-lastWk)/lastWk*100).toFixed(1):null;
 
+  // ── FOOD COST CALCULATION ──────────────────────────────────
+  var _bc2=S._branchConfig||{};
+  var fcTarget=parseFloat(_bc2.fcTarget)||30; // default 30%
+
+  // Food cost = sum of invoices with category "Food & Beverage" for this month
+  var foodSpendMonth=0,foodSpendLM=0;
+  S.invoices.forEach(function(inv){
+    if(!inv.invoiceDate)return;
+    var a=parseFloat(inv.amount)||0;
+    var isFood=(inv.category==='Food & Beverage')||(inv.category&&inv.category.toLowerCase().indexOf('food')>=0);
+    if(!isFood)return;
+    if(inv.invoiceDate.indexOf(tm)===0) foodSpendMonth+=a;
+    if(inv.invoiceDate.indexOf(lm)===0) foodSpendLM+=a;
+  });
+  // Also add wastage as a cost factor this month
+  var wasteMonth=0,wasteLM=0;
+  S.waste.forEach(function(w){
+    if(!w.date)return;
+    if(w.date.indexOf(tm)===0)wasteMonth+=(+w.value||0);
+    if(w.date.indexOf(lm)===0)wasteLM+=(+w.value||0);
+  });
+  var totalFoodCostMonth=foodSpendMonth+wasteMonth;
+  var totalFoodCostLM=foodSpendLM+wasteLM;
+
+  var fcPct=tA>0?(totalFoodCostMonth/tA*100):0;
+  var fcPctLM=lmA>0?(totalFoodCostLM/lmA*100):0;
+  var fcDelta=fcPctLM>0?(fcPct-fcPctLM):null; // positive = cost went up (bad)
+  var fcOk=fcPct>0&&fcPct<=fcTarget;
+  var fcHigh=fcPct>fcTarget&&fcPct<=fcTarget*1.1;
+  var fcBad=fcPct>fcTarget*1.1;
+  var fcColor=fcPct===0?'var(--text3)':fcOk?'var(--grn)':fcHigh?'var(--gold)':'var(--red)';
+
+  // Last 3 months trend
+  var fcMonths=[];
+  for(var mi=2;mi>=0;mi--){
+    var mpfx=mthKey(-mi);
+    var ms=0,mv=0,mw=0;
+    S.invoices.forEach(function(inv){
+      if(!inv.invoiceDate||inv.invoiceDate.indexOf(mpfx)!==0)return;
+      var isFood=(inv.category==='Food & Beverage')||(inv.category&&inv.category.toLowerCase().indexOf('food')>=0);
+      if(isFood)ms+=(parseFloat(inv.amount)||0);
+    });
+    S.sales.forEach(function(e){if(e.date&&e.date.indexOf(mpfx)===0)mv+=(+e.actual||0);});
+    S.waste.forEach(function(w){if(w.date&&w.date.indexOf(mpfx)===0)mw+=(+w.value||0);});
+    var mpct=mv>0?((ms+mw)/mv*100):0;
+    fcMonths.push({pfx:mpfx,pct:mpct,spend:ms+mw,sales:mv});
+  }
+
   var pn=S.rem.filter(function(r){return !r.done;}).sort(function(a,b){return new Date(a.date)-new Date(b.date);});
   var hExp=0,hSoon=0,hOk=0,hExpList=[];
   S.health.forEach(function(h2){
@@ -3896,6 +3939,112 @@ function pInvDash(){
   // Stock Value
   h+='<div class="sc" style="'+(hExp>0?'border-color:rgba(248,81,73,.2)':'')+'"><div class="sc-lbl">Stock Value</div><div class="sc-val cb" style="font-size:28px;font-weight:300">'+Math.round(value).toLocaleString()+'</div><div class="sc-sub">SAR · '+(hExp>0?'<span style="color:var(--red)">'+hExp+' cards expired</span>':'0 cards expired')+'</div></div>';
   h+='</div>';
+
+  // ── ROW 2b: Food Cost Panel ──────────────────────────────
+  h+='<div class="card" style="padding:16px;margin-bottom:10px">';
+  // Header
+  h+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">';
+  h+='<div style="display:flex;align-items:center;gap:10px">';
+  h+='<span style="font-size:13px;font-weight:700">🍽️ Food Cost</span>';
+  h+='<span style="font-size:10px;background:var(--bg2);border:1px solid var(--bd);border-radius:20px;padding:2px 8px;color:var(--text3);font-family:var(--mono)">'+tm+'</span>';
+  if(fcDelta!==null){
+    var fcUp=fcDelta>0;
+    h+='<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:'+(fcUp?'rgba(239,68,68,.1)':'rgba(52,211,153,.1)')+';color:'+(fcUp?'var(--red)':'var(--grn)')+'">'+(fcUp?'▲':'▼')+Math.abs(fcDelta).toFixed(1)+'% vs last month</span>';
+  }
+  h+='</div>';
+  h+='<button class="btn sm s" onclick="openFoodCostTargetModal()" style="font-size:10px">⚙️ Target: '+fcTarget+'%</button>';
+  h+='</div>';
+
+  // Main grid: gauge + breakdown + trend
+  h+='<div style="display:grid;grid-template-columns:auto 1fr auto;gap:16px;align-items:start">';
+
+  // ── LEFT: Gauge circle ──
+  var gaugeRadius=44,gCirc=2*Math.PI*gaugeRadius;
+  var gFill=Math.min(100,fcPct)/100;
+  var gTarget=Math.min(100,fcTarget)/100;
+  h+='<div style="display:flex;flex-direction:column;align-items:center;gap:6px">';
+  h+='<svg width="110" height="110" viewBox="0 0 110 110">';
+  // Track
+  h+='<circle cx="55" cy="55" r="'+gaugeRadius+'" fill="none" stroke="rgba(255,255,255,.06)" stroke-width="10"/>';
+  // Target arc (dashed)
+  var tFill=gTarget*gCirc;
+  h+='<circle cx="55" cy="55" r="'+gaugeRadius+'" fill="none" stroke="rgba(240,165,0,.2)" stroke-width="10" stroke-dasharray="'+tFill.toFixed(1)+' '+gCirc.toFixed(1)+'" stroke-dashoffset="'+( gCirc/4).toFixed(1)+'" stroke-linecap="round"/>';
+  // Actual fill
+  if(fcPct>0){
+    var aFill=gFill*gCirc;
+    h+='<circle cx="55" cy="55" r="'+gaugeRadius+'" fill="none" stroke="'+fcColor+'" stroke-width="10" stroke-dasharray="'+aFill.toFixed(1)+' '+gCirc.toFixed(1)+'" stroke-dashoffset="'+(gCirc/4).toFixed(1)+'" stroke-linecap="round" style="transition:stroke-dasharray .6s"/>';
+  }
+  // Center text
+  h+='<text x="55" y="50" text-anchor="middle" fill="'+fcColor+'" font-size="18" font-weight="800" font-family="var(--mono)">'+fcPct.toFixed(1)+'%</text>';
+  h+='<text x="55" y="65" text-anchor="middle" fill="rgba(255,255,255,.4)" font-size="9" font-family="var(--mono)">FOOD COST</text>';
+  h+='</svg>';
+  // Status badge
+  var statusLabel=fcPct===0?'No Data':fcOk?'✅ On Track':fcHigh?'⚠️ Caution':'🔴 Over Target';
+  var statusBg=fcPct===0?'rgba(255,255,255,.06)':fcOk?'rgba(52,211,153,.12)':fcHigh?'rgba(240,165,0,.12)':'rgba(239,68,68,.12)';
+  h+='<div style="font-size:9px;font-weight:700;padding:3px 10px;border-radius:20px;background:'+statusBg+';color:'+fcColor+'">'+statusLabel+'</div>';
+  h+='</div>';
+
+  // ── CENTER: Breakdown ──
+  h+='<div style="display:flex;flex-direction:column;gap:8px">';
+  // Food invoices
+  h+='<div style="background:var(--bg2);border:1px solid var(--bd);border-radius:9px;padding:11px 13px">';
+  h+='<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;font-family:var(--mono)">Food Invoices This Month</div>';
+  h+='<div style="font-size:16px;font-weight:700;color:var(--text);font-family:var(--mono)">'+fsar(foodSpendMonth)+'</div>';
+  h+='<div style="font-size:9px;color:var(--text3);margin-top:2px">'+(tA>0?(foodSpendMonth/tA*100).toFixed(1)+'% of sales':'No sales recorded')+'</div>';
+  h+='</div>';
+  // Wastage
+  h+='<div style="background:var(--bg2);border:1px solid var(--bd);border-radius:9px;padding:11px 13px">';
+  h+='<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;font-family:var(--mono)">Wastage This Month</div>';
+  h+='<div style="font-size:16px;font-weight:700;color:'+(wasteMonth>0?'var(--red)':'var(--text)')+';font-family:var(--mono)">'+fsar(wasteMonth)+'</div>';
+  h+='<div style="font-size:9px;color:var(--text3);margin-top:2px">'+(tA>0?(wasteMonth/tA*100).toFixed(1)+'% of sales':'—')+'</div>';
+  h+='</div>';
+  // Total & sales
+  h+='<div style="background:var(--bg2);border:1px solid var(--bd);border-radius:9px;padding:11px 13px">';
+  h+='<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;font-family:var(--mono)">Total Food Cost vs Sales</div>';
+  h+='<div style="display:flex;align-items:baseline;gap:6px">';
+  h+='<div style="font-size:16px;font-weight:700;color:'+fcColor+';font-family:var(--mono)">'+fsar(totalFoodCostMonth)+'</div>';
+  h+='<div style="font-size:10px;color:var(--text3)">/ '+fsar(tA)+' sales</div>';
+  h+='</div>';
+  // Progress bar
+  h+='<div style="height:5px;background:var(--bg3);border-radius:99px;overflow:hidden;margin-top:7px">';
+  h+='<div style="height:100%;width:'+Math.min(100,fcPct).toFixed(1)+'%;background:'+fcColor+';border-radius:99px;transition:width .6s"></div>';
+  h+='</div>';
+  h+='<div style="display:flex;justify-content:space-between;font-size:8px;color:var(--text3);margin-top:3px;font-family:var(--mono)">';
+  h+='<span>0%</span><span style="color:var(--gold)">Target '+fcTarget+'%</span><span>100%</span>';
+  h+='</div>';
+  h+='</div>';
+  h+='</div>';
+
+  // ── RIGHT: 3-month trend ──
+  h+='<div style="display:flex;flex-direction:column;gap:6px;min-width:120px">';
+  h+='<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;font-family:var(--mono)">3-Month Trend</div>';
+  var maxFCPct=Math.max(fcTarget*1.2,Math.max.apply(null,fcMonths.map(function(m){return m.pct;}))||1);
+  fcMonths.forEach(function(m,i){
+    var isCurrentMth=(i===2);
+    var barW=maxFCPct>0?Math.max(4,m.pct/maxFCPct*100):0;
+    var barColor=m.pct===0?'rgba(255,255,255,.1)':m.pct<=fcTarget?'var(--grn)':m.pct<=fcTarget*1.1?'var(--gold)':'var(--red)';
+    var labelMonth=m.pfx.slice(5); // "MM"
+    var monthNames=['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    var mLabel=monthNames[parseInt(labelMonth)]||labelMonth;
+    h+='<div style="display:flex;align-items:center;gap:8px">';
+    h+='<div style="font-size:9px;color:'+(isCurrentMth?'var(--text)':'var(--text3)')+';font-family:var(--mono);width:26px;text-align:right;font-weight:'+(isCurrentMth?'700':'400')+'">'+mLabel+'</div>';
+    h+='<div style="flex:1;height:16px;background:var(--bg2);border-radius:4px;overflow:hidden;position:relative">';
+    h+='<div style="position:absolute;top:0;left:0;height:100%;width:'+barW.toFixed(1)+'%;background:'+barColor+';border-radius:4px;transition:width .5s"></div>';
+    // Target line
+    var targetX=fcTarget/maxFCPct*100;
+    h+='<div style="position:absolute;top:0;left:'+targetX.toFixed(1)+'%;height:100%;width:1.5px;background:rgba(240,165,0,.5)"></div>';
+    h+='</div>';
+    h+='<div style="font-size:9px;font-family:var(--mono);color:'+(m.pct===0?'var(--text3)':barColor)+';width:34px;text-align:right;font-weight:700">'+(m.pct>0?m.pct.toFixed(1)+'%':'—')+'</div>';
+    h+='</div>';
+  });
+  // Legend
+  h+='<div style="margin-top:8px;display:flex;align-items:center;gap:4px;font-size:8px;color:var(--text3)">';
+  h+='<div style="width:12px;height:1.5px;background:rgba(240,165,0,.5)"></div><span>Target '+fcTarget+'%</span>';
+  h+='</div>';
+  h+='</div>';
+
+  h+='</div>'; // end main grid
+  h+='</div>'; // end card
 
   // ── ROW 3: Branch Capacity (Tables & Seats) — editable per branch ──
   var _bc=S._branchConfig||{};
@@ -4076,7 +4225,7 @@ function pItems(){
 
   var uoms=[];items.forEach(function(i){if(uoms.indexOf(i.unit)<0)uoms.push(i.unit);});uoms.sort();
   var uomOpts='<option value="">All UoM</option>'+uoms.map(function(u){return '<option value="'+u+'"'+(u===uom?' selected':'')+'>'+u+'</option>';}).join('');
-  var lBdg={'Dry Storage':'bdg-amb','Paper & Chemical':'bdg-blu','Freezer':'bdg-blu','Fridge':'bdg-blu','Walk-in Chiller':'bdg-blu','Walk-in Freezer':'bdg-blu','Beverage Storage':'bdg-ok','Production Cooler':'bdg-ok','Chemical Storage':'bdg-blu','Small Wares':'bdg-amb','Front Line':'bdg-ok','General Storage':'bdg-amb','Unassigned':'bdg-red'};
+  var lBdg={'Dry Storage':'bdg-amb','Paper & Chemical':'bdg-blu','Freezer':'bdg-blu','Fridge':'bdg-blu'};
   var rows=pageItems.map(function(it){
     var isLow=it.min>0&&it.qty<=it.min;
     var _actionsHtml = IS_SUPER_ADMIN
@@ -4119,7 +4268,7 @@ function pItems(){
   h+='</div>';
   h+='<div class="ttb" style="background:var(--bg3);border:1px solid var(--bd);border-radius:var(--r) var(--r) 0 0">';
   h+='<input class="fi-s" id="inv-q" placeholder="🔍  Search code or name…" value="'+xe(S.q||'')+'">';
-  h+='<select class="fi-s" id="inv-loc"><option value="">All Locations</option>'+getLocations().map(function(l){return '<option value="'+xe(l)+'"'+(loc===l?' selected':'')+'>'+xe(l)+'</option>';}).join('')+'</select>';
+  h+='<select class="fi-s" id="inv-loc"><option value="">All Locations</option><option value="Dry Storage"'+(loc==='Dry Storage'?' selected':'')+'>Dry Storage</option><option value="Paper &amp; Chemical"'+(loc==='Paper & Chemical'?' selected':'')+'>Paper & Chemical</option><option value="Freezer"'+(loc==='Freezer'?' selected':'')+'>Freezer</option><option value="Fridge"'+(loc==='Fridge'?' selected':'')+'>Fridge</option></select>';
   h+='<select class="fi-s" id="inv-sts"><option value="">All Status</option><option value="ok"'+(sts==='ok'?' selected':'')+'>OK</option><option value="low"'+(sts==='low'?' selected':'')+'>Low</option></select>';
   h+='<select class="fi-s" id="inv-uom">'+uomOpts+'</select>';
   if(IS_SUPER_ADMIN) h+='<button class="btn" onclick="openItemModal(null)">+ Add Item</button>';
@@ -5404,13 +5553,12 @@ function openItemModal(code){
   document.getElementById('item-modal-t').textContent=isEdit?'Edit Product':'Add New Product';
   document.getElementById('edit-orig').value=code||'';
   populateItemModalSupplier(''); // populate first
-  populateItemModalLocation('');  // populate locations
   if(isEdit){
     var it=findItem(code);if(!it)return;
     document.getElementById('f-code').value=it.code;
     document.getElementById('f-name').value=it.name;
     document.getElementById('f-uom').value=it.unit;
-    populateItemModalLocation(it.location);
+    document.getElementById('f-loc').value=it.location;
     document.getElementById('f-min').value=it.min;
     document.getElementById('f-price').value=it.price;
     document.getElementById('f-qty').value=it.qty;
@@ -5419,7 +5567,7 @@ function openItemModal(code){
   } else {
     ['f-code','f-name','f-min','f-price','f-qty'].forEach(function(id){document.getElementById(id).value='';});
     document.getElementById('f-uom').value='EA';
-    populateItemModalLocation('Dry Storage');
+    document.getElementById('f-loc').value='Dry Storage';
     document.getElementById('f-qty').disabled=false;
   }
   document.getElementById('item-modal').classList.remove('hide');
@@ -5522,132 +5670,6 @@ function openAddSupplierModal(){
   toast('Supplier "'+name+'" added ✓','success');
 }
 
-// ── Delete Supplier ────────────────────────────────────────
-function openDeleteSupplierModal(){
-  var sups=getSuppliers().slice().sort();
-  if(!sups.length){toast('No suppliers to delete','w');return;}
-  var curSel=document.getElementById('f-sup');
-  var cur=curSel?curSel.value:'';
-  var opts=sups.map(function(s){return '<option value="'+xe(s)+'"'+(s===cur?' selected':'')+'>'+xe(s)+'</option>';}).join('');
-  om('Delete Supplier',
-    '<div style="display:flex;flex-direction:column;gap:14px;padding:4px 0">'    +'<div class="fg"><label>Select Supplier to Delete</label>'    +'<select id="del-sup-sel" style="width:100%"><option value="">— Choose —</option>'+opts+'</select></div>'    +'<div style="font-size:11px;color:var(--red);background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:8px;padding:10px">'    +'⚠️ Items linked to this supplier will have their supplier cleared.'    +'</div>'    +'<div class="mfoot" style="margin-top:4px;padding-top:12px;border-top:1px solid var(--bd)">'    +'<button class="btn s" onclick="cm()">Cancel</button>'    +'<button class="btn d" onclick="confirmDeleteSupplier()">Delete Supplier</button>'    +'</div></div>',null);
-}
-
-function confirmDeleteSupplier(){
-  var sel=document.getElementById('del-sup-sel');
-  if(!sel||!sel.value){toast('Please select a supplier','w');return;}
-  var name=sel.value;
-  if(!S.suppliers)S.suppliers=getSuppliers().slice();
-  var idx=S.suppliers.indexOf(name);
-  if(idx<0){toast('Supplier not found','error');return;}
-  S.suppliers.splice(idx,1);
-  if(db)db.ref(bPath('suppliers')).set(S.suppliers);
-  // Clear supplier from any items that use it
-  var updates={};
-  items.forEach(function(it){
-    if(it.supplier===name){
-      it.supplier='';
-      var ck=String(it.code).replace(/[.#$\[\]\/]/g,'_');
-      updates['shared/inv_items/'+ck+'/supplier']='';
-    }
-  });
-  if(db&&Object.keys(updates).length)db.ref().update(updates);
-  populateSupplierSelect();
-  cm();
-  toast('Supplier "'+name+'" deleted','success');
-}
-
-// ── Location Management ────────────────────────────────────
-var DEFAULT_LOCATIONS=['Dry Storage','Beverage Storage','Production Cooler','Walk-in Chiller','Walk-in Freezer','Chemical Storage','Small Wares','Front Line','General Storage','Unassigned'];
-
-function getLocations(){
-  if(S.locations&&S.locations.length)return S.locations;
-  return DEFAULT_LOCATIONS.slice();
-}
-
-function loadLocations(){
-  if(!db)return;
-  db.ref(bPath('locations')).on('value',function(snap){
-    var v=snap.val();
-    if(v&&Array.isArray(v))S.locations=v;
-    else S.locations=DEFAULT_LOCATIONS.slice();
-    populateItemModalLocation();
-  });
-}
-
-function populateItemModalLocation(selectVal){
-  var fLoc=document.getElementById('f-loc');
-  if(!fLoc)return;
-  var cur=selectVal!==undefined?selectVal:fLoc.value;
-  fLoc.innerHTML='';
-  getLocations().sort().forEach(function(l){
-    var o=document.createElement('option');
-    o.value=l;o.textContent=l;
-    if(l===cur)o.selected=true;
-    fLoc.appendChild(o);
-  });
-  // If nothing selected and cur is not in list, default to first
-  if(!fLoc.value&&fLoc.options.length)fLoc.selectedIndex=0;
-}
-
-function openAddLocationModal(){
-  om('Add New Location',
-    '<div style="display:flex;flex-direction:column;gap:14px;padding:4px 0">'    +'<div class="fg"><label>Location Name *</label>'    +'<input id="new-loc-inp" placeholder="e.g. Bakery Storage" style="width:100%"></div>'    +'<div class="mfoot" style="margin-top:4px;padding-top:12px;border-top:1px solid var(--bd)">'    +'<button class="btn s" onclick="cm()">Cancel</button>'    +'<button class="btn" onclick="confirmAddLocation()">Add Location</button>'    +'</div></div>',null);
-  setTimeout(function(){var el=document.getElementById('new-loc-inp');if(el)el.focus();},80);
-}
-
-function confirmAddLocation(){
-  var inp=document.getElementById('new-loc-inp');
-  if(!inp||!inp.value.trim()){toast('Enter a location name','w');return;}
-  var name=inp.value.trim();
-  if(!S.locations)S.locations=getLocations().slice();
-  if(S.locations.indexOf(name)>=0){toast('Location already exists','w');return;}
-  S.locations.push(name);
-  if(db)db.ref(bPath('locations')).set(S.locations);
-  var curCode=document.getElementById('f-loc');
-  populateItemModalLocation(curCode?curCode.value:'');
-  cm();
-  // Re-select the new location
-  setTimeout(function(){populateItemModalLocation(name);},50);
-  toast('Location "'+name+'" added ✓','success');
-}
-
-function openDeleteLocationModal(){
-  var locs=getLocations().slice().sort();
-  if(!locs.length){toast('No locations to delete','w');return;}
-  var curSel=document.getElementById('f-loc');
-  var cur=curSel?curSel.value:'';
-  var opts=locs.map(function(l){return '<option value="'+xe(l)+'"'+(l===cur?' selected':'')+'>'+xe(l)+'</option>';}).join('');
-  om('Delete Location',
-    '<div style="display:flex;flex-direction:column;gap:14px;padding:4px 0">'    +'<div class="fg"><label>Select Location to Delete</label>'    +'<select id="del-loc-sel" style="width:100%"><option value="">— Choose —</option>'+opts+'</select></div>'    +'<div style="font-size:11px;color:var(--red);background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);border-radius:8px;padding:10px">'    +'⚠️ Items assigned to this location will be moved to "Dry Storage".'    +'</div>'    +'<div class="mfoot" style="margin-top:4px;padding-top:12px;border-top:1px solid var(--bd)">'    +'<button class="btn s" onclick="cm()">Cancel</button>'    +'<button class="btn d" onclick="confirmDeleteLocation()">Delete Location</button>'    +'</div></div>',null);
-}
-
-function confirmDeleteLocation(){
-  var sel=document.getElementById('del-loc-sel');
-  if(!sel||!sel.value){toast('Please select a location','w');return;}
-  var name=sel.value;
-  if(!S.locations)S.locations=getLocations().slice();
-  var idx=S.locations.indexOf(name);
-  if(idx<0){toast('Location not found','error');return;}
-  S.locations.splice(idx,1);
-  if(db)db.ref(bPath('locations')).set(S.locations);
-  // Move all items with this location to Dry Storage
-  var fallback='Dry Storage';
-  if(S.locations.indexOf(fallback)<0&&S.locations.length)fallback=S.locations[0];
-  var updates={};
-  items.forEach(function(it){
-    if(it.location===name){
-      it.location=fallback;
-      var ck=String(it.code).replace(/[.#$\[\]\/]/g,'_');
-      updates['shared/inv_items/'+ck+'/location']=fallback;
-    }
-  });
-  if(db&&Object.keys(updates).length)db.ref().update(updates);
-  populateItemModalLocation(fallback);
-  cm();
-  toast('Location "'+name+'" deleted. Items moved to "'+fallback+'"','success');
-}
-
 function loadSuppliers(){
   if(!db)return;
   db.ref(bPath('suppliers')).on('value',function(snap){
@@ -5672,6 +5694,40 @@ function saveBranchConfig(cfg){
     if(!err){S._branchConfig=Object.assign(S._branchConfig||{},cfg);toast('Saved ✓','success');}
     else toast('Save error','error');
   });
+}
+
+function openFoodCostTargetModal(){
+  var cfg=S._branchConfig||{};
+  var cur=parseFloat(cfg.fcTarget)||30;
+  om('⚙️ Food Cost Target',
+    '<div style="display:flex;flex-direction:column;gap:16px;padding:4px 0">'
+    +'<div style="font-size:12px;color:var(--text3);background:var(--bg2);border-radius:8px;padding:10px 12px;">'
+    +'Set the monthly food cost target percentage for this branch. The dashboard gauge will show green/amber/red based on this target.'
+    +'</div>'
+    +'<div class="fg"><label>Food Cost Target (%)</label>'
+    +'<input id="fc-target-inp" type="number" min="1" max="100" step="0.5" value="'+cur+'" style="font-size:28px;font-weight:300;text-align:center;font-family:var(--mono)">'
+    +'</div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap">'
+    +['25','28','30','32','35'].map(function(v){return '<button type="button" onclick="document.getElementById(\'fc-target-inp\').value=\''+v+'\'" style="padding:6px 14px;border-radius:8px;border:1px solid var(--bd);background:var(--bg2);color:var(--text2);font-size:12px;cursor:pointer;font-family:var(--mono)">'+v+'%</button>';}).join('')
+    +'</div>'
+    +'<div style="font-size:10px;color:var(--text3);background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.15);border-radius:8px;padding:10px 12px">'
+    +'✅ <strong style="color:var(--grn)">On Track</strong> = at or below target &nbsp;·&nbsp; '
+    +'⚠️ <strong style="color:var(--gold)">Caution</strong> = up to 10% above target &nbsp;·&nbsp; '
+    +'🔴 <strong style="color:var(--red)">Over</strong> = more than 10% above target'
+    +'</div>'
+    +'<div class="mfoot" style="margin-top:4px;padding-top:12px;border-top:1px solid var(--bd)">'
+    +'<button class="btn s" onclick="cm()">Cancel</button>'
+    +'<button class="btn" onclick="saveFoodCostTarget()">Save Target</button>'
+    +'</div>'
+    +'</div>', null);
+}
+
+function saveFoodCostTarget(){
+  var inp=document.getElementById('fc-target-inp');
+  var v=parseFloat(inp?inp.value:0)||30;
+  if(v<1||v>100){toast('Target must be between 1% and 100%','w');return;}
+  saveBranchConfig({fcTarget:v});
+  cm();
 }
 
 function openTablesSeatsModal(){
@@ -6862,7 +6918,6 @@ function _doLaunch(){
       buildTodayShiftMap();
       attachListeners();
       loadSuppliers();
-      loadLocations();
       loadBranchConfig();
       attachTransferListener();
       if(!IS_SUPER_ADMIN) seedIfEmpty();
@@ -6925,7 +6980,7 @@ function doLogout(){
   // detach all listeners
   if(db){try{db.ref().off();}catch(e){}}
   _listenersAttached=false;
-  S={p:'inv-dash',q:'',fd:'All',wo:0,tsTab:'att',tsLTab:'all',tsSt:'present',tsViewDate:TODAY,staff:[],sch:{},sales:[],pull:[],waste:[],wares:[],rem:[],pc:[],health:[],invoices:[],tsEmps:[],tsAtt:[],tsLeaves:[],locations:[],suppliers:[]};
+  S={p:'inv-dash',q:'',fd:'All',wo:0,tsTab:'att',tsLTab:'all',tsSt:'present',tsViewDate:TODAY,staff:[],sch:{},sales:[],pull:[],waste:[],wares:[],rem:[],pc:[],health:[],invoices:[],tsEmps:[],tsAtt:[],tsLeaves:[]};
   items=[];logs=[];orders=[];
   document.getElementById('app').style.display='none';
   showLoginScreen();
