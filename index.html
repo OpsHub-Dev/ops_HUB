@@ -7759,15 +7759,29 @@ function saveBranchModal(){
     if(e){toast('Error saving branch','error');return;}
     toast((_editBranchId?'Branch updated':'Branch created')+': '+name,'success');
     cm();
-    loadAdminBranches();
-    if(db) loadBranchesForLogin();
+    if(typeof loadAdminBranches==='function') loadAdminBranches();
+    if(db&&typeof loadBranchesForLogin==='function') loadBranchesForLogin();
     // Also update CURRENT_BRANCH if editing the branch we're in
     if(CURRENT_BRANCH&&CURRENT_BRANCH.id===id){
       CURRENT_BRANCH=b;
+      // Update session storage
+      try{
+        var sess=JSON.parse(localStorage.getItem(SESSION_KEY)||'{}');
+        if(sess.branchId===id){sess.branch=b;localStorage.setItem(SESSION_KEY,JSON.stringify(sess));}
+      }catch(ex){}
+      // Update header
       var bl=document.getElementById('branch-label');
       if(bl) bl.textContent=b.name;
       var bd2=document.getElementById('branch-dot');
       if(bd2) bd2.style.background=b.color||'var(--grn)';
+      var hico=document.getElementById('header-branch-icon');
+      if(hico){hico.textContent=b.icon||'⚡';hico.style.background='linear-gradient(135deg,'+(b.color||'#f0a500')+','+(b.color||'#f0a500')+'aa)';}
+      var htitle=document.getElementById('header-branch-name');
+      if(htitle) htitle.textContent=b.name||'';
+      var hsub=document.getElementById('header-branch-sub');
+      if(hsub) hsub.textContent=(b.brand||'')+(b.location?' · '+b.location:'');
+      // Re-render dashboard if currently visible
+      if(S.p==='inv-dash') ren();
     }
   });
 }
