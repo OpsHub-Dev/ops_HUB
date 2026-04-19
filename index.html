@@ -1569,6 +1569,42 @@ var NAV_CONFIG = {
 //         branches/{id}/stock      → branch stock quantities
 // ══════════════════════════════════════════════════════
 
+// Users registry (directors, area managers) loaded from admin/users
+var NX_USERS = {};  // { userId: {id, name, role, pin, branchIds:[], brandName, ...} }
+
+function loadUserRegistry(cb) {
+  if (!db) { setTimeout(function(){ loadUserRegistry(cb); }, 500); return; }
+  db.ref('admin/users').on('value', function(snap) {
+    var raw = snap.val() || {};
+    NX_USERS = {};
+    Object.values(raw).filter(Boolean).forEach(function(u) {
+      if (u.id) NX_USERS[u.id] = u;
+    });
+    if (cb) cb(NX_USERS);
+  });
+}
+
+function saveUser(user, cb) {
+  if (!db) { showToast('No Firebase connection','error'); return; }
+  db.ref('admin/users/' + user.id).set(user, function(err) {
+    if (err) { showToast('Save failed: ' + err.message, 'error'); return; }
+    NX_USERS[user.id] = user;
+    if (cb) cb();
+  });
+}
+
+function deleteUser(userId, cb) {
+  if (!db) return;
+  db.ref('admin/users/' + userId).remove(function(err) {
+    if (err) { showToast('Delete failed','error'); return; }
+    delete NX_USERS[userId];
+    if (cb) cb();
+  });
+}
+
+// Get all branches accessible to a session (supports multi-branch directors)
+// This replaces getAccessibleBranches for session-aware filtering
+
 // Live branch registry loaded from admin/branches
 var NX_BRANCHES = {};    // { branchId: {id, name, brand, location, manager, color, icon, pin, ...} }
 var NX_BRANCH_SALES = {}; // { branchId: [sales entries] } — loaded on demand
@@ -1651,14 +1687,20 @@ function getAccessibleBranches() {
   if (!all.length) return [];
 
   if (s.role === 'super_admin' || s.role === 'ceo') return all;
+
+  // Branch manager and staff — single branch
   if (s.role === 'branch_mgr' || s.role === 'staff') {
     return all.filter(function(b) { return b.id === s.branchId; });
   }
-  if (s.role === 'brand_dir' && s.brandName) {
-    return all.filter(function(b) { return (b.brand||'').toLowerCase() === s.brandName.toLowerCase(); });
-  }
-  if (s.role === 'regional' && s.regionName) {
-    return all.filter(function(b) { return (b.location||'').toLowerCase() === s.regionName.toLowerCase() && (b.brand||'').toLowerCase() === (s.brandName||'').toLowerCase(); });
+
+  // Brand Director or Area Manager — multi-branch via branchIds array
+  if (s.role === 'brand_dir' || s.role === 'regional') {
+    if (s.branchIds && s.branchIds.length) {
+      return all.filter(function(b) { return s.branchIds.indexOf(b.id) >= 0; });
+    }
+    // Fallback: single branch (legacy)
+    if (s.branchId) return all.filter(function(b){ return b.id === s.branchId; });
+    return [];
   }
   return all;
 }
@@ -2202,10 +2244,14 @@ function verifyPIN() {
   var pin   = loginState.pin;
   var valid = false;
 
-  // ── System PINs ──
-  if      (role === 'super_admin' && pin === ACCESS.superAdmin.pin) valid = true;
-  else if (role === 'ceo'         && pin === ACCESS.ceo.pin)        valid = true;
-  else if (role === 'branch_mgr') {
+  // ── System PINs ──────────────────────────────────────────────────────────
+  if (role === 'super_admin' && pin === ACCESS.superAdmin.pin) {
+    valid = true;
+  } else if (role === 'ceo' && pin === ACCESS.ceo.pin) {
+    valid = true;
+
+  // ── Branch Manager: PIN from admin/branches ───────────────────────────────
+  } else if (role === 'branch_mgr') {
     var brObj   = NX_BRANCHES[loginState.branchId] || {};
     var realPin = String(brObj.pin || '');
     valid = realPin.length > 0 && pin === realPin;
@@ -2214,72 +2260,68 @@ function verifyPIN() {
       if (errEl) errEl.textContent = 'Branch data not yet loaded — please wait and retry.';
       loginState.pin = ''; updatePinDots(); return;
     }
-  }
-  else if (role === 'staff') valid = true;
 
-  // ── Director / Regional: look up their branch assignment from Firebase ──
-  // Their PIN is stored in admin/branches as directorPin or regionalPin field
-  else if (role === 'brand_dir' || role === 'regional') {
-    var pinField = role === 'brand_dir' ? 'directorPin' : 'regionalPin';
-    var matchedBranch = null;
-    Object.values(NX_BRANCHES).forEach(function(b) {
-      if (String(b[pinField] || '') === pin) matchedBranch = b;
+  // ── Staff: no PIN ─────────────────────────────────────────────────────────
+  } else if (role === 'staff') {
+    valid = true;
+
+  // ── Brand Director / Area Manager: PIN from admin/users ──────────────────
+  // admin/users/{id} = {id, name, role, pin, branchIds:[...], ...}
+  } else if (role === 'brand_dir' || role === 'regional') {
+    // Search admin/users for a user with matching role + PIN
+    var matchedUser = null;
+    Object.values(NX_USERS).forEach(function(u) {
+      if (u.role === role && String(u.pin || '') === pin && u.active !== false) {
+        matchedUser = u;
+      }
     });
 
-    if (matchedBranch) {
+    if (matchedUser) {
       valid = true;
-      loginState.branchId    = matchedBranch.id;
-      loginState.branchName  = matchedBranch.name;
-      loginState.brandName   = matchedBranch.brand || matchedBranch.name;
-      loginState.regionName  = matchedBranch.location || '';
-    } else {
-      // Also check global ACCESS fallbacks
-      var fallbackPin = role === 'brand_dir' ? ACCESS.brandDir.pin : ACCESS.regional.pin;
-      if (pin === fallbackPin) valid = true;
+      loginState.userId     = matchedUser.id;
+      loginState.userName   = matchedUser.name || '';
+      loginState.branchIds  = matchedUser.branchIds || [];
+      loginState.brandName  = matchedUser.brandName  || '';
+      loginState.regionName = matchedUser.regionName || '';
+      // For single-branch compatibility, set branchId to first branch
+      if (loginState.branchIds.length === 1) {
+        loginState.branchId = loginState.branchIds[0];
+      }
+    } else if (!Object.keys(NX_USERS).length) {
+      // NX_USERS not loaded yet — show retry message
+      var errEl2 = document.getElementById('pin-error');
+      if (errEl2) errEl2.textContent = 'User data loading… please wait and try again.';
+      loginState.pin = ''; updatePinDots(); return;
     }
   }
 
   if (!valid) {
-    var errEl2 = document.getElementById('pin-error');
-    if (errEl2) errEl2.textContent = 'Incorrect PIN — please try again.';
+    var errEl3 = document.getElementById('pin-error');
+    if (errEl3) errEl3.textContent = 'Incorrect PIN — please try again.';
     loginState.pin = ''; updatePinDots(); return;
   }
 
-  // ── Build session ──
+  // ── Build session ─────────────────────────────────────────────────────────
   var sess = { role: role };
   if (role === 'super_admin' || role === 'ceo') {
     sess.entityName = 'ALFA.CO';
-  } else if (role === 'brand_dir') {
-    if (loginState.branchId) {
-      // Auto-assigned to their branch
-      var bObj2 = NX_BRANCHES[loginState.branchId] || {};
-      sess.branchId   = loginState.branchId;
-      sess.branchName = bObj2.name     || loginState.branchName || '';
-      sess.brandName  = bObj2.brand    || loginState.brandName  || '';
-      sess.regionName = bObj2.location || loginState.regionName || '';
-      sess.entityName = sess.brandName || sess.branchName;
-    } else {
-      sess.brandName  = loginState.brandName || 'Brand Director';
-      sess.entityName = sess.brandName;
-    }
-  } else if (role === 'regional') {
-    if (loginState.branchId) {
-      var bObj3 = NX_BRANCHES[loginState.branchId] || {};
-      sess.branchId   = loginState.branchId;
-      sess.branchName = bObj3.name     || loginState.branchName || '';
-      sess.brandName  = bObj3.brand    || loginState.brandName  || '';
-      sess.regionName = bObj3.location || loginState.regionName || '';
-      sess.entityName = sess.regionName || sess.branchName;
-    } else {
-      sess.brandName  = loginState.brandName  || '';
-      sess.regionName = loginState.regionName || 'Regional Manager';
-      sess.entityName = sess.regionName;
-    }
-  } else {
-    // branch_mgr or staff
+
+  } else if (role === 'brand_dir' || role === 'regional') {
+    sess.userId     = loginState.userId    || '';
+    sess.userName   = loginState.userName  || '';
+    sess.branchIds  = loginState.branchIds || [];
+    sess.branchId   = loginState.branchId  || (loginState.branchIds[0] || '');
+    sess.brandName  = loginState.brandName  || '';
+    sess.regionName = loginState.regionName || '';
+    var firstBranch = NX_BRANCHES[sess.branchId] || {};
+    sess.branchName = firstBranch.name || '';
+    sess.entityName = loginState.userName || (role === 'brand_dir' ? 'Brand Director' : 'Area Manager');
+
+  } else if (role === 'branch_mgr' || role === 'staff') {
     var branchId4 = loginState.branchId;
     var bObj4     = NX_BRANCHES[branchId4] || {};
     sess.branchId   = branchId4;
+    sess.branchIds  = [branchId4];
     sess.branchName = bObj4.name     || loginState.branchName || branchId4;
     sess.brandName  = bObj4.brand    || loginState.brandName  || '';
     sess.regionName = bObj4.location || loginState.regionName || '';
@@ -3366,6 +3408,89 @@ function manageBranches(k) { showToast('Managing ' + SEED.brands[k].config.name 
 
 // ── PAGE: ACCESS CONTROL ──
 
+function saveNewUser() {
+  var name = (document.getElementById('nxu-name')||{}).value||'';
+  var pin  = (document.getElementById('nxu-pin') ||{}).value||'';
+  var role = (document.getElementById('nxu-role')||{}).value||'brand_dir';
+  var err  = document.getElementById('nxu-err');
+
+  if (!name.trim()) { if(err)err.textContent='Name is required'; return; }
+  if (pin.length < 4) { if(err)err.textContent='PIN must be at least 4 digits'; return; }
+
+  // Check PIN uniqueness
+  var pinConflict = Object.values(NX_USERS).find(function(u){ return String(u.pin||'') === pin; });
+  if (pinConflict) { if(err)err.textContent='PIN already used by "' + (pinConflict.name||pinConflict.id) + '"'; return; }
+
+  // Collect checked branches
+  var checkboxes = document.querySelectorAll('.nxu-branch:checked');
+  var branchIds = [];
+  checkboxes.forEach(function(cb){ branchIds.push(cb.value); });
+
+  var userId = 'u_' + Date.now();
+  var user = {
+    id: userId,
+    name: name.trim(),
+    role: role,
+    pin: pin,
+    branchIds: branchIds,
+    brandName: branchIds.length && NX_BRANCHES[branchIds[0]] ? NX_BRANCHES[branchIds[0]].brand || '' : '',
+    active: true,
+    createdAt: TODAY_BS
+  };
+
+  saveUser(user, function() {
+    closeModalForce();
+    showToast('"' + user.name + '" created with ' + branchIds.length + ' branch(es)','success');
+    navTo('access-ctrl');
+  });
+}
+
+function updateUser(userId) {
+  var u = NX_USERS[userId];
+  if (!u) return;
+  var name = (document.getElementById('nxu-name')||{}).value||'';
+  var pin  = (document.getElementById('nxu-pin') ||{}).value||'';
+  var role = (document.getElementById('nxu-role')||{}).value||u.role;
+  var err  = document.getElementById('nxu-err');
+
+  if (!name.trim()) { if(err)err.textContent='Name is required'; return; }
+  if (pin.length < 4) { if(err)err.textContent='PIN must be at least 4 digits'; return; }
+
+  // Check PIN uniqueness (excluding self)
+  var pinConflict = Object.values(NX_USERS).find(function(x){ return x.id !== userId && String(x.pin||'') === pin; });
+  if (pinConflict) { if(err)err.textContent='PIN already used by "' + (pinConflict.name||pinConflict.id) + '"'; return; }
+
+  var checkboxes = document.querySelectorAll('.nxu-branch:checked');
+  var branchIds = [];
+  checkboxes.forEach(function(cb){ branchIds.push(cb.value); });
+
+  var updates = {
+    id: userId,
+    name: name.trim(),
+    role: role,
+    pin: pin,
+    branchIds: branchIds,
+    brandName: branchIds.length && NX_BRANCHES[branchIds[0]] ? NX_BRANCHES[branchIds[0]].brand || '' : '',
+    active: u.active !== false,
+    createdAt: u.createdAt || TODAY_BS
+  };
+
+  saveUser(updates, function() {
+    closeModalForce();
+    showToast('"' + updates.name + '" updated — ' + branchIds.length + ' branch(es) assigned','success');
+    navTo('access-ctrl');
+  });
+}
+
+function confirmDeleteUser(userId, name) {
+  if (!confirm('Delete user "' + name + '"? They will no longer be able to log in.')) return;
+  deleteUser(userId, function() {
+    closeModalForce();
+    showToast('"' + name + '" deleted','success');
+    navTo('access-ctrl');
+  });
+}
+
 function openAddBranchModal() {
   openModal(
     '<div class="modal-head"><h2>Add Branch</h2><button class="modal-close" onclick="closeModalForce()">✕</button></div>' +
@@ -3484,43 +3609,110 @@ function deleteBranch(branchId) {
 
 function pAccessCtrl() {
   var branches = Object.values(NX_BRANCHES);
-  var h = '<div class="page-header"><h1>Access Control</h1><p>Assign Directors, Area Managers and Branch Managers to branches</p></div>';
+  var users    = Object.values(NX_USERS);
+  var directors = users.filter(function(u){ return u.role === 'brand_dir'; });
+  var areaMgrs  = users.filter(function(u){ return u.role === 'regional'; });
+
+  var h = '<div class="page-header"><h1>Access Control</h1>';
+  h += '<p>Manage Directors, Area Managers and Branch Managers · ' + branches.length + ' branch(es) registered</p></div>';
+
   h += '<div class="header-actions"><div></div>';
+  h += '<button class="btn" style="margin-right:8px" onclick="openAddUserModal(\'brand_dir\')">+ Add Director</button>';
+  h += '<button class="btn" style="margin-right:8px" onclick="openAddUserModal(\'regional\')">+ Add Area Manager</button>';
   h += '<button class="btn btn-primary" onclick="openAddBranchModal()">+ Add Branch</button>';
   h += '</div>';
 
-  // System PINs card
-  h += '<div class="card section" style="margin-bottom:20px"><h3 style="font-size:12px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.08em;margin-bottom:14px">System PINs</h3>';
-  h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px">';
-  [['👑 Super Admin','0000','var(--super-admin)'],['🏆 CEO','1111','var(--ceo)']].forEach(function(r) {
-    h += '<div style="background:var(--surface-3);border-radius:10px;padding:12px;border-left:3px solid ' + r[2] + '">';
-    h += '<div style="font-size:10px;color:var(--text-secondary);margin-bottom:4px">' + r[0] + '</div>';
-    h += '<div style="font-family:var(--mono);font-size:20px;letter-spacing:4px;color:var(--text-primary);font-weight:600">' + r[1] + '</div></div>';
+  // ── System PINs ──────────────────────────────────────────────────────────
+  h += '<div class="card section"><div style="font-size:11px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">System Access</div>';
+  h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px">';
+  [['🔑','Super Admin','0000','var(--super-admin)'],['👑','CEO','1111','var(--ceo)']].forEach(function(r){
+    h += '<div style="background:var(--surface-3);border-radius:10px;padding:12px;border-left:3px solid '+r[3]+'">';
+    h += '<div style="font-size:10px;color:'+r[3]+';font-weight:700;margin-bottom:4px">'+r[0]+' '+r[1]+'</div>';
+    h += '<div style="font-family:var(--mono);font-size:20px;letter-spacing:4px;font-weight:600">'+r[2]+'</div></div>';
   });
   h += '</div></div>';
 
-  // Branch table with assign controls
-  h += '<div class="table-wrap section"><table class="data-table"><thead><tr>';
-  h += '<th>Branch</th><th>Brand</th><th>Location</th><th>Manager</th><th>Branch PIN</th><th>Director PIN</th><th>Area Mgr PIN</th><th>Actions</th>';
-  h += '</tr></thead><tbody>';
-
-  if (!branches.length) {
-    h += '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-tertiary)">No branches yet — click "+ Add Branch" to create one</td></tr>';
+  // ── Brand Directors ───────────────────────────────────────────────────────
+  h += '<div class="card section"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">';
+  h += '<div style="font-size:11px;font-weight:700;color:var(--brand-dir);text-transform:uppercase;letter-spacing:.08em">🎯 Brand Directors</div>';
+  h += '<button class="btn btn-sm" onclick="openAddUserModal(\'brand_dir\')">+ Add</button></div>';
+  if (!directors.length) {
+    h += '<div style="text-align:center;padding:20px;color:var(--text-tertiary);font-size:12px">No directors yet — click "+ Add" to create one</div>';
   } else {
-    branches.forEach(function(b) {
-      h += '<tr>';
-      h += '<td><strong style="color:var(--text-primary)">' + xe(b.name||b.id) + '</strong></td>';
-      h += '<td>' + xe(b.brand||'—') + '</td>';
-      h += '<td>' + xe(b.location||'—') + '</td>';
-      h += '<td style="font-size:11px;color:var(--text-secondary)">' + xe(b.manager||'—') + '</td>';
-      h += '<td><code style="font-family:var(--mono);font-size:12px;color:var(--branch-mgr)">' + xe(String(b.pin||'—')) + '</code></td>';
-      h += '<td><code style="font-family:var(--mono);font-size:12px;color:var(--brand-dir)">' + xe(String(b.directorPin||'—')) + '</code></td>';
-      h += '<td><code style="font-family:var(--mono);font-size:12px;color:var(--regional)">' + xe(String(b.regionalPin||'—')) + '</code></td>';
-      h += '<td><button class="btn btn-sm" onclick="openManageBranchModal(\'' + xe(b.id) + '\')">Manage</button></td>';
-      h += '</tr>';
+    h += '<div style="display:flex;flex-direction:column;gap:8px">';
+    directors.forEach(function(u) {
+      var assignedBranches = (u.branchIds||[]).map(function(bid){
+        return NX_BRANCHES[bid] ? NX_BRANCHES[bid].name : bid;
+      });
+      h += '<div style="background:var(--surface-3);border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">';
+      h += '<div style="width:36px;height:36px;border-radius:9px;background:var(--brand-dir)18;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">🎯</div>';
+      h += '<div style="flex:1;min-width:120px">';
+      h += '<div style="font-size:13px;font-weight:700;color:var(--text-primary)">' + xe(u.name||u.id) + '</div>';
+      h += '<div style="font-size:10px;color:var(--text-secondary);margin-top:2px">';
+      h += assignedBranches.length ? assignedBranches.map(xe).join(' · ') : '<span style="color:var(--text-tertiary)">No branches assigned</span>';
+      h += '</div></div>';
+      h += '<div style="font-family:var(--mono);font-size:11px;color:var(--brand-dir);background:var(--brand-dir)12;padding:4px 10px;border-radius:6px">PIN: ' + xe(String(u.pin||'—')) + '</div>';
+      h += '<div style="display:flex;gap:6px">';
+      h += '<button class="btn btn-sm" onclick="openEditUserModal(\'' + xe(u.id) + '\')">Edit</button>';
+      h += '<button class="btn btn-sm" style="color:var(--danger);border-color:rgba(248,113,113,.3)" onclick="confirmDeleteUser(\'' + xe(u.id) + '\',\'' + xe(u.name||'') + '\')">Delete</button>';
+      h += '</div></div>';
     });
+    h += '</div>';
   }
-  h += '</tbody></table></div>';
+  h += '</div>';
+
+  // ── Area Managers ─────────────────────────────────────────────────────────
+  h += '<div class="card section"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">';
+  h += '<div style="font-size:11px;font-weight:700;color:var(--regional);text-transform:uppercase;letter-spacing:.08em">🗺️ Area Managers</div>';
+  h += '<button class="btn btn-sm" onclick="openAddUserModal(\'regional\')">+ Add</button></div>';
+  if (!areaMgrs.length) {
+    h += '<div style="text-align:center;padding:20px;color:var(--text-tertiary);font-size:12px">No area managers yet</div>';
+  } else {
+    h += '<div style="display:flex;flex-direction:column;gap:8px">';
+    areaMgrs.forEach(function(u) {
+      var assignedBranches = (u.branchIds||[]).map(function(bid){
+        return NX_BRANCHES[bid] ? NX_BRANCHES[bid].name : bid;
+      });
+      h += '<div style="background:var(--surface-3);border-radius:10px;padding:12px 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">';
+      h += '<div style="width:36px;height:36px;border-radius:9px;background:var(--regional)18;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">🗺️</div>';
+      h += '<div style="flex:1;min-width:120px">';
+      h += '<div style="font-size:13px;font-weight:700;color:var(--text-primary)">' + xe(u.name||u.id) + '</div>';
+      h += '<div style="font-size:10px;color:var(--text-secondary);margin-top:2px">';
+      h += assignedBranches.length ? assignedBranches.map(xe).join(' · ') : '<span style="color:var(--text-tertiary)">No branches assigned</span>';
+      h += '</div></div>';
+      h += '<div style="font-family:var(--mono);font-size:11px;color:var(--regional);background:var(--regional)12;padding:4px 10px;border-radius:6px">PIN: ' + xe(String(u.pin||'—')) + '</div>';
+      h += '<div style="display:flex;gap:6px">';
+      h += '<button class="btn btn-sm" onclick="openEditUserModal(\'' + xe(u.id) + '\')">Edit</button>';
+      h += '<button class="btn btn-sm" style="color:var(--danger);border-color:rgba(248,113,113,.3)" onclick="confirmDeleteUser(\'' + xe(u.id) + '\',\'' + xe(u.name||'') + '\')">Delete</button>';
+      h += '</div></div>';
+    });
+    h += '</div>';
+  }
+  h += '</div>';
+
+  // ── Branch Managers ───────────────────────────────────────────────────────
+  h += '<div class="card section"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">';
+  h += '<div style="font-size:11px;font-weight:700;color:var(--branch-mgr);text-transform:uppercase;letter-spacing:.08em">🏪 Branch Managers</div>';
+  h += '<button class="btn btn-sm" onclick="openAddBranchModal()">+ Add Branch</button></div>';
+  if (!branches.length) {
+    h += '<div style="text-align:center;padding:20px;color:var(--text-tertiary);font-size:12px">No branches yet</div>';
+  } else {
+    h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px">';
+    branches.forEach(function(b) {
+      h += '<div style="background:var(--surface-3);border-radius:10px;padding:12px 14px;border-left:3px solid ' + (b.color||'#f0a500') + '">';
+      h += '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px">';
+      h += '<div style="flex:1;min-width:0">';
+      h += '<div style="font-size:13px;font-weight:700;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + (b.icon||'🍽️') + ' ' + xe(b.name||b.id) + '</div>';
+      h += '<div style="font-size:10px;color:var(--text-secondary);margin-top:2px">' + xe(b.brand||'') + (b.location ? ' · ' + xe(b.location) : '') + '</div>';
+      h += '<div style="font-size:10px;color:var(--text-tertiary);margin-top:2px">Manager: ' + xe(b.manager||'—') + '</div></div>';
+      h += '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">';
+      h += '<div style="font-family:var(--mono);font-size:11px;color:var(--branch-mgr);background:var(--branch-mgr)15;padding:3px 8px;border-radius:5px">PIN: ' + xe(String(b.pin||'—')) + '</div>';
+      h += '<button class="btn btn-sm" onclick="openManageBranchModal(\'' + xe(b.id) + '\')">Edit</button>';
+      h += '</div></div></div>';
+    });
+    h += '</div>';
+  }
+  h += '</div>';
   return h;
 }
 
@@ -3612,41 +3804,99 @@ function saveManageBranch(branchId) {
   }
 }
 
-function openAddUserModal() {
-  var branchOpts = Object.values(NX_BRANCHES).map(function(b){
-    return '<option value="' + xe(b.id) + '">' + xe(b.name) + ' (' + xe(b.brand||'') + ')</option>';
-  }).join('');
+function openAddUserModal(presetRole) {
+  var branches = Object.values(NX_BRANCHES);
+  var roleLabel = presetRole === 'brand_dir' ? 'Brand Director' : 'Area Manager';
+  var roleColor = presetRole === 'brand_dir' ? 'var(--brand-dir)' : 'var(--regional)';
+  var roleIcon  = presetRole === 'brand_dir' ? '🎯' : '🗺️';
+
+  // Build branch checkboxes
+  var branchList = '';
+  if (!branches.length) {
+    branchList = '<div style="color:var(--text-tertiary);font-size:12px;text-align:center;padding:16px">No branches registered yet — add branches first</div>';
+  } else {
+    branchList = '<div style="display:flex;flex-direction:column;gap:6px;max-height:280px;overflow-y:auto;padding-right:4px">' +
+      branches.map(function(b) {
+        return '<label style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--surface-3);border-radius:9px;cursor:pointer;border:1.5px solid transparent;transition:border-color .12s" class="branch-check-row">' +
+          '<input type="checkbox" class="nxu-branch" value="' + xe(b.id) + '" style="width:16px;height:16px;accent-color:' + roleColor + ';cursor:pointer">' +
+          '<span style="font-size:16px">' + (b.icon||'🍽️') + '</span>' +
+          '<div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--text-primary)">' + xe(b.name) + '</div>' +
+          '<div style="font-size:10px;color:var(--text-secondary)">' + xe(b.brand||'') + (b.location?' · '+xe(b.location):'') + '</div></div>' +
+          '<div style="font-family:var(--mono);font-size:10px;color:var(--text-tertiary)">PIN ' + xe(String(b.pin||'')) + '</div>' +
+        '</label>';
+      }).join('') + '</div>';
+  }
+
   openModal(
-    '<div class="modal-head"><h2>Add System User</h2><button class="modal-close" onclick="closeModalForce()">✕</button></div>' +
-    '<div class="form-group"><label class="form-label">Name</label><input class="form-input" id="au-name" placeholder="Full name"></div>' +
-    '<div class="form-group"><label class="form-label">Role</label><select class="form-input form-select" id="au-role"><option value="branch_mgr">Branch Manager</option><option value="regional">Regional Manager</option><option value="brand_dir">Brand Director</option></select></div>' +
-    '<div class="form-group"><label class="form-label">Branch (if Branch Manager)</label><select class="form-input form-select" id="au-branch"><option value="">— None —</option>' + branchOpts + '</select></div>' +
-    '<div class="form-group"><label class="form-label">PIN</label><input class="form-input" type="password" id="au-pin" placeholder="Min 4 digits" maxlength="8"></div>' +
-    '<p style="font-size:11px;color:var(--text-tertiary);margin-bottom:14px">Branch Manager PINs are stored in Firebase at admin/branches/{id}.pin</p>' +
+    '<div class="modal-head"><h2>' + roleIcon + ' Add ' + roleLabel + '</h2>' +
+    '<button class="modal-close" onclick="closeModalForce()">✕</button></div>' +
+
+    '<div class="form-group"><label class="form-label">Full Name *</label>' +
+    '<input class="form-input" id="nxu-name" placeholder="e.g. Ahmed Lotfy"></div>' +
+
+    '<div class="form-row"><div class="form-group"><label class="form-label">Personal PIN * (4–8 digits)</label>' +
+    '<input class="form-input" id="nxu-pin" type="text" placeholder="e.g. 2201" maxlength="8" style="font-family:var(--mono);letter-spacing:3px;font-size:16px"></div>' +
+    '<div class="form-group"><label class="form-label">Role</label>' +
+    '<select class="form-input" id="nxu-role">' +
+    '<option value="brand_dir"' + (presetRole==='brand_dir'?' selected':'') + '>🎯 Brand Director</option>' +
+    '<option value="regional"' + (presetRole==='regional'?' selected':'') + '>🗺️ Area Manager</option>' +
+    '</select></div></div>' +
+
+    '<div class="form-group"><label class="form-label">Assign Branches</label>' +
+    '<div style="font-size:10px;color:var(--text-tertiary);margin-bottom:8px">Select all branches this person is responsible for — they will see performance data for all of them</div>' +
+    branchList + '</div>' +
+
+    '<div id="nxu-err" style="color:var(--danger);font-size:12px;min-height:16px;margin:4px 0"></div>' +
     '<button class="btn btn-primary" style="width:100%" onclick="saveNewUser()">Create User</button>'
   );
 }
 
-function saveNewUser() {
-  var name = document.getElementById('au-name');
-  var role = document.getElementById('au-role');
-  var branch = document.getElementById('au-branch');
-  var pin = document.getElementById('au-pin');
-  if (!name || !name.value.trim()) { showToast('Name required','error'); return; }
-  if (!pin || pin.value.length < 4) { showToast('PIN must be 4+ digits','error'); return; }
-  if (role && role.value === 'branch_mgr' && branch && branch.value) {
-    // Update the branch PIN in Firebase
-    var branchId = branch.value;
-    if (db && branchId) {
-      db.ref('admin/branches/' + branchId + '/pin').set(pin.value);
-      // Update local cache
-      if (NX_BRANCHES[branchId]) NX_BRANCHES[branchId].pin = pin.value;
-      showToast('Branch PIN updated in Firebase', 'success');
-    }
-  }
-  closeModalForce();
-  showToast('User saved', 'success');
+function openEditUserModal(userId) {
+  var u = NX_USERS[userId];
+  if (!u) { showToast('User not found','error'); return; }
+  var branches = Object.values(NX_BRANCHES);
+  var assigned = u.branchIds || [];
+  var roleLabel = u.role === 'brand_dir' ? 'Brand Director' : 'Area Manager';
+  var roleColor = u.role === 'brand_dir' ? 'var(--brand-dir)' : 'var(--regional)';
+
+  var branchList = '<div style="display:flex;flex-direction:column;gap:6px;max-height:280px;overflow-y:auto;padding-right:4px">' +
+    branches.map(function(b) {
+      var checked = assigned.indexOf(b.id) >= 0;
+      return '<label style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--surface-3);border-radius:9px;cursor:pointer">' +
+        '<input type="checkbox" class="nxu-branch" value="' + xe(b.id) + '"' + (checked?' checked':'') + ' style="width:16px;height:16px;accent-color:' + roleColor + ';cursor:pointer">' +
+        '<span style="font-size:16px">' + (b.icon||'🍽️') + '</span>' +
+        '<div style="flex:1"><div style="font-size:13px;font-weight:600;color:var(--text-primary)">' + xe(b.name) + '</div>' +
+        '<div style="font-size:10px;color:var(--text-secondary)">' + xe(b.brand||'') + (b.location?' · '+xe(b.location):'') + '</div></div>' +
+      '</label>';
+    }).join('') + '</div>';
+
+  openModal(
+    '<div class="modal-head"><h2>Edit: ' + xe(u.name||userId) + '</h2>' +
+    '<button class="modal-close" onclick="closeModalForce()">✕</button></div>' +
+
+    '<div class="form-group"><label class="form-label">Full Name</label>' +
+    '<input class="form-input" id="nxu-name" value="' + xe(u.name||'') + '"></div>' +
+
+    '<div class="form-row"><div class="form-group"><label class="form-label">Personal PIN</label>' +
+    '<input class="form-input" id="nxu-pin" type="text" value="' + xe(String(u.pin||'')) + '" maxlength="8" style="font-family:var(--mono);letter-spacing:3px;font-size:16px"></div>' +
+    '<div class="form-group"><label class="form-label">Role</label>' +
+    '<select class="form-input" id="nxu-role">' +
+    '<option value="brand_dir"' + (u.role==='brand_dir'?' selected':'') + '>🎯 Brand Director</option>' +
+    '<option value="regional"' + (u.role==='regional'?' selected':'') + '>🗺️ Area Manager</option>' +
+    '</select></div></div>' +
+
+    '<div class="form-group"><label class="form-label">Assigned Branches</label>' +
+    branchList + '</div>' +
+
+    '<div id="nxu-err" style="color:var(--danger);font-size:12px;min-height:16px;margin:4px 0"></div>' +
+    '<div style="display:flex;gap:8px">' +
+    '<button class="btn btn-primary" style="flex:1" onclick="updateUser(\'' + xe(userId) + '\')">Save Changes</button>' +
+    '<button class="btn" style="color:var(--danger);border-color:rgba(248,113,113,.3)" onclick="confirmDeleteUser(\'' + xe(userId) + '\',\'' + xe(u.name||'') + '\')">Delete</button>' +
+    '</div>'
+  );
 }
+
+
 
 
 
@@ -3686,38 +3936,52 @@ function pAuditLog() {
 // ── PAGE: BRAND DASHBOARD ──
 function pBrandDash() {
   var s = NX.session || {};
-  var brandName = s.brandName || s.entityName || 'Brand';
-  var branches = getAccessibleBranches().filter(function(b) {
-    return !s.brandName || (b.brand||b.name) === s.brandName;
-  });
-  var today = 0, mtd = 0;
-  branches.forEach(function(b) { today += branchSalesToday(b.id); mtd += branchSalesMTD(b.id); });
+  var branches = getAccessibleBranches();
+  var totalToday = 0, totalMTD = 0;
+  branches.forEach(function(b) { totalToday += branchSalesToday(b.id); totalMTD += branchSalesMTD(b.id); });
+  var userName = s.userName || s.entityName || (s.role === 'brand_dir' ? 'Brand Director' : 'Area Manager');
+  var roleLabel = s.role === 'brand_dir' ? 'Brand Director' : 'Area Manager';
 
-  var h = '<div class="page-header"><h1>' + xe(brandName) + ' Dashboard</h1><p>Brand-level overview · ' + branches.length + ' branch(es)</p></div>';
+  var h = '<div class="page-header"><h1>' + xe(userName) + '</h1>';
+  h += '<p>' + roleLabel + ' · ' + branches.length + ' branch(es) assigned · ' + fmtDate(new Date()) + '</p></div>';
+
+  if (!branches.length) {
+    h += '<div class="empty-state"><div class="es-icon">🏪</div>';
+    h += '<h3>No branches assigned</h3>';
+    h += '<p style="color:var(--text-secondary)">Ask the CEO or Super Admin to assign branches to your account in Access Control.</p></div>';
+    return h;
+  }
+
+  // KPI summary across all assigned branches
   h += '<div class="kpi-grid section">';
-  h += kpiCard('💰','Today Revenue', formatSAR(today), 'All branches', 'var(--ceo)', 'Live from Firebase', '');
-  h += kpiCard('📅','MTD Revenue', formatSAR(mtd), 'This month', 'var(--brand-dir)', new Date().toLocaleDateString('en-GB',{month:'short',year:'numeric'}), '');
-  h += kpiCard('🏢','Branches', branches.length, 'Registered branches', 'var(--info)', 'From admin/branches', '');
-  h += kpiCard('📊','Sales Loaded', Object.keys(NX_LOADED_SALES).length, 'Branches synced', 'var(--branch-mgr)', '', '');
+  h += kpiCard('💰','Today — All Branches', formatSAR(totalToday), branches.length + ' branch(es)', 'var(--ceo)', 'Live from Firebase', '');
+  h += kpiCard('📅','MTD — All Branches', formatSAR(totalMTD), new Date().toLocaleDateString('en-GB',{month:'long',year:'numeric'}), 'var(--brand-dir)', '', '');
+  h += kpiCard('🏢','Branches', branches.length, 'Assigned to you', 'var(--info)', '', '');
+  h += kpiCard('📊','Daily Avg', formatSAR(totalMTD / Math.max(1, new Date().getDate())), 'This month', 'var(--branch-mgr)', '', '');
   h += '</div>';
 
-  // Branch cards
-  h += '<div class="section"><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px">';
+  // Per-branch breakdown cards
+  h += '<div class="section"><h3 style="font-size:12px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.08em;margin-bottom:14px">Branch Breakdown</h3>';
+  h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px">';
   branches.forEach(function(b) {
     var bt = branchSalesToday(b.id), bm = branchSalesMTD(b.id);
+    var dayAvg = bm / Math.max(1, new Date().getDate());
     h += '<div class="card" style="border-left:3px solid ' + (b.color||'#f0a500') + '">';
-    h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">';
-    h += '<div style="width:36px;height:36px;border-radius:9px;background:' + (b.color||'#f0a500') + '20;display:flex;align-items:center;justify-content:center;font-size:18px">' + (b.icon||'🍽️') + '</div>';
-    h += '<div><div style="font-weight:700;color:var(--text-primary)">' + xe(b.name) + '</div>';
-    h += '<div style="font-size:11px;color:var(--text-tertiary)">' + xe(b.location||'') + '</div></div></div>';
-    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
-    h += '<div style="background:var(--surface-2);border-radius:7px;padding:10px"><div style="font-size:10px;color:var(--text-tertiary);margin-bottom:3px">TODAY</div><div class="mono" style="font-size:15px;color:var(--ceo);font-weight:700">' + formatSAR(bt) + '</div></div>';
-    h += '<div style="background:var(--surface-2);border-radius:7px;padding:10px"><div style="font-size:10px;color:var(--text-tertiary);margin-bottom:3px">MTD</div><div class="mono" style="font-size:15px;color:var(--brand-dir);font-weight:700">' + formatSAR(bm) + '</div></div>';
+    h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">';
+    h += '<div style="width:38px;height:38px;border-radius:9px;background:' + (b.color||'#f0a500') + '20;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">' + (b.icon||'🍽️') + '</div>';
+    h += '<div><div style="font-size:14px;font-weight:700;color:var(--text-primary)">' + xe(b.name) + '</div>';
+    h += '<div style="font-size:10px;color:var(--text-secondary)">' + xe(b.brand||'') + (b.location?' · '+xe(b.location):'') + '</div></div>';
+    h += '<button class="btn btn-sm" style="margin-left:auto" onclick="switchBranch(\'' + xe(b.id) + '\')">Open →</button></div>';
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">';
+    [['Today',formatSAR(bt),'var(--ceo)'],['MTD',formatSAR(bm),'var(--brand-dir)'],['Daily Avg',formatSAR(dayAvg),'var(--info)']].forEach(function(m){
+      h += '<div style="background:var(--surface-3);border-radius:8px;padding:9px">';
+      h += '<div style="font-size:9px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.06em">' + m[0] + '</div>';
+      h += '<div style="font-size:13px;font-weight:700;color:' + m[2] + ';font-family:var(--mono);margin-top:2px">' + m[1] + '</div></div>';
+    });
     h += '</div>';
-    if (b.manager) h += '<div style="margin-top:10px;font-size:11px;color:var(--text-tertiary)">Manager: ' + xe(b.manager) + '</div>';
+    h += '<div style="margin-top:10px;font-size:11px;color:var(--text-tertiary)">Manager: ' + xe(b.manager||'—') + '</div>';
     h += '</div>';
   });
-  if (!branches.length) h += '<div style="color:var(--text-tertiary);padding:32px;text-align:center">No branches found for this brand in Firebase</div>';
   h += '</div></div>';
   return h;
 }
@@ -3751,33 +4015,64 @@ function pBrandBranches() {
 // ── PAGE: REGION DASHBOARD ──
 function pRegionDash() {
   var s = NX.session || {};
-  var branches = getAccessibleBranches().filter(function(b) {
-    if (s.brandName && (b.brand||b.name) !== s.brandName) return false;
-    if (s.regionName && b.location !== s.regionName) return false;
-    return true;
-  });
-  var today = 0, mtd = 0;
-  branches.forEach(function(b) { today += branchSalesToday(b.id); mtd += branchSalesMTD(b.id); });
-  var regionLabel = s.regionName || s.entityName || 'Region';
+  var branches = getAccessibleBranches();
+  var totalToday = 0, totalMTD = 0;
+  branches.forEach(function(b) { totalToday += branchSalesToday(b.id); totalMTD += branchSalesMTD(b.id); });
+  var userName = s.userName || s.entityName || 'Area Manager';
 
-  var h = '<div class="page-header"><h1>' + xe(regionLabel) + ' Dashboard</h1><p>' + branches.length + ' branch(es) in this region</p></div>';
+  var h = '<div class="page-header"><h1>' + xe(userName) + '</h1>';
+  h += '<p>Area Manager · ' + branches.length + ' branch(es) · ' + fmtDate(new Date()) + '</p></div>';
+
+  if (!branches.length) {
+    h += '<div class="empty-state"><div class="es-icon">🗺️</div>';
+    h += '<h3>No branches assigned</h3>';
+    h += '<p style="color:var(--text-secondary)">Ask the Director or CEO to assign branches to your account in Access Control.</p></div>';
+    return h;
+  }
+
   h += '<div class="kpi-grid section">';
-  h += kpiCard('💰','Region Today', formatSAR(today), branches.length + ' branches', 'var(--regional)', 'Live from Firebase', '');
-  h += kpiCard('📅','Region MTD', formatSAR(mtd), 'This month', 'var(--ceo)', new Date().toLocaleDateString('en-GB',{month:'short',year:'numeric'}), '');
-  h += kpiCard('🏢','Branches', branches.length, 'In this region', 'var(--info)', '', '');
-  h += kpiCard('📊','Daily Avg', formatSAR(today / Math.max(1, new Date().getDate())), 'Per day this month', 'var(--brand-dir)', '', '');
+  h += kpiCard('💰','Today', formatSAR(totalToday), branches.length + ' branch(es)', 'var(--regional)', '', '');
+  h += kpiCard('📅','MTD', formatSAR(totalMTD), 'This month', 'var(--ceo)', '', '');
+  h += kpiCard('🏢','Branches', branches.length, 'Under your supervision', 'var(--info)', '', '');
+  h += kpiCard('📊','Daily Avg', formatSAR(totalMTD / Math.max(1, new Date().getDate())), 'Per day this month', 'var(--branch-mgr)', '', '');
   h += '</div>';
 
-  h += '<div class="section"><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px">';
-  branches.forEach(function(b) {
+  // Sales comparison table
+  h += '<div class="card section">';
+  h += '<div style="font-size:11px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.08em;margin-bottom:14px">Sales Comparison</div>';
+  h += '<table class="data-table"><thead><tr><th>Branch</th><th>Brand</th><th>Today</th><th>MTD</th><th>Daily Avg</th><th>Actions</th></tr></thead><tbody>';
+  // Sort by today descending
+  var sorted = branches.slice().sort(function(a,b){ return branchSalesToday(b.id)-branchSalesToday(a.id); });
+  sorted.forEach(function(b, rank) {
+    var bt = branchSalesToday(b.id), bm = branchSalesMTD(b.id);
+    var dayAvg = bm / Math.max(1, new Date().getDate());
+    var medal = rank===0?'🥇':rank===1?'🥈':rank===2?'🥉':'';
+    h += '<tr>';
+    h += '<td><div style="display:flex;align-items:center;gap:8px">' + medal + ' <span>' + (b.icon||'🍽️') + '</span><strong>' + xe(b.name) + '</strong></div></td>';
+    h += '<td style="color:var(--text-secondary)">' + xe(b.brand||'—') + '</td>';
+    h += '<td class="mono" style="color:var(--ceo)">' + formatSAR(bt) + '</td>';
+    h += '<td class="mono" style="color:var(--brand-dir)">' + formatSAR(bm) + '</td>';
+    h += '<td class="mono">' + formatSAR(dayAvg) + '</td>';
+    h += '<td><button class="btn btn-sm" onclick="switchBranch(\'' + xe(b.id) + '\')">Open</button></td>';
+    h += '</tr>';
+  });
+  h += '</tbody></table></div>';
+
+  // Per-branch cards
+  h += '<div class="section"><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px">';
+  sorted.forEach(function(b) {
+    var bt = branchSalesToday(b.id), bm = branchSalesMTD(b.id);
     h += '<div class="card" style="border-left:3px solid ' + (b.color||'#f0a500') + '">';
-    h += '<div style="font-size:14px;font-weight:700;margin-bottom:12px">' + (b.icon||'🍽️') + ' ' + xe(b.name) + '</div>';
+    h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">';
+    h += '<span style="font-size:18px">' + (b.icon||'🍽️') + '</span>';
+    h += '<div><div style="font-size:13px;font-weight:700">' + xe(b.name) + '</div>';
+    h += '<div style="font-size:10px;color:var(--text-secondary)">' + xe(b.location||'') + '</div></div>';
+    h += '<button class="btn btn-sm" style="margin-left:auto" onclick="switchBranch(\'' + xe(b.id) + '\')">→</button></div>';
     h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
-    h += '<div style="background:var(--surface-2);border-radius:7px;padding:10px"><div style="font-size:10px;color:var(--text-tertiary);margin-bottom:3px">TODAY</div><div class="mono" style="color:var(--ceo);font-weight:700">' + formatSAR(branchSalesToday(b.id)) + '</div></div>';
-    h += '<div style="background:var(--surface-2);border-radius:7px;padding:10px"><div style="font-size:10px;color:var(--text-tertiary);margin-bottom:3px">MTD</div><div class="mono" style="color:var(--brand-dir);font-weight:700">' + formatSAR(branchSalesMTD(b.id)) + '</div></div>';
+    h += '<div style="background:var(--surface-3);border-radius:8px;padding:8px"><div style="font-size:9px;color:var(--text-tertiary)">TODAY</div><div style="font-size:13px;font-weight:700;color:var(--ceo);font-family:var(--mono)">' + formatSAR(bt) + '</div></div>';
+    h += '<div style="background:var(--surface-3);border-radius:8px;padding:8px"><div style="font-size:9px;color:var(--text-tertiary)">MTD</div><div style="font-size:13px;font-weight:700;color:var(--brand-dir);font-family:var(--mono)">' + formatSAR(bm) + '</div></div>';
     h += '</div></div>';
   });
-  if (!branches.length) h += '<div style="color:var(--text-tertiary);padding:32px;text-align:center">No branches found for this region</div>';
   h += '</div></div>';
   return h;
 }
@@ -5907,9 +6202,9 @@ window.onload = function() {
   // Init Firebase first, then load branch registry so login can show real branches
   tryInitFB();
 
-  // Load branches immediately — needed for branch/role selection on login screen.
-  // loadBranchRegistry retries until db is ready (500ms interval).
+  // Load branches + users immediately — needed for login screen
   loadBranchRegistry();
+  loadUserRegistry();
 
   // Check session
   var sess = loadSession();
