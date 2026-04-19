@@ -951,6 +951,7 @@ body{
       </button>
       <button class="icon-btn" onclick="toggleTheme()" title="Toggle theme" id="theme-btn">🌙</button>
       <div class="user-avatar" id="user-avatar" title="User info">U</div>
+      <button class="icon-btn" onclick="doLogout()" title="Sign out" style="color:var(--text-secondary);font-size:16px">⎋</button>
     </div>
   </div>
 
@@ -1135,6 +1136,37 @@ function loadSession() {
 function clearSession() {
   localStorage.removeItem(SESSION_KEY);
   NX.session = null;
+}
+
+function doLogout() {
+  // Reset all branch state
+  _bListenersAttached = false;
+  BS = { q:'', fd:'All', wo:0, tsTab:'att', tsLTab:'all', tsViewDate: TODAY_BS,
+         staff:[], sales:[], waste:[], rem:[], pc:[], health:[], invoices:[],
+         tsEmps:[], tsLeaves:[], sch:{}, tsAtt:{}, _branchConfig:{} };
+  bItems = []; bLogs = []; bOrders = [];
+  clNxRole = null;
+  clNxState = {};
+  NX.rev = null;
+  NX.notifications = [];
+  NX.unreadCount = 0;
+  NX._notifFilter = 'all';
+
+  // Stop all Firebase listeners
+  clearLiveListeners();
+
+  // Clear session
+  clearSession();
+
+  // Show login screen
+  var app = document.getElementById('app');
+  var login = document.getElementById('login-screen');
+  if (app)   { app.classList.remove('visible'); app.style.display = 'none'; }
+  if (login) { login.style.display = ''; }
+
+  // Reset login state and re-render login
+  renderLogin(0);
+  showToast('Signed out', 'success');
 }
 
 // ── Core utility functions ────────────────────────────────────────────────────
@@ -2004,9 +2036,10 @@ function verifyPIN() {
 
 // ── APP LAUNCH ──
 function launchApp() {
-  document.getElementById('login-screen').style.display = 'none';
+  var login = document.getElementById('login-screen');
+  if (login) login.style.display = 'none';
   var app = document.getElementById('app');
-  app.classList.add('visible');
+  if (app) { app.style.display = ''; app.classList.add('visible'); }
   renderSidebar();
   renderNotifications();
 
