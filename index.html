@@ -1506,45 +1506,36 @@ var NAV_CONFIG = {
     ]}
   ],
   branch_mgr: [
-    { section:'PORTALS', items:[
-      { id:'_staff-portal',     icon:'🏃', label:'Staff Portal' },
-      { id:'_leave-portal',     icon:'📝', label:'Leave Request' },
-      { id:'_checklist-portal', icon:'📋', label:'Checklist App' }
+    { section:'DASHBOARD', items:[
+      { id:'branch-dash', icon:'📊', label:'Dashboard' }
     ]},
     { section:'INVENTORY', items:[
-      { id:'branch-dash', icon:'📊', label:'Dashboard' },
-      { id:'inv-items',   icon:'📋', label:'Items' },
+      { id:'inv-items',   icon:'📦', label:'Items' },
       { id:'inv-moves',   icon:'🔄', label:'Receive / Issue' },
       { id:'inv-orders',  icon:'🛒', label:'Purchase Orders' },
       { id:'low-stock',   icon:'🚨', label:'Low Stock', badge:'lowstock' },
-      { id:'inv-report',  icon:'📅', label:'Monthly Report' }
+      { id:'inv-report',  icon:'📅', label:'Monthly Report' },
+      { id:'wastage',     icon:'🗑️', label:'Wastage Log' }
     ]},
     { section:'OPERATIONS', items:[
-      { id:'wastage', icon:'🗑️', label:'Wastage Log' }
-    ]},
-    { section:'TEAM', items:[
       { id:'staff',        icon:'👥', label:'Staff' },
       { id:'schedule',     icon:'🗓️', label:'Schedule' },
-      { id:'timesheet',    icon:'⏱️', label:'Time Sheet' },
+      { id:'timesheet',    icon:'⏱️', label:'Timesheet' },
       { id:'health-cards', icon:'💳', label:'Health Cards' },
       { id:'sales',        icon:'💰', label:'Sales' },
       { id:'petty-cash',   icon:'🧾', label:'Petty Cash' }
     ]},
-    { section:'MOBILE', items:[
-      { id:'qr-checkin', icon:'📱', label:'QR Check-In' },
-      { id:'checklists', icon:'✅', label:'Checklists' }
+    { section:'DAILY TASK', items:[
+      { id:'_staff-portal', icon:'📱', label:'Portal' }
     ]}
   ],
   staff: [
     { section:'MY BRANCH', items:[
-      { id:'branch-dash', icon:'📊', label:'Dashboard' },
-      { id:'checklists',  icon:'✅', label:'Checklists' },
-      { id:'qr-checkin',  icon:'📱', label:'Check-In' }
+      { id:'branch-dash',   icon:'📊', label:'Dashboard' }
     ]},
-    { section:'PORTALS', items:[
-      { id:'_staff-portal',      icon:'🏃', label:'Staff Portal' },
-      { id:'_leave-portal',      icon:'📝', label:'Leave Request' },
-      { id:'_checklist-portal',  icon:'📋', label:'Checklist App' }
+    { section:'DAILY TASK', items:[
+      { id:'_staff-portal',     icon:'📱', label:'Portal (Check-In & Tasks)' },
+      { id:'_leave-portal',     icon:'📝', label:'Leave Request' }
     ]}
   ]
 };
@@ -3162,106 +3153,285 @@ function toggleYoY(on) { revToggleYoY(on); }
 
 
 // ── PAGE: HEADCOUNT ──
+// In-memory cache: { branchId: [staffArray] }
+var NX_HC_CACHE = {};
+
 function pHeadcount() {
   var branches = getAccessibleBranches();
-  // pHeadcount reads staff counts from NX_BRANCHES (loaded from admin/branches)
-  // and from BS.staff if a branch is selected
-  var totalStaff = 0, activeStaff = 0;
-  // For CEO/admin: sum staff counts stored on branch records if available
-  branches.forEach(function(b) {
-    var count = parseInt(b.staffCount) || 0;
-    totalStaff += count;
-    activeStaff += count; // assume all active unless branch data says otherwise
-  });
+  var h = '<div class="page-header"><h1>Headcount Overview</h1><p>Live staff data from Firebase · ' + branches.length + ' branch(es)</p></div>';
 
-  var h = '<div class="page-header"><h1>Headcount Overview</h1><p>Staff data from Firebase · ' + branches.length + ' branch(es)</p></div>';
+  // Branch manager — use already-loaded BS.staff
+  if ((NX.session||{}).role === 'branch_mgr') {
+    var staffList = BS.staff.length ? BS.staff : (NX_HC_CACHE[NX.session.branchId] || []);
+    var act  = staffList.filter(function(m){ return (m.status||'Active')==='Active'; }).length;
+    var lv   = staffList.filter(function(m){ return m.status==='On Leave'; }).length;
+    var res  = staffList.filter(function(m){ return m.status==='Resigned'; }).length;
+    var depts = {};
+    staffList.forEach(function(m){ var d=m.dept||'Other'; depts[d]=(depts[d]||0)+1; });
 
-  // For branch manager with loaded data, use BS.staff
-  if ((NX.session||{}).role === 'branch_mgr' && BS.staff.length) {
-    var act = BS.staff.filter(function(m){ return m.status==='Active'; }).length;
-    var lv  = BS.staff.filter(function(m){ return m.status==='On Leave'; }).length;
     h += '<div class="kpi-grid section">';
-    h += kpiCard('👥','Total Staff', BS.staff.length, 'Your branch', 'var(--ceo)', 'From branches/' + NX.session.branchId + '/staff', '');
-    h += kpiCard('✅','Active', act, 'Currently active', 'var(--success)', '', '');
-    h += kpiCard('🏖','On Leave', lv, 'On leave today', 'var(--warning)', '', '');
-    h += kpiCard('🏢','Departments', 3, 'Manager / Kitchen / FOH', 'var(--info)', '', '');
+    h += kpiCard('👥','Total Staff', staffList.length, NX.session.branchName||'Your branch', 'var(--ceo)', '', '');
+    h += kpiCard('✅','Active', act, 'Currently working', 'var(--success)', '', '');
+    h += kpiCard('🏖️','On Leave', lv, 'Approved leave', 'var(--warning)', '', '');
+    h += kpiCard('🚪','Resigned', res, 'Separated staff', 'var(--danger)', '', '');
     h += '</div>';
 
-    // Staff breakdown by dept
+    // Dept breakdown
+    h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-bottom:20px">';
+    Object.keys(depts).forEach(function(d){
+      var col = d==='Manager'?'#f0c040':d==='Kitchen'?'#60a5fa':'#34d399';
+      h += '<div style="background:var(--surface-2);border:1px solid '+col+'30;border-radius:10px;padding:14px;text-align:center">';
+      h += '<div style="font-size:24px;font-weight:300;color:'+col+';font-family:var(--mono)">'+depts[d]+'</div>';
+      h += '<div style="font-size:11px;color:var(--text-secondary);margin-top:4px">'+xe(d)+'</div></div>';
+    });
+    h += '</div>';
+
     h += '<div class="table-wrap section"><table class="data-table"><thead><tr><th>Name</th><th>Department</th><th>Role</th><th>Status</th><th>Phone</th></tr></thead><tbody>';
-    BS.staff.slice().sort(function(a,b){ return (a.dept||'').localeCompare(b.dept||'')||a.name.localeCompare(b.name); }).forEach(function(m) {
-      var stc = m.status==='Active'?'#34d399':m.status==='On Leave'?'#f87171':'#94a3b8';
-      h += '<tr><td><strong>' + xe(m.name) + '</strong></td>';
-      h += '<td><span class="badge badge-blue">' + xe(m.dept||'—') + '</span></td>';
-      h += '<td>' + xe(m.role||'—') + '</td>';
-      h += '<td><span style="color:' + stc + ';font-weight:600">' + xe(m.status||'Active') + '</span></td>';
-      h += '<td>' + xe(m.phone||'—') + '</td></tr>';
+    staffList.slice().sort(function(a,b){ return (a.dept||'').localeCompare(b.dept||'')||a.name.localeCompare(b.name); }).forEach(function(m) {
+      var stc = (m.status||'Active')==='Active'?'#34d399':m.status==='On Leave'?'#f59e0b':m.status==='Resigned'?'#f87171':'#94a3b8';
+      h += '<tr><td><strong>'+xe(m.name)+'</strong></td>';
+      h += '<td><span style="background:var(--surface-3);border-radius:4px;padding:2px 8px;font-size:11px">'+xe(m.dept||'—')+'</span></td>';
+      h += '<td>'+xe(m.role||'—')+'</td>';
+      h += '<td><span style="color:'+stc+';font-weight:600">'+xe(m.status||'Active')+'</span></td>';
+      h += '<td>'+xe(m.phone||'—')+'</td></tr>';
     });
     h += '</tbody></table></div>';
     return h;
   }
 
-  h += '<div class="kpi-grid section">';
-  h += kpiCard('🏢','Branches', branches.length, 'Registered in Firebase', 'var(--ceo)', '', '');
-  h += kpiCard('👥','Staff Count', totalStaff || '—', totalStaff ? 'From branch records' : 'Visit each branch', 'var(--brand-dir)', '', '');
-  h += kpiCard('📊','Data Source', 'Firebase', 'branches/{id}/staff', 'var(--info)', 'Real-time', '');
-  h += '</div>';
+  // CEO / Admin / Director — load all branches
+  // Check if cache is populated
+  var cached = branches.filter(function(b){ return NX_HC_CACHE[b.id]; });
+  var totalAll = 0, totalActive = 0, totalLeave = 0, totalResign = 0;
 
-  h += '<div class="section card"><p style="color:var(--text-secondary);font-size:13px">Staff headcount is loaded per-branch. Log in as Branch Manager to see detailed staff data for that branch from <code>branches/{id}/staff</code>.</p>';
-  h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-top:16px">';
-  branches.forEach(function(b) {
-    h += '<div style="background:var(--surface-2);border-radius:10px;padding:14px;border:1px solid var(--border)">';
-    h += '<div style="font-size:16px;margin-bottom:6px">' + (b.icon||'🍽️') + ' <strong>' + xe(b.name) + '</strong></div>';
-    h += '<div style="font-size:11px;color:var(--text-tertiary)">Manager: ' + xe(b.manager||'—') + '</div>';
-    h += '<div style="font-size:11px;color:var(--text-tertiary)">Path: branches/' + xe(b.id) + '/staff</div>';
+  if (cached.length > 0) {
+    // Build from cache
+    branches.forEach(function(b){
+      var list = NX_HC_CACHE[b.id] || [];
+      totalAll    += list.length;
+      totalActive += list.filter(function(m){ return (m.status||'Active')==='Active'; }).length;
+      totalLeave  += list.filter(function(m){ return m.status==='On Leave'; }).length;
+      totalResign += list.filter(function(m){ return m.status==='Resigned'; }).length;
+    });
+
+    h += '<div class="kpi-grid section">';
+    h += kpiCard('👥','Total Headcount', totalAll, branches.length+' branches', 'var(--ceo)', 'From Firebase', '');
+    h += kpiCard('✅','Active', totalActive, 'Working staff', 'var(--success)', '', '');
+    h += kpiCard('🏖️','On Leave', totalLeave, 'Approved leave', 'var(--warning)', '', '');
+    h += kpiCard('🚪','Resigned', totalResign, 'Separated', 'var(--danger)', '', '');
     h += '</div>';
-  });
-  h += '</div></div>';
+
+    // Per-branch breakdown table
+    h += '<div class="table-wrap section"><table class="data-table"><thead><tr><th>Branch</th><th>Brand</th><th style="text-align:center">Total</th><th style="text-align:center">Active</th><th style="text-align:center">On Leave</th><th style="text-align:center">Resigned</th><th>Manager</th></tr></thead><tbody>';
+    branches.forEach(function(b){
+      var list = NX_HC_CACHE[b.id] || [];
+      var act = list.filter(function(m){ return (m.status||'Active')==='Active'; }).length;
+      var lv  = list.filter(function(m){ return m.status==='On Leave'; }).length;
+      var rs  = list.filter(function(m){ return m.status==='Resigned'; }).length;
+      h += '<tr>';
+      h += '<td><div style="display:flex;align-items:center;gap:8px"><span style="font-size:16px">'+(b.icon||'🍽️')+'</span><strong>'+xe(b.name)+'</strong></div></td>';
+      h += '<td><span style="font-size:11px;color:var(--text-secondary)">'+xe(b.brand||'—')+'</span></td>';
+      h += '<td style="text-align:center;font-weight:700;color:var(--ceo)">'+list.length+'</td>';
+      h += '<td style="text-align:center;color:#34d399;font-weight:600">'+act+'</td>';
+      h += '<td style="text-align:center;color:#f59e0b;font-weight:600">'+lv+'</td>';
+      h += '<td style="text-align:center;color:#f87171;font-weight:600">'+rs+'</td>';
+      h += '<td style="font-size:11px;color:var(--text-secondary)">'+xe(b.manager||'—')+'</td>';
+      h += '</tr>';
+    });
+    h += '</tbody></table></div>';
+
+    h += '<div style="text-align:right;margin-top:8px"><button class="btn btn-sm" onclick="NX_HC_CACHE={};navTo(\'headcount\')">↺ Refresh</button></div>';
+  } else {
+    // Show loading and trigger Firebase reads
+    h += '<div class="empty-state"><div style="font-size:36px;margin-bottom:12px">⏳</div><h3>Loading staff data from all branches…</h3><p style="color:var(--text-secondary)">Reading branches/*/staff from Firebase</p></div>';
+    h += '<div id="hc-branch-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-top:20px">';
+    branches.forEach(function(b){
+      h += '<div id="hc-b-'+xe(b.id)+'" style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:14px">';
+      h += '<div style="font-size:15px;font-weight:700;margin-bottom:6px">'+(b.icon||'🍽️')+' '+xe(b.name)+'</div>';
+      h += '<div style="font-size:11px;color:var(--text-tertiary)">Loading…</div></div>';
+    });
+    h += '</div>';
+
+    // Trigger Firebase reads for each branch
+    if (db) {
+      var loaded = 0;
+      branches.forEach(function(b) {
+        db.ref('branches/' + b.id + '/staff').once('value', function(snap) {
+          var raw = snap.val() || {};
+          var list = Array.isArray(raw) ? raw.filter(Boolean) : Object.values(raw).filter(Boolean);
+          NX_HC_CACHE[b.id] = list;
+          loaded++;
+          // Update card
+          var card = document.getElementById('hc-b-' + b.id);
+          if (card) {
+            var act = list.filter(function(m){ return (m.status||'Active')==='Active'; }).length;
+            var lv  = list.filter(function(m){ return m.status==='On Leave'; }).length;
+            var rs  = list.filter(function(m){ return m.status==='Resigned'; }).length;
+            card.innerHTML = '<div style="font-size:15px;font-weight:700;margin-bottom:8px">'+(b.icon||'🍽️')+' '+xe(b.name)+'</div>'+
+              '<div style="display:flex;gap:8px;font-size:11px">'+
+              '<span style="color:#34d399">✅ '+act+'</span>'+
+              '<span style="color:#f59e0b">🏖️ '+lv+'</span>'+
+              '<span style="color:#f87171">🚪 '+rs+'</span>'+
+              '</div>'+
+              '<div style="font-size:10px;color:var(--text-tertiary);margin-top:4px">Total: '+list.length+'</div>';
+          }
+          // When all loaded, refresh the page
+          if (loaded === branches.length) {
+            setTimeout(function(){ if(NX.page==='headcount') navTo('headcount'); }, 300);
+          }
+        });
+      });
+    }
+  }
   return h;
 }
 
 // ── PAGE: FOOD COST ──
+var NX_FC_CACHE = {}; // { branchId: { waste:[], mtdSales:0 } }
+
 function pFoodCost() {
   var branches = getAccessibleBranches();
-  var totalWastage = 0;
+  var s = NX.session || {};
+  var tm = new Date();
+  var mkey = tm.getFullYear() + '-' + String(tm.getMonth()+1).padStart(2,'0');
 
-  // If branch manager, use real BS.waste data
-  if ((NX.session||{}).role === 'branch_mgr' && BS.waste.length) {
-    var tm = new Date(), mkey = tm.getFullYear()+'-'+String(tm.getMonth()+1).padStart(2,'0');
+  var h = '<div class="page-header"><h1>Food Cost Analysis</h1><p>Wastage data from all branches · ' + branches.length + ' branch(es)</p></div>';
+
+  // Branch manager — use pre-loaded BS.waste
+  if (s.role === 'branch_mgr') {
+    var totalWastage = 0;
     BS.waste.forEach(function(w){ if((w.date||'').indexOf(mkey)===0) totalWastage+=(+w.value||0); });
-    var mtd = branchSalesMTD((NX.session||{}).branchId||'');
+    var mtd = branchSalesMTD(s.branchId||'');
     var fcPct = mtd > 0 ? (totalWastage/mtd*100).toFixed(1) : '—';
+    var target = 30; // 30% food cost target
+    var pctNum = mtd > 0 ? (totalWastage/mtd*100) : 0;
+    var gaugeCol = pctNum > 35 ? '#f87171' : pctNum > 25 ? '#f59e0b' : '#34d399';
 
-    var h = '<div class="page-header"><h1>Food Cost Analysis</h1><p>Real wastage data from branches/' + NX.session.branchId + '/waste</p></div>';
     h += '<div class="kpi-grid section">';
-    h += kpiCard('🗑️','Wastage This Month', formatSAR(totalWastage), 'From Firebase waste log', 'var(--danger)', '', '');
+    h += kpiCard('🗑️','MTD Wastage', formatSAR(totalWastage), 'This month waste log', 'var(--danger)', mkey, '');
     h += kpiCard('💰','MTD Sales', formatSAR(mtd), 'Branch total', 'var(--ceo)', '', '');
-    h += kpiCard('📊','Wastage %', (fcPct !== '—' ? fcPct + '%' : '—'), 'of MTD sales', mtd>0&&totalWastage/mtd>0.05?'var(--danger)':'var(--success)', '', '');
+    h += kpiCard('📊','Food Cost %', fcPct !== '—' ? fcPct + '%' : '—', 'of MTD sales', pctNum>35?'var(--danger)':pctNum>25?'var(--warning)':'var(--success)', 'Target: ≤30%', '');
     h += kpiCard('📋','Log Entries', BS.waste.length, 'Total wastage records', 'var(--info)', '', '');
     h += '</div>';
-    h += '<div class="table-wrap section"><table class="data-table"><thead><tr><th>Date</th><th>Item</th><th>Reason</th><th>Estimated Loss (SAR)</th></tr></thead><tbody>';
-    BS.waste.slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); }).slice(0,20).forEach(function(w){
-      h += '<tr><td class="mono">' + xe(w.date||'—') + '</td><td>' + xe(w.item||'—') + '</td><td>' + xe(w.reason||'—') + '</td><td class="mono" style="color:var(--danger)">' + formatSAR(w.value||0) + '</td></tr>';
+
+    // Visual food cost gauge bar
+    if (fcPct !== '—') {
+      var pctW = Math.min(100, pctNum).toFixed(1);
+      h += '<div class="card section" style="margin-bottom:16px">';
+      h += '<div style="font-size:12px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">Food Cost vs Target</div>';
+      h += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:6px">';
+      h += '<div style="flex:1;height:12px;background:var(--surface-3);border-radius:6px;overflow:hidden">';
+      h += '<div style="height:100%;width:'+pctW+'%;background:'+gaugeCol+';border-radius:6px;transition:width .6s ease"></div></div>';
+      h += '<span style="font-size:16px;font-weight:700;color:'+gaugeCol+';font-family:var(--mono);flex-shrink:0">'+fcPct+'%</span></div>';
+      h += '<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-tertiary)"><span>0%</span><span style="color:#34d399">✓ Target 30%</span><span>50%</span></div>';
+      h += '</div>';
+    }
+
+    // Wastage table
+    h += '<div class="table-wrap section"><table class="data-table"><thead><tr><th>Date</th><th>Item</th><th>Qty</th><th>Unit</th><th>Reason</th><th>Reported By</th><th style="text-align:right">Loss (SAR)</th></tr></thead><tbody>';
+    BS.waste.slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); }).forEach(function(w){
+      h += '<tr><td class="mono" style="font-size:11px">'+xe(w.date||'—')+'</td>';
+      h += '<td style="font-weight:600">'+xe(w.item||'—')+'</td>';
+      h += '<td class="mono">'+xe(w.qty||'—')+'</td>';
+      h += '<td class="mono" style="color:var(--text-tertiary)">'+xe(w.unit||'—')+'</td>';
+      h += '<td style="font-size:11px">'+xe(w.reason||'—')+'</td>';
+      h += '<td style="font-size:11px;color:var(--text-secondary)">'+xe(w.by||'—')+'</td>';
+      h += '<td class="mono" style="text-align:right;color:var(--danger);font-weight:600">'+formatSAR(w.value||0)+'</td></tr>';
     });
-    if (!BS.waste.length) h += '<tr><td colspan="4" style="text-align:center;color:var(--text-tertiary);padding:20px">No wastage entries yet</td></tr>';
+    if (!BS.waste.length) h += '<tr><td colspan="7" style="text-align:center;color:var(--text-tertiary);padding:24px">No wastage entries yet</td></tr>';
     h += '</tbody></table></div>';
     return h;
   }
 
-  var h = '<div class="page-header"><h1>Food Cost Analysis</h1><p>Wastage data from Firebase — ' + branches.length + ' branch(es)</p></div>';
-  h += '<div class="kpi-grid section">';
-  h += kpiCard('🏢','Branches', branches.length, 'Accessible branches', 'var(--ceo)', '', '');
-  h += kpiCard('📊','Data Source', 'Firebase', 'branches/{id}/waste', 'var(--info)', 'Per-branch wastage logs', '');
-  h += '</div>';
-  h += '<div class="section card"><p style="color:var(--text-secondary);font-size:13px">Food cost data is stored per-branch at <code>branches/{id}/waste</code>. Log in as Branch Manager to see detailed wastage analysis for that branch.</p>';
-  h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-top:16px">';
-  branches.forEach(function(b) {
-    h += '<div style="background:var(--surface-2);border-radius:10px;padding:14px;border:1px solid var(--border)">';
-    h += '<div style="font-size:16px;margin-bottom:6px">' + (b.icon||'🍽️') + ' <strong>' + xe(b.name) + '</strong></div>';
-    h += '<div style="font-size:11px;color:var(--text-tertiary)">Path: branches/' + xe(b.id) + '/waste</div>';
+  // CEO / Admin / Director — load all branches
+  var cached = branches.filter(function(b){ return NX_FC_CACHE[b.id]; });
+
+  if (cached.length > 0) {
+    // Aggregate totals
+    var grandWaste = 0, grandSales = 0;
+    var branchRows = [];
+
+    branches.forEach(function(b){
+      var fc = NX_FC_CACHE[b.id] || { waste:[], mtdSales:0 };
+      var waste = 0;
+      fc.waste.forEach(function(w){ if((w.date||'').indexOf(mkey)===0) waste+=(+w.value||0); });
+      var sales = fc.mtdSales || branchSalesMTD(b.id);
+      var pct = sales > 0 ? (waste/sales*100) : 0;
+      grandWaste += waste;
+      grandSales += sales;
+      branchRows.push({ b:b, waste:waste, sales:sales, pct:pct, entries:fc.waste.length });
+    });
+
+    var grandPct = grandSales > 0 ? (grandWaste/grandSales*100).toFixed(1) : '—';
+    var grandCol = grandSales > 0 && grandWaste/grandSales*100 > 35 ? 'var(--danger)' : grandSales > 0 && grandWaste/grandSales*100 > 25 ? 'var(--warning)' : 'var(--success)';
+
+    h += '<div class="kpi-grid section">';
+    h += kpiCard('🗑️','Total MTD Wastage', formatSAR(grandWaste), 'All branches · '+mkey, 'var(--danger)', '', '');
+    h += kpiCard('💰','Total MTD Sales', formatSAR(grandSales), 'All branches', 'var(--ceo)', '', '');
+    h += kpiCard('📊','Avg Food Cost %', grandPct !== '—' ? grandPct+'%' : '—', 'Combined', grandCol, 'Target: ≤30%', '');
+    h += kpiCard('🏢','Branches Loaded', cached.length+'/'+branches.length, 'Firebase branches', 'var(--info)', '', '');
     h += '</div>';
-  });
-  h += '</div></div>';
+
+    // Per-branch food cost table
+    branchRows.sort(function(a,b){ return b.pct - a.pct; }); // worst first
+    h += '<div class="table-wrap section"><table class="data-table"><thead><tr><th>Branch</th><th>Brand</th><th style="text-align:right">MTD Wastage</th><th style="text-align:right">MTD Sales</th><th style="text-align:center">Food Cost %</th><th style="text-align:center">vs Target</th><th style="text-align:center">Entries</th></tr></thead><tbody>';
+    branchRows.forEach(function(row){
+      var pctStr = row.sales > 0 ? row.pct.toFixed(1)+'%' : '—';
+      var col = row.pct > 35 ? '#f87171' : row.pct > 25 ? '#f59e0b' : '#34d399';
+      var barW = Math.min(100, row.pct).toFixed(0);
+      var diff = row.pct - 30;
+      var diffStr = row.sales > 0 ? (diff > 0 ? '<span style="color:#f87171">+'+diff.toFixed(1)+'%</span>' : '<span style="color:#34d399">'+diff.toFixed(1)+'%</span>') : '—';
+      h += '<tr>';
+      h += '<td><div style="display:flex;align-items:center;gap:8px"><span style="font-size:16px">'+(row.b.icon||'🍽️')+'</span><strong>'+xe(row.b.name)+'</strong></div></td>';
+      h += '<td style="font-size:11px;color:var(--text-secondary)">'+xe(row.b.brand||'—')+'</td>';
+      h += '<td class="mono" style="text-align:right;color:var(--danger)">'+formatSAR(row.waste)+'</td>';
+      h += '<td class="mono" style="text-align:right;color:var(--ceo)">'+formatSAR(row.sales)+'</td>';
+      h += '<td style="text-align:center"><div style="display:flex;align-items:center;gap:8px;justify-content:center">';
+      h += '<div style="width:60px;height:5px;background:var(--surface-3);border-radius:3px;overflow:hidden"><div style="height:100%;width:'+barW+'%;background:'+col+';border-radius:3px"></div></div>';
+      h += '<span class="mono" style="color:'+col+';font-weight:700">'+pctStr+'</span></div></td>';
+      h += '<td style="text-align:center">'+diffStr+'</td>';
+      h += '<td style="text-align:center;color:var(--text-tertiary)">'+row.entries+'</td>';
+      h += '</tr>';
+    });
+    h += '</tbody></table></div>';
+    h += '<div style="text-align:right;margin-top:8px"><button class="btn btn-sm" onclick="NX_FC_CACHE={};navTo(\'food-cost\')">↺ Refresh</button></div>';
+
+  } else {
+    // Trigger Firebase reads
+    h += '<div class="empty-state"><div style="font-size:36px;margin-bottom:12px">⏳</div><h3>Loading food cost data…</h3><p style="color:var(--text-secondary)">Reading wastage logs from all branches</p></div>';
+    h += '<div id="fc-branch-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-top:20px">';
+    branches.forEach(function(b){
+      h += '<div id="fc-b-'+xe(b.id)+'" style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:14px">';
+      h += '<div style="font-weight:700;margin-bottom:4px">'+(b.icon||'🍽️')+' '+xe(b.name)+'</div>';
+      h += '<div style="font-size:11px;color:var(--text-tertiary)">Loading…</div></div>';
+    });
+    h += '</div>';
+
+    if (db) {
+      var loaded = 0;
+      branches.forEach(function(b) {
+        db.ref('branches/' + b.id + '/waste').once('value', function(snap) {
+          var raw = snap.val() || {};
+          var list = Array.isArray(raw) ? raw.filter(Boolean) : Object.values(raw).filter(Boolean);
+          var mtdS = branchSalesMTD(b.id);
+          NX_FC_CACHE[b.id] = { waste: list, mtdSales: mtdS };
+          loaded++;
+          var card = document.getElementById('fc-b-' + b.id);
+          if (card) {
+            var w = 0; list.forEach(function(e){ if((e.date||'').indexOf(mkey)===0) w+=(+e.value||0); });
+            var pct = mtdS > 0 ? (w/mtdS*100).toFixed(1)+'%' : '—';
+            var col = mtdS > 0 && w/mtdS > .35 ? '#f87171' : mtdS > 0 && w/mtdS > .25 ? '#f59e0b' : '#34d399';
+            card.innerHTML = '<div style="font-weight:700;margin-bottom:8px">'+(b.icon||'🍽️')+' '+xe(b.name)+'</div>'+
+              '<div class="mono" style="font-size:14px;color:'+col+';font-weight:700">'+pct+'</div>'+
+              '<div style="font-size:10px;color:var(--text-tertiary);margin-top:2px">Waste: '+formatSAR(w)+'</div>';
+          }
+          if (loaded === branches.length) {
+            setTimeout(function(){ if(NX.page==='food-cost') navTo('food-cost'); }, 300);
+          }
+        });
+      });
+    }
+  }
   return h;
 }
 
@@ -3324,74 +3494,143 @@ function filterAlerts(level, btn) {
 
 // ── PAGE: BRAND MANAGEMENT ──
 function pBrandMgmt() {
-  var branches = getAccessibleBranches();
-
-  // Group by brand
-  var brandMap = {};
-  branches.forEach(function(b) {
-    var bkey = (b.brand || b.name || b.id);
-    if (!brandMap[bkey]) {
-      brandMap[bkey] = { name:bkey, icon:b.icon||'🍽️', color:b.color||'#f0a500',
-                         branches:[], regions:new Set() };
-    }
-    brandMap[bkey].branches.push(b);
-    if (b.location) brandMap[bkey].regions.add(b.location);
-  });
+  var branches = Object.values(NX_BRANCHES); // ALL registered branches, not filtered by session
+  var tab = (NX._bmTab || 'brands');
 
   var h = '<div class="page-header"><h1>Brand Management</h1>' +
-    '<p>Manage restaurant brands registered in Firebase · admin/branches</p></div>';
-  h += '<div class="header-actions"><div></div>' +
-    '<button class="btn" style="margin-right:8px" onclick="openAddBrandModal()">+ Add Brand</button>' +
-    '<button class="btn btn-primary" onclick="openAddBranchModal()">+ Add Branch</button></div>';
+    '<p>Manage brands and branches registered in Firebase · admin/branches</p></div>';
+
+  // Tab bar
+  h += '<div style="display:flex;gap:0;margin-bottom:20px;background:var(--surface-1);border:1px solid var(--border);border-radius:11px;padding:3px">';
+  h += '<button onclick="NX._bmTab=\'brands\';navTo(\'brand-mgmt\')" style="flex:1;padding:9px;border-radius:8px;border:none;cursor:pointer;font-size:12px;font-weight:700;font-family:var(--font);transition:all .15s;background:'+(tab==='brands'?'var(--accent)':'transparent')+';color:'+(tab==='brands'?'#000':'var(--text-secondary)')+'">🏢 Brands</button>';
+  h += '<button onclick="NX._bmTab=\'branches\';navTo(\'brand-mgmt\')" style="flex:1;padding:9px;border-radius:8px;border:none;cursor:pointer;font-size:12px;font-weight:700;font-family:var(--font);transition:all .15s;background:'+(tab==='branches'?'var(--accent)':'transparent')+';color:'+(tab==='branches'?'#000':'var(--text-secondary)')+'">🏪 All Branches ('+branches.length+')</button>';
+  h += '</div>';
+
+  // Action buttons
+  h += '<div class="header-actions" style="margin-bottom:16px"><div></div>' +
+    '<div style="display:flex;gap:8px">' +
+    '<button class="btn" onclick="openAddBrandModal()">+ Add Brand</button>' +
+    '<button class="btn btn-primary" onclick="openAddBranchModal()">+ Add Branch</button>' +
+    '</div></div>';
 
   if (!branches.length) {
     h += '<div class="empty-state"><div class="es-icon">🏢</div>' +
-      '<h3>No branches yet</h3><p>Add your first branch using the button above</p></div>';
+      '<h3>No branches yet</h3><p>Add your first branch to get started</p></div>';
     return h;
   }
 
-  h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;margin-top:4px">';
-  Object.values(brandMap).forEach(function(bm) {
-    var today = 0, mtd = 0;
-    bm.branches.forEach(function(b) { today+=branchSalesToday(b.id); mtd+=branchSalesMTD(b.id); });
-    h += '<div class="card" style="border-top:3px solid ' + bm.color + '">';
-    h += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">';
-    h += '<div style="width:44px;height:44px;border-radius:12px;background:' + bm.color + '20;' +
-         'display:flex;align-items:center;justify-content:center;font-size:22px">' + bm.icon + '</div>';
-    h += '<div><div style="font-size:16px;font-weight:700;color:var(--text-primary)">' + xe(bm.name) + '</div>';
-    h += '<div style="font-size:11px;color:var(--text-tertiary)">' + bm.branches.length + ' branch(es)</div></div></div>';
-    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">';
-    h += '<div style="background:var(--surface-2);border-radius:8px;padding:10px">';
-    h += '<div style="font-size:10px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.08em">Today</div>';
-    h += '<div class="mono" style="font-size:15px;font-weight:700;color:var(--ceo)">' + formatSAR(today) + '</div></div>';
-    h += '<div style="background:var(--surface-2);border-radius:8px;padding:10px">';
-    h += '<div style="font-size:10px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.08em">MTD</div>';
-    h += '<div class="mono" style="font-size:15px;font-weight:700;color:var(--brand-dir)">' + formatSAR(mtd) + '</div></div></div>';
-    h += '<div style="border-top:1px solid var(--border);padding-top:12px">';
-    bm.branches.forEach(function(b) {
-      h += '<div style="display:flex;align-items:center;justify-content:space-between;padding:5px 0;font-size:12px">';
-      h += '<span style="color:var(--text-primary)">' + xe(b.name) + ' <span style="color:var(--text-tertiary);font-size:10px">' + xe(b.location||'') + '</span></span>';
-      h += '<div style="display:flex;gap:4px">';
-      h += '<button class="btn btn-sm" onclick="switchBranch(\'' + xe(b.id) + '\')">View</button>';
-      h += '<button class="btn btn-sm" onclick="openEditBranchModal(\'' + xe(b.id) + '\')">Edit</button>';
+  if (tab === 'brands') {
+    // Group by brand
+    var brandMap = {};
+    branches.forEach(function(b) {
+      var bkey = b.brand || b.name || b.id;
+      if (!brandMap[bkey]) {
+        brandMap[bkey] = { name:bkey, icon:b.icon||'🍽️', color:b.color||'#f0a500', branches:[] };
+      }
+      brandMap[bkey].branches.push(b);
+    });
+
+    h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px">';
+    Object.values(brandMap).forEach(function(bm) {
+      var today = 0, mtd = 0;
+      bm.branches.forEach(function(b){ today += branchSalesToday(b.id); mtd += branchSalesMTD(b.id); });
+      h += '<div class="card" style="border-top:3px solid '+bm.color+'">';
+      h += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px">';
+      h += '<div style="width:44px;height:44px;border-radius:12px;background:'+bm.color+'20;display:flex;align-items:center;justify-content:center;font-size:22px">'+bm.icon+'</div>';
+      h += '<div><div style="font-size:16px;font-weight:700;color:var(--text-primary)">'+xe(bm.name)+'</div>';
+      h += '<div style="font-size:11px;color:var(--text-tertiary)">'+bm.branches.length+' branch'+(bm.branches.length!==1?'es':'')+'</div></div></div>';
+      h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">';
+      h += '<div style="background:var(--surface-2);border-radius:8px;padding:10px"><div style="font-size:10px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.08em">Today</div>';
+      h += '<div class="mono" style="font-size:14px;font-weight:700;color:var(--ceo)">'+formatSAR(today)+'</div></div>';
+      h += '<div style="background:var(--surface-2);border-radius:8px;padding:10px"><div style="font-size:10px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.08em">MTD</div>';
+      h += '<div class="mono" style="font-size:14px;font-weight:700;color:var(--brand-dir)">'+formatSAR(mtd)+'</div></div></div>';
+      h += '<div style="border-top:1px solid var(--border);padding-top:12px">';
+      bm.branches.forEach(function(b){
+        h += '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 0;font-size:12px;border-bottom:1px solid var(--border)">';
+        h += '<div><span style="color:var(--text-primary);font-weight:600">'+xe(b.name)+'</span>';
+        h += ' <span style="color:var(--text-tertiary);font-size:10px">'+xe(b.location||'')+'</span></div>';
+        h += '<div style="display:flex;gap:4px">';
+        h += '<button class="btn btn-sm" onclick="switchBranch(\''+xe(b.id)+'\')">View</button>';
+        h += '<button class="btn btn-sm" onclick="openEditBranchModal(\''+xe(b.id)+'\')">Edit</button>';
+        h += '</div></div>';
+      });
       h += '</div></div>';
     });
-    h += '</div></div>';
-  });
-  h += '</div>';
+    h += '</div>';
+
+  } else {
+    // All branches table
+    h += '<div class="table-wrap"><table class="data-table"><thead><tr><th>Branch</th><th>Brand</th><th>Location</th><th>Manager</th><th>PIN</th><th style="text-align:right">Today Sales</th><th></th></tr></thead><tbody>';
+    branches.slice().sort(function(a,b){ return (a.brand||a.name||'').localeCompare(b.brand||b.name||''); }).forEach(function(b) {
+      var today = branchSalesToday(b.id);
+      h += '<tr>';
+      h += '<td><div style="display:flex;align-items:center;gap:8px"><span style="font-size:16px">'+(b.icon||'🍽️')+'</span><strong>'+xe(b.name)+'</strong></div></td>';
+      h += '<td><span style="font-size:11px;background:var(--surface-3);padding:2px 8px;border-radius:4px">'+xe(b.brand||'—')+'</span></td>';
+      h += '<td style="font-size:11px;color:var(--text-secondary)">'+xe(b.location||'—')+'</td>';
+      h += '<td style="font-size:11px;color:var(--text-secondary)">'+xe(b.manager||'—')+'</td>';
+      h += '<td class="mono" style="font-size:11px;color:var(--text-tertiary)">'+( b.pin ? '••••' : '—')+'</td>';
+      h += '<td class="mono" style="text-align:right;color:var(--ceo)">'+formatSAR(today)+'</td>';
+      h += '<td><div style="display:flex;gap:4px;justify-content:flex-end">';
+      h += '<button class="btn btn-sm" onclick="switchBranch(\''+xe(b.id)+'\')">View</button>';
+      h += '<button class="btn btn-sm" onclick="openEditBranchModal(\''+xe(b.id)+'\')">Edit</button>';
+      h += '</div></td></tr>';
+    });
+    h += '</tbody></table></div>';
+  }
   return h;
 }
 
 function openAddBrandModal() {
-  openModal('<div class="modal-head"><h2>Add New Brand</h2><button class="modal-close" onclick="closeModalForce()">✕</button></div>' +
-    '<div class="form-group"><label class="form-label">Brand Name</label><input class="form-input" placeholder="e.g. Sakura Japanese"></div>' +
+  openModal(
+    '<div class="modal-head"><h2>Add New Brand</h2><button class="modal-close" onclick="closeModalForce()">✕</button></div>' +
+    '<div class="form-group"><label class="form-label">Brand Name *</label><input class="form-input" id="nb2-name" placeholder="e.g. Sakura Japanese"></div>' +
     '<div class="form-row">' +
-    '<div class="form-group"><label class="form-label">Icon (emoji)</label><input class="form-input" placeholder="🍣" maxlength="2"></div>' +
-    '<div class="form-group"><label class="form-label">Brand Color</label><input class="form-input" type="color" value="#7c6ff7"></div>' +
+    '<div class="form-group"><label class="form-label">Icon (emoji)</label><input class="form-input" id="nb2-icon" placeholder="🍣" maxlength="4" value="🍽️"></div>' +
+    '<div class="form-group"><label class="form-label">Brand Color</label><input class="form-input" id="nb2-color" type="color" value="#7c6ff7" style="height:40px"></div>' +
     '</div>' +
-    '<div class="form-group"><label class="form-label">Cuisine Type</label><input class="form-input" placeholder="e.g. Japanese"></div>' +
-    '<div class="form-group"><label class="form-label">Brand Director</label><input class="form-input" placeholder="Director name"></div>' +
-    '<button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="showToast(\'Brand added!\',\'success\');closeModalForce()">Create Brand</button>');
+    '<div class="form-group"><label class="form-label">Cuisine Type</label><input class="form-input" id="nb2-cuisine" placeholder="e.g. Japanese"></div>' +
+    '<div class="form-group"><label class="form-label">Brand Director</label><input class="form-input" id="nb2-dir" placeholder="Director name"></div>' +
+    '<p style="font-size:11px;color:var(--text-tertiary);margin-bottom:12px">Note: A brand is created by adding its first branch below. This registers the brand name in the system.</p>' +
+    '<div style="border-top:1px solid var(--border);padding-top:16px;margin-top:4px">' +
+    '<div style="font-size:12px;font-weight:700;color:var(--text-secondary);margin-bottom:12px">First Branch</div>' +
+    '<div class="form-group"><label class="form-label">Branch Name *</label><input class="form-input" id="nb2-bname" placeholder="e.g. Sakura MOA"></div>' +
+    '<div class="form-group"><label class="form-label">Location</label><input class="form-input" id="nb2-loc" placeholder="e.g. Mall of Arabia, Jeddah"></div>' +
+    '<div class="form-group"><label class="form-label">Manager Name</label><input class="form-input" id="nb2-mgr" placeholder="Manager full name"></div>' +
+    '<div class="form-group"><label class="form-label">PIN (4+ digits) *</label><input class="form-input" type="password" id="nb2-pin" placeholder="e.g. 5555" maxlength="8"></div>' +
+    '</div>' +
+    '<button class="btn btn-primary" style="width:100%;margin-top:12px" onclick="saveNewBrandWithBranch()">Create Brand + Branch</button>'
+  );
+}
+
+function saveNewBrandWithBranch() {
+  var brandName = (document.getElementById('nb2-name')||{}).value||'';
+  var icon      = (document.getElementById('nb2-icon')||{}).value||'🍽️';
+  var color     = (document.getElementById('nb2-color')||{}).value||'#7c6ff7';
+  var bname     = (document.getElementById('nb2-bname')||{}).value||'';
+  var loc       = (document.getElementById('nb2-loc')||{}).value||'';
+  var mgr       = (document.getElementById('nb2-mgr')||{}).value||'';
+  var pin       = (document.getElementById('nb2-pin')||{}).value||'';
+  if (!brandName.trim()) { showToast('Brand name required','error'); return; }
+  if (!bname.trim()) { showToast('Branch name required','error'); return; }
+  if (pin.length < 4) { showToast('PIN must be at least 4 digits','error'); return; }
+  var id = bname.toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
+  var branch = { id:id, name:bname, brand:brandName, location:loc, manager:mgr,
+                 pin:pin, icon:icon, color:color, active:true,
+                 createdAt: new Date().toISOString().split('T')[0] };
+  if (db) {
+    db.ref('admin/branches/' + id).set(branch, function(err) {
+      if (err) { showToast('Firebase error: ' + err.message, 'error'); return; }
+      NX_BRANCHES[id] = branch;
+      closeModalForce();
+      showToast('Brand "' + brandName + '" + Branch "' + bname + '" created!', 'success');
+      navTo('brand-mgmt');
+    });
+  } else {
+    NX_BRANCHES[id] = branch;
+    closeModalForce();
+    showToast('Created (offline — will sync when connected)', 'success');
+    navTo('brand-mgmt');
+  }
 }
 
 function editBrand(k) {
@@ -4427,82 +4666,214 @@ function pBranchDash() {
   var isStaff = s.role === 'staff';
   var branchName = s.branchName || s.entityName || 'Branch';
   var b = NX_BRANCHES[s.branchId] || {};
+  var today = TODAY_BS;
 
-  var h = '<div class="page-header"><h1>' + (b.icon||'🏪') + ' ' + xe(branchName) + '</h1>';
-  h += '<p>' + xe(b.brand||'') + (b.location?' · '+xe(b.location):'') + ' · ' + fmtDate(new Date()) + '</p></div>';
-
-  // Staff only sees check-in status + checklists — no KPIs or quick actions
+  // ── STAFF ROLE VIEW ──────────────────────────────────────────────────────
   if (isStaff) {
-    // Today's attendance for current staff (QR check-in card)
-    h += '<div class="kpi-grid section">';
-    h += kpiCard('📱','QR Check-In','Ready','Tap to check in','var(--branch-mgr)','','');
-    h += kpiCard('✅','Checklists','View tasks','Daily operations','var(--accent)','','');
-    h += '</div>';
-    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:8px">';
-    h += '<div class="card" style="text-align:center;cursor:pointer" onclick="navTo(\'qr-checkin\')">';
+    var h = '<div class="page-header"><h1>' + (b.icon||'🏪') + ' ' + xe(branchName) + '</h1>';
+    h += '<p>' + xe(b.brand||'') + (b.location?' · '+xe(b.location):'') + ' · ' + fmtDate(new Date()) + '</p></div>';
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px">';
+    h += '<div class="card" style="text-align:center;padding:24px;cursor:pointer;border:1px solid rgba(52,211,153,.3)" onclick="navTo(\'_staff-portal\')">';
     h += '<div style="font-size:48px;margin-bottom:12px">📱</div>';
-    h += '<div style="font-size:16px;font-weight:700;color:var(--text-primary);margin-bottom:6px">QR Check-In</div>';
-    h += '<div style="font-size:12px;color:var(--text-secondary)">Clock in/out for your shift</div></div>';
-    h += '<div class="card" style="text-align:center;cursor:pointer" onclick="navTo(\'checklists\')">';
-    h += '<div style="font-size:48px;margin-bottom:12px">✅</div>';
-    h += '<div style="font-size:16px;font-weight:700;color:var(--text-primary);margin-bottom:6px">Checklists</div>';
-    h += '<div style="font-size:12px;color:var(--text-secondary)">Daily operations checklist</div></div>';
+    h += '<div style="font-size:15px;font-weight:700;color:var(--text-primary);margin-bottom:6px">Daily Task Portal</div>';
+    h += '<div style="font-size:12px;color:var(--text-secondary)">Check-in, checklist & tasks</div></div>';
+    h += '<div class="card" style="text-align:center;padding:24px;cursor:pointer" onclick="navTo(\'_leave-portal\')">';
+    h += '<div style="font-size:48px;margin-bottom:12px">📝</div>';
+    h += '<div style="font-size:15px;font-weight:700;color:var(--text-primary);margin-bottom:6px">Leave Request</div>';
+    h += '<div style="font-size:12px;color:var(--text-secondary)">Submit leave or view status</div></div>';
     h += '</div>';
-
-    // Standalone portals
-    h += '<div class="card section" style="margin-top:16px"><h3 style="font-size:12px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">Staff Portals</h3>';
+    h += '<div class="card section"><h3 style="font-size:12px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">Staff Portals</h3>';
     h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">';
-    var portals = [
-      ['🏃','Staff Check-In','staff.html'],
-      ['📝','Leave Request','leave.html'],
-      ['✅','Checklists','checklists.html']
-    ];
-    portals.forEach(function(p) {
-      h += '<a href="' + p[2] + '" target="_blank" style="text-decoration:none">';
+    [['🏃','Staff Check-In','staff.html'],['📝','Leave Request','leave.html'],['✅','Checklists','checklists.html']].forEach(function(p){
+      h += '<a href="'+p[2]+'" target="_blank" style="text-decoration:none">';
       h += '<div class="card" style="text-align:center;padding:14px 10px;cursor:pointer">';
-      h += '<div style="font-size:28px;margin-bottom:8px">' + p[0] + '</div>';
-      h += '<div style="font-size:11px;font-weight:600;color:var(--text-primary)">' + p[1] + '</div></div></a>';
+      h += '<div style="font-size:28px;margin-bottom:8px">'+p[0]+'</div>';
+      h += '<div style="font-size:11px;font-weight:600;color:var(--text-primary)">'+p[1]+'</div></div></a>';
     });
     h += '</div></div>';
     return h;
   }
 
-  // Branch Manager view — full KPIs
-  var today = branchSalesToday(s.branchId) || 0;
-  var mtd   = branchSalesMTD(s.branchId)   || 0;
+  // ── BRANCH MANAGER VIEW ────────────────────────────────────────────────────
+  var todaySales = branchSalesToday(s.branchId) || 0;
+  var mtdSales   = branchSalesMTD(s.branchId)   || 0;
+  var lowStock   = bItems.filter(function(i){ return i.min > 0 && i.qty <= i.min; }).length;
 
+  // Staff counts from BS.staff + schedule for today
+  var totalStaff  = BS.staff.length;
+  var todayDow    = new Date().getDay(); // 0=Sun
+  var staffOnDuty = 0, staffOff = 0, staffOnLeave = 0;
+
+  BS.staff.forEach(function(m) {
+    // Check if on leave today
+    var onLeave = BS.tsLeaves.some(function(l){
+      return l.empId === m.id && l.status === 'approved' &&
+             l.start <= today && l.end >= today;
+    });
+    if (onLeave) { staffOnLeave++; return; }
+
+    // Check schedule for today
+    var sch = BS.sch[String(m.id)];
+    if (sch) {
+      var days = ['sun','mon','tue','wed','thu','fri','sat'];
+      var dayKey = days[todayDow];
+      if (sch[dayKey] && sch[dayKey] !== 'off') staffOnDuty++;
+      else staffOff++;
+    } else {
+      staffOnDuty++; // assume on duty if no schedule
+    }
+  });
+
+  // Check-in counts from tsAtt
+  var monthKey = today.slice(0,7);
+  var checkedIn = 0, notCheckedIn = 0;
+  BS.tsEmps.forEach(function(e) {
+    var recs = (BS.tsAtt[e.id] && BS.tsAtt[e.id][monthKey]) || [];
+    var rec = null;
+    for (var i = 0; i < recs.length; i++) { if (recs[i].date === today) { rec = recs[i]; break; } }
+    if (rec && rec.ci) checkedIn++;
+    else notCheckedIn++;
+  });
+
+  // Checklist status from cl_weeks (Portal path)
+  var now = new Date();
+  var dow = now.getDay();
+  var sun = new Date(now); sun.setDate(now.getDate() - dow);
+  var wkKey = sun.getFullYear() + '-' + String(sun.getMonth()+1).padStart(2,'0') + '-' + String(sun.getDate()).padStart(2,'0');
+  var fbWkKey = wkKey.replace(/[.#$\[\]\/]/g,'_');
+  var clDone = 0, clPending = 0;
+  var todayIdx = dow; // 0=Sun index
+  // Count from cached clNxState if available
+  if (clNxState && Object.keys(clNxState).length) {
+    Object.keys(clNxState).forEach(function(clId) {
+      var dayState = (clNxState[clId] && clNxState[clId][todayIdx]) ? clNxState[clId][todayIdx] : null;
+      if (!dayState) { clPending++; return; }
+      var hasY = false;
+      Object.keys(dayState).forEach(function(itemId){ if(dayState[itemId]&&dayState[itemId].yn==='Y') hasY=true; });
+      if (hasY) clDone++; else clPending++;
+    });
+  }
+
+  // ── Sales data for chart (last 7 days) ────────────────────────────────────
+  var sales7 = [];
+  var sales7Labels = [];
+  for (var d7 = 6; d7 >= 0; d7--) {
+    var dd = new Date(); dd.setDate(dd.getDate() - d7);
+    var ds = dd.getFullYear()+'-'+String(dd.getMonth()+1).padStart(2,'0')+'-'+String(dd.getDate()).padStart(2,'0');
+    var dv = (NX_BRANCH_SALES[s.branchId]||[]).reduce(function(sum,e){ return e.date===ds?sum+(parseFloat(e.actual)||0):sum; },0);
+    // Also check BS.sales for branch manager
+    if (!dv) dv = BS.sales.reduce(function(sum,e){ return e.date===ds?sum+(parseFloat(e.actual)||0):sum; },0);
+    sales7.push(dv);
+    sales7Labels.push(dd.toLocaleDateString('en-GB',{weekday:'short',day:'numeric'}));
+  }
+  var maxSales = Math.max.apply(null, sales7) || 1;
+
+  // ── Today Sales vs Target ──────────────────────────────────────────────────
+  var todayTarget = BS.sales.reduce(function(s2,e){ return e.date===today?s2+(parseFloat(e.target)||0):s2; },0);
+  var salesPct = todayTarget > 0 ? Math.min(100,(todaySales/todayTarget*100)).toFixed(0) : null;
+
+  var h = '<div class="page-header"><h1>' + (b.icon||'🏪') + ' ' + xe(branchName) + ' Dashboard</h1>';
+  h += '<p>' + xe(b.brand||'') + (b.location?' · '+xe(b.location):'') + ' · ' + fmtDate(new Date()) + '</p></div>';
+
+  // ── KPI Row 1: Sales ────────────────────────────────────────────────────────
   h += '<div class="kpi-grid section">';
-  h += kpiCard('💰','Today Sales',formatSAR(today),'From Firebase sales','var(--ceo)','','');
-  h += kpiCard('📅','MTD Sales',formatSAR(mtd),'Month to date','var(--branch-mgr)','','');
-  h += kpiCard('👥','Staff',BS.staff.length || '—','Active staff','var(--brand-dir)','','');
-  h += kpiCard('📦','Low Stock',bItems.filter(function(i){return i.min>0&&i.qty<=i.min;}).length,'Items below min','var(--danger)','','');
+  h += kpiCard('💰','Today Sales', formatSAR(todaySales), todayTarget > 0 ? 'Target: '+formatSAR(todayTarget) : 'No target set', 'var(--ceo)', salesPct ? salesPct+'% of target' : '', '');
+  h += kpiCard('📅','MTD Sales', formatSAR(mtdSales), 'Month to date', 'var(--branch-mgr)', new Date().toLocaleDateString('en-GB',{month:'short',year:'numeric'}), '');
+  h += kpiCard('📦','Low Stock', lowStock, lowStock ? 'Items below minimum' : 'All stock OK', lowStock ? 'var(--danger)' : 'var(--success)', lowStock ? 'Action needed' : 'All clear', lowStock ? 'neg' : '');
+  h += kpiCard('👥','Total Staff', totalStaff || '—', totalStaff ? 'Registered staff' : 'No staff loaded', 'var(--brand-dir)', '', '');
   h += '</div>';
 
-  // Quick Actions
-  h += '<div class="section"><h3 style="font-size:12px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">Quick Actions</h3>';
-  h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px">';
-  var actions = [
-    ['🛒','Purchase Orders','inv-orders'],['📦','Receive Stock','inv-moves'],
-    ['👥','Staff','staff'],['✅','Checklists','checklists'],
-    ['📱','QR Check-In','qr-checkin'],['💰','Sales','sales'],
-    ['🗑️','Wastage','wastage'],['💳','Health Cards','health-cards']
-  ];
-  actions.forEach(function(a) {
-    h += '<div class="card" style="text-align:center;padding:14px 10px;cursor:pointer" onclick="navTo(\'' + a[2] + '\')">';
-    h += '<div style="font-size:26px;margin-bottom:8px">' + a[0] + '</div>';
-    h += '<div style="font-size:11px;font-weight:600;color:var(--text-primary)">' + a[1] + '</div></div>';
+  // ── KPI Row 2: Staff Ops + Check-in + Checklist ────────────────────────────
+  h += '<div class="kpi-grid section">';
+  h += kpiCard('🟢','On Duty Today', staffOnDuty, 'Scheduled staff', 'var(--success)', 'From schedule', '');
+  h += kpiCard('🔴','Off Today', staffOff, 'Day off scheduled', 'var(--text-tertiary)', 'From schedule', '');
+  h += kpiCard('🏖️','On Leave', staffOnLeave, 'Approved leave', 'var(--warning)', 'From leave records', '');
+  h += kpiCard('📋','Check-ins', checkedIn + ' / ' + BS.tsEmps.length, notCheckedIn + ' not checked in', notCheckedIn > 0 ? 'var(--warning)' : 'var(--success)', 'Today', '');
+  h += '</div>';
+
+  // Checklist + Sales target inline strip
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px">';
+
+  // Checklist status card
+  h += '<div class="card">';
+  h += '<div style="font-size:12px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">✅ Checklists Today</div>';
+  if (clDone + clPending > 0) {
+    var clTotal = clDone + clPending;
+    var clPct = Math.round(clDone/clTotal*100);
+    h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">';
+    h += '<div style="flex:1;height:8px;background:var(--surface-3);border-radius:4px;overflow:hidden">';
+    h += '<div style="height:100%;width:'+clPct+'%;background:var(--success);border-radius:4px"></div></div>';
+    h += '<span class="mono" style="color:var(--success);font-weight:700">'+clPct+'%</span></div>';
+    h += '<div style="font-size:12px;color:var(--text-secondary)">'+clDone+' done · '+clPending+' pending</div>';
+  } else {
+    h += '<div style="font-size:12px;color:var(--text-tertiary)">No checklist data today</div>';
+    h += '<div style="margin-top:8px"><a href="checklists.html" target="_blank" class="btn btn-sm">Open Checklist Portal</a></div>';
+  }
+  h += '</div>';
+
+  // Sales progress card
+  h += '<div class="card">';
+  h += '<div style="font-size:12px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">💰 Sales vs Target</div>';
+  if (salesPct !== null) {
+    var spctNum = parseInt(salesPct);
+    var spctCol = spctNum >= 100 ? '#34d399' : spctNum >= 70 ? '#f59e0b' : '#f87171';
+    h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">';
+    h += '<div style="flex:1;height:8px;background:var(--surface-3);border-radius:4px;overflow:hidden">';
+    h += '<div style="height:100%;width:'+Math.min(100,spctNum)+'%;background:'+spctCol+';border-radius:4px"></div></div>';
+    h += '<span class="mono" style="color:'+spctCol+';font-weight:700">'+salesPct+'%</span></div>';
+    h += '<div style="font-size:12px;color:var(--text-secondary)">'+formatSAR(todaySales)+' of '+formatSAR(todayTarget)+'</div>';
+  } else {
+    h += '<div class="mono" style="font-size:22px;font-weight:300;color:var(--ceo);margin-bottom:6px">'+formatSAR(todaySales)+'</div>';
+    h += '<div style="font-size:11px;color:var(--text-tertiary)">Today · No target set</div>';
+    h += '<div style="margin-top:8px"><button class="btn btn-sm" onclick="navTo(\'sales\')">Add Entry</button></div>';
+  }
+  h += '</div>';
+  h += '</div>';
+
+  // ── 7-Day Sales Sparkline Bar Chart ───────────────────────────────────────
+  h += '<div class="card section" style="margin-bottom:16px">';
+  h += '<div style="font-size:12px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.08em;margin-bottom:14px">📈 Sales — Last 7 Days</div>';
+  h += '<div style="display:flex;align-items:flex-end;gap:8px;height:80px">';
+  sales7.forEach(function(v, i) {
+    var barH = Math.max(4, Math.round(v / maxSales * 76));
+    var isToday = (i === 6);
+    var col = isToday ? 'var(--ceo)' : 'var(--surface-4)';
+    h += '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">';
+    h += '<div class="mono" style="font-size:9px;color:var(--text-tertiary);white-space:nowrap">' + (v > 0 ? (v >= 1000 ? (v/1000).toFixed(1)+'K' : v.toFixed(0)) : '—') + '</div>';
+    h += '<div style="width:100%;height:'+barH+'px;background:'+col+';border-radius:4px 4px 0 0;opacity:'+(isToday?1:.65)+'"></div>';
+    h += '<div style="font-size:9px;color:var(--text-tertiary);white-space:nowrap">'+xe(sales7Labels[i])+'</div></div>';
   });
   h += '</div></div>';
 
-  // Standalone portals link
+  // ── Quick Actions ──────────────────────────────────────────────────────────
+  h += '<div class="section"><h3 style="font-size:12px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">Quick Actions</h3>';
+  h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px">';
+  var actions = [
+    ['🛒','Purchase Orders','inv-orders'],
+    ['📦','Receive Stock','inv-moves'],
+    ['👥','Staff','staff'],
+    ['💰','Sales','sales'],
+    ['⏱️','Timesheet','timesheet'],
+    ['🗑️','Wastage','wastage'],
+    ['💳','Health Cards','health-cards'],
+    ['🧾','Petty Cash','petty-cash']
+  ];
+  actions.forEach(function(a) {
+    h += '<div class="card" style="text-align:center;padding:14px 10px;cursor:pointer" onclick="navTo(\''+a[2]+'\')">';
+    h += '<div style="font-size:26px;margin-bottom:8px">'+a[0]+'</div>';
+    h += '<div style="font-size:11px;font-weight:600;color:var(--text-primary)">'+a[1]+'</div></div>';
+  });
+  h += '</div></div>';
+
+  // ── Staff Portals Standalone ───────────────────────────────────────────────
   h += '<div class="card section"><h3 style="font-size:12px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">Staff Portals (Standalone)</h3>';
   h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">';
   [['🏃','Staff Portal','staff.html'],['📝','Leave Request','leave.html'],['✅','Checklists','checklists.html']].forEach(function(p){
-    h += '<a href="' + p[2] + '" target="_blank" style="text-decoration:none">';
+    h += '<a href="'+p[2]+'" target="_blank" style="text-decoration:none">';
     h += '<div class="card" style="text-align:center;padding:12px 8px;cursor:pointer">';
-    h += '<div style="font-size:24px;margin-bottom:6px">' + p[0] + '</div>';
-    h += '<div style="font-size:11px;font-weight:600;color:var(--text-primary)">' + p[1] + '</div>';
-    h += '<div style="font-size:9px;color:var(--text-tertiary);margin-top:2px">' + p[2] + '</div></div></a>';
+    h += '<div style="font-size:24px;margin-bottom:6px">'+p[0]+'</div>';
+    h += '<div style="font-size:11px;font-weight:600;color:var(--text-primary)">'+p[1]+'</div>';
+    h += '<div style="font-size:9px;color:var(--text-tertiary);margin-top:2px">'+p[2]+'</div></div></a>';
   });
   h += '</div></div>';
   return h;
@@ -5879,7 +6250,7 @@ var SEARCH_INDEX = [
   { label:'Sales', page:'sales', keywords:'sales revenue daily covers check average' },
   { label:'Petty Cash', page:'petty-cash', keywords:'petty cash expenses float finance' },
   { label:'Checklists', page:'checklists', keywords:'checklists tasks compliance operations' },
-  { label:'QR Check-In', page:'qr-checkin', keywords:'qr checkin attendance mobile scan' }
+  { label:'Daily Task Portal', page:'_staff-portal', keywords:'daily task portal checkin checklist qr staff mobile' },
 ];
 
 var searchTimeout = null;
@@ -5985,15 +6356,14 @@ function buildMobileNav() {
       { id:'alerts-center', icon:'⚠️', label:'Alerts' }
     ],
     branch_mgr: [
-      { id:'branch-dash', icon:'📊', label:'Dashboard' },
-      { id:'inv-items', icon:'📦', label:'Inventory' },
-      { id:'staff', icon:'👥', label:'Staff' },
-      { id:'checklists', icon:'✅', label:'Checklists' }
+      { id:'branch-dash',   icon:'📊', label:'Dashboard' },
+      { id:'inv-items',     icon:'📦', label:'Inventory' },
+      { id:'staff',         icon:'👥', label:'Staff' },
+      { id:'_staff-portal', icon:'📱', label:'Daily Task' }
     ],
     staff: [
-      { id:'branch-dash', icon:'📊', label:'Dashboard' },
-      { id:'checklists', icon:'✅', label:'Checklists' },
-      { id:'qr-checkin', icon:'📱', label:'Check-In' }
+      { id:'branch-dash',   icon:'📊', label:'Dashboard' },
+      { id:'_staff-portal', icon:'📱', label:'Daily Task' }
     ]
   };
 
