@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>NEXUS — Enterprise Restaurant Intelligence</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -14,51 +14,90 @@
    NEXUS — CSS DESIGN SYSTEM
 ══════════════════════════════════════════════════════ */
 :root {
-  --body-bg: #030508;
-  --surface-1: rgba(255,255,255,0.03);
-  --surface-2: rgba(255,255,255,0.06);
-  --surface-3: rgba(255,255,255,0.09);
-  --surface-4: rgba(255,255,255,0.13);
-  --border: rgba(255,255,255,0.08);
-  --border-strong: rgba(255,255,255,0.15);
-  --text-primary: rgba(255,255,255,0.92);
-  --text-secondary: rgba(255,255,255,0.55);
-  --text-tertiary: rgba(255,255,255,0.30);
-  --ceo: #f0c040;
-  --brand-dir: #7c6ff7;
-  --regional: #3b9eff;
-  --branch-mgr: #34d399;
-  --staff: #94a3b8;
-  --super-admin: #ff6b6b;
-  --success: #34d399;
-  --warning: #f59e0b;
-  --danger: #f87171;
-  --info: #60a5fa;
-  --sidebar-w: 240px;
-  --topbar-h: 54px;
-  --statusbar-h: 26px;
+  --font:'Plus Jakarta Sans',system-ui,sans-serif;
+  --font-serif:'Instrument Serif',Georgia,serif;
+  --mono:'JetBrains Mono','Fira Code',monospace;
+  --fw-regular:400; --fw-medium:500; --fw-semibold:600; --fw-bold:700;
+
+  /* Dark (default) */
+  --body-bg:#070c18;
+  --body-bg2:#0b1120;
+  --surface-1:rgba(255,255,255,.030);
+  --surface-2:rgba(255,255,255,.055);
+  --surface-3:rgba(255,255,255,.085);
+  --surface-4:rgba(255,255,255,.115);
+  --border:rgba(255,255,255,.07);
+  --border-strong:rgba(255,255,255,.13);
+  --text-primary:rgba(255,255,255,.93);
+  --text-secondary:rgba(255,255,255,.52);
+  --text-tertiary:rgba(255,255,255,.28);
+  --text-inverse:rgba(0,0,0,.88);
+  --shadow:0 2px 12px rgba(0,0,0,.45);
+  --shadow-lg:0 8px 40px rgba(0,0,0,.60);
+  --sidebar-bg:rgba(5,8,16,.97);
+
+  /* Role colors */
+  --ceo:#f0c040;
+  --brand-dir:#a78bfa;
+  --regional:#60a5fa;
+  --branch-mgr:#34d399;
+  --staff:#94a3b8;
+  --super-admin:#f87171;
+
+  /* Semantic */
+  --success:#34d399;
+  --warning:#f59e0b;
+  --danger:#f87171;
+  --info:#60a5fa;
+  --accent:#f0a500;
+  --accent-2:#f5be45;
+
+  /* Sidebar */
+  --sidebar-w:232px;
+
+  /* Inputs */
+  --input-bg:rgba(255,255,255,.06);
+  --input-border:rgba(255,255,255,.10);
+  --input-focus:rgba(240,165,0,.5);
+
+  /* Chart */
+  --chart-grid:rgba(255,255,255,.04);
+  --chart-tick:rgba(255,255,255,.32);
 }
 [data-theme="light"] {
-  --body-bg: #f0f2f7;
-  --surface-1: rgba(255,255,255,0.7);
-  --surface-2: rgba(255,255,255,0.85);
-  --surface-3: rgba(255,255,255,0.95);
-  --surface-4: rgba(255,255,255,1);
-  --border: rgba(0,0,0,0.08);
-  --border-strong: rgba(0,0,0,0.18);
-  --text-primary: rgba(0,0,0,0.88);
-  --text-secondary: rgba(0,0,0,0.50);
-  --text-tertiary: rgba(0,0,0,0.28);
+  --body-bg:#f3f6fb;
+  --body-bg2:#e9edf7;
+  --surface-1:rgba(255,255,255,.72);
+  --surface-2:rgba(255,255,255,.88);
+  --surface-3:rgba(255,255,255,.96);
+  --surface-4:#ffffff;
+  --border:rgba(0,0,0,.07);
+  --border-strong:rgba(0,0,0,.14);
+  --text-primary:rgba(8,12,28,.90);
+  --text-secondary:rgba(8,12,28,.50);
+  --text-tertiary:rgba(8,12,28,.28);
+  --shadow:0 2px 12px rgba(0,0,0,.08);
+  --shadow-lg:0 8px 40px rgba(0,0,0,.14);
+  --sidebar-bg:rgba(8,12,24,.97);
+  --input-bg:rgba(0,0,0,.04);
+  --input-border:rgba(0,0,0,.10);
+  --chart-grid:rgba(0,0,0,.05);
+  --chart-tick:rgba(0,0,0,.38);
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;overflow:hidden}
 body{
-  font-family:'DM Sans',sans-serif;
+  font-family:var(--font);
+  font-size:13.5px;
   background:var(--body-bg);
   color:var(--text-primary);
-  font-size:14px;
-  line-height:1.5;
-  transition:background .3s,color .3s;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+  text-rendering:optimizeLegibility;
+  height:100%;
+  overflow:hidden;
+  letter-spacing:-.01em;
+  background-image:radial-gradient(ellipse at 70% 10%,rgba(167,139,250,.06) 0%,transparent 60%),radial-gradient(ellipse at 10% 90%,rgba(96,165,250,.04) 0%,transparent 50%);
 }
 ::-webkit-scrollbar{width:4px;height:4px}
 ::-webkit-scrollbar-track{background:transparent}
@@ -101,7 +140,7 @@ body{
   text-align:center;
 }
 .login-logo .nexus-mark{
-  font-family:'Syne',sans-serif;
+  font-family:var(--font-display),sans-serif;
   font-size:56px;font-weight:800;
   letter-spacing:-2px;
   background:linear-gradient(135deg,#fff 0%,rgba(255,255,255,.6) 100%);
@@ -109,7 +148,7 @@ body{
   line-height:1;
 }
 .login-logo .nexus-sub{
-  font-family:'DM Sans',sans-serif;
+  font-family:var(--font),sans-serif;
   font-size:12px;font-weight:400;
   letter-spacing:.25em;text-transform:uppercase;
   color:var(--text-tertiary);
@@ -125,7 +164,7 @@ body{
   box-shadow:0 32px 80px rgba(0,0,0,.5);
 }
 .login-step-title{
-  font-family:'Syne',sans-serif;
+  font-family:var(--font-display),sans-serif;
   font-size:13px;font-weight:600;
   letter-spacing:.1em;text-transform:uppercase;
   color:var(--text-tertiary);
@@ -175,7 +214,7 @@ body{
   height:52px;border-radius:10px;border:1px solid var(--border);
   background:var(--surface-2);
   color:var(--text-primary);
-  font-family:'Syne',sans-serif;font-size:18px;font-weight:600;
+  font-family:var(--font-display),sans-serif;font-size:18px;font-weight:600;
   cursor:pointer;transition:all .15s;
 }
 .pin-btn:hover{background:var(--surface-3);border-color:var(--border-strong)}
@@ -193,7 +232,7 @@ body{
   width:100%;padding:12px 14px;
   background:var(--surface-2);border:1px solid var(--border);
   border-radius:8px;color:var(--text-primary);
-  font-family:'DM Sans',sans-serif;font-size:14px;
+  font-family:var(--font),sans-serif;font-size:14px;
   outline:none;transition:border .2s;
   margin-bottom:8px;
 }
@@ -212,7 +251,7 @@ body{
 .entity-item:hover,.entity-item.selected{background:var(--surface-3)}
 .login-btn{
   width:100%;height:46px;border-radius:10px;border:none;
-  font-family:'Syne',sans-serif;font-size:14px;font-weight:600;
+  font-family:var(--font-display),sans-serif;font-size:14px;font-weight:600;
   cursor:pointer;transition:all .2s;letter-spacing:.05em;
   background:var(--text-primary);color:var(--body-bg);
 }
@@ -243,7 +282,7 @@ body{
 }
 [data-theme="light"] .topbar{background:rgba(240,242,247,.9)}
 .topbar-title{
-  font-family:'Syne',sans-serif;
+  font-family:var(--font-display),sans-serif;
   font-size:16px;font-weight:700;
   color:var(--text-primary);
   white-space:nowrap;
@@ -266,7 +305,7 @@ body{
   border:1px solid var(--border);
   border-radius:8px;
   color:var(--text-primary);font-size:13px;
-  font-family:'DM Sans',sans-serif;
+  font-family:var(--font),sans-serif;
   outline:none;transition:all .2s;
 }
 .topbar-search input:focus{width:260px;border-color:var(--border-strong)}
@@ -274,21 +313,26 @@ body{
   position:absolute;left:10px;top:50%;transform:translateY(-50%);
   color:var(--text-tertiary);font-size:13px;
 }
-.topbar-actions{display:flex;align-items:center;gap:4px}
+.topbar-actions{display:flex;align-items:center;gap:6px}
 .icon-btn{
-  width:34px;height:34px;border-radius:8px;
-  background:none;border:1px solid transparent;
-  color:var(--text-secondary);
-  cursor:pointer;transition:all .15s;
+  background:var(--surface-2);
+  border:1px solid var(--border);
+  color:var(--text-primary);
+  border-radius:8px;
+  width:34px;height:34px;
   display:flex;align-items:center;justify-content:center;
-  font-size:16px;position:relative;
+  cursor:pointer;font-size:15px;
+  transition:all .15s;
+  position:relative;
+  flex-shrink:0;
 }
+.icon-btn:hover{background:var(--surface-3);border-color:var(--border-strong);}
 .icon-btn:hover{background:var(--surface-2);border-color:var(--border);color:var(--text-primary)}
 .notif-badge{
   position:absolute;top:4px;right:4px;
   width:16px;height:16px;border-radius:50%;
   background:var(--danger);
-  font-size:9px;font-weight:700;font-family:'DM Sans',sans-serif;
+  font-size:9px;font-weight:700;font-family:var(--font),sans-serif;
   color:#fff;display:flex;align-items:center;justify-content:center;
 }
 .user-avatar{
@@ -297,7 +341,7 @@ body{
   border:1px solid var(--border);
   display:flex;align-items:center;justify-content:center;
   font-size:13px;font-weight:600;cursor:pointer;
-  font-family:'Syne',sans-serif;
+  font-family:var(--font-display),sans-serif;
 }
 
 .body-wrap{
@@ -320,7 +364,7 @@ body{
 [data-theme="light"] .sidebar{background:rgba(255,255,255,.95)}
 .sidebar.collapsed{width:0}
 .sb-head{
-  padding:16px;
+  padding:16px 14px;
   border-bottom:1px solid var(--border);
   flex-shrink:0;
 }
@@ -328,21 +372,35 @@ body{
   display:flex;align-items:center;gap:10px;margin-bottom:12px;
 }
 .sb-logo-mark{
-  font-family:'Syne',sans-serif;font-size:20px;font-weight:800;
-  letter-spacing:-1px;color:var(--text-primary);
+  font-size:18px;
+  font-weight:800;
+  letter-spacing:-.05em;
+  color:var(--text-primary);
+  font-family:var(--font);
 }
+.sb-logo-mark span{color:var(--accent);}
 .sb-logo-mark span{opacity:.4;font-weight:400}
 .role-badge{
-  display:inline-flex;align-items:center;gap:6px;
-  padding:4px 10px;border-radius:20px;
-  font-size:11px;font-weight:600;
-  letter-spacing:.05em;text-transform:uppercase;
+  display:inline-flex;
+  align-items:center;
+  gap:5px;
+  font-size:10px;
+  font-weight:700;
+  padding:3px 8px;
+  border-radius:20px;
   border:1px solid currentColor;
-  margin-bottom:4px;
+  opacity:.85;
+  margin-bottom:5px;
+  letter-spacing:.02em;
 }
 .entity-name{
-  font-size:12px;color:var(--text-secondary);
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  font-size:13px;
+  font-weight:700;
+  color:var(--text-primary);
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  letter-spacing:-.02em;
 }
 .sb-nav{
   flex:1;overflow-y:auto;padding:8px;
@@ -354,13 +412,20 @@ body{
   padding:12px 8px 4px;
 }
 .nav-item{
-  display:flex;align-items:center;gap:10px;
-  padding:9px 10px;border-radius:8px;
-  cursor:pointer;transition:all .15s;
-  color:var(--text-secondary);font-size:13px;
-  white-space:nowrap;overflow:hidden;
+  display:flex;
+  align-items:center;
+  gap:9px;
+  padding:7px 10px;
+  border-radius:8px;
+  cursor:pointer;
+  transition:all .12s;
+  color:var(--text-secondary);
+  font-size:12.5px;
+  font-weight:500;
   margin-bottom:1px;
 }
+.nav-item:hover{background:var(--surface-2);color:var(--text-primary);}
+.nav-item.active{background:var(--surface-3);color:var(--text-primary);font-weight:600;}
 .nav-item:hover{background:var(--surface-2);color:var(--text-primary)}
 .nav-item.active{background:var(--surface-3);color:var(--text-primary)}
 .nav-item .ni-icon{width:18px;text-align:center;flex-shrink:0;font-size:14px}
@@ -403,7 +468,7 @@ body{
   color:var(--text-secondary);font-size:12px;
   cursor:pointer;transition:all .15s;
   display:flex;align-items:center;justify-content:center;gap:6px;
-  font-family:'DM Sans',sans-serif;
+  font-family:var(--font),sans-serif;
 }
 .logout-btn:hover{border-color:var(--danger);color:var(--danger)}
 
@@ -414,10 +479,24 @@ body{
   position:relative;
 }
 .page-header{
-  margin-bottom:24px;
+  margin-bottom:20px;
+  padding-bottom:16px;
+  border-bottom:1px solid var(--border);
 }
 .page-header h1{
-  font-family:'Syne',sans-serif;
+  font-size:22px;
+  font-weight:700;
+  color:var(--text-primary);
+  letter-spacing:-.03em;
+  margin-bottom:3px;
+  font-family:var(--font);
+}
+.page-header p{
+  font-size:12px;
+  color:var(--text-secondary);
+}
+.page-header h1{
+  font-family:var(--font-display),sans-serif;
   font-size:24px;font-weight:700;
   letter-spacing:-.5px;
 }
@@ -427,21 +506,21 @@ body{
 
 /* ═══ CARDS ═══ */
 .card{
-  background:var(--surface-1);
+  background:var(--surface-2);
   border:1px solid var(--border);
-  border-radius:12px;
-  padding:20px;
-  backdrop-filter:blur(20px);
-  box-shadow:0 4px 24px rgba(0,0,0,.4);
-  transition:border-color .2s;
+  border-radius:14px;
+  padding:18px 20px;
+  box-shadow:var(--shadow);
+  transition:box-shadow .2s;
 }
+.card:hover{box-shadow:var(--shadow-lg);}
 .card:hover{border-color:var(--border-strong)}
 .card-label{
   font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
   color:var(--text-tertiary);margin-bottom:8px;
 }
 .card-value{
-  font-family:'Syne',sans-serif;
+  font-family:var(--font-display),sans-serif;
   font-size:28px;font-weight:700;
   letter-spacing:-1px;color:var(--text-primary);
   line-height:1;
@@ -456,19 +535,20 @@ body{
 /* KPI Grid */
 .kpi-grid{
   display:grid;
-  grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
-  gap:16px;
-  margin-bottom:24px;
+  grid-template-columns:repeat(auto-fill,minmax(200px,1fr));
+  gap:14px;
+  margin-bottom:20px;
 }
 .kpi-card{
-  background:var(--surface-1);
+  background:var(--surface-2);
   border:1px solid var(--border);
-  border-radius:12px;padding:20px;
-  backdrop-filter:blur(20px);
-  box-shadow:0 4px 24px rgba(0,0,0,.4);
-  transition:all .2s;
-  position:relative;overflow:hidden;
+  border-radius:14px;
+  padding:16px 18px;
+  position:relative;
+  overflow:hidden;
+  transition:box-shadow .2s;
 }
+.kpi-card:hover{box-shadow:var(--shadow);}
 .kpi-card::before{
   content:'';position:absolute;
   top:-40px;right:-40px;
@@ -485,7 +565,7 @@ body{
 }
 .kpi-label{font-size:11px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px}
 .kpi-value{
-  font-family:'Syne',sans-serif;font-size:28px;font-weight:700;
+  font-family:var(--font-display),sans-serif;font-size:28px;font-weight:700;
   letter-spacing:-1px;line-height:1;color:var(--text-primary);
 }
 .kpi-meta{
@@ -506,15 +586,35 @@ body{
   margin-bottom:16px;
 }
 .chart-title{
-  font-family:'Syne',sans-serif;
+  font-family:var(--font-display),sans-serif;
   font-size:15px;font-weight:600;
 }
 
 /* Tables */
 .data-table{
-  width:100%;border-collapse:collapse;
-  font-size:13px;
+  width:100%;
+  border-collapse:collapse;
+  font-size:12.5px;
 }
+.data-table th{
+  padding:10px 14px;
+  text-align:left;
+  font-size:10px;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+  color:var(--text-tertiary);
+  border-bottom:1px solid var(--border);
+  white-space:nowrap;
+}
+.data-table td{
+  padding:11px 14px;
+  color:var(--text-primary);
+  border-bottom:1px solid var(--border);
+  vertical-align:middle;
+}
+.data-table tr:last-child td{border-bottom:none;}
+.data-table tr:hover td{background:var(--surface-1);}
 .data-table th{
   padding:10px 12px;
   font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
@@ -611,7 +711,7 @@ body{
   display:flex;align-items:center;justify-content:space-between;
   flex-shrink:0;
 }
-.notif-head h3{font-family:'Syne',sans-serif;font-size:15px;font-weight:700}
+.notif-head h3{font-family:var(--font-display),sans-serif;font-size:15px;font-weight:700}
 .notif-close{
   background:none;border:none;color:var(--text-secondary);
   cursor:pointer;font-size:18px;line-height:1;padding:4px;
@@ -687,7 +787,7 @@ body{
   display:flex;align-items:center;justify-content:space-between;
   margin-bottom:24px;
 }
-.modal-head h2{font-family:'Syne',sans-serif;font-size:18px;font-weight:700}
+.modal-head h2{font-family:var(--font-display),sans-serif;font-size:18px;font-weight:700}
 .modal-close{
   background:none;border:none;color:var(--text-secondary);
   cursor:pointer;font-size:20px;padding:4px;
@@ -698,7 +798,7 @@ body{
   width:100%;padding:10px 12px;
   background:var(--surface-2);border:1px solid var(--border);
   border-radius:8px;color:var(--text-primary);
-  font-family:'DM Sans',sans-serif;font-size:14px;
+  font-family:var(--font),sans-serif;font-size:14px;
   outline:none;transition:border .2s;
 }
 .form-input:focus{border-color:var(--border-strong)}
@@ -714,7 +814,7 @@ body{
   padding:8px 16px;border-radius:8px 8px 0 0;
   border:none;border-bottom:2px solid transparent;
   background:none;color:var(--text-secondary);
-  font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;
+  font-family:var(--font),sans-serif;font-size:13px;font-weight:500;
   cursor:pointer;transition:all .15s;margin-bottom:-1px;
 }
 .tab-btn:hover{color:var(--text-primary)}
@@ -726,7 +826,7 @@ body{
   padding:16px 0;
 }
 .gauge-value{
-  font-family:'Syne',sans-serif;font-size:40px;font-weight:700;
+  font-family:var(--font-display),sans-serif;font-size:40px;font-weight:700;
   letter-spacing:-2px;margin-top:-20px;
 }
 .gauge-label{font-size:12px;color:var(--text-secondary)}
@@ -754,7 +854,7 @@ body{
   width:44px;height:44px;border-radius:10px;
   display:flex;align-items:center;justify-content:center;font-size:20px;
 }
-.bc-name{font-family:'Syne',sans-serif;font-size:16px;font-weight:700}
+.bc-name{font-family:var(--font-display),sans-serif;font-size:16px;font-weight:700}
 .bc-sub{font-size:12px;color:var(--text-secondary)}
 .bc-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
 .bc-stat{text-align:center}
@@ -814,7 +914,7 @@ body{
   color:var(--text-tertiary);
 }
 .empty-state .es-icon{font-size:40px;margin-bottom:12px}
-.empty-state h3{font-family:'Syne',sans-serif;font-size:16px;color:var(--text-secondary);margin-bottom:8px}
+.empty-state h3{font-family:var(--font-display),sans-serif;font-size:16px;color:var(--text-secondary);margin-bottom:8px}
 
 /* Scrollable table wrapper */
 .table-wrap{
@@ -833,7 +933,7 @@ body{
   width:100%;padding:8px 12px;
   background:var(--surface-2);border:1px solid var(--border);
   border-radius:8px;color:var(--text-primary);
-  font-family:'DM Sans',sans-serif;font-size:13px;
+  font-family:var(--font),sans-serif;font-size:13px;
   outline:none;cursor:pointer;
   appearance:none;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='rgba(255,255,255,.4)' fill='none' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E");
@@ -858,7 +958,7 @@ body{
 .compact-item:last-child{border-bottom:none}
 .compact-rank{
   width:20px;text-align:center;
-  font-family:'Syne',sans-serif;font-size:12px;font-weight:700;
+  font-family:var(--font-display),sans-serif;font-size:12px;font-weight:700;
   color:var(--text-tertiary);flex-shrink:0;
 }
 .compact-name{flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -880,12 +980,13 @@ body{
 .btn{
   padding:8px 16px;border-radius:8px;border:1px solid var(--border);
   background:var(--surface-2);color:var(--text-primary);
-  font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;
+  font-family:var(--font),sans-serif;font-size:13px;font-weight:500;
   cursor:pointer;transition:all .15s;display:inline-flex;align-items:center;gap:6px;
 }
 .btn:hover{background:var(--surface-3);border-color:var(--border-strong)}
 .btn-primary{
-  background:var(--text-primary);color:var(--body-bg);border-color:var(--text-primary);
+  background:var(--accent);color:#000;border-color:var(--accent);
+  font-weight:700;
 }
 .btn-primary:hover{opacity:.85}
 .btn-sm{padding:5px 10px;font-size:12px}
@@ -1206,6 +1307,10 @@ function rand(min, max) {
 // ── Navigation ───────────────────────────────────────────────────────────────
 
 function navTo(pageId) {
+  // Standalone portal links — open in new tab
+  var portalMap = { '_staff-portal':'staff.html', '_leave-portal':'leave.html', '_checklist-portal':'checklists.html' };
+  if (portalMap[pageId]) { window.open(portalMap[pageId], '_blank'); return; }
+
   NX.page = pageId;
   updateTopBar(pageId);
   renderSidebar();
@@ -1401,6 +1506,11 @@ var NAV_CONFIG = {
     ]}
   ],
   branch_mgr: [
+    { section:'PORTALS', items:[
+      { id:'_staff-portal',     icon:'🏃', label:'Staff Portal' },
+      { id:'_leave-portal',     icon:'📝', label:'Leave Request' },
+      { id:'_checklist-portal', icon:'📋', label:'Checklist App' }
+    ]},
     { section:'INVENTORY', items:[
       { id:'branch-dash', icon:'📊', label:'Dashboard' },
       { id:'inv-items',   icon:'📋', label:'Items' },
@@ -1430,6 +1540,11 @@ var NAV_CONFIG = {
       { id:'branch-dash', icon:'📊', label:'Dashboard' },
       { id:'checklists',  icon:'✅', label:'Checklists' },
       { id:'qr-checkin',  icon:'📱', label:'Check-In' }
+    ]},
+    { section:'PORTALS', items:[
+      { id:'_staff-portal',      icon:'🏃', label:'Staff Portal' },
+      { id:'_leave-portal',      icon:'📝', label:'Leave Request' },
+      { id:'_checklist-portal',  icon:'📋', label:'Checklist App' }
     ]}
   ]
 };
@@ -1701,7 +1816,7 @@ function renderNotifications() {
   var html = '<div style="display:flex;gap:4px;padding:8px 12px;border-bottom:1px solid var(--border);overflow-x:auto;flex-shrink:0">';
   tabs.forEach(function(t) {
     var active = filt === t.id;
-    html += '<button onclick="NX._notifFilter=\''+t.id+'\';renderNotifications()" style="padding:4px 10px;border-radius:20px;border:1px solid '+(active?'var(--border-strong)':'var(--border)')+';background:'+(active?'var(--surface-3)':'transparent')+';color:'+(active?'var(--text-primary)':'var(--text-secondary)')+';font-size:11px;cursor:pointer;white-space:nowrap;font-family:DM Sans,sans-serif">'+t.label+(t.count?'<span style="margin-left:4px;background:var(--surface-3);padding:1px 5px;border-radius:10px;font-size:10px">'+t.count+'</span>':'')+'</button>';
+    html += '<button onclick="NX._notifFilter=\''+t.id+'\';renderNotifications()" style="padding:4px 10px;border-radius:20px;border:1px solid '+(active?'var(--border-strong)':'var(--border)')+';background:'+(active?'var(--surface-3)':'transparent')+';color:'+(active?'var(--text-primary)':'var(--text-secondary)')+';font-size:11px;cursor:pointer;white-space:nowrap;font-family:var(--font)">'+t.label+(t.count?'<span style="margin-left:4px;background:var(--surface-3);padding:1px 5px;border-radius:10px;font-size:10px">'+t.count+'</span>':'')+'</button>';
   });
   html += '</div>';
 
@@ -1873,14 +1988,15 @@ function renderLogin(step) {
 
 function renderLoginStep0(card) {
   var roles = [
-    { id:'super_admin', label:'Super Admin', sub:'Full system access', icon:'⚙️', color:'#ff6b6b' },
-    { id:'ceo', label:'CEO / Executive', sub:'Company overview', icon:'👑', color:'#f0c040' },
-    { id:'brand_dir', label:'Brand Director', sub:'Brand operations', icon:'🎯', color:'#7c6ff7' },
-    { id:'regional', label:'Regional Manager', sub:'Regional oversight', icon:'🗺️', color:'#3b9eff' },
-    { id:'branch_mgr', label:'Branch Manager', sub:'Branch operations', icon:'🏪', color:'#34d399' },
-    { id:'staff', label:'Staff', sub:'Check-in & tasks', icon:'👤', color:'#94a3b8' }
+    { id:'super_admin', label:'Super Admin',      sub:'Full system control',           icon:'🔑', color:'#f87171' },
+    { id:'ceo',         label:'CEO / Executive',  sub:'Company-wide overview',         icon:'👑', color:'#f0c040' },
+    { id:'brand_dir',   label:'Brand Director',   sub:'Enter PIN → auto-login',        icon:'🎯', color:'#a78bfa' },
+    { id:'regional',    label:'Area Manager',     sub:'Enter PIN → auto-login',        icon:'🗺️', color:'#60a5fa' },
+    { id:'branch_mgr',  label:'Branch Manager',   sub:'Select branch + enter PIN',     icon:'🏪', color:'#34d399' },
+    { id:'staff',       label:'Staff',            sub:'Check-in & checklists only',    icon:'👤', color:'#94a3b8' }
   ];
-  card.innerHTML = '<div class="login-step-title">Select Your Role</div>' +
+  card.innerHTML =
+    '<div class="login-step-title">Select Your Role</div>' +
     '<div class="role-grid">' +
     roles.map(function(r) {
       return '<div class="role-card" onclick="selectRole(\'' + r.id + '\')" style="--role-color:' + r.color + '">' +
@@ -1888,20 +2004,20 @@ function renderLoginStep0(card) {
         '<div class="role-label"><strong>' + r.label + '</strong>' + r.sub + '</div>' +
       '</div>';
     }).join('') +
-  '</div>';
+    '</div>';
 }
 
 function selectRole(roleId) {
   loginState.role = roleId;
-  if (roleId === 'super_admin' || roleId === 'ceo') {
+  // super_admin, ceo, brand_dir, regional — go straight to PIN
+  // Their branch/brand assignments are looked up from Firebase AFTER PIN verification
+  if (roleId === 'super_admin' || roleId === 'ceo' ||
+      roleId === 'brand_dir'   || roleId === 'regional') {
     renderLogin(2);
-  } else if (roleId === 'brand_dir') {
-    renderLoginEntitySelect('brand');
-  } else if (roleId === 'regional') {
-    renderLoginEntitySelect('region');
   } else if (roleId === 'branch_mgr') {
     renderLoginEntitySelect('branch');
   } else {
+    // staff — pick branch then straight to dashboard
     renderLoginEntitySelect('branch');
   }
 }
@@ -1995,21 +2111,40 @@ function selectEntity(id, type) {
 
 function renderLoginPIN(card) {
   loginState.pin = '';
-  card.innerHTML = '<button class="login-back-btn" onclick="renderLogin(0)">← Back</button>' +
-    '<div class="login-step-title">Enter PIN</div>' +
-    '<div class="pin-display">' +
-    '<div class="pin-dot" id="pd0"></div><div class="pin-dot" id="pd1"></div>' +
-    '<div class="pin-dot" id="pd2"></div><div class="pin-dot" id="pd3"></div>' +
+  var role = loginState.role || '';
+  var branch = loginState.branchId ? (NX_BRANCHES[loginState.branchId]||{}) : null;
+
+  // Role-specific headings & hints
+  var roleHints = {
+    super_admin: { icon:'🔑', title:'Super Admin', hint:'Enter system PIN: ••••', color:'var(--super-admin)' },
+    ceo:         { icon:'👑', title:'CEO Access',  hint:'Enter CEO PIN',         color:'var(--ceo)' },
+    brand_dir:   { icon:'🎯', title:'Brand Director', hint:'Enter your personal Director PIN (set by Admin/CEO)', color:'var(--brand-dir)' },
+    regional:    { icon:'🗺️', title:'Area Manager',   hint:'Enter your personal Area Manager PIN (set by Director)', color:'var(--regional)' },
+    branch_mgr:  { icon:'🏪', title:branch ? xe(branch.name||'Branch') : 'Branch Manager', hint:'Enter branch PIN', color:'var(--branch-mgr)' },
+    staff:       { icon:'👤', title:'Staff',        hint:'No PIN required — tap Login', color:'var(--staff)' }
+  };
+  var rh = roleHints[role] || roleHints.branch_mgr;
+
+  card.innerHTML =
+    '<button class="login-back-btn" onclick="renderLogin(0)">← Back</button>' +
+    '<div style="text-align:center;margin-bottom:20px">' +
+      '<div style="font-size:36px;margin-bottom:6px">' + rh.icon + '</div>' +
+      '<div class="login-step-title" style="color:' + rh.color + '">' + rh.title + '</div>' +
+      (branch ? '<div style="font-size:12px;color:var(--text-secondary);margin-top:4px">' + xe(branch.name||'') + (branch.location?' · '+xe(branch.location):'') + '</div>' : '') +
+      '<div style="font-size:11px;color:var(--text-tertiary);margin-top:8px">' + rh.hint + '</div>' +
     '</div>' +
-    '<div class="pin-pad">' +
-    [1,2,3,4,5,6,7,8,9].map(function(n) {
-      return '<button class="pin-btn" onclick="pinPress(\'' + n + '\')">' + n + '</button>';
-    }).join('') +
-    '<button class="pin-btn wide" onclick="pinPress(\'0\')">0</button>' +
-    '<button class="pin-btn del" onclick="pinDel()">⌫</button>' +
-    '</div>' +
-    '<div class="login-error" id="pin-error"></div>' +
-    '<p style="font-size:11px;text-align:center;color:var(--text-tertiary);margin-top:16px">Forgot PIN? Contact your System Administrator</p>';
+    '<div class="pin-dots" id="pin-dots"><span></span><span></span><span></span><span></span></div>' +
+    '<div id="pin-error" style="color:var(--danger);font-size:12px;text-align:center;min-height:18px;margin:4px 0 10px"></div>' +
+    (role === 'staff' ?
+      '<button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="verifyPIN()">Login →</button>' :
+      '<div class="pin-pad">' +
+        [1,2,3,4,5,6,7,8,9,'',0,'⌫'].map(function(k) {
+          return k === '' ?
+            '<div style="visibility:hidden"></div>' :
+            '<button class="pin-key" onclick="' + (k==='⌫' ? 'pinBackspace()' : 'pinDigit(' + k + ')') + '">' + k + '</button>';
+        }).join('') +
+      '</div>'
+    );
 }
 
 function pinPress(n) {
@@ -2040,59 +2175,91 @@ var ACCESS = {
 };
 
 function verifyPIN() {
-  var role = loginState.role;
-  var pin  = loginState.pin;
+  var role  = loginState.role;
+  var pin   = loginState.pin;
   var valid = false;
 
-  if (role === 'super_admin' && pin === ACCESS.superAdmin.pin) valid = true;
-  else if (role === 'ceo'       && pin === ACCESS.ceo.pin)       valid = true;
-  else if (role === 'brand_dir' && pin === ACCESS.brandDir.pin)  valid = true;
-  else if (role === 'regional'  && pin === ACCESS.regional.pin)  valid = true;
+  // ── System PINs ──
+  if      (role === 'super_admin' && pin === ACCESS.superAdmin.pin) valid = true;
+  else if (role === 'ceo'         && pin === ACCESS.ceo.pin)        valid = true;
   else if (role === 'branch_mgr') {
-    // PIN comes from admin/branches/{id}.pin in Firebase (set via OpsHub)
-    var brObj  = NX_BRANCHES[loginState.branchId] || {};
+    var brObj   = NX_BRANCHES[loginState.branchId] || {};
     var realPin = String(brObj.pin || '');
     valid = realPin.length > 0 && pin === realPin;
     if (!valid && !realPin.length) {
-      // Branch not yet loaded — show helpful error
       var errEl = document.getElementById('pin-error');
-      if (errEl) errEl.textContent = 'Branch data not loaded yet — please wait and try again.';
-      loginState.pin = '';
-      updatePinDots();
-      return;
+      if (errEl) errEl.textContent = 'Branch data not yet loaded — please wait and retry.';
+      loginState.pin = ''; updatePinDots(); return;
     }
   }
-  else if (role === 'staff') valid = true; // staff: no PIN required
+  else if (role === 'staff') valid = true;
 
-  if (!valid) {
-    var errEl = document.getElementById('pin-error');
-    if (errEl) errEl.textContent = 'Incorrect PIN. Please try again.';
-    loginState.pin = '';
-    updatePinDots();
-    return;
+  // ── Director / Regional: look up their branch assignment from Firebase ──
+  // Their PIN is stored in admin/branches as directorPin or regionalPin field
+  else if (role === 'brand_dir' || role === 'regional') {
+    var pinField = role === 'brand_dir' ? 'directorPin' : 'regionalPin';
+    var matchedBranch = null;
+    Object.values(NX_BRANCHES).forEach(function(b) {
+      if (String(b[pinField] || '') === pin) matchedBranch = b;
+    });
+
+    if (matchedBranch) {
+      valid = true;
+      loginState.branchId    = matchedBranch.id;
+      loginState.branchName  = matchedBranch.name;
+      loginState.brandName   = matchedBranch.brand || matchedBranch.name;
+      loginState.regionName  = matchedBranch.location || '';
+    } else {
+      // Also check global ACCESS fallbacks
+      var fallbackPin = role === 'brand_dir' ? ACCESS.brandDir.pin : ACCESS.regional.pin;
+      if (pin === fallbackPin) valid = true;
+    }
   }
 
-  // Build session from real Firebase branch data
+  if (!valid) {
+    var errEl2 = document.getElementById('pin-error');
+    if (errEl2) errEl2.textContent = 'Incorrect PIN — please try again.';
+    loginState.pin = ''; updatePinDots(); return;
+  }
+
+  // ── Build session ──
   var sess = { role: role };
-  if (role === 'super_admin') {
-    sess.entityName = 'ALFA.CO';
-  } else if (role === 'ceo') {
+  if (role === 'super_admin' || role === 'ceo') {
     sess.entityName = 'ALFA.CO';
   } else if (role === 'brand_dir') {
-    sess.brandName  = loginState.brandName || '';
-    sess.entityName = sess.brandName;
+    if (loginState.branchId) {
+      // Auto-assigned to their branch
+      var bObj2 = NX_BRANCHES[loginState.branchId] || {};
+      sess.branchId   = loginState.branchId;
+      sess.branchName = bObj2.name     || loginState.branchName || '';
+      sess.brandName  = bObj2.brand    || loginState.brandName  || '';
+      sess.regionName = bObj2.location || loginState.regionName || '';
+      sess.entityName = sess.brandName || sess.branchName;
+    } else {
+      sess.brandName  = loginState.brandName || 'Brand Director';
+      sess.entityName = sess.brandName;
+    }
   } else if (role === 'regional') {
-    sess.brandName  = loginState.brandName  || '';
-    sess.regionName = loginState.regionName || '';
-    sess.entityName = sess.brandName + (sess.regionName ? ' — ' + sess.regionName : '');
+    if (loginState.branchId) {
+      var bObj3 = NX_BRANCHES[loginState.branchId] || {};
+      sess.branchId   = loginState.branchId;
+      sess.branchName = bObj3.name     || loginState.branchName || '';
+      sess.brandName  = bObj3.brand    || loginState.brandName  || '';
+      sess.regionName = bObj3.location || loginState.regionName || '';
+      sess.entityName = sess.regionName || sess.branchName;
+    } else {
+      sess.brandName  = loginState.brandName  || '';
+      sess.regionName = loginState.regionName || 'Regional Manager';
+      sess.entityName = sess.regionName;
+    }
   } else {
-    // branch_mgr or staff — use real branch data
-    var branchId = loginState.branchId;
-    var bObj = NX_BRANCHES[branchId] || {};
-    sess.branchId   = branchId;
-    sess.branchName = bObj.name  || loginState.branchName || branchId;
-    sess.brandName  = bObj.brand || loginState.brandName  || '';
-    sess.regionName = bObj.location || loginState.regionName || '';
+    // branch_mgr or staff
+    var branchId4 = loginState.branchId;
+    var bObj4     = NX_BRANCHES[branchId4] || {};
+    sess.branchId   = branchId4;
+    sess.branchName = bObj4.name     || loginState.branchName || branchId4;
+    sess.brandName  = bObj4.brand    || loginState.brandName  || '';
+    sess.regionName = bObj4.location || loginState.regionName || '';
     sess.entityName = sess.branchName;
   }
 
@@ -3109,6 +3276,7 @@ function pBrandMgmt() {
   var h = '<div class="page-header"><h1>Brand Management</h1>' +
     '<p>Manage restaurant brands registered in Firebase · admin/branches</p></div>';
   h += '<div class="header-actions"><div></div>' +
+    '<button class="btn" style="margin-right:8px" onclick="openAddBrandModal()">+ Add Brand</button>' +
     '<button class="btn btn-primary" onclick="openAddBranchModal()">+ Add Branch</button></div>';
 
   if (!branches.length) {
@@ -3292,51 +3460,133 @@ function deleteBranch(branchId) {
 }
 
 function pAccessCtrl() {
-  var h = '<div class="page-header"><h1>Access Control</h1><p>PIN management and session control · branches loaded from Firebase</p></div>';
-  h += '<div class="header-actions"><div></div><button class="btn btn-primary" onclick="openAddUserModal()">+ Add User</button></div>';
+  var branches = Object.values(NX_BRANCHES);
+  var h = '<div class="page-header"><h1>Access Control</h1><p>Assign Directors, Area Managers and Branch Managers to branches</p></div>';
+  h += '<div class="header-actions"><div></div>';
+  h += '<button class="btn btn-primary" onclick="openAddBranchModal()">+ Add Branch</button>';
+  h += '</div>';
 
-  // Role config (system-level PINs)
-  var systemRoles = [
-    { name:'Super Admin', role:'super_admin', pin:'****', entity:'ALFA.CO', status:'active' },
-    { name:'CEO', role:'ceo', pin:'****', entity:'ALFA.CO', status:'active' },
-  ];
-
-  // Branch manager entries from real Firebase NX_BRANCHES
-  var branchRows = Object.values(NX_BRANCHES).map(function(b) {
-    return { name:b.manager||'Manager', role:'branch_mgr', entity:b.name||b.id, pin:'****', status:b.active!==false?'active':'inactive' };
+  // System PINs card
+  h += '<div class="card section" style="margin-bottom:20px"><h3 style="font-size:12px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.08em;margin-bottom:14px">System PINs</h3>';
+  h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px">';
+  [['👑 Super Admin','0000','var(--super-admin)'],['🏆 CEO','1111','var(--ceo)']].forEach(function(r) {
+    h += '<div style="background:var(--surface-3);border-radius:10px;padding:12px;border-left:3px solid ' + r[2] + '">';
+    h += '<div style="font-size:10px;color:var(--text-secondary);margin-bottom:4px">' + r[0] + '</div>';
+    h += '<div style="font-family:var(--mono);font-size:20px;letter-spacing:4px;color:var(--text-primary);font-weight:600">' + r[1] + '</div></div>';
   });
+  h += '</div></div>';
 
-  var allUsers = systemRoles.concat(branchRows);
-  var roleColors = { super_admin:'var(--danger)', ceo:'var(--ceo)', brand_dir:'var(--brand-dir)', regional:'var(--regional)', branch_mgr:'var(--branch-mgr)', staff:'var(--text-secondary)' };
-  var roleLabels = { super_admin:'Super Admin', ceo:'CEO', brand_dir:'Brand Director', regional:'Regional Manager', branch_mgr:'Branch Manager', staff:'Staff' };
-
+  // Branch table with assign controls
   h += '<div class="table-wrap section"><table class="data-table"><thead><tr>';
-  h += '<th>Name</th><th>Role</th><th>Branch / Entity</th><th>PIN</th><th>Status</th><th>Actions</th>';
+  h += '<th>Branch</th><th>Brand</th><th>Location</th><th>Manager</th><th>Branch PIN</th><th>Director PIN</th><th>Area Mgr PIN</th><th>Actions</th>';
   h += '</tr></thead><tbody>';
-  allUsers.forEach(function(u) {
-    var stc = u.status === 'active' ? 'var(--success)' : 'var(--danger)';
-    h += '<tr>';
-    h += '<td><strong style="color:var(--text-primary)">' + xe(u.name||'—') + '</strong></td>';
-    h += '<td><span style="color:' + (roleColors[u.role]||'var(--text-secondary)') + ';font-size:11px;font-weight:600">' + (roleLabels[u.role]||u.role) + '</span></td>';
-    h += '<td>' + xe(u.entity||'—') + '</td>';
-    h += '<td class="mono" style="letter-spacing:3px">' + xe(u.pin) + '</td>';
-    h += '<td><span style="color:' + stc + ';font-weight:600">' + xe(u.status) + '</span></td>';
-    h += '<td><button class="btn btn-sm" onclick="showToast(\'PIN management via Firebase Admin\',\'info\')">Manage</button></td>';
-    h += '</tr>';
-  });
-  if (!branchRows.length) h += '<tr><td colspan="6" style="text-align:center;color:var(--text-tertiary);padding:20px">Loading branches from Firebase…</td></tr>';
-  h += '</tbody></table></div>';
 
-  h += '<div class="card section"><h3 style="font-size:13px;font-weight:700;margin-bottom:12px">System PIN Configuration</h3>';
-  h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">';
-  [['Super Admin','0000','var(--danger)'],['CEO','1111','var(--ceo)'],['Brand Director','2222','var(--brand-dir)'],['Regional','3333','var(--regional)']].forEach(function(r){
-    h += '<div style="background:var(--surface-2);border-radius:8px;padding:12px;border:1px solid var(--border)">';
-    h += '<div style="font-size:11px;color:' + r[2] + ';font-weight:600;margin-bottom:4px">' + xe(r[0]) + '</div>';
-    h += '<div class="mono" style="font-size:18px;letter-spacing:4px;color:var(--text-primary)">' + r[1] + '</div>';
-    h += '</div>';
-  });
-  h += '</div><p style="font-size:11px;color:var(--text-tertiary);margin-top:10px">Branch Manager PINs are stored in Firebase at <code>admin/branches/{id}.pin</code></p></div>';
+  if (!branches.length) {
+    h += '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-tertiary)">No branches yet — click "+ Add Branch" to create one</td></tr>';
+  } else {
+    branches.forEach(function(b) {
+      h += '<tr>';
+      h += '<td><strong style="color:var(--text-primary)">' + xe(b.name||b.id) + '</strong></td>';
+      h += '<td>' + xe(b.brand||'—') + '</td>';
+      h += '<td>' + xe(b.location||'—') + '</td>';
+      h += '<td style="font-size:11px;color:var(--text-secondary)">' + xe(b.manager||'—') + '</td>';
+      h += '<td><code style="font-family:var(--mono);font-size:12px;color:var(--branch-mgr)">' + xe(String(b.pin||'—')) + '</code></td>';
+      h += '<td><code style="font-family:var(--mono);font-size:12px;color:var(--brand-dir)">' + xe(String(b.directorPin||'—')) + '</code></td>';
+      h += '<td><code style="font-family:var(--mono);font-size:12px;color:var(--regional)">' + xe(String(b.regionalPin||'—')) + '</code></td>';
+      h += '<td><button class="btn btn-sm" onclick="openManageBranchModal(\'' + xe(b.id) + '\')">Manage</button></td>';
+      h += '</tr>';
+    });
+  }
+  h += '</tbody></table></div>';
   return h;
+}
+
+function openManageBranchModal(branchId) {
+  var b = NX_BRANCHES[branchId];
+  if (!b) { showToast('Branch not found','error'); return; }
+
+  openModal(
+    '<div class="modal-head"><h2 style="display:flex;align-items:center;gap:8px">' +
+    '<span style="font-size:20px">' + (b.icon||'🏪') + '</span>' + xe(b.name) + '</h2>' +
+    '<button class="modal-close" onclick="closeModalForce()">✕</button></div>' +
+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
+
+    '<div class="form-group"><label class="form-label">Branch Name</label>' +
+    '<input class="form-input" id="mb-name" value="' + xe(b.name||'') + '"></div>' +
+
+    '<div class="form-group"><label class="form-label">Brand</label>' +
+    '<input class="form-input" id="mb-brand" value="' + xe(b.brand||'') + '"></div>' +
+
+    '<div class="form-group"><label class="form-label">Location</label>' +
+    '<input class="form-input" id="mb-loc" value="' + xe(b.location||'') + '"></div>' +
+
+    '<div class="form-group"><label class="form-label">Manager Name</label>' +
+    '<input class="form-input" id="mb-mgr" value="' + xe(b.manager||'') + '"></div>' +
+
+    '</div>' +
+
+    '<div style="background:var(--surface-3);border-radius:10px;padding:14px;margin:12px 0">' +
+    '<div style="font-size:11px;font-weight:700;color:var(--text-secondary);margin-bottom:12px;text-transform:uppercase;letter-spacing:.08em">PINs & Access</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">' +
+
+    '<div><div style="font-size:10px;color:var(--branch-mgr);font-weight:600;margin-bottom:4px">🏪 Branch Manager PIN</div>' +
+    '<input class="form-input" id="mb-pin" type="text" value="' + xe(String(b.pin||'')) + '" placeholder="e.g. 3333" maxlength="8" style="font-family:var(--mono);letter-spacing:3px;font-size:16px"></div>' +
+
+    '<div><div style="font-size:10px;color:var(--brand-dir);font-weight:600;margin-bottom:4px">🎯 Brand Director PIN</div>' +
+    '<input class="form-input" id="mb-dirpin" type="text" value="' + xe(String(b.directorPin||'')) + '" placeholder="e.g. 2201" maxlength="8" style="font-family:var(--mono);letter-spacing:3px;font-size:16px"></div>' +
+
+    '<div><div style="font-size:10px;color:var(--regional);font-weight:600;margin-bottom:4px">🗺️ Area Manager PIN</div>' +
+    '<input class="form-input" id="mb-regpin" type="text" value="' + xe(String(b.regionalPin||'')) + '" placeholder="e.g. 3301" maxlength="8" style="font-family:var(--mono);letter-spacing:3px;font-size:16px"></div>' +
+
+    '</div><p style="font-size:10px;color:var(--text-tertiary);margin-top:10px">💡 Each person enters their own PIN to auto-login to this branch. Director/Area Manager PINs override the branch selection step.</p>' +
+    '</div>' +
+
+    '<div style="display:flex;gap:8px;margin-top:8px">' +
+    '<div class="form-group" style="flex:1"><label class="form-label">Icon (emoji)</label>' +
+    '<input class="form-input" id="mb-icon" value="' + xe(b.icon||'🍽️') + '" maxlength="4"></div>' +
+    '<div class="form-group" style="flex:1"><label class="form-label">Color</label>' +
+    '<input class="form-input" id="mb-color" type="color" value="' + xe(b.color||'#f0a500') + '" style="height:40px;padding:4px 8px"></div>' +
+    '</div>' +
+
+    '<div style="display:flex;gap:8px;margin-top:4px">' +
+    '<button class="btn btn-primary" style="flex:1" onclick="saveManageBranch(\'' + xe(branchId) + '\')">💾 Save Changes</button>' +
+    '<button class="btn" style="color:var(--danger);border-color:rgba(248,113,113,.25)" onclick="deleteBranch(\'' + xe(branchId) + '\')">Delete</button>' +
+    '</div>'
+  );
+}
+
+function saveManageBranch(branchId) {
+  var b = NX_BRANCHES[branchId];
+  if (!b) return;
+  var get = function(id) { var el=document.getElementById(id); return el ? el.value.trim() : ''; };
+
+  var updates = {
+    name:        get('mb-name')   || b.name,
+    brand:       get('mb-brand')  || b.brand||'',
+    location:    get('mb-loc')    || b.location||'',
+    manager:     get('mb-mgr')    || b.manager||'',
+    pin:         get('mb-pin')    || String(b.pin||''),
+    directorPin: get('mb-dirpin'),
+    regionalPin: get('mb-regpin'),
+    icon:        get('mb-icon')   || b.icon||'🍽️',
+    color:       get('mb-color')  || b.color||'#f0a500'
+  };
+
+  Object.assign(b, updates);
+
+  if (db) {
+    db.ref('admin/branches/' + branchId).update(updates, function(err) {
+      if (err) { showToast('Firebase error: ' + err.message,'error'); return; }
+      closeModalForce();
+      showToast('Branch "' + updates.name + '" updated','success');
+      navTo('access-ctrl');
+    });
+  } else {
+    closeModalForce();
+    showToast('Saved locally','success');
+    navTo('access-ctrl');
+  }
 }
 
 function openAddUserModal() {
@@ -3854,51 +4104,89 @@ function renderPage_(pageId) {
 // BRANCH DASHBOARD
 // ══════════════════════════════════════════════════════
 function pBranchDash() {
-  if(NX.session&&(NX.session.role==='branch_mgr'||NX.session.role==='staff'))attachBranchListeners();
-  var s=NX.session||{},cfg=BS._branchConfig||{},name=s.branchName||s.entityName||'Branch';
-  var brand=s.brandId?((SEED.brands[s.brandId]||{}).config||{}):{};
-  var tm=bmthKey(0),lm=bmthKey(-1),tA=0,lmA=0,todaySales=0;
-  BS.sales.forEach(function(e){if(!e.date)return;var a=+e.actual||0;if(e.date===TODAY_BS)todaySales+=a;if(e.date.indexOf(tm)===0)tA+=a;if(e.date.indexOf(lm)===0)lmA+=a;});
-  var mChg=lmA>0?((tA-lmA)/lmA*100).toFixed(1):null;
-  var act=0,onL=0;BS.staff.forEach(function(m){if(m.status==='Active')act++;else if(m.status==='On Leave')onL++;});
-  var low=bItems.filter(function(i){return i.min>0&&i.qty<=i.min;}).length;
-  var pend=bOrders.filter(function(o){return o.status==='pending'||o.status==='partial';}).length;
-  var hExp=0,hSoon=0;BS.health.forEach(function(h2){var d=bdrem(h2.medExp);if(d===null)return;if(d<0)hExp++;else if(d<=30)hSoon++;});
-  var wv=0;BS.waste.forEach(function(w){if(w.date===TODAY_BS)wv+=(+w.value||0);});
-  var chgStr=function(v){if(v===null)return '\u2014';return(parseFloat(v)>=0?'\u25b2 +':'\u25bc ')+Math.abs(v)+'%';};
-  var h='<div class="page-header"><h1 style="display:flex;align-items:center;gap:10px">';
-  if(brand.icon)h+='<span style="font-size:28px">'+bxe(brand.icon)+'</span>';
-  h+=bxe(name)+'</h1><p>'+bfdate(TODAY_BS)+' \u00b7 Live branch operations</p></div>';
-  h+='<div class="bgrid-4" style="margin-bottom:16px">';
-  h+='<div class="bsc"><div class="bsc-lbl">Today Sales</div><div class="bsc-val bcgold">'+bfsar(todaySales)+'</div></div>';
-  h+='<div class="bsc"><div class="bsc-lbl">This Month</div><div class="bsc-val bcgold">'+bfsar(tA)+'</div><div class="bsc-sub">'+chgStr(mChg)+' vs last mo</div></div>';
-  h+='<div class="bsc"><div class="bsc-lbl">Active Staff</div><div class="bsc-val bcg">'+act+'</div><div class="bsc-sub">'+onL+' on leave</div></div>';
-  h+='<div class="bsc" style="'+(low>0?'border-color:rgba(248,113,113,.3)':'')+'"><div class="bsc-lbl">Low Stock</div><div class="bsc-val '+(low>0?'bcr':'bcg')+'">'+low+'</div><div class="bsc-sub">'+pend+' orders pending</div></div>';
-  h+='</div>';
-  h+='<div class="bgrid-2" style="margin-bottom:16px">';
-  h+='<div class="bcard"><div style="font-size:13px;font-weight:700;margin-bottom:14px">\u26a1 Quick Actions</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
-  [['New Order','inv-orders'],['Receive Stock','inv-moves'],['Add Staff','staff'],['Checklists','checklists'],['Log Sales','sales'],['Wastage','wastage']].forEach(function(a){h+='<button class="btn" style="height:44px;font-size:12px;justify-content:center" onclick="navTo(\''+a[1]+'\')">'+bxe(a[0])+'</button>';});
-  h+='</div></div>';
-  h+='<div class="bcard"><div style="font-size:13px;font-weight:700;margin-bottom:14px">Status Snapshot</div>';
-  h+='<div class="alert-item"><div class="alert-dot" style="background:'+(hExp>0?'var(--danger)':'var(--success)')+'"></div><div class="alert-content"><div class="alert-title">Health Cards</div><div class="alert-meta">'+(hExp>0?hExp+' expired, ':'')+hSoon+' expiring soon</div></div></div>';
-  h+='<div class="alert-item"><div class="alert-dot" style="background:'+(low>0?'var(--warning)':'var(--success)')+'"></div><div class="alert-content"><div class="alert-title">Inventory</div><div class="alert-meta">'+low+' below min \u00b7 '+bItems.length+' total items</div></div></div>';
-  h+='<div class="alert-item"><div class="alert-dot" style="background:var(--info)"></div><div class="alert-content"><div class="alert-title">Wastage Today</div><div class="alert-meta">'+bfsar(wv)+'</div></div></div>';
-  h+='<div class="alert-item"><div class="alert-dot" style="background:'+(pend>0?'var(--warning)':'var(--success)')+'"></div><div class="alert-content"><div class="alert-title">Purchase Orders</div><div class="alert-meta">'+pend+' pending</div></div></div>';
-  h+='</div></div>';
-  h+='<div class="bgrid-2">';
-  h+='<div class="bcard"><div style="font-size:13px;font-weight:700;margin-bottom:14px">Branch Info</div>';
-  var rData=s.brandId&&s.regionId?((SEED.brands[s.brandId]||{}).regions||{})[s.regionId]:null;
-  var brData=rData&&s.branchId?(rData.branches||{})[s.branchId]:null;
-  var brConf=brData?brData.config:{};
-  [['Location',brConf.location||cfg.location||'\u2014'],['Manager',brConf.manager||cfg.manager||'\u2014'],['Tables',cfg.tables||brConf.tables||'\u2014'],['Seats',cfg.seats||brConf.seats||'\u2014']].forEach(function(row){
-    h+='<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px"><span style="color:var(--text-secondary)">'+bxe(row[0])+'</span><span style="font-weight:600">'+bxe(String(row[1]))+'</span></div>';
+  attachBranchListeners();
+  var s = NX.session || {};
+  var isStaff = s.role === 'staff';
+  var branchName = s.branchName || s.entityName || 'Branch';
+  var b = NX_BRANCHES[s.branchId] || {};
+
+  var h = '<div class="page-header"><h1>' + (b.icon||'🏪') + ' ' + xe(branchName) + '</h1>';
+  h += '<p>' + xe(b.brand||'') + (b.location?' · '+xe(b.location):'') + ' · ' + fmtDate(new Date()) + '</p></div>';
+
+  // Staff only sees check-in status + checklists — no KPIs or quick actions
+  if (isStaff) {
+    // Today's attendance for current staff (QR check-in card)
+    h += '<div class="kpi-grid section">';
+    h += kpiCard('📱','QR Check-In','Ready','Tap to check in','var(--branch-mgr)','','');
+    h += kpiCard('✅','Checklists','View tasks','Daily operations','var(--accent)','','');
+    h += '</div>';
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:8px">';
+    h += '<div class="card" style="text-align:center;cursor:pointer" onclick="navTo(\'qr-checkin\')">';
+    h += '<div style="font-size:48px;margin-bottom:12px">📱</div>';
+    h += '<div style="font-size:16px;font-weight:700;color:var(--text-primary);margin-bottom:6px">QR Check-In</div>';
+    h += '<div style="font-size:12px;color:var(--text-secondary)">Clock in/out for your shift</div></div>';
+    h += '<div class="card" style="text-align:center;cursor:pointer" onclick="navTo(\'checklists\')">';
+    h += '<div style="font-size:48px;margin-bottom:12px">✅</div>';
+    h += '<div style="font-size:16px;font-weight:700;color:var(--text-primary);margin-bottom:6px">Checklists</div>';
+    h += '<div style="font-size:12px;color:var(--text-secondary)">Daily operations checklist</div></div>';
+    h += '</div>';
+
+    // Standalone portals
+    h += '<div class="card section" style="margin-top:16px"><h3 style="font-size:12px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">Staff Portals</h3>';
+    h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">';
+    var portals = [
+      ['🏃','Staff Check-In','staff.html'],
+      ['📝','Leave Request','leave.html'],
+      ['✅','Checklists','checklists.html']
+    ];
+    portals.forEach(function(p) {
+      h += '<a href="' + p[2] + '" target="_blank" style="text-decoration:none">';
+      h += '<div class="card" style="text-align:center;padding:14px 10px;cursor:pointer">';
+      h += '<div style="font-size:28px;margin-bottom:8px">' + p[0] + '</div>';
+      h += '<div style="font-size:11px;font-weight:600;color:var(--text-primary)">' + p[1] + '</div></div></a>';
+    });
+    h += '</div></div>';
+    return h;
+  }
+
+  // Branch Manager view — full KPIs
+  var today = branchSalesToday(s.branchId) || 0;
+  var mtd   = branchSalesMTD(s.branchId)   || 0;
+
+  h += '<div class="kpi-grid section">';
+  h += kpiCard('💰','Today Sales',formatSAR(today),'From Firebase sales','var(--ceo)','','');
+  h += kpiCard('📅','MTD Sales',formatSAR(mtd),'Month to date','var(--branch-mgr)','','');
+  h += kpiCard('👥','Staff',BS.staff.length || '—','Active staff','var(--brand-dir)','','');
+  h += kpiCard('📦','Low Stock',bItems.filter(function(i){return i.min>0&&i.qty<=i.min;}).length,'Items below min','var(--danger)','','');
+  h += '</div>';
+
+  // Quick Actions
+  h += '<div class="section"><h3 style="font-size:12px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">Quick Actions</h3>';
+  h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px">';
+  var actions = [
+    ['🛒','Purchase Orders','inv-orders'],['📦','Receive Stock','inv-moves'],
+    ['👥','Staff','staff'],['✅','Checklists','checklists'],
+    ['📱','QR Check-In','qr-checkin'],['💰','Sales','sales'],
+    ['🗑️','Wastage','wastage'],['💳','Health Cards','health-cards']
+  ];
+  actions.forEach(function(a) {
+    h += '<div class="card" style="text-align:center;padding:14px 10px;cursor:pointer" onclick="navTo(\'' + a[2] + '\')">';
+    h += '<div style="font-size:26px;margin-bottom:8px">' + a[0] + '</div>';
+    h += '<div style="font-size:11px;font-weight:600;color:var(--text-primary)">' + a[1] + '</div></div>';
   });
-  h+='</div>';
-  h+='<div class="bcard"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><span style="font-size:13px;font-weight:700">Recent Orders</span><button class="btn btn-sm" onclick="navTo(\'inv-orders\')">All \u2192</button></div>';
-  if(!bOrders.length)h+='<div style="color:var(--text-tertiary);font-size:12px;text-align:center;padding:20px">No orders yet</div>';
-  var stColO={pending:'var(--warning)',partial:'var(--info)',done:'var(--success)',cancelled:'var(--danger)'};
-  bOrders.slice(0,4).forEach(function(o){h+='<div style="display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px"><div style="flex:1"><div class="bmono" style="color:var(--ceo);font-size:10px">'+bxe(o.id)+'</div><div>'+bxe(o.supplier||'No supplier')+'</div></div><span style="color:'+(stColO[o.status]||'var(--text-tertiary)')+'">'+bxe(o.status)+'</span></div>';});
-  h+='</div></div>';
+  h += '</div></div>';
+
+  // Standalone portals link
+  h += '<div class="card section"><h3 style="font-size:12px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">Staff Portals (Standalone)</h3>';
+  h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">';
+  [['🏃','Staff Portal','staff.html'],['📝','Leave Request','leave.html'],['✅','Checklists','checklists.html']].forEach(function(p){
+    h += '<a href="' + p[2] + '" target="_blank" style="text-decoration:none">';
+    h += '<div class="card" style="text-align:center;padding:12px 8px;cursor:pointer">';
+    h += '<div style="font-size:24px;margin-bottom:6px">' + p[0] + '</div>';
+    h += '<div style="font-size:11px;font-weight:600;color:var(--text-primary)">' + p[1] + '</div>';
+    h += '<div style="font-size:9px;color:var(--text-tertiary);margin-top:2px">' + p[2] + '</div></div></a>';
+  });
+  h += '</div></div>';
   return h;
 }
 
@@ -3941,11 +4229,227 @@ function exportBranchLogsCSV(){var rows=[['Code','Name','Type','Qty','Note','Dat
 // ── Purchase Orders ──────────────────────────────────
 var bOrdItems=[];
 function bGenOrdId(){var d=new Date();return 'ORD-'+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+'-'+String(bOrders.length+1).padStart(3,'0');}
+// ── Basket state ──────────────────────────────────────────────────────────────
+var _basket = {};  // code → {item, qty}
+
 function pInvOrders() {
   attachBranchListeners();
-  var stColO={pending:'var(--warning)',partial:'var(--info)',done:'var(--success)',cancelled:'var(--danger)'};
-  var rows=bOrders.map(function(o){return '<tr><td class="bmono" style="color:var(--ceo);font-size:10px">'+bxe(o.id)+'</td><td style="font-weight:600;color:var(--text-primary)">'+bxe(o.supplier||'\u2014')+'</td><td class="bmono" style="color:var(--text-secondary)">'+bxe(o.date)+'</td><td class="bmono">'+(o.items?o.items.length:0)+' items</td><td>'+bpl(o.status,stColO[o.status]||'var(--text-secondary)')+'</td><td><div style="display:flex;gap:4px"><button class="btn btn-sm" onclick="viewBranchOrder(\''+bxe(o.id)+'\')">View</button><button class="btn btn-sm" onclick="printBranchOrderPDF(\''+bxe(o.id)+'\')">PDF</button><button class="btn btn-sm" style="color:var(--danger)" onclick="delBranchOrder(\''+bxe(o.id)+'\')">Del</button></div></td></tr>';}).join('');
-  return '<div class="page-header"><h1>Purchase Orders</h1></div><div class="header-actions"><div></div><button class="btn btn-primary" onclick="openBranchOrderModal()">+ New Order</button></div><div class="btw"><div class="btw-s"><table class="btbl"><thead><tr><th>PO#</th><th>Supplier</th><th>Date</th><th>Items</th><th>Status</th><th>Actions</th></tr></thead><tbody>'+(rows||'<tr><td colspan="6" style="text-align:center;color:var(--text-tertiary);padding:28px">No orders yet</td></tr>')+'</tbody></table></div></div>';
+  var tab = BS.ordTab || 'market';
+  var tabStyle = 'flex:1;padding:9px;border-radius:8px;border:none;cursor:pointer;font-size:12px;font-weight:700;font-family:var(--font);transition:all .15s';
+  var h = '<div style="display:flex;gap:0;margin-bottom:16px;background:var(--surface-1);border:1px solid var(--border);border-radius:11px;padding:3px">';
+  h += '<button onclick="BS.ordTab=\'market\';navTo(\'inv-orders\')" style="' + tabStyle + ';background:' + (tab==='market'?'var(--accent)':'transparent') + ';color:' + (tab==='market'?'#000':'var(--text-secondary)') + '">🛒 Market</button>';
+  var ordCount = bOrders.length;
+  h += '<button onclick="BS.ordTab=\'orders\';navTo(\'inv-orders\')" style="' + tabStyle + ';background:' + (tab==='orders'?'var(--accent)':'transparent') + ';color:' + (tab==='orders'?'#000':'var(--text-secondary)') + '">📋 Orders' + (ordCount ? ' (' + ordCount + ')' : '') + '</button>';
+  h += '</div>';
+  return h + (tab === 'market' ? pOrdersMarketNX() : pOrdersHistoryNX());
+}
+
+function pOrdersMarketNX() {
+  var suppliers = DEFAULT_SUPPLIERS.slice().sort();
+  var selSup = BS.mktSup || '';
+  var q = (BS.mktQ || '').toLowerCase();
+  var basketCount = Object.keys(_basket).length;
+  var basketTotal = Object.values(_basket).reduce(function(s,e){ return s + (e.qty * (parseFloat(e.item.price)||0)); }, 0);
+
+  var h = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px">';
+  h += '<select id="mkt-sup" onchange="BS.mktSup=this.value;navTo(\'inv-orders\')" style="background:var(--surface-3);border:1px solid var(--border);border-radius:8px;padding:7px 10px;color:var(--text-primary);font-size:12px;outline:none;font-family:var(--font)">';
+  h += '<option value="">All Suppliers</option>';
+  suppliers.forEach(function(s) { h += '<option value="' + xe(s) + '"' + (selSup===s?' selected':'') + '>' + xe(s) + '</option>'; });
+  h += '</select>';
+  h += '<input id="mkt-srch" placeholder="🔍 Search items…" value="' + xe(BS.mktQ||'') + '" oninput="BS.mktQ=this.value;navTo(\'inv-orders\')" style="flex:1;min-width:140px;background:var(--surface-3);border:1px solid var(--border);border-radius:8px;padding:7px 10px;color:var(--text-primary);font-size:12px;outline:none;font-family:var(--font)">';
+  h += '</div>';
+
+  if (basketCount > 0) {
+    h += '<div style="background:rgba(240,165,0,.10);border:1px solid rgba(240,165,0,.28);border-radius:11px;padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:12px">';
+    h += '<span style="font-size:20px">🧺</span>';
+    h += '<div style="flex:1"><div style="font-size:13px;font-weight:700;color:var(--accent)">' + basketCount + ' item' + (basketCount!==1?'s':'') + ' · ' + formatSAR(basketTotal) + '</div>';
+    h += '<div style="font-size:10px;color:var(--text-secondary)">One PO per supplier will be created</div></div>';
+    h += '<button class="btn btn-primary" onclick="openBasketModalNX()" style="background:var(--accent);color:#000;font-weight:700">🧺 Checkout</button></div>';
+  }
+
+  var filtered = bItems.filter(function(it) {
+    if (selSup && it.supplier !== selSup) return false;
+    if (q && String(it.code||'').toLowerCase().indexOf(q) < 0 && (it.name||'').toLowerCase().indexOf(q) < 0) return false;
+    return true;
+  }).sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
+
+  if (!filtered.length) {
+    h += '<div style="text-align:center;padding:60px;color:var(--text-tertiary)"><div style="font-size:36px;margin-bottom:10px">🛒</div><div>No items match filters</div></div>';
+    return h;
+  }
+
+  // Group by supplier
+  var bySup = {};
+  filtered.forEach(function(it) {
+    var sup = it.supplier || 'Unassigned';
+    if (!bySup[sup]) bySup[sup] = [];
+    bySup[sup].push(it);
+  });
+
+  Object.keys(bySup).sort().forEach(function(sup) {
+    h += '<div style="margin-bottom:20px">';
+    h += '<div style="font-size:10px;font-weight:700;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:2px;font-family:var(--mono);padding:0 2px;margin-bottom:8px">🏢 ' + xe(sup) + '</div>';
+    h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px">';
+    bySup[sup].forEach(function(it) {
+      var inBasket = _basket[it.code];
+      var isLow = it.min > 0 && it.qty <= it.min;
+      h += '<div style="background:var(--surface-2);border:1.5px solid ' + (inBasket ? 'var(--accent)' : 'var(--border)') + ';border-radius:11px;padding:12px;position:relative;transition:border-color .15s">';
+      if (isLow) h += '<div style="position:absolute;top:8px;right:8px;font-size:8px;background:rgba(248,113,113,.15);color:var(--danger);border-radius:4px;padding:2px 5px;font-weight:700">LOW</div>';
+      h += '<div style="font-size:10px;color:var(--accent);font-weight:700;font-family:var(--mono);margin-bottom:3px">' + xe(it.code||'') + '</div>';
+      h += '<div style="font-size:12px;font-weight:600;color:var(--text-primary);margin-bottom:4px;line-height:1.3">' + xe(it.name) + '</div>';
+      h += '<div style="font-size:9px;color:var(--text-tertiary);margin-bottom:8px">Stock: ' + it.qty + ' ' + (it.unit||'') + (it.min?' · Min:'+it.min:'') + '</div>';
+      if (inBasket) {
+        h += '<div style="display:flex;align-items:center;gap:6px">';
+        h += '<button onclick="bktDec(\'' + xe(it.code) + '\')" style="width:26px;height:26px;border-radius:6px;border:1px solid var(--border);background:var(--surface-3);color:var(--text-primary);cursor:pointer;font-size:14px;font-weight:700">−</button>';
+        h += '<div style="flex:1;text-align:center;font-size:14px;font-weight:700;color:var(--accent);font-family:var(--mono)">' + inBasket.qty + '</div>';
+        h += '<button onclick="bktInc(\'' + xe(it.code) + '\')" style="width:26px;height:26px;border-radius:6px;border:1px solid var(--border);background:var(--surface-3);color:var(--text-primary);cursor:pointer;font-size:14px;font-weight:700">+</button>';
+        h += '<button onclick="bktRemove(\'' + xe(it.code) + '\')" style="width:26px;height:26px;border-radius:6px;border:1px solid rgba(248,113,113,.3);background:rgba(248,113,113,.1);color:var(--danger);cursor:pointer;font-size:11px">✕</button>';
+        h += '</div>';
+      } else {
+        h += '<button onclick="bktAdd(\'' + xe(it.code) + '\')" style="width:100%;padding:7px;border-radius:8px;border:1px solid var(--border);background:var(--surface-3);color:var(--text-primary);cursor:pointer;font-size:11px;font-weight:600;font-family:var(--font)">+ Add to Basket</button>';
+      }
+      h += '</div>';
+    });
+    h += '</div></div>';
+  });
+  return h;
+}
+
+function pOrdersHistoryNX() {
+  var q = (BS.ordQ||'').toLowerCase();
+  var sf = BS.ordSF || '';
+  var filtered = bOrders.filter(function(o) {
+    if (sf && o.status !== sf) return false;
+    if (q) {
+      var m = (o.id||'').toLowerCase().indexOf(q) >= 0 || (o.supplier||'').toLowerCase().indexOf(q) >= 0;
+      if (!m) return false;
+    }
+    return true;
+  });
+  var stC = {pending:'var(--warning)',partial:'var(--info)',done:'var(--success)',cancelled:'var(--danger)'};
+  var h = '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px">';
+  h += '<input placeholder="🔍 Search orders…" value="' + xe(BS.ordQ||'') + '" oninput="BS.ordQ=this.value;navTo(\'inv-orders\')" style="flex:1;background:var(--surface-3);border:1px solid var(--border);border-radius:8px;padding:7px 10px;color:var(--text-primary);font-size:12px;outline:none;font-family:var(--font)">';
+  h += '<select onchange="BS.ordSF=this.value;navTo(\'inv-orders\')" style="background:var(--surface-3);border:1px solid var(--border);border-radius:8px;padding:7px 10px;color:var(--text-primary);font-size:12px;outline:none;font-family:var(--font)">';
+  h += '<option value="">All Status</option><option value="pending"' + (sf==='pending'?' selected':'') + '>Pending</option><option value="done"' + (sf==='done'?' selected':'') + '>Done</option><option value="cancelled"' + (sf==='cancelled'?' selected':'') + '>Cancelled</option></select>';
+  h += '</div>';
+  if (!filtered.length) { return h + '<div style="text-align:center;padding:60px;color:var(--text-tertiary)">No orders found</div>'; }
+  filtered.forEach(function(o) {
+    var recvd = (o.items||[]).filter(function(x){ return (x.received||0) >= x.qty; }).length;
+    var pct = o.items&&o.items.length ? Math.round(recvd/o.items.length*100) : 0;
+    h += '<div style="background:var(--surface-2);border:1px solid var(--border);border-radius:12px;margin-bottom:10px;overflow:hidden">';
+    h += '<div style="display:flex;align-items:center;gap:12px;padding:12px 14px;cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'block\':\'none\'">';
+    h += '<div style="flex:1"><div style="font-size:11px;font-weight:700;color:var(--text-primary)">📋 ' + xe(o.id||'') + ' · ' + xe(o.supplier||'No supplier') + '</div>';
+    h += '<div style="font-size:10px;color:var(--text-secondary);margin-top:2px">📅 ' + xe(o.date||'') + (o.note?' · '+xe(o.note):'') + '</div></div>';
+    h += '<div style="font-size:11px;font-weight:700;color:' + (stC[o.status]||'var(--text-secondary)') + '">' + xe(o.status||'pending') + '</div>';
+    h += '<span style="color:var(--text-tertiary)">▾</span></div>';
+    h += '<div style="display:none;padding:0 14px 12px">';
+    (o.items||[]).forEach(function(it) {
+      var rv = it.received||0, done = rv >= it.qty;
+      h += '<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px">';
+      h += '<span>' + xe(it.name) + ' <span style="font-family:var(--mono);color:var(--text-tertiary);font-size:10px">'+xe(it.code)+'</span></span>';
+      h += '<span style="font-family:var(--mono);color:' + (done?'var(--success)':'var(--text-primary)') + '">' + (it.received||0) + '/' + it.qty + ' ' + (it.unit||'') + '</span>';
+      if (!done && o.status !== 'done' && o.status !== 'cancelled') {
+        h += '<button class="btn btn-sm" onclick="bktReceiveItem(\'' + xe(o.id) + '\',\'' + xe(it.code) + '\')">✅ Receive</button>';
+      }
+      h += '</div>';
+    });
+    h += '</div></div>';
+  });
+  return h;
+}
+
+// Basket helpers (nexus version)
+function bktAdd(code) {
+  var it = bItems.find(function(x){ return x.code===code; });
+  if (!it) return;
+  if (!_basket[code]) _basket[code] = {item:it, qty:1};
+  else _basket[code].qty++;
+  navTo('inv-orders');
+}
+function bktInc(code) { if (_basket[code]) { _basket[code].qty++; navTo('inv-orders'); } }
+function bktDec(code) { if (_basket[code]) { _basket[code].qty--; if (_basket[code].qty<=0) delete _basket[code]; navTo('inv-orders'); } }
+function bktRemove(code) { delete _basket[code]; navTo('inv-orders'); }
+
+function bktReceiveItem(ordId, code) {
+  var o = bOrders.find(function(x){ return x.id===ordId; });
+  if (!o) return;
+  var it = (o.items||[]).find(function(x){ return x.code===code; });
+  if (it) { it.received = it.qty; }
+  var allDone = (o.items||[]).every(function(x){ return (x.received||0)>=x.qty; });
+  if (allDone) o.status = 'done';
+  bSaveColl('inv_orders', bOrders);
+  navTo('inv-orders');
+}
+
+function openBasketModalNX() {
+  var bItems2 = Object.values(_basket);
+  if (!bItems2.length) { showToast('Basket is empty','error'); return; }
+  var bySup = {};
+  bItems2.forEach(function(e) {
+    var sup = e.item.supplier || 'No Supplier';
+    if (!bySup[sup]) bySup[sup] = [];
+    bySup[sup].push(e);
+  });
+  var grandTotal = bItems2.reduce(function(s,e){ return s + (e.qty*(parseFloat(e.item.price)||0)); }, 0);
+
+  var html = '<div style="display:flex;flex-direction:column;gap:14px">';
+  html += '<div style="font-size:11px;color:var(--text-secondary);background:var(--surface-3);border-radius:8px;padding:10px 12px">One <strong>purchase order per supplier</strong> will be created.</div>';
+  Object.keys(bySup).sort().forEach(function(sup) {
+    var sItems = bySup[sup];
+    var supTotal = sItems.reduce(function(s,e){ return s+(e.qty*(parseFloat(e.item.price)||0)); }, 0);
+    html += '<div style="background:var(--surface-2);border:1px solid var(--border);border-radius:11px;overflow:hidden">';
+    html += '<div style="padding:10px 14px;background:var(--surface-3);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">';
+    html += '<div style="font-size:12px;font-weight:700">🏢 ' + xe(sup) + '</div>';
+    html += '<div style="font-size:11px;color:var(--accent);font-weight:700;font-family:var(--mono)">' + formatSAR(supTotal) + '</div></div>';
+    html += '<table style="width:100%;border-collapse:collapse">';
+    sItems.forEach(function(e) {
+      html += '<tr style="border-bottom:1px solid var(--border)">';
+      html += '<td style="padding:8px 14px;font-size:11px"><div style="font-weight:600">' + xe(e.item.name) + '</div><div style="font-size:9px;color:var(--text-tertiary);font-family:var(--mono)">' + xe(e.item.code||'') + '</div></td>';
+      html += '<td style="padding:8px 14px;text-align:center"><div style="display:flex;align-items:center;gap:4px;justify-content:center">';
+      html += '<button onclick="bktDecModal(\'' + xe(e.item.code) + '\')" style="width:22px;height:22px;border-radius:4px;border:1px solid var(--border);background:var(--surface-3);color:var(--text-primary);cursor:pointer">−</button>';
+      html += '<span id="bqnx-' + xe(e.item.code) + '" style="font-weight:700;min-width:28px;text-align:center;font-family:var(--mono)">' + e.qty + '</span>';
+      html += '<button onclick="bktIncModal(\'' + xe(e.item.code) + '\')" style="width:22px;height:22px;border-radius:4px;border:1px solid var(--border);background:var(--surface-3);color:var(--text-primary);cursor:pointer">+</button>';
+      html += '</div></td>';
+      html += '<td style="padding:8px 14px;font-size:10px;color:var(--text-tertiary);font-family:var(--mono)">' + (e.item.unit||'') + '</td>';
+      html += '<td style="padding:8px 14px"><button onclick="bktRemoveModal(\'' + xe(e.item.code) + '\')" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px">✕</button></td>';
+      html += '</tr>';
+    });
+    html += '</table></div>';
+  });
+  html += '<div style="display:flex;justify-content:space-between;align-items:center">';
+  html += '<div style="font-size:13px;font-weight:700">Total: <span style="color:var(--accent);font-family:var(--mono)">' + formatSAR(grandTotal) + '</span></div></div>';
+  html += '<div class="form-group"><label class="form-label">Note (optional)</label>';
+  html += '<input class="form-input" id="basket-note-nx" placeholder="e.g. Weekly order — urgent"></div>';
+  html += '<div style="display:flex;gap:8px">';
+  html += '<button class="btn" onclick="closeModalForce()">Cancel</button>';
+  html += '<button class="btn btn-primary" onclick="submitBasketNX()">✅ Submit Orders</button></div>';
+  html += '</div>';
+  openModal('<div class="modal-head"><h2>🧺 Review Basket</h2><button class="modal-close" onclick="closeModalForce()">✕</button></div>' + html);
+}
+function bktDecModal(code){if(_basket[code]){_basket[code].qty--;if(_basket[code].qty<=0){delete _basket[code];closeModalForce();openBasketModalNX();}else{var el=document.getElementById('bqnx-'+code);if(el)el.textContent=_basket[code].qty;}}}
+function bktIncModal(code){if(_basket[code]){_basket[code].qty++;var el=document.getElementById('bqnx-'+code);if(el)el.textContent=_basket[code].qty;}}
+function bktRemoveModal(code){delete _basket[code];closeModalForce();if(Object.keys(_basket).length)openBasketModalNX();}
+function submitBasketNX(){
+  var bItems3=Object.values(_basket);
+  if(!bItems3.length){showToast('Basket is empty','error');return;}
+  var note=(document.getElementById('basket-note-nx')||{}).value||'';
+  var bySup={};
+  bItems3.forEach(function(e){var sup=e.item.supplier||'No Supplier';if(!bySup[sup])bySup[sup]=[];bySup[sup].push(e);});
+  var created=0;
+  Object.keys(bySup).forEach(function(sup){
+    var sItems=bySup[sup];
+    var ordId='PO-'+Date.now()+'-'+Math.random().toString(36).slice(2,6).toUpperCase();
+    var ord={id:ordId,supplier:sup,date:TODAY_BS,status:'pending',note:note,
+             items:sItems.map(function(e){return{code:e.item.code,name:e.item.name,unit:e.item.unit||'',qty:e.qty,received:0};})};
+    bOrders.unshift(ord);
+    created++;
+  });
+  bSaveColl('inv_orders',bOrders);
+  _basket={};
+  closeModalForce();
+  BS.ordTab='orders';
+  showToast('✅ '+created+' purchase order'+(created!==1?'s':'')+' created!','success');
+  navTo('inv-orders');
 }
 function openBranchOrderModal(){bOrdItems=[];var html='<div class="modal-head"><h2>New Purchase Order</h2><button class="modal-close" onclick="closeModalForce()">&#x2715;</button></div>';html+='<div class="bfg"><label class="form-label">Supplier *</label><select class="form-input form-select" id="bord-sup" onchange="bOrdSupChange(this.value)"><option value="">Select supplier</option>'+DEFAULT_SUPPLIERS.map(function(s2){return '<option>'+bxe(s2)+'</option>';}).join('')+'</select></div>';html+='<div id="bord-sup-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;min-height:4px"></div>';html+='<div class="form-row"><div class="bfg"><label class="form-label">Add Any Item</label><select class="form-input form-select" id="bord-item-sel"><option value="">Select item</option>'+bItems.map(function(i){return '<option value="'+bxe(i.code)+'">'+bxe(i.code)+' \u2014 '+bxe(i.name)+'</option>';}).join('')+'</select></div><div class="bfg"><label class="form-label">Qty</label><input class="form-input" type="number" id="bord-qty" value="1" min="1"></div></div>';html+='<button class="btn" style="width:100%;margin-bottom:12px" onclick="bOrdAddItem()">+ Add to Order</button>';html+='<div class="bfg"><label class="form-label">Note</label><input class="form-input" id="bord-note" placeholder="Order note\u2026"></div>';html+='<div id="bord-items-wrap" style="margin-bottom:14px"><div style="color:var(--text-tertiary);font-size:12px;text-align:center;padding:12px" id="bord-empty">No items added yet</div><table class="btbl" id="bord-tbl" style="display:none"><thead><tr><th>Code</th><th>Name</th><th>Unit</th><th>Qty</th><th></th></tr></thead><tbody id="bord-tbody"></tbody></table></div>';html+='<button class="btn btn-primary" style="width:100%" onclick="submitBranchOrder()">Create Purchase Order</button>';openModal(html);}
 function bOrdSupChange(sup){var chips=document.getElementById('bord-sup-chips');if(!chips)return;chips.innerHTML='';bItems.filter(function(i){return i.supplier===sup;}).forEach(function(it){var btn=document.createElement('button');btn.className='chip';btn.style.cursor='pointer';btn.textContent=it.code+' \u2014 '+it.name;btn.onclick=function(){bOrdItems.push({code:it.code,name:it.name,unit:it.unit,qty:1,price:it.price||0,received:0});bOrdRenderTable();showToast(it.name+' added','success');};chips.appendChild(btn);});}
@@ -4098,7 +4602,7 @@ function pChecklists() {
   for(var i=0;i<7;i++){var dd=new Date(sun);dd.setDate(sun.getDate()+i);clNxWeekDates.push(dd.getFullYear()+'-'+String(dd.getMonth()+1).padStart(2,'0')+'-'+String(dd.getDate()).padStart(2,'0'));}
   clNxInitFBSync();
   var h='<div class="page-header"><h1>Operations Checklists</h1><p>Week of '+bxe(clNxWk())+'</p></div>';
-  if(!clNxRole){return h+'<div class="bcard" style="max-width:420px;margin:0 auto"><div style="font-size:16px;font-weight:700;font-family:Syne,sans-serif;margin-bottom:16px;text-align:center">Sign In</div><div style="display:flex;gap:10px;margin-bottom:16px"><button class="btn" style="flex:1" onclick="clNxRole=\'staff\';navTo(\'checklists\')">Staff Access</button><button class="btn" style="flex:1" onclick="clNxShowAdminPin()">Admin Access</button></div><div id="cl-nx-pin-area"></div></div>';}
+  if(!clNxRole){return h+'<div class="bcard" style="max-width:420px;margin:0 auto"><div style="font-size:16px;font-weight:700;font-family:var(--font-display);margin-bottom:16px;text-align:center">Sign In</div><div style="display:flex;gap:10px;margin-bottom:16px"><button class="btn" style="flex:1" onclick="clNxRole=\'staff\';navTo(\'checklists\')">Staff Access</button><button class="btn" style="flex:1" onclick="clNxShowAdminPin()">Admin Access</button></div><div id="cl-nx-pin-area"></div></div>';}
   var secs=['mod','foh','boh'],secLabels={mod:'MOD',foh:'FOH',boh:'BOH'};
   var secTabs=secs.map(function(s){return '<button class="tab-btn'+(clNxSec===s?' active':'')+'" onclick="clNxSec=\''+s+'\';clNxCl[clNxSec]=0;clNxRenderContent()">'+secLabels[s]+'</button>';}).join('');
   h+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px"><div class="tab-row" style="margin-bottom:0">'+secTabs+'</div><div style="display:flex;gap:8px">';
@@ -5189,7 +5693,7 @@ function buildMobileNav() {
   nav.innerHTML = items.map(function(item) {
     return '<div onclick="navTo(\'' + item.id + '\');updateMobileNav(\'' + item.id + '\')" ' +
       'data-page="' + item.id + '" ' +
-      'style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;transition:all .15s;color:var(--text-tertiary);font-size:10px;font-family:DM Sans,sans-serif;padding:6px 0" ' +
+      'style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;transition:all .15s;color:var(--text-tertiary);font-size:10px;font-family:var(--font);padding:6px 0" ' +
       'onmouseover="this.style.color=\'var(--text-primary)\'" onmouseout="updateMobileNavStyle()">' +
       '<span style="font-size:20px">' + item.icon + '</span>' +
       '<span>' + item.label + '</span>' +
