@@ -1876,11 +1876,24 @@ function selectRole(roleId) {
 function renderLoginEntitySelect(type) {
   var card = document.getElementById('login-card');
   var typeLabel = { brand:'Brand', region:'Region', branch:'Branch' }[type];
-  var items = [];
   var branches = Object.values(NX_BRANCHES);
 
+  // If Firebase hasn't loaded branches yet, show loading and retry
+  if (!branches.length) {
+    card.innerHTML = '<button class="login-back-btn" onclick="renderLogin(0)">← Back</button>' +
+      '<div class="login-step-title">Select ' + typeLabel + '</div>' +
+      '<div style="text-align:center;padding:40px 20px;color:var(--text-secondary)">' +
+      '<div style="font-size:28px;margin-bottom:12px">⏳</div>' +
+      '<div style="font-size:13px;margin-bottom:6px">Loading branches from Firebase…</div>' +
+      '<div style="font-size:11px;color:var(--text-tertiary)">Please wait</div>' +
+      '</div>';
+    // Retry every 400ms until branches are loaded
+    setTimeout(function() { renderLoginEntitySelect(type); }, 400);
+    return;
+  }
+
+  var items = [];
   if (type === 'brand') {
-    // Unique brands from branch registry
     var seen = {};
     branches.forEach(function(b) {
       var bname = b.brand || b.name;
@@ -1890,7 +1903,6 @@ function renderLoginEntitySelect(type) {
       }
     });
   } else if (type === 'region') {
-    // Unique brand+location combos
     var seen2 = {};
     branches.forEach(function(b) {
       var key = (b.brand||b.name) + '|' + (b.location||'Main');
@@ -1900,21 +1912,24 @@ function renderLoginEntitySelect(type) {
       }
     });
   } else {
-    // All branches
-    branches.forEach(function(b) {
+    // All branches sorted by name
+    branches.slice().sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); }).forEach(function(b) {
       items.push({ id: b.id, name: b.name || b.id, sub: (b.brand||'') + (b.location?' · '+b.location:''), icon: b.icon || '🍽️' });
     });
   }
 
   card.innerHTML = '<button class="login-back-btn" onclick="renderLogin(0)">← Back</button>' +
     '<div class="login-step-title">Select ' + typeLabel + '</div>' +
-    '<input class="login-input" type="text" placeholder="Search..." oninput="filterEntityList(this.value)">' +
+    '<input class="login-input" type="text" placeholder="Search..." oninput="filterEntityList(this.value)" style="margin-bottom:8px">' +
     '<div class="entity-list" id="entity-list">' +
-    items.map(function(item) {
+    (items.length ? items.map(function(item) {
       return '<div class="entity-item" data-id="' + xe(item.id) + '" onclick="selectEntity(\'' + xe(item.id) + '\',\'' + type + '\')">' +
-        item.icon + ' <strong>' + xe(item.name) + '</strong> <span style="color:var(--text-tertiary);font-size:11px;margin-left:6px">' + xe(item.sub) + '</span>' +
+        '<span style="font-size:20px">' + item.icon + '</span>' +
+        '<div style="flex:1"><strong style="color:var(--text-primary)">' + xe(item.name) + '</strong>' +
+        '<div style="font-size:11px;color:var(--text-tertiary);margin-top:2px">' + xe(item.sub) + '</div></div>' +
+        '<span style="color:var(--text-tertiary);font-size:16px">›</span>' +
       '</div>';
-    }).join('') +
+    }).join('') : '<div style="text-align:center;padding:20px;color:var(--text-tertiary)">No ' + typeLabel + 's found</div>') +
   '</div>';
 }
 
@@ -1983,22 +1998,38 @@ function updatePinDots() {
   }
 }
 
+// System-level PINs (branch manager PINs come from admin/branches in Firebase)
+var ACCESS = {
+  superAdmin: { pin: '0000' },
+  ceo:        { pin: '1111' },
+  brandDir:   { pin: '2222' },
+  regional:   { pin: '3333' }
+};
+
 function verifyPIN() {
   var role = loginState.role;
-  var pin = loginState.pin;
+  var pin  = loginState.pin;
   var valid = false;
 
   if (role === 'super_admin' && pin === ACCESS.superAdmin.pin) valid = true;
-  else if (role === 'ceo' && pin === ACCESS.ceo.pin) valid = true;
-  else if (role === 'brand_dir' && pin === ACCESS.brandDir.pin) valid = true;
-  else if (role === 'regional' && pin === ACCESS.regional.pin) valid = true;
+  else if (role === 'ceo'       && pin === ACCESS.ceo.pin)       valid = true;
+  else if (role === 'brand_dir' && pin === ACCESS.brandDir.pin)  valid = true;
+  else if (role === 'regional'  && pin === ACCESS.regional.pin)  valid = true;
   else if (role === 'branch_mgr') {
-    // Check against real branch PIN from Firebase registry
-    var brObj = NX_BRANCHES[loginState.branchId] || {};
-    var realPin = String(brObj.pin || ACCESS.branchMgr.pin);
-    valid = (pin === realPin);
+    // PIN comes from admin/branches/{id}.pin in Firebase (set via OpsHub)
+    var brObj  = NX_BRANCHES[loginState.branchId] || {};
+    var realPin = String(brObj.pin || '');
+    valid = realPin.length > 0 && pin === realPin;
+    if (!valid && !realPin.length) {
+      // Branch not yet loaded — show helpful error
+      var errEl = document.getElementById('pin-error');
+      if (errEl) errEl.textContent = 'Branch data not loaded yet — please wait and try again.';
+      loginState.pin = '';
+      updatePinDots();
+      return;
+    }
   }
-  else if (role === 'staff') valid = true; // staff no PIN
+  else if (role === 'staff') valid = true; // staff: no PIN required
 
   if (!valid) {
     var errEl = document.getElementById('pin-error');
@@ -5134,8 +5165,12 @@ window.onload = function() {
   setInterval(updateClock, 1000);
   updateClock();
 
-  // Init Firebase
+  // Init Firebase first, then load branch registry so login can show real branches
   tryInitFB();
+
+  // Load branches immediately — needed for branch/role selection on login screen.
+  // loadBranchRegistry retries until db is ready (500ms interval).
+  loadBranchRegistry();
 
   // Check session
   var sess = loadSession();
