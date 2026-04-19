@@ -2008,7 +2008,14 @@ function renderLoginStep0(card) {
 }
 
 function selectRole(roleId) {
-  loginState.role = roleId;
+  // Reset any leftover state from previous selections
+  loginState.role      = roleId;
+  loginState.pin       = '';
+  loginState.entityId  = null;
+  loginState.branchId  = null;
+  loginState.branchName= null;
+  loginState.brandName = null;
+  loginState.regionName= null;
   // super_admin, ceo, brand_dir, regional — go straight to PIN
   // Their branch/brand assignments are looked up from Firebase AFTER PIN verification
   if (roleId === 'super_admin' || roleId === 'ceo' ||
@@ -2130,7 +2137,7 @@ function renderLoginPIN(card) {
     '<div style="text-align:center;margin-bottom:20px">' +
       '<div style="font-size:36px;margin-bottom:6px">' + rh.icon + '</div>' +
       '<div class="login-step-title" style="color:' + rh.color + '">' + rh.title + '</div>' +
-      (branch ? '<div style="font-size:12px;color:var(--text-secondary);margin-top:4px">' + xe(branch.name||'') + (branch.location?' · '+xe(branch.location):'') + '</div>' : '') +
+      (branch && (role === 'branch_mgr' || role === 'staff') ? '<div style="font-size:12px;color:var(--text-secondary);margin-top:4px">' + xe(branch.name||'') + (branch.location?' · '+xe(branch.location):'') + '</div>' : '') +
       '<div style="font-size:11px;color:var(--text-tertiary);margin-top:8px">' + rh.hint + '</div>' +
     '</div>' +
     '<div class="pin-dots" id="pin-dots"><span></span><span></span><span></span><span></span></div>' +
@@ -2141,7 +2148,7 @@ function renderLoginPIN(card) {
         [1,2,3,4,5,6,7,8,9,'',0,'⌫'].map(function(k) {
           return k === '' ?
             '<div style="visibility:hidden"></div>' :
-            '<button class="pin-key" onclick="' + (k==='⌫' ? 'pinBackspace()' : 'pinDigit(' + k + ')') + '">' + k + '</button>';
+            '<button class="pin-btn" onclick="' + (k==='⌫' ? 'pinBackspace()' : 'pinDigit(' + k + ')') + '">' + k + '</button>';
         }).join('') +
       '</div>'
     );
@@ -2156,6 +2163,22 @@ function pinPress(n) {
 
 function pinDel() {
   loginState.pin = loginState.pin.slice(0,-1);
+  updatePinDots();
+}
+
+function pinDigit(d) {
+  if (loginState.pin.length >= 8) return;
+  loginState.pin += String(d);
+  updatePinDots();
+  // Auto-submit when 4 digits entered (most PINs are 4 digits)
+  if (loginState.pin.length >= 4) {
+    // Small delay so user sees the last dot fill
+    setTimeout(verifyPIN, 180);
+  }
+}
+
+function pinBackspace() {
+  loginState.pin = loginState.pin.slice(0, -1);
   updatePinDots();
 }
 
