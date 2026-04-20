@@ -5603,44 +5603,438 @@ function pDSR(){
   attachBranchListeners();
   var s=NX.session||{};
   var branchName=xe(s.branchName||s.entityName||'Branch');
-  // Get today's and recent DSR entries from sales for summary
-  var today=TODAY_BS,tm=today.slice(0,7);
-  var todaySales=BS.sales.filter(function(e){return e.date===today;}).reduce(function(a,e){return a+(+e.actual||0);},0);
-  var mtdSales=BS.sales.filter(function(e){return e.date&&e.date.indexOf(tm)===0;}).reduce(function(a,e){return a+(+e.actual||0);},0);
-  var h='<div class="page-header"><h1>📋 Daily Sales Report</h1><p>'+branchName+' \xb7 '+today+'</p></div>';
-  h+='<div class="bgrid-3" style="margin-bottom:20px">';
-  h+='<div class="bsc"><div class="bsc-lbl">Today\'s Sales</div><div class="bsc-val bcgold">'+bfsar(todaySales)+'</div><div class="bsc-sub">'+today+'</div></div>';
-  h+='<div class="bsc"><div class="bsc-lbl">MTD Sales</div><div class="bsc-val bca">'+bfsar(mtdSales)+'</div><div class="bsc-sub">'+tm+'</div></div>';
-  h+='<div class="bsc"><div class="bsc-lbl">DSR Console</div><div class="bsc-val" style="font-size:14px;color:var(--text-secondary)">Full Report</div><div class="bsc-sub">Opens standalone</div></div>';
-  h+='</div>';
-  h+='<div class="card" style="text-align:center;padding:40px 24px;margin-bottom:16px">';
-  h+='<div style="font-size:48px;margin-bottom:16px">📋</div>';
-  h+='<h2 style="font-size:18px;font-weight:700;margin-bottom:8px">DSR Console</h2>';
-  h+='<p style="font-size:13px;color:var(--text-secondary);margin-bottom:24px;max-width:420px;margin-left:auto;margin-right:auto">The Daily Sales Report console handles server cash drops, payment breakdowns, discounts, delivery, petty cash, safe counts, and deposit calculation.</p>';
-  h+='<button class="btn btn-primary" style="font-size:14px;padding:12px 32px;font-weight:700" onclick="window.open(\'dsr-v4-glass.html\',\'_blank\')">Open DSR Console →</button>';
-  h+='</div>';
-  // Recent DSR entries from sales
-  var recent=BS.sales.slice().sort(function(a,b){return(b.date||'').localeCompare(a.date||'');}).slice(0,10);
-  if(recent.length){
-    var rows=recent.map(function(e){
-      var chg=e.target>0?((e.actual-e.target)/e.target*100):0;
-      var cc=chg>=0?'#34d399':'#f87171';
-      return '<tr><td class="bmono" style="font-size:11px;color:var(--text-tertiary)">'+bfdate(e.date)+'</td>'+
-        '<td class="bmono" style="font-weight:700;color:var(--ceo)">'+bfsar(e.actual)+'</td>'+
-        '<td class="bmono" style="color:var(--text-secondary)">'+bfsar(e.target||0)+'</td>'+
-        '<td class="bmono" style="color:'+cc+';font-weight:600">'+(chg>=0?'+':'')+chg.toFixed(1)+'%</td>'+
-        '<td style="color:var(--text-secondary);font-size:11px">'+xe(e.note||'\u2014')+'</td></tr>';
-    }).join('');
-    h+='<div class="btw"><div style="padding:12px 14px;font-size:13px;font-weight:700;border-bottom:1px solid var(--border)">Recent Sales Entries</div>';
-    h+='<div class="btw-s"><table class="btbl"><thead><tr><th>Date</th><th>Actual</th><th>Target</th><th>vs Target</th><th>Note</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
+  var today=TODAY_BS;
+
+  // Init DSR state if not exists
+  if(!BS.dsrState)BS.dsrState={};
+  if(!BS.dsrState[today])BS.dsrState[today]={
+    date:today,restName:branchName,
+    food:'',bev:'',misc:'',vat:'',vatAlfa:'',guests:'',
+    discounts:[],payments:[{id:'p1',method:'Cash',amount:''},{id:'p2',method:'MADA',amount:''},{id:'p3',method:'VISA',amount:''},{id:'p4',method:'Qlub',amount:''}],
+    delivery:[],servers:[],
+    closedPetty:[],ongoingPetty:[],safeItems:[],
+    denoms:{},tab:'overview'
+  };
+  var D=BS.dsrState[today];
+  if(!D.tab)D.tab='overview';
+
+  var tabs=[['overview','◈ Overview'],['deposit','◎ Deposit'],['income','◇ Income'],['payments','◫ Payments'],['delivery','◻ Delivery'],['server','◉ Server Drops'],['manager','▲ Manager'],['masterfile','⊞ Master File']];
+  var tabBar='<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:18px;border-bottom:1px solid var(--border);padding-bottom:12px">';
+  tabs.forEach(function(t){
+    var act=D.tab===t[0];
+    tabBar+='<button onclick="dsrNav(\''+t[0]+'\')" style="padding:6px 14px;border-radius:8px;border:1px solid '+(act?'var(--accent)':'var(--border)')+';background:'+(act?'var(--accent)':'transparent')+';color:'+(act?'#000':'var(--text-secondary)')+';font-size:11px;font-weight:'+(act?'700':'500')+';cursor:pointer;font-family:var(--font)">'+t[1]+'</button>';
+  });
+  tabBar+='<button onclick="dsrSave()" style="margin-left:auto;padding:6px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);color:var(--text-secondary);font-size:11px;cursor:pointer">💾 Save</button>';
+  tabBar+='<button onclick="dsrClear()" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(248,113,113,.3);background:transparent;color:var(--danger);font-size:11px;cursor:pointer">⊗ Clear</button>';
+  tabBar+='</div>';
+
+  var body='';
+  var fi='background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text-primary);font-size:13px;outline:none;width:100%;font-family:var(--font);';
+  var flab='display:block;font-size:10px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;';
+  var fg='margin-bottom:12px;';
+  var grid2='display:grid;grid-template-columns:1fr 1fr;gap:12px;';
+  var grid3='display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;';
+  var secHdr='font-size:12px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border);';
+  var card='background:var(--surface-1);border:1px solid var(--border);border-radius:11px;padding:16px;margin-bottom:14px;';
+  var sline='display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px;';
+  var mono='font-family:var(--mono);font-weight:700;font-size:13px;';
+
+  // Helper: number input
+  function fi_n(id,val,ph,cb){return '<input type="number" step="0.01" placeholder="'+ph+'" value="'+(val||'')+'" oninput="dsrUp(\''+id+'\',this.value);'+cb+'" style="'+fi+'">';}
+  function fi_t(id,val,ph,cb){return '<input type="text" placeholder="'+ph+'" value="'+(bxe(val||''))+'" oninput="dsrUp(\''+id+'\',this.value);'+cb+'" style="'+fi+'">';}
+  function lbl(t){return '<label style="'+flab+'">'+t+'</label>';}
+  function grp(l,inp){return '<div style="'+fg+'">'+lbl(l)+inp+'</div>';}
+
+  if(D.tab==='overview'){
+    // Calculate all values
+    var food=parseFloat(D.food)||0,bev=parseFloat(D.bev)||0,misc=parseFloat(D.misc)||0;
+    var vat=parseFloat(D.vat)||0,guests=parseInt(D.guests)||0;
+    var totalDisc=(D.discounts||[]).reduce(function(a,d){return a+(parseFloat(d.amount)||0);},0);
+    var totalDelivery=(D.delivery||[]).reduce(function(a,d){return a+(parseFloat(d.amount)||0);},0);
+    var totalPay=(D.payments||[]).reduce(function(a,p){return a+(parseFloat(p.amount)||0);},0);
+    var netSales=(food+bev+misc)-totalDisc;
+    var totalSales=netSales+vat;
+    var serverCash=(D.servers||[]).reduce(function(a,s){return a+(parseFloat(s.cashSales)||0);},0);
+    var approvedTips=(D.servers||[]).reduce(function(a,s){return a+(s.tips||[]).filter(function(t){return t.status==='approved';}).reduce(function(b,t){return b+(parseFloat(t.amount)||0);},0);},0);
+    var toDeposit=serverCash-approvedTips;
+    var approvedVoids=(D.servers||[]).reduce(function(a,s){return a+(s.voids||[]).filter(function(v){return v.status==='approved';}).reduce(function(b,v){return b+(parseFloat(v.amount)||0);},0);},0);
+    var approvedRets=(D.servers||[]).reduce(function(a,s){return a+(s.returns||[]).filter(function(v){return v.status==='approved';}).reduce(function(b,v){return b+(parseFloat(v.amount)||0);},0);},0);
+    var checkAvg=guests>0?netSales/guests:0;
+    function sv(v,c){return '<span style="'+mono+'color:'+(c||'var(--ceo)')+'">'+bfsar(v)+'</span>';}
+    function sline_r(l,v,c){return '<div style="'+sline+'"><span>'+l+'</span>'+sv(v,c)+'</div>';}
+    body+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;margin-bottom:16px">';
+    [['Total Sales',totalSales,'var(--ceo)'],['Net Sales',netSales,'#34d399'],['Guest Count',guests,'#60a5fa'],['Check Avg',checkAvg,'var(--text-primary)'],['Server Cash',serverCash,'var(--ceo)'],['To Deposit',toDeposit,'#34d399'],['Delivery',totalDelivery,'#a78bfa'],['Returns',approvedRets,'#f87171']].forEach(function(k){
+      body+='<div class="bsc"><div class="bsc-lbl">'+k[0]+'</div><div class="bsc-val bmono" style="font-size:18px;color:'+k[2]+'">'+(k[0]==='Guest Count'?k[1]:bfsar(k[1]))+'</div></div>';
+    });
+    body+='</div>';
+    body+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">';
+    body+='<div style="'+card+'"><div style="'+secHdr+'">Sales Calculation</div>';
+    body+=sline_r('Food + Bev + MISC',food+bev+misc);
+    body+=sline_r('(-) Discounts',totalDisc,'#f87171');
+    body+='<div style="'+sline+'font-weight:700"><span>= Net Sales</span>'+sv(netSales,'#34d399')+'</div>';
+    body+=sline_r('+ System VAT',vat,'var(--text-secondary)');
+    body+='<div style="'+sline+'font-weight:700"><span>= Total Sales Revenue</span>'+sv(totalSales,'var(--ceo)')+'</div>';
+    body+=sline_r('Voids (info)',approvedVoids,'#f59e0b');
+    body+=sline_r('Returns (info)',approvedRets,'#f59e0b');
+    body+='</div>';
+    body+='<div style="'+card+'"><div style="'+secHdr+'">Cash Reconciliation</div>';
+    body+=sline_r('Server Cash Total',serverCash);
+    body+=sline_r('(-) Approved Tips Paid',approvedTips,'#f87171');
+    body+='<div style="'+sline+'font-weight:700"><span>Expected Deposit</span>'+sv(toDeposit,'#34d399')+'</div>';
+    body+=sline_r('MADA',( D.payments||[]).filter(function(p){return p.method==='MADA';}).reduce(function(a,p){return a+(parseFloat(p.amount)||0);},0),'#60a5fa');
+    body+=sline_r('VISA',(D.payments||[]).filter(function(p){return p.method==='VISA';}).reduce(function(a,p){return a+(parseFloat(p.amount)||0);},0),'#60a5fa');
+    body+=sline_r('Qlub',(D.payments||[]).filter(function(p){return p.method==='Qlub';}).reduce(function(a,p){return a+(parseFloat(p.amount)||0);},0),'#a78bfa');
+    body+='</div></div>';
+
+  } else if(D.tab==='income'){
+    body+='<div style="'+card+'"><div style="'+secHdr+'">Income Categories</div>';
+    body+='<div style="'+grid3+'">';
+    body+=grp('Food Sales (SAR)',fi_n('food',D.food,'0.00','dsrRecalc()'));
+    body+=grp('Beverage Sales (SAR)',fi_n('bev',D.bev,'0.00','dsrRecalc()'));
+    body+=grp('MISC / Other (SAR)',fi_n('misc',D.misc,'0.00','dsrRecalc()'));
+    body+=grp('Guest Count',fi_n('guests',D.guests,'0','dsrRecalc()'));
+    body+=grp('System VAT (SAR)',fi_n('vat',D.vat,'0.00','dsrRecalc()'));
+    body+=grp('VAT on ALFA (info)',fi_n('vatAlfa',D.vatAlfa,'0.00','dsrRecalc()'));
+    body+='</div></div>';
+    body+='<div style="'+card+'"><div style="'+secHdr+'">Discounts</div>';
+    (D.discounts||[]).forEach(function(d,i){
+      body+='<div style="display:flex;gap:8px;margin-bottom:8px;align-items:center">';
+      body+='<input type="text" placeholder="Discount type" value="'+bxe(d.type||'')+'" oninput="dsrUpdArr(\'discounts\','+i+',\'type\',this.value)" style="'+fi+'flex:2">';
+      body+='<input type="number" step="0.01" placeholder="SAR" value="'+(d.amount||'')+'" oninput="dsrUpdArr(\'discounts\','+i+',\'amount\',this.value);dsrRecalc()" style="'+fi+'flex:1">';
+      body+='<button onclick="dsrRmArr(\'discounts\','+i+')" style="color:var(--danger);background:transparent;border:none;cursor:pointer;font-size:18px;line-height:1">×</button>';
+      body+='</div>';
+    });
+    body+='<button onclick="dsrAddDisc()" style="padding:7px 16px;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);color:var(--text-primary);font-size:12px;cursor:pointer;margin-top:4px">+ Add Discount</button>';
+    body+='</div>';
+
+  } else if(D.tab==='payments'){
+    body+='<div style="'+card+'"><div style="'+secHdr+'">Sales by Payment Method</div>';
+    var payMethods=['Cash','MADA','VISA','AMEX','Master Card','Qlub','Loyalty Point','Gift Card'];
+    (D.payments||[]).forEach(function(p,i){
+      body+='<div style="display:flex;gap:8px;margin-bottom:8px;align-items:center">';
+      body+='<select oninput="dsrUpdArr(\'payments\','+i+',\'method\',this.value)" style="'+fi+'flex:1.5">';
+      payMethods.forEach(function(m){body+='<option'+(p.method===m?' selected':'')+'>'+m+'</option>';});
+      body+='</select>';
+      body+='<input type="number" step="0.01" placeholder="SAR" value="'+(p.amount||'')+'" oninput="dsrUpdArr(\'payments\','+i+',\'amount\',this.value);dsrRecalc()" style="'+fi+'flex:1">';
+      body+='<button onclick="dsrRmArr(\'payments\','+i+')" style="color:var(--danger);background:transparent;border:none;cursor:pointer;font-size:18px;line-height:1">×</button>';
+      body+='</div>';
+    });
+    body+='<button onclick="dsrAddPay()" style="padding:7px 16px;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);color:var(--text-primary);font-size:12px;cursor:pointer;margin-top:4px">+ Add Method</button>';
+    body+='</div>';
+    // Tip approval
+    var allTips=[];
+    (D.servers||[]).forEach(function(s,si){(s.tips||[]).forEach(function(t,ti){allTips.push({s:s,si:si,t:t,ti:ti});});});
+    if(allTips.length){
+      body+='<div style="'+card+'"><div style="'+secHdr+'">Credit Tips — Manager Approval</div>';
+      allTips.forEach(function(x){
+        var tc=x.t.status==='approved'?'#34d399':x.t.status==='rejected'?'#f87171':'#f59e0b';
+        body+='<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">';
+        body+='<div style="flex:1"><div style="font-size:12px;font-weight:600">'+bxe(x.s.name||'Server '+(x.si+1))+'</div><div style="font-size:10px;color:var(--text-secondary)">'+x.t.method+' — '+bfsar(x.t.amount)+'</div></div>';
+        body+='<span style="background:'+tc+'18;color:'+tc+';border-radius:20px;padding:2px 10px;font-size:10px;font-weight:700">'+x.t.status.toUpperCase()+'</span>';
+        if(x.t.status==='pending'){
+          body+='<button onclick="dsrTipApprove('+x.si+',\''+x.t.id+'\')" style="padding:4px 10px;border-radius:6px;background:rgba(52,211,153,.15);border:1px solid rgba(52,211,153,.3);color:#34d399;font-size:11px;cursor:pointer">✓</button>';
+          body+='<button onclick="dsrTipReject('+x.si+',\''+x.t.id+'\')" style="padding:4px 10px;border-radius:6px;background:rgba(248,113,113,.15);border:1px solid rgba(248,113,113,.3);color:#f87171;font-size:11px;cursor:pointer">✕</button>';
+        }
+        body+='</div>';
+      });
+      body+='</div>';
+    }
+
+  } else if(D.tab==='delivery'){
+    body+='<div style="'+card+'"><div style="'+secHdr+'">Delivery Platforms</div>';
+    (D.delivery||[]).forEach(function(d,i){
+      body+='<div style="display:flex;gap:8px;margin-bottom:8px;align-items:center">';
+      body+='<input type="text" placeholder="Platform (HungerStation, Jahez...)" value="'+bxe(d.platform||'')+'" oninput="dsrUpdArr(\'delivery\','+i+',\'platform\',this.value)" style="'+fi+'flex:2">';
+      body+='<input type="number" step="0.01" placeholder="SAR" value="'+(d.amount||'')+'" oninput="dsrUpdArr(\'delivery\','+i+',\'amount\',this.value);dsrRecalc()" style="'+fi+'flex:1">';
+      body+='<input type="number" placeholder="Orders" value="'+(d.orders||'')+'" oninput="dsrUpdArr(\'delivery\','+i+',\'orders\',this.value)" style="'+fi+'width:80px;flex:none">';
+      body+='<button onclick="dsrRmArr(\'delivery\','+i+')" style="color:var(--danger);background:transparent;border:none;cursor:pointer;font-size:18px;line-height:1">×</button>';
+      body+='</div>';
+    });
+    body+='<button onclick="dsrAddDeliv()" style="padding:7px 16px;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);color:var(--text-primary);font-size:12px;cursor:pointer;margin-top:4px">+ Add Platform</button>';
+    body+='</div>';
+
+  } else if(D.tab==='server'){
+    body+='<div style="display:flex;gap:8px;margin-bottom:14px">';
+    body+='<button onclick="dsrAddServer()" style="padding:8px 18px;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);color:var(--text-primary);font-size:12px;font-weight:600;cursor:pointer">+ Add Server</button>';
+    body+='<div style="flex:1"></div>';
+    body+='<div style="font-size:11px;color:var(--text-secondary);padding:8px 0">Server Drop entry also available as <a href="server-drop.html" target="_blank" style="color:var(--ceo);text-decoration:none;font-weight:600">standalone page →</a></div>';
+    body+='</div>';
+    (D.servers||[]).forEach(function(s,si){
+      var approvedT=(s.tips||[]).filter(function(t){return t.status==='approved';}).reduce(function(a,t){return a+(parseFloat(t.amount)||0);},0);
+      var cashDrop=parseFloat(s.cashSales)||0;
+      var totalDrop=cashDrop+approvedT;
+      var diff=totalDrop-(parseFloat(s.totalSales)||0);
+      var dc=Math.abs(diff)<0.01?'#34d399':diff<0?'#f87171':'#f59e0b';
+      var dl=Math.abs(diff)<0.01?'✓ Balanced':diff<0?'Short '+bfsar(Math.abs(diff)):'Over '+bfsar(diff);
+      var pend=(s.voids||[]).filter(function(v){return v.status==='pending';}).length+(s.returns||[]).filter(function(v){return v.status==='pending';}).length+(s.tips||[]).filter(function(t){return t.status==='pending';}).length;
+      body+='<div style="'+card+'">';
+      body+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">';
+      body+='<div style="font-size:13px;font-weight:700;flex:1">'+bxe(s.name||'Server '+(si+1))+(s.sap?' <span style="color:var(--text-tertiary);font-size:10px">'+bxe(s.sap)+'</span>':'')+'</div>';
+      if(pend>0)body+='<span style="background:rgba(245,158,11,.15);color:#f59e0b;border-radius:20px;padding:2px 8px;font-size:10px;font-weight:700">'+pend+' pending</span>';
+      body+='<span style="background:'+dc+'18;color:'+dc+';border-radius:20px;padding:2px 10px;font-size:10px;font-weight:700">'+dl+'</span>';
+      body+='<button onclick="dsrRmServer('+si+')" style="color:var(--danger);background:transparent;border:1px solid rgba(248,113,113,.3);border-radius:6px;padding:3px 9px;cursor:pointer;font-size:12px">×</button>';
+      body+='</div>';
+      body+='<div style="'+grid3+'margin-bottom:12px">';
+      body+=grp('Server Name',fi_t('srv_name_'+si,s.name,'Full name','dsrUpdSrv('+si+',\'name\',this.value)'));
+      body+=grp('SAP Number',fi_t('srv_sap_'+si,s.sap,'SAP-XXXX','dsrUpdSrv('+si+',\'sap\',this.value)'));
+      body+=grp('Total Sales (SAR)',fi_n('srv_tot_'+si,s.totalSales,'0.00','dsrUpdSrv('+si+',\'totalSales\',this.value);dsrRecalc()'));
+      body+=grp('Cash Sales (SAR)',fi_n('srv_cash_'+si,s.cashSales,'0.00','dsrUpdSrv('+si+',\'cashSales\',this.value);dsrRecalc()'));
+      body+=grp('MADA (SAR)',fi_n('srv_mada_'+si,s.madaSales,'0.00','dsrUpdSrv('+si+',\'madaSales\',this.value);dsrRecalc()'));
+      body+=grp('VISA (SAR)',fi_n('srv_visa_'+si,s.visaSales,'0.00','dsrUpdSrv('+si+',\'visaSales\',this.value);dsrRecalc()'));
+      body+=grp('Master Card (SAR)',fi_n('srv_mc_'+si,s.mcSales,'0.00','dsrUpdSrv('+si+',\'mcSales\',this.value);dsrRecalc()'));
+      body+=grp('AMEX (SAR)',fi_n('srv_amex_'+si,s.amexSales,'0.00','dsrUpdSrv('+si+',\'amexSales\',this.value);dsrRecalc()'));
+      body+=grp('Qlub (SAR)',fi_n('srv_qlub_'+si,s.qlubSales,'0.00','dsrUpdSrv('+si+',\'qlubSales\',this.value);dsrRecalc()'));
+      body+=grp('Loyalty Point (SAR)',fi_n('srv_loy_'+si,s.loyaltySales,'0.00','dsrUpdSrv('+si+',\'loyaltySales\',this.value);dsrRecalc()'));
+      body+='</div>';
+      // Tips
+      body+='<div style="margin-bottom:12px;padding-top:10px;border-top:1px solid var(--border)">';
+      body+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><span style="font-size:10px;color:var(--ceo);font-weight:700;text-transform:uppercase">Tips by Card</span><button onclick="dsrAddTip('+si+')" style="padding:3px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);color:var(--text-primary);font-size:11px;cursor:pointer">+ Tip</button></div>';
+      (s.tips||[]).forEach(function(t,ti){
+        var tc=t.status==='approved'?'#34d399':t.status==='rejected'?'#f87171':'#f59e0b';
+        var CARDM=['MADA','VISA','Master Card','AMEX','Qlub'];
+        body+='<div style="display:flex;gap:6px;margin-bottom:6px;align-items:center">';
+        body+='<select oninput="dsrUpdTip('+si+',\''+t.id+'\',\'method\',this.value)" style="'+fi+'flex:1;font-size:11px">';
+        CARDM.forEach(function(m){body+='<option'+(t.method===m?' selected':'')+'>'+m+'</option>';});
+        body+='</select>';
+        body+='<input type="number" step="0.01" placeholder="SAR" value="'+(t.amount||'')+'" oninput="dsrUpdTip('+si+',\''+t.id+'\',\'amount\',this.value)" style="'+fi+'width:90px;flex:none;font-size:11px">';
+        body+='<input type="text" placeholder="Code" value="'+bxe(t.approval||'')+'" oninput="dsrUpdTip('+si+',\''+t.id+'\',\'approval\',this.value)" style="'+fi+'width:90px;flex:none;font-size:11px">';
+        body+='<span style="background:'+tc+'18;color:'+tc+';border-radius:20px;padding:1px 7px;font-size:9px;font-weight:700;flex:none">'+t.status+'</span>';
+        body+='<button onclick="dsrRmTip('+si+',\''+t.id+'\')" style="color:var(--danger);background:transparent;border:none;cursor:pointer;font-size:16px">×</button>';
+        body+='</div>';
+      });
+      body+='</div>';
+      // Voids
+      body+='<div style="margin-bottom:10px;padding-top:10px;border-top:1px solid var(--border)">';
+      body+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><span style="font-size:10px;color:#f87171;font-weight:700;text-transform:uppercase">⊗ Voids</span><button onclick="dsrAddVoid('+si+')" style="padding:3px 10px;border-radius:6px;border:1px solid rgba(248,113,113,.3);background:rgba(248,113,113,.08);color:#f87171;font-size:11px;cursor:pointer">+ Void</button></div>';
+      (s.voids||[]).forEach(function(v,vi){
+        var vc=v.status==='approved'?'#34d399':v.status==='rejected'?'#94a3b8':'#f87171';
+        var VRR=['Customer Complaint','Wrong Order','Burnt/Overcooked','Out of Stock','Manager Courtesy','Pricing Error','Other'];
+        body+='<div style="display:flex;gap:6px;margin-bottom:6px;align-items:center;background:rgba(248,113,113,.05);border-radius:7px;padding:6px">';
+        body+='<input type="text" placeholder="Item" value="'+bxe(v.item||'')+'" oninput="dsrUpdVR('+si+',\'voids\',\''+v.id+'\',\'item\',this.value)" style="'+fi+'flex:1.5;font-size:11px">';
+        body+='<select oninput="dsrUpdVR('+si+',\'voids\',\''+v.id+'\',\'reason\',this.value)" style="'+fi+'flex:1;font-size:11px"><option value="">Reason</option>';
+        VRR.forEach(function(r){body+='<option'+(v.reason===r?' selected':'')+'>'+r+'</option>';});
+        body+='</select>';
+        body+='<input type="text" placeholder="Check#" value="'+bxe(v.check||'')+'" oninput="dsrUpdVR('+si+',\'voids\',\''+v.id+'\',\'check\',this.value)" style="'+fi+'width:70px;flex:none;font-size:11px">';
+        body+='<input type="number" step="0.01" placeholder="SAR" value="'+(v.amount||'')+'" oninput="dsrUpdVR('+si+',\'voids\',\''+v.id+'\',\'amount\',this.value);dsrRecalc()" style="'+fi+'width:80px;flex:none;font-size:11px">';
+        body+='<span style="background:'+vc+'18;color:'+vc+';border-radius:20px;padding:1px 7px;font-size:9px;font-weight:700;flex:none">'+v.status+'</span>';
+        if(v.status==='pending'){
+          body+='<button onclick="dsrApprVR('+si+',\'voids\',\''+v.id+'\')" style="padding:2px 7px;border-radius:5px;background:rgba(52,211,153,.15);border:1px solid rgba(52,211,153,.3);color:#34d399;font-size:10px;cursor:pointer">✓</button>';
+          body+='<button onclick="dsrRejVR('+si+',\'voids\',\''+v.id+'\')" style="padding:2px 7px;border-radius:5px;background:rgba(248,113,113,.15);border:1px solid rgba(248,113,113,.3);color:#f87171;font-size:10px;cursor:pointer">✕</button>';
+        }
+        body+='<button onclick="dsrRmVR('+si+',\'voids\',\''+v.id+'\')" style="color:var(--danger);background:transparent;border:none;cursor:pointer;font-size:16px">×</button>';
+        body+='</div>';
+      });
+      body+='</div>';
+      // Returns
+      body+='<div style="padding-top:10px;border-top:1px solid var(--border)">';
+      body+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><span style="font-size:10px;color:#f59e0b;font-weight:700;text-transform:uppercase">↩ Returns</span><button onclick="dsrAddRet('+si+')" style="padding:3px 10px;border-radius:6px;border:1px solid rgba(245,158,11,.3);background:rgba(245,158,11,.08);color:#f59e0b;font-size:11px;cursor:pointer">+ Return</button></div>';
+      (s.returns||[]).forEach(function(v,vi){
+        var vc=v.status==='approved'?'#34d399':v.status==='rejected'?'#94a3b8':'#f59e0b';
+        var VRR=['Customer Complaint','Wrong Order','Burnt/Overcooked','Out of Stock','Manager Courtesy','Pricing Error','Other'];
+        body+='<div style="display:flex;gap:6px;margin-bottom:6px;align-items:center;background:rgba(245,158,11,.05);border-radius:7px;padding:6px">';
+        body+='<input type="text" placeholder="Item" value="'+bxe(v.item||'')+'" oninput="dsrUpdVR('+si+',\'returns\',\''+v.id+'\',\'item\',this.value)" style="'+fi+'flex:1.5;font-size:11px">';
+        body+='<select oninput="dsrUpdVR('+si+',\'returns\',\''+v.id+'\',\'reason\',this.value)" style="'+fi+'flex:1;font-size:11px"><option value="">Reason</option>';
+        VRR.forEach(function(r){body+='<option'+(v.reason===r?' selected':'')+'>'+r+'</option>';});
+        body+='</select>';
+        body+='<input type="text" placeholder="Check#" value="'+bxe(v.check||'')+'" oninput="dsrUpdVR('+si+',\'returns\',\''+v.id+'\',\'check\',this.value)" style="'+fi+'width:70px;flex:none;font-size:11px">';
+        body+='<input type="number" step="0.01" placeholder="SAR" value="'+(v.amount||'')+'" oninput="dsrUpdVR('+si+',\'returns\',\''+v.id+'\',\'amount\',this.value);dsrRecalc()" style="'+fi+'width:80px;flex:none;font-size:11px">';
+        body+='<span style="background:'+vc+'18;color:'+vc+';border-radius:20px;padding:1px 7px;font-size:9px;font-weight:700;flex:none">'+v.status+'</span>';
+        if(v.status==='pending'){
+          body+='<button onclick="dsrApprVR('+si+',\'returns\',\''+v.id+'\')" style="padding:2px 7px;border-radius:5px;background:rgba(52,211,153,.15);border:1px solid rgba(52,211,153,.3);color:#34d399;font-size:10px;cursor:pointer">✓</button>';
+          body+='<button onclick="dsrRejVR('+si+',\'returns\',\''+v.id+'\')" style="padding:2px 7px;border-radius:5px;background:rgba(248,113,113,.15);border:1px solid rgba(248,113,113,.3);color:#f87171;font-size:10px;cursor:pointer">✕</button>';
+        }
+        body+='<button onclick="dsrRmVR('+si+',\'returns\',\''+v.id+'\')" style="color:var(--danger);background:transparent;border:none;cursor:pointer;font-size:16px">×</button>';
+        body+='</div>';
+      });
+      body+='</div>';
+      body+='<div style="display:flex;gap:12px;padding-top:10px;border-top:1px solid var(--border);margin-top:8px">';
+      body+='<span style="font-size:11px;color:var(--text-secondary)">Cash: '+bfsar(cashDrop)+'</span>';
+      body+='<span style="font-size:11px;color:var(--text-secondary)">Tips: '+bfsar(approvedT)+'</span>';
+      body+='<span style="font-size:11px;color:var(--text-secondary)">Drop: '+bfsar(totalDrop)+'</span>';
+      body+='<span style="margin-left:auto;font-size:11px;font-weight:700;color:'+dc+'">'+dl+'</span>';
+      body+='</div>';
+      body+='</div>';
+    });
+    if(!(D.servers||[]).length){body+='<div style="text-align:center;padding:48px;color:var(--text-tertiary)"><div style="font-size:36px;margin-bottom:10px">◉</div><p style="font-size:13px">No servers yet — click "+ Add Server" to begin</p></div>';}
+
+  } else if(D.tab==='deposit'){
+    var DENOMS_DEP=[{v:'500',l:'500'},{v:'200',l:'200'},{v:'100',l:'100'},{v:'50',l:'50'},{v:'20',l:'20'},{v:'10',l:'10'},{v:'5',l:'5'},{v:'1',l:'1.00'},{v:'0.5',l:'0.50'},{v:'0.25',l:'0.25'}];
+    var serverCash2=(D.servers||[]).reduce(function(a,s){return a+(parseFloat(s.cashSales)||0);},0);
+    var approvedTips2=(D.servers||[]).reduce(function(a,s){return a+(s.tips||[]).filter(function(t){return t.status==='approved';}).reduce(function(b,t){return b+(parseFloat(t.amount)||0);},0);},0);
+    var toDeposit2=serverCash2-approvedTips2;
+    var physTotal=DENOMS_DEP.reduce(function(a,d){return a+(parseFloat((D.denoms||{})['dep_'+d.v.replace('.','_')])||0)*parseFloat(d.v);},0);
+    var depDiff=physTotal-toDeposit2;
+    body+='<div style="display:flex;gap:16px;flex-wrap:wrap;background:var(--surface-1);border:1px solid var(--border);border-radius:11px;padding:14px;margin-bottom:16px;align-items:center">';
+    body+='<div><div style="font-size:9px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.08em;margin-bottom:2px">Server Cash Total</div><div class="bmono" style="font-size:20px;color:var(--ceo)">'+bfsar(serverCash2)+'</div></div>';
+    body+='<div style="font-size:20px;color:var(--text-tertiary)">−</div>';
+    body+='<div><div style="font-size:9px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.08em;margin-bottom:2px">Credit Tips to Pay</div><div class="bmono" style="font-size:20px;color:#f87171">'+bfsar(approvedTips2)+'</div></div>';
+    body+='<div style="font-size:20px;color:var(--text-tertiary)">=</div>';
+    body+='<div><div style="font-size:9px;color:var(--ceo);text-transform:uppercase;letter-spacing:.08em;margin-bottom:2px">Amount to Deposit</div><div class="bmono" style="font-size:24px;font-weight:700;color:var(--ceo)">'+bfsar(toDeposit2)+'</div></div>';
+    body+='<div style="margin-left:auto;text-align:right"><div style="font-size:9px;color:var(--text-tertiary);text-transform:uppercase;margin-bottom:2px">Physical Counted</div><div class="bmono" style="font-size:20px;color:'+(Math.abs(depDiff)<0.01?'#34d399':depDiff<0?'#f87171':'#f59e0b')+'">'+bfsar(physTotal)+'</div><div style="font-size:10px;color:var(--text-secondary)">Diff: '+(depDiff>=0?'+':'')+bfsar(depDiff)+'</div></div>';
+    body+='</div>';
+    body+='<div style="'+card+'"><div style="'+secHdr+'">Count Physical Cash — Enter Quantities</div>';
+    body+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px">';
+    DENOMS_DEP.forEach(function(d){
+      var dk='dep_'+d.v.replace('.','_');
+      var qty=parseFloat((D.denoms||{})[dk])||0;
+      var sub=qty*parseFloat(d.v);
+      body+='<div style="background:var(--surface-2);border:1px solid var(--border);border-radius:9px;padding:10px;text-align:center">';
+      body+='<div style="font-size:9px;color:var(--text-tertiary);margin-bottom:6px">SAR '+d.l+'</div>';
+      body+='<input type="number" min="0" value="'+(qty||'')+'" placeholder="0" oninput="dsrUpdDenom(\''+dk+'\',this.value)" style="'+fi+'text-align:center;font-size:14px;font-weight:700;margin-bottom:4px">';
+      body+='<div style="font-size:10px;color:var(--ceo);font-family:var(--mono)">='+sub.toFixed(2)+'</div>';
+      body+='</div>';
+    });
+    body+='</div></div>';
+    body+='<button onclick="dsrPrintDeposit()" style="padding:10px 28px;border-radius:9px;background:var(--surface-2);border:1px solid var(--border);color:var(--text-primary);font-size:13px;font-weight:600;cursor:pointer">⎙ Print Deposit Sheet</button>';
+
+  } else if(D.tab==='manager'){
+    var food2=parseFloat(D.food)||0,bev2=parseFloat(D.bev)||0,misc2=parseFloat(D.misc)||0;
+    var vat2=parseFloat(D.vat)||0;
+    var totalDisc2=(D.discounts||[]).reduce(function(a,d){return a+(parseFloat(d.amount)||0);},0);
+    var netSales2=(food2+bev2+misc2)-totalDisc2;
+    var totalSales2=netSales2+vat2;
+    var serverCash3=(D.servers||[]).reduce(function(a,s){return a+(parseFloat(s.cashSales)||0);},0);
+    var approvedTips3=(D.servers||[]).reduce(function(a,s){return a+(s.tips||[]).filter(function(t){return t.status==='approved';}).reduce(function(b,t){return b+(parseFloat(t.amount)||0);},0);},0);
+    var toDeposit3=serverCash3-approvedTips3;
+    var physTotal3=Object.keys(D.denoms||{}).filter(function(k){return k.indexOf('dep_')===0;}).reduce(function(a,k){var v=k.replace('dep_','').replace('_','.');return a+(parseFloat((D.denoms||{})[k])||0)*parseFloat(v);},0);
+    var variance3=physTotal3-toDeposit3;
+    var approvedVoids3=(D.servers||[]).reduce(function(a,s){return a+(s.voids||[]).filter(function(v){return v.status==='approved';}).reduce(function(b,v){return b+(parseFloat(v.amount)||0);},0);},0);
+    var approvedRets3=(D.servers||[]).reduce(function(a,s){return a+(s.returns||[]).filter(function(v){return v.status==='approved';}).reduce(function(b,v){return b+(parseFloat(v.amount)||0);},0);},0);
+    // Alerts
+    var alerts=[];
+    if(Math.abs(variance3)>5)alerts.push({c:'#f87171',i:'⛔',t:'Deposit '+(variance3<0?'SHORT':'OVER')+' by '+bfsar(Math.abs(variance3)),d:'Expected: '+bfsar(toDeposit3)+' | Physical: '+bfsar(physTotal3)});
+    (D.servers||[]).forEach(function(s){
+      var approvedT2=(s.tips||[]).filter(function(t){return t.status==='approved';}).reduce(function(a,t){return a+(parseFloat(t.amount)||0);},0);
+      var drop=(parseFloat(s.cashSales)||0)+approvedT2;
+      var diff2=drop-(parseFloat(s.totalSales)||0);
+      if(Math.abs(diff2)>0.01)alerts.push({c:diff2<0?'#f87171':'#f59e0b',i:diff2<0?'⛔':'⚡',t:(s.name||'Server')+': '+(diff2<0?'SHORT':'OVER')+' '+bfsar(Math.abs(diff2)),d:'Reported: '+bfsar(s.totalSales)+' | Drop: '+bfsar(drop)});
+      var pend2=(s.voids||[]).filter(function(v){return v.status==='pending';}).length+(s.returns||[]).filter(function(v){return v.status==='pending';}).length+(s.tips||[]).filter(function(t){return t.status==='pending';}).length;
+      if(pend2>0)alerts.push({c:'#f59e0b',i:'⏳',t:(s.name||'Server')+': '+pend2+' pending approval',d:'Go to Server Drops tab'});
+    });
+    body+='<div style="margin-bottom:16px">';
+    if(!alerts.length){body+='<div style="background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.3);border-radius:10px;padding:14px 18px;display:flex;gap:12px;align-items:center"><span style="font-size:24px">✓</span><div><div style="font-weight:700;color:#34d399">All checks passed</div><div style="font-size:11px;color:var(--text-secondary)">No discrepancies found</div></div></div>';}
+    else alerts.forEach(function(a){body+='<div style="background:'+a.c+'18;border:1px solid '+a.c+'40;border-radius:10px;padding:12px 16px;display:flex;gap:12px;align-items:center;margin-bottom:8px"><span style="font-size:20px">'+a.i+'</span><div><div style="font-weight:700;color:'+a.c+'">'+a.t+'</div><div style="font-size:11px;color:var(--text-secondary)">'+a.d+'</div></div></div>';});
+    body+='</div>';
+    body+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">';
+    body+='<div style="'+card+'"><div style="'+secHdr+'">Server Reconciliation</div>';
+    body+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="background:var(--surface-2)"><th style="padding:7px 10px;text-align:left;color:var(--text-tertiary)">Server</th><th style="padding:7px 10px;text-align:right;color:var(--text-tertiary)">Reported</th><th style="padding:7px 10px;text-align:right;color:var(--text-tertiary)">Cash</th><th style="padding:7px 10px;text-align:right;color:var(--text-tertiary)">Tips</th><th style="padding:7px 10px;text-align:center;color:var(--text-tertiary)">Status</th></tr></thead><tbody>';
+    (D.servers||[]).forEach(function(s){
+      var approvedT4=(s.tips||[]).filter(function(t){return t.status==='approved';}).reduce(function(a,t){return a+(parseFloat(t.amount)||0);},0);
+      var drop=(parseFloat(s.cashSales)||0)+approvedT4;
+      var diff3=drop-(parseFloat(s.totalSales)||0);
+      var dc=Math.abs(diff3)<0.01?'#34d399':diff3<0?'#f87171':'#f59e0b';
+      var dl=Math.abs(diff3)<0.01?'OK':diff3<0?'Short':'Over';
+      body+='<tr style="border-top:1px solid var(--border)"><td style="padding:7px 10px;font-weight:600">'+bxe(s.name||'—')+'</td><td style="padding:7px 10px;text-align:right;font-family:var(--mono)">'+bfsar(s.totalSales)+'</td><td style="padding:7px 10px;text-align:right;font-family:var(--mono)">'+bfsar(s.cashSales)+'</td><td style="padding:7px 10px;text-align:right;font-family:var(--mono)">'+bfsar(approvedT4)+'</td><td style="padding:7px 10px;text-align:center"><span style="background:'+dc+'18;color:'+dc+';border-radius:20px;padding:1px 8px;font-size:10px;font-weight:700">'+dl+'</span></td></tr>';
+    });
+    body+='</tbody></table></div></div>';
+    body+='<div style="'+card+'"><div style="'+secHdr+'">Daily Balance</div>';
+    function sl3(l,v,c,bold){return '<div style="'+sline+(bold?'font-weight:700':'')+'"><span>'+l+'</span><span style="'+mono+'color:'+(c||'var(--ceo)')+'">'+bfsar(v)+'</span></div>';}
+    body+=sl3('Food + Bev + MISC',food2+bev2+misc2);
+    body+=sl3('(-) Discounts',totalDisc2,'#f87171');
+    body+=sl3('= Net Sales',netSales2,'#34d399',true);
+    body+=sl3('+ System VAT',vat2);
+    body+=sl3('= Total Sales',totalSales2,'var(--ceo)',true);
+    body+=sl3('Server Cash Total',serverCash3);
+    body+=sl3('(-) Credit Tips',approvedTips3,'#f87171');
+    body+=sl3('Expected Deposit',toDeposit3,'#34d399',true);
+    body+=sl3('Physical Counted',physTotal3);
+    var vcolor=Math.abs(variance3)<0.01?'#34d399':variance3<0?'#f87171':'#f59e0b';
+    body+='<div style="'+sline+'font-weight:700"><span>Deposit Variance</span><span style="'+mono+'color:'+vcolor+'">'+(variance3>=0?'+':'')+bfsar(Math.abs(variance3))+'</span></div>';
+    body+=sl3('Voids (info)',approvedVoids3,'#f59e0b');
+    body+=sl3('Returns (info)',approvedRets3,'#f59e0b');
+    body+='</div></div>';
+    body+='<div style="margin-top:14px;display:flex;gap:10px">';
+    body+='<button onclick="dsrPrintFull()" style="padding:10px 28px;border-radius:9px;background:var(--accent);border:none;color:#000;font-size:13px;font-weight:700;cursor:pointer">⎙ Print Full DSR</button>';
+    body+='<button onclick="dsrPrintVR()" style="padding:10px 24px;border-radius:9px;background:var(--surface-2);border:1px solid var(--border);color:var(--text-primary);font-size:13px;font-weight:600;cursor:pointer">⎙ Voids & Returns</button>';
+    body+='<button onclick="dsrPrintTips()" style="padding:10px 24px;border-radius:9px;background:var(--surface-2);border:1px solid var(--border);color:var(--text-primary);font-size:13px;font-weight:600;cursor:pointer">⎙ Tips Report</button>';
+    body+='</div>';
+
+  } else if(D.tab==='masterfile'){
+    var DENOMS_MF={have:[{v:'500',l:'500'},{v:'200',l:'200'},{v:'100',l:'100'},{v:'50',l:'50'},{v:'20',l:'20'},{v:'10',l:'10'},{v:'5',l:'5'},{v:'1',l:'1.00'},{v:'0.5',l:'0.50'},{v:'0.25',l:'0.25'}],change:[{v:'100',l:'100'},{v:'50',l:'50'},{v:'20',l:'20'},{v:'10',l:'10'},{v:'5',l:'5'},{v:'1',l:'1.00'}],drawer:[{v:'500',l:'500'},{v:'200',l:'200'},{v:'100',l:'100'},{v:'50',l:'50'},{v:'20',l:'20'},{v:'10',l:'10'},{v:'5',l:'5'},{v:'1',l:'1.00'},{v:'0.5',l:'0.50'},{v:'0.25',l:'0.25'}]};
+    function denomGrid(type,denoms){
+      var ht='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px">';
+      denoms.forEach(function(d){var dk=type+'_'+d.v.replace('.','_');var qty=parseFloat((D.denoms||{})[dk])||0;var sub=qty*parseFloat(d.v);ht+='<div style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:8px;text-align:center"><div style="font-size:9px;color:var(--text-tertiary);margin-bottom:4px">SAR '+d.l+'</div><input type="number" min="0" value="'+(qty||'')+'" placeholder="0" oninput="dsrUpdDenom(\''+dk+'\',this.value)" style="'+fi+'text-align:center;font-size:13px;font-weight:700;margin-bottom:3px"><div style="font-size:10px;color:var(--ceo);font-family:var(--mono)">='+sub.toFixed(2)+'</div></div>';});
+      return ht+'</div>';
+    }
+    var haveTotal=DENOMS_MF.have.reduce(function(a,d){return a+(parseFloat((D.denoms||{})['mfh_'+d.v.replace('.','_')])||0)*parseFloat(d.v);},0);
+    var changeTotal=DENOMS_MF.change.reduce(function(a,d){return a+(parseFloat((D.denoms||{})['mfc_'+d.v.replace('.','_')])||0)*parseFloat(d.v);},0);
+    var drawerTotal=DENOMS_MF.drawer.reduce(function(a,d){return a+(parseFloat((D.denoms||{})['mfd_'+d.v.replace('.','_')])||0)*parseFloat(d.v);},0);
+    var closedPC=(D.closedPetty||[]).reduce(function(a,p){return a+(parseFloat(p.amount)||0);},0);
+    var ongoingPC=(D.ongoingPetty||[]).reduce(function(a,p){return a+(parseFloat(p.amount)||0);},0);
+    var mfCompany=parseFloat(D.mfCompany)||0;
+    var mfTotal=haveTotal+changeTotal+drawerTotal+closedPC+ongoingPC;
+    var mfDiff=mfTotal-mfCompany;
+    body+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">';
+    body+='<div style="'+card+'"><div style="'+secHdr+'">Company Float</div>';
+    body+=grp('Company Provides (SAR)','<input type="number" step="0.01" placeholder="e.g. 10000" value="'+(D.mfCompany||'')+'" oninput="dsrUp(\'mfCompany\',this.value)" style="'+fi+'font-size:18px;padding:9px 12px;color:var(--ceo)">');
+    body+='<div style="background:var(--surface-2);border-radius:9px;padding:12px;margin-top:8px">';
+    function msl(l,v,c,bold){return '<div style="'+sline+(bold?'font-weight:700':'')+'"><span style="color:var(--text-secondary)">'+l+'</span><span style="font-family:var(--mono);color:'+(c||'var(--text-primary)')+'">'+v.toFixed(2)+'</span></div>';}
+    body+=msl('Cash I Have',haveTotal);body+=msl('Change in Safe',changeTotal);body+=msl('Cash Drawer',drawerTotal);body+=msl('Closed Petty Cash',closedPC);body+=msl('Ongoing Petty Cash',ongoingPC);
+    body+=msl('Total I Account For',mfTotal,'var(--ceo)',true);
+    body+=msl('Difference vs Company',mfDiff,Math.abs(mfDiff)<0.01?'#34d399':mfDiff<0?'#f87171':'#f59e0b',true);
+    body+='</div></div>';
+    body+='<div style="'+card+'"><div style="'+secHdr+'">Cash I Have</div>'+denomGrid('mfh',DENOMS_MF.have)+'<div style="font-size:11px;color:var(--ceo);font-family:var(--mono);margin-top:8px;font-weight:700">Total: '+bfsar(haveTotal)+'</div></div>';
+    body+='</div>';
+    body+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">';
+    body+='<div style="'+card+'"><div style="'+secHdr+'">Change in Safe</div>'+denomGrid('mfc',DENOMS_MF.change)+'<div style="font-size:11px;color:var(--ceo);font-family:var(--mono);margin-top:8px;font-weight:700">Total: '+bfsar(changeTotal)+'</div></div>';
+    body+='<div style="'+card+'"><div style="'+secHdr+'">Cash Drawer</div>'+denomGrid('mfd',DENOMS_MF.drawer)+'<div style="font-size:11px;color:var(--ceo);font-family:var(--mono);margin-top:8px;font-weight:700">Total: '+bfsar(drawerTotal)+'</div></div>';
+    body+='</div>';
+    body+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">';
+    body+='<div style="'+card+'"><div style="'+secHdr+'">Closed Petty Cash</div>';
+    (D.closedPetty||[]).forEach(function(p,i){body+='<div style="display:flex;gap:8px;margin-bottom:8px;align-items:center"><input type="text" placeholder="Description" value="'+bxe(p.desc||'')+'" oninput="dsrUpdArr(\'closedPetty\','+i+',\'desc\',this.value)" style="'+fi+'flex:2"><input type="number" step="0.01" placeholder="SAR" value="'+(p.amount||'')+'" oninput="dsrUpdArr(\'closedPetty\','+i+',\'amount\',this.value)" style="'+fi+'flex:1"><button onclick="dsrRmArr(\'closedPetty\','+i+')" style="color:var(--danger);background:transparent;border:none;cursor:pointer;font-size:18px">×</button></div>';});
+    body+='<button onclick="dsrAddArr(\'closedPetty\')" style="padding:6px 14px;border-radius:7px;border:1px solid var(--border);background:var(--surface-2);color:var(--text-primary);font-size:11px;cursor:pointer;margin-top:4px">+ Add</button>';
+    body+='<div style="font-size:11px;color:#f87171;font-family:var(--mono);margin-top:10px;font-weight:700">Total: '+bfsar(closedPC)+'</div></div>';
+    body+='<div style="'+card+'"><div style="'+secHdr+'">Ongoing Petty Cash</div>';
+    (D.ongoingPetty||[]).forEach(function(p,i){body+='<div style="display:flex;gap:8px;margin-bottom:8px;align-items:center"><input type="text" placeholder="Description" value="'+bxe(p.desc||'')+'" oninput="dsrUpdArr(\'ongoingPetty\','+i+',\'desc\',this.value)" style="'+fi+'flex:2"><input type="number" step="0.01" placeholder="SAR" value="'+(p.amount||'')+'" oninput="dsrUpdArr(\'ongoingPetty\','+i+',\'amount\',this.value)" style="'+fi+'flex:1"><button onclick="dsrRmArr(\'ongoingPetty\','+i+')" style="color:var(--danger);background:transparent;border:none;cursor:pointer;font-size:18px">×</button></div>';});
+    body+='<button onclick="dsrAddArr(\'ongoingPetty\')" style="padding:6px 14px;border-radius:7px;border:1px solid var(--border);background:var(--surface-2);color:var(--text-primary);font-size:11px;cursor:pointer;margin-top:4px">+ Add</button>';
+    body+='<div style="font-size:11px;color:#f87171;font-family:var(--mono);margin-top:10px;font-weight:700">Total: '+bfsar(ongoingPC)+'</div></div>';
+    body+='</div>';
+    body+='<div style="'+card+'"><div style="'+secHdr+'">Safe Contents</div>';
+    (D.safeItems||[]).forEach(function(s3,i){body+='<div style="display:flex;gap:8px;margin-bottom:8px;align-items:center"><input type="text" placeholder="Item" value="'+bxe(s3.item||'')+'" oninput="dsrUpdArr(\'safeItems\','+i+',\'item\',this.value)" style="'+fi+'flex:1"><input type="text" placeholder="Remark" value="'+bxe(s3.remark||'')+'" oninput="dsrUpdArr(\'safeItems\','+i+',\'remark\',this.value)" style="'+fi+'flex:2"><button onclick="dsrRmArr(\'safeItems\','+i+')" style="color:var(--danger);background:transparent;border:none;cursor:pointer;font-size:18px">×</button></div>';});
+    body+='<button onclick="dsrAddArr(\'safeItems\')" style="padding:6px 14px;border-radius:7px;border:1px solid var(--border);background:var(--surface-2);color:var(--text-primary);font-size:11px;cursor:pointer;margin-top:4px">+ Add Item</button>';
+    body+='</div>';
   }
-  return h;
+
+  return '<div class="page-header"><h1>📋 Daily Sales Report</h1><p>'+branchName+' · '+today+'</p></div>'+tabBar+body;
 }
 
-// ── Checklists ────────────────────────────────────────
-var CL_DATA_NX={mod:[{id:'mod_salad',name:'Salad & Gelato',groups:[{name:'Opening',items:[{id:'sg1',label:'Prep station clean',yellow:true},{id:'sg2',label:'Temperature logged'},{id:'sg3',label:'Mise en place ready'},{id:'sg4',label:'Equipment sanitized'}]},{name:'Closing',items:[{id:'sg5',label:'Station cleaned & stored'},{id:'sg6',label:'Closing temp logged'}]}]},{id:'mod_pastry',name:'Pastry & Receiving',groups:[{name:'Morning',items:[{id:'ps1',label:'Proofing checked'},{id:'ps2',label:'Deliveries received & logged',yellow:true},{id:'ps3',label:'Temperature verified'},{id:'ps4',label:'Labeling complete'}]},{name:'Evening',items:[{id:'ps5',label:'Dough prepared for tomorrow'},{id:'ps6',label:'Station cleaned'}]}]},{id:'mod_fryer',name:'Fryer & Pizza',groups:[{name:'Opening',items:[{id:'fp1',label:'Oil level checked',yellow:true},{id:'fp2',label:'Oil temperature correct'},{id:'fp3',label:'Filters cleaned'},{id:'fp4',label:'Toppings stocked'}]},{name:'Closing',items:[{id:'fp5',label:'Oil filtered & covered'},{id:'fp6',label:'Station deep cleaned'}]}]}],foh:[{id:'foh_waiter',name:"Waiter's Checklist",groups:[{name:'Pre-Shift',items:[{id:'w1',label:'Uniform & grooming check'},{id:'w2',label:'Table setup complete',yellow:true},{id:'w3',label:'Menu knowledge briefed'},{id:'w4',label:'Section assigned'}]},{name:'Post-Shift',items:[{id:'w5',label:'Tables reset'},{id:'w6',label:'Handover complete'}]}]},{id:'foh_hygiene',name:'Daily Hygiene FOH',groups:[{name:'Tasks',items:[{id:'fh1',label:'Surfaces wiped'},{id:'fh2',label:'Floors cleaned'},{id:'fh3',label:'Restrooms checked',yellow:true},{id:'fh4',label:'Waste removed'}]}]},{id:'foh_barista',name:'Barista Opening/Closing',groups:[{name:'Opening',items:[{id:'ba1',label:'Machine warmed & calibrated',yellow:true},{id:'ba2',label:'Beans restocked'},{id:'ba3',label:'Milk fridge checked'}]},{name:'Closing',items:[{id:'ba4',label:'Machine backflushed'},{id:'ba5',label:'Grinders cleaned'},{id:'ba6',label:'Fridge stocked for AM'}]}]}],boh:[{id:'boh_pizza',name:'Pizza Station',groups:[{name:'Opening',items:[{id:'bz1',label:'Dough temped & ready',yellow:true},{id:'bz2',label:'Oven pre-heated & calibrated'},{id:'bz3',label:'Toppings stocked & labeled'},{id:'bz4',label:'Stone cleaned'}]},{name:'Closing',items:[{id:'bz5',label:'Oven cleaned'},{id:'bz6',label:'Dough covered & refrigerated'}]}]},{id:'boh_grill',name:'Grill Section',groups:[{name:'Opening',items:[{id:'gr1',label:'Grill heated & cleaned',yellow:true},{id:'gr2',label:'Meats checked & portioned'},{id:'gr3',label:'Sauces prepped'}]},{name:'Closing',items:[{id:'gr4',label:'Grill scrubbed down'},{id:'gr5',label:'Leftovers labeled & stored'}]}]},{id:'boh_dishwash',name:'Dishwasher',groups:[{name:'Tasks',items:[{id:'dw1',label:'Machine sanitized & running',yellow:true},{id:'dw2',label:'Chemical levels checked'},{id:'dw3',label:'Racks organized'},{id:'dw4',label:'Machine emptied & dried at close'}]}]}]};
-var clNxState={},clNxRole=null,clNxSec='mod',clNxCl={mod:0,foh:0,boh:0},clNxWeekDates=[];
-var CL_NX_ADMIN_PIN='1422';
+// ── DSR Helper Functions ──────────────────────────────────────────────────────
+function _dsrD(){var today=TODAY_BS;if(!BS.dsrState)BS.dsrState={};if(!BS.dsrState[today])BS.dsrState[today]={date:today,food:'',bev:'',misc:'',vat:'',vatAlfa:'',guests:'',mfCompany:'',discounts:[],payments:[{id:'p1',method:'Cash',amount:''},{id:'p2',method:'MADA',amount:''},{id:'p3',method:'VISA',amount:''},{id:'p4',method:'Qlub',amount:''}],delivery:[],servers:[],closedPetty:[],ongoingPetty:[],safeItems:[],denoms:{},tab:'overview'};return BS.dsrState[today];}
+function dsrNav(tab){var D=_dsrD();D.tab=tab;navTo('dsr');}
+function dsrUp(k,v){var D=_dsrD();D[k]=v;}
+function dsrRecalc(){navTo('dsr');}
+function dsrUpdArr(arr,idx,key,val){var D=_dsrD();if(D[arr]&&D[arr][idx])D[arr][idx][key]=val;}
+function dsrRmArr(arr,idx){var D=_dsrD();if(D[arr])D[arr].splice(idx,1);navTo('dsr');}
+function dsrAddArr(arr){var D=_dsrD();var defaults={closedPetty:{id:buid(),desc:'',amount:''},ongoingPetty:{id:buid(),desc:'',amount:''},safeItems:{id:buid(),item:'',remark:''}};D[arr].push(defaults[arr]||{id:buid()});navTo('dsr');}
+function dsrAddDisc(){var D=_dsrD();D.discounts.push({id:buid(),type:'',amount:''});navTo('dsr');}
+function dsrAddPay(){var D=_dsrD();D.payments.push({id:buid(),method:'Cash',amount:''});navTo('dsr');}
+function dsrAddDeliv(){var D=_dsrD();D.delivery.push({id:buid(),platform:'',amount:'',orders:''});navTo('dsr');}
+function dsrAddServer(){var D=_dsrD();D.servers.push({id:buid(),name:'',sap:'',totalSales:'',cashSales:'',madaSales:'',visaSales:'',mcSales:'',amexSales:'',qlubSales:'',loyaltySales:'',tips:[],voids:[],returns:[]});navTo('dsr');}
+function dsrRmServer(si){var D=_dsrD();if(!confirm('Remove this server?'))return;D.servers.splice(si,1);navTo('dsr');}
+function dsrUpdSrv(si,k,v){var D=_dsrD();if(D.servers[si])D.servers[si][k]=v;}
+function dsrAddTip(si){var D=_dsrD();if(!D.servers[si])return;D.servers[si].tips.push({id:buid(),method:'MADA',amount:'',approval:'',guest:'',status:'pending'});navTo('dsr');}
+function dsrRmTip(si,id){var D=_dsrD();if(!D.servers[si])return;D.servers[si].tips=D.servers[si].tips.filter(function(t){return t.id!==id;});navTo('dsr');}
+function dsrUpdTip(si,id,k,v){var D=_dsrD();var t=(D.servers[si]&&D.servers[si].tips||[]).find(function(x){return x.id===id;});if(t)t[k]=v;}
+function dsrTipApprove(si,id){var D=_dsrD();var t=(D.servers[si]&&D.servers[si].tips||[]).find(function(x){return x.id===id;});if(t)t.status='approved';navTo('dsr');}
+function dsrTipReject(si,id){var D=_dsrD();var t=(D.servers[si]&&D.servers[si].tips||[]).find(function(x){return x.id===id;});if(t)t.status='rejected';navTo('dsr');}
+function dsrAddVoid(si){var D=_dsrD();if(!D.servers[si])return;D.servers[si].voids.push({id:buid(),item:'',reason:'',check:'',manager:'',amount:'',status:'pending'});navTo('dsr');}
+function dsrAddRet(si){var D=_dsrD();if(!D.servers[si])return;D.servers[si].returns.push({id:buid(),item:'',reason:'',check:'',manager:'',amount:'',status:'pending'});navTo('dsr');}
+function dsrRmVR(si,arr,id){var D=_dsrD();if(!D.servers[si])return;D.servers[si][arr]=D.servers[si][arr].filter(function(v){return v.id!==id;});navTo('dsr');}
+function dsrUpdVR(si,arr,id,k,v){var D=_dsrD();var item=(D.servers[si]&&D.servers[si][arr]||[]).find(function(x){return x.id===id;});if(item)item[k]=v;}
+function dsrApprVR(si,arr,id){var D=_dsrD();var item=(D.servers[si]&&D.servers[si][arr]||[]).find(function(x){return x.id===id;});if(item)item.status='approved';navTo('dsr');}
+function dsrRejVR(si,arr,id){var D=_dsrD();var item=(D.servers[si]&&D.servers[si][arr]||[]).find(function(x){return x.id===id;});if(item)item.status='rejected';navTo('dsr');}
+function dsrUpdDenom(k,v){var D=_dsrD();if(!D.denoms)D.denoms={};D.denoms[k]=v;navTo('dsr');}
+function dsrSave(){var D=_dsrD();if(db&&NX.session&&NX.session.branchId){db.ref('branches/'+NX.session.branchId+'/dsr/'+TODAY_BS).set(D,function(err){if(err)showToast('Save failed','error');else showToast('DSR saved to Firebase ✓','success');});}else{try{localStorage.setItem('dsr_nexus_'+TODAY_BS,JSON.stringify(D));showToast('DSR saved locally ✓','success');}catch(e){showToast('Save failed','error');}}}
+function dsrClear(){if(!confirm('Clear all DSR data for today?'))return;var s=NX.session||{};BS.dsrState[TODAY_BS]={date:TODAY_BS,restName:s.branchName||'',food:'',bev:'',misc:'',vat:'',vatAlfa:'',guests:'',mfCompany:'',discounts:[],payments:[{id:'p1',method:'Cash',amount:''},{id:'p2',method:'MADA',amount:''},{id:'p3',method:'VISA',amount:''},{id:'p4',method:'Qlub',amount:''}],delivery:[],servers:[],closedPetty:[],ongoingPetty:[],safeItems:[],denoms:{},tab:'overview'};navTo('dsr');}
+function dsrPrintFull(){var D=_dsrD();var food=parseFloat(D.food)||0,bev=parseFloat(D.bev)||0,misc=parseFloat(D.misc)||0,vat=parseFloat(D.vat)||0;var totalDisc=(D.discounts||[]).reduce(function(a,d){return a+(parseFloat(d.amount)||0);},0);var netSales=(food+bev+misc)-totalDisc;var totalSales=netSales+vat;var serverCash=(D.servers||[]).reduce(function(a,s){return a+(parseFloat(s.cashSales)||0);},0);var approvedTips=(D.servers||[]).reduce(function(a,s){return a+(s.tips||[]).filter(function(t){return t.status==='approved';}).reduce(function(b,t){return b+(parseFloat(t.amount)||0);},0);},0);var toDeposit=serverCash-approvedTips;var guests=parseInt(D.guests)||0;var checkAvg=guests>0?netSales/guests:0;var dateStr=new Date(D.date+'T00:00:00').toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'});var payRows=(D.payments||[]).map(function(p){return '<tr><td>'+bxe(p.method)+'</td><td style="text-align:right">'+(parseFloat(p.amount||0)).toFixed(2)+'</td></tr>';}).join('');var delivRows=(D.delivery||[]).map(function(d){return '<tr><td>'+bxe(d.platform||'—')+'</td><td>'+(d.orders||0)+' orders</td><td style="text-align:right">'+(parseFloat(d.amount||0)).toFixed(2)+'</td></tr>';}).join('');var discRows=(D.discounts||[]).map(function(d){return '<tr><td>'+bxe(d.type||'—')+'</td><td style="text-align:right">'+(parseFloat(d.amount||0)).toFixed(2)+'</td></tr>';}).join('');var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>DSR - '+(D.restName||'')+'</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;padding:20px;color:#111;font-size:11px}@page{size:A4;margin:8mm}@media print{button{display:none!important}}h2{font-size:18px;font-weight:800;color:#1a2340}table{width:100%;border-collapse:collapse;margin-bottom:10px}th{background:#1a2340;color:#fff;padding:6px 8px;text-align:left;font-size:9px;text-transform:uppercase}td{padding:6px 8px;border-bottom:1px solid #eee}.amt{text-align:right;font-family:monospace;font-weight:600}.sig-row{display:grid;grid-template-columns:repeat(3,1fr);gap:30px;margin-top:24px}.sig-box{border-top:1px solid #333;padding-top:4px;text-align:center;font-size:9px;color:#666}</style></head><body>';html+='<div style="display:flex;justify-content:space-between;border-bottom:3px solid #1a2340;padding-bottom:10px;margin-bottom:16px"><div><div style="font-size:20px;font-weight:900;color:#1a2340">ALFA.CO</div><div style="font-size:11px;color:#888">'+bxe(D.restName||'')+'</div></div><div style="text-align:right"><div style="font-size:16px;font-weight:800;color:#1a2340">DAILY SALES REPORT</div><div style="font-size:10px;color:#666">'+dateStr+'</div></div></div>';html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:14px"><table><thead><tr><th colspan="2">Sales Summary</th></tr></thead><tbody><tr><td>Food + Bev + MISC</td><td class="amt">'+(food+bev+misc).toFixed(2)+'</td></tr><tr><td>(-) Discounts</td><td class="amt">('+totalDisc.toFixed(2)+')</td></tr><tr style="font-weight:700;background:#f5f5f5"><td>= Net Sales</td><td class="amt">'+netSales.toFixed(2)+'</td></tr><tr><td>+ System VAT</td><td class="amt">'+vat.toFixed(2)+'</td></tr><tr style="font-weight:700;background:#e8f0fe"><td>= Total Sales</td><td class="amt">'+totalSales.toFixed(2)+'</td></tr></tbody></table>';html+='<table><thead><tr><th colspan="2">Cash Reconciliation</th></tr></thead><tbody><tr><td>Guest Count</td><td class="amt">'+guests+'</td></tr><tr><td>Check Average</td><td class="amt">'+checkAvg.toFixed(2)+'</td></tr><tr><td>Server Cash Total</td><td class="amt">'+serverCash.toFixed(2)+'</td></tr><tr><td>(-) Credit Tips Paid</td><td class="amt">('+approvedTips.toFixed(2)+')</td></tr><tr style="font-weight:700;background:#e8f5e9"><td>Amount to Deposit</td><td class="amt">'+toDeposit.toFixed(2)+'</td></tr></tbody></table></div>';html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:14px"><table><thead><tr><th colspan="2">Payment Methods</th></tr></thead><tbody>'+(payRows||'<tr><td colspan="2">None</td></tr>')+'</tbody></table><table><thead><tr><th colspan="3">Delivery</th></tr></thead><tbody>'+(delivRows||'<tr><td colspan="3">None</td></tr>')+'</tbody></table><table><thead><tr><th colspan="2">Discounts</th></tr></thead><tbody>'+(discRows||'<tr><td colspan="2">None</td></tr>')+'</tbody></table></div>';html+='<div class="sig-row"><div class="sig-box">Manager</div><div class="sig-box">Cashier / Supervisor</div><div class="sig-box">Date & Stamp</div></div>';html+='<div style="text-align:center;margin-top:16px"><button onclick="window.print()" style="background:#1a2340;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:13px;font-weight:700;cursor:pointer">Print / Save PDF</button></div></body></html>';var w=window.open('','_blank','width=900,height=700');if(w){w.document.write(html);w.document.close();}else showToast('Allow pop-ups to print','error');}
+function dsrPrintVR(){var D=_dsrD();var rows=[];(D.servers||[]).forEach(function(s){(s.voids||[]).filter(function(v){return v.status==='approved';}).forEach(function(v){rows.push({server:s.name,sap:s.sap,type:'Void',item:v.item,check:v.check,reason:v.reason,manager:v.manager,amount:v.amount});});(s.returns||[]).filter(function(v){return v.status==='approved';}).forEach(function(v){rows.push({server:s.name,sap:s.sap,type:'Return',item:v.item,check:v.check,reason:v.reason,manager:v.manager,amount:v.amount});});});var tot=rows.reduce(function(a,v){return a+(parseFloat(v.amount)||0);},0);var dateStr=new Date(D.date+'T00:00:00').toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'});var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Voids & Returns</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;padding:20px;color:#111;font-size:11px}@media print{button{display:none!important}@page{size:A4;margin:8mm}}table{width:100%;border-collapse:collapse}th{background:#1a2340;color:#fff;padding:6px 8px;text-align:left;font-size:9px;text-transform:uppercase}td{padding:7px 8px;border-bottom:1px solid #eee}.amt{text-align:right;font-family:monospace;font-weight:600}</style></head><body><div style="display:flex;justify-content:space-between;border-bottom:3px solid #1a2340;padding-bottom:10px;margin-bottom:16px"><div><div style="font-size:18px;font-weight:900;color:#1a2340">ALFA.CO</div><div>'+bxe(D.restName||'')+'</div></div><div style="text-align:right"><div style="font-size:16px;font-weight:700">VOIDS & RETURNS REPORT</div><div style="font-size:10px;color:#666">'+dateStr+'</div></div></div><table><thead><tr><th>Server</th><th>SAP</th><th>Type</th><th>Item</th><th>Check #</th><th>Reason</th><th>Manager</th><th class="amt">Amount SAR</th></tr></thead><tbody>'+(rows.length?rows.map(function(v){return '<tr><td>'+bxe(v.server||'—')+'</td><td>'+bxe(v.sap||'—')+'</td><td>'+v.type+'</td><td>'+bxe(v.item||'—')+'</td><td>'+bxe(v.check||'—')+'</td><td>'+bxe(v.reason||'—')+'</td><td>'+bxe(v.manager||'—')+'</td><td class="amt">'+(parseFloat(v.amount||0)).toFixed(2)+'</td></tr>';}).join(''):'<tr><td colspan="8" style="text-align:center;padding:16px;color:#999">No approved voids or returns</td></tr>')+'<tr style="font-weight:700;background:#f5f5f5"><td colspan="7">TOTAL</td><td class="amt">'+tot.toFixed(2)+'</td></tr></tbody></table><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:30px;margin-top:24px"><div style="border-top:1px solid #333;padding-top:4px;text-align:center;font-size:9px;color:#666">Manager</div><div style="border-top:1px solid #333;padding-top:4px;text-align:center;font-size:9px;color:#666">Date</div><div style="border-top:1px solid #333;padding-top:4px;text-align:center;font-size:9px;color:#666">Verified By</div></div><div style="text-align:center;margin-top:14px"><button onclick="window.print()" style="background:#1a2340;color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:13px;font-weight:700;cursor:pointer">Print</button></div></body></html>';var w=window.open('','_blank','width=900,height=600');if(w){w.document.write(html);w.document.close();}else showToast('Allow pop-ups','error');}
+function dsrPrintTips(){var D=_dsrD();var rows=[];(D.servers||[]).forEach(function(s){(s.tips||[]).filter(function(t){return t.status==='approved';}).forEach(function(t){rows.push({server:s.name,sap:s.sap,method:t.method,amount:t.amount,approval:t.approval,guest:t.guest});});});var tot=rows.reduce(function(a,t){return a+(parseFloat(t.amount)||0);},0);var dateStr=new Date(D.date+'T00:00:00').toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'});var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Tips Report</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;padding:20px;color:#111;font-size:11px}@media print{button{display:none!important}@page{size:A4;margin:8mm}}table{width:100%;border-collapse:collapse}th{background:#1a2340;color:#fff;padding:6px 8px;text-align:left;font-size:9px;text-transform:uppercase}td{padding:7px 8px;border-bottom:1px solid #eee}.amt{text-align:right;font-family:monospace;font-weight:600}</style></head><body><div style="display:flex;justify-content:space-between;border-bottom:3px solid #1a2340;padding-bottom:10px;margin-bottom:16px"><div><div style="font-size:18px;font-weight:900;color:#1a2340">ALFA.CO</div><div>'+bxe(D.restName||'')+'</div></div><div style="text-align:right"><div style="font-size:16px;font-weight:700">TIPS REPORT</div><div style="font-size:10px;color:#666">'+dateStr+'</div></div></div><table><thead><tr><th>Server</th><th>SAP</th><th>Card Method</th><th class="amt">Amount SAR</th><th>Approval Code</th><th>Guest #</th></tr></thead><tbody>'+(rows.length?rows.map(function(t){return '<tr><td>'+bxe(t.server||'—')+'</td><td>'+bxe(t.sap||'—')+'</td><td>'+bxe(t.method)+'</td><td class="amt">'+(parseFloat(t.amount||0)).toFixed(2)+'</td><td>'+bxe(t.approval||'—')+'</td><td>'+bxe(t.guest||'—')+'</td></tr>';}).join(''):'<tr><td colspan="6" style="text-align:center;padding:16px;color:#999">No approved tips</td></tr>')+'<tr style="font-weight:700;background:#f5f5f5"><td colspan="3">TOTAL TIPS</td><td class="amt">'+tot.toFixed(2)+'</td><td colspan="2"></td></tr></tbody></table><div style="text-align:center;margin-top:14px"><button onclick="window.print()" style="background:#1a2340;color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:13px;font-weight:700;cursor:pointer">Print</button></div></body></html>';var w=window.open('','_blank','width=900,height=600');if(w){w.document.write(html);w.document.close();}else showToast('Allow pop-ups','error');}
+function dsrPrintDeposit(){var D=_dsrD();var DENOMS_DEP2=[{v:'500',l:'500'},{v:'200',l:'200'},{v:'100',l:'100'},{v:'50',l:'50'},{v:'20',l:'20'},{v:'10',l:'10'},{v:'5',l:'5'},{v:'1',l:'1.00'},{v:'0.5',l:'0.50'},{v:'0.25',l:'0.25'}];var serverCash4=(D.servers||[]).reduce(function(a,s){return a+(parseFloat(s.cashSales)||0);},0);var approvedTips4=(D.servers||[]).reduce(function(a,s){return a+(s.tips||[]).filter(function(t){return t.status==='approved';}).reduce(function(b,t){return b+(parseFloat(t.amount)||0);},0);},0);var toDeposit4=serverCash4-approvedTips4;var notes=0,coins=0;var denomRows='';DENOMS_DEP2.forEach(function(d){var qty=parseFloat((D.denoms||{})['dep_'+d.v.replace('.','_')])||0;var sub=qty*parseFloat(d.v);if(qty>0){denomRows+='<tr><td>SAR '+d.l+'</td><td style="text-align:center">'+qty+'</td><td style="text-align:right">'+sub.toFixed(2)+'</td></tr>';}if(parseFloat(d.v)>=5)notes+=sub;else coins+=sub;});var physical=notes+coins;var diff=physical-toDeposit4;var dateStr=new Date(D.date+'T00:00:00').toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'});var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Deposit Sheet</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;padding:20px;color:#111;font-size:11px}@media print{button{display:none!important}@page{size:A4;margin:8mm}}table{width:100%;border-collapse:collapse}th{background:#1a2340;color:#fff;padding:6px 8px;text-align:left;font-size:9px;text-transform:uppercase}td{padding:7px 8px;border-bottom:1px solid #eee}.amt{text-align:right;font-family:monospace;font-weight:600}</style></head><body><div style="display:flex;justify-content:space-between;border-bottom:3px solid #1a2340;padding-bottom:10px;margin-bottom:16px"><div><div style="font-size:18px;font-weight:900;color:#1a2340">ALFA.CO</div><div>'+bxe(D.restName||'')+'</div></div><div style="text-align:right"><div style="font-size:16px;font-weight:700">DAILY DEPOSIT SHEET</div><div style="font-size:10px;color:#666">'+dateStr+'</div></div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:20px"><table><thead><tr><th>Denomination</th><th style="text-align:center">Qty</th><th style="text-align:right">Amount SAR</th></tr></thead><tbody>'+(denomRows||'<tr><td colspan="3" style="text-align:center;color:#999">No denominations entered</td></tr>')+'<tr style="background:#f0f0f0"><td>Notes</td><td></td><td style="text-align:right">'+notes.toFixed(2)+'</td></tr><tr style="background:#f0f0f0"><td>Coins</td><td></td><td style="text-align:right">'+coins.toFixed(2)+'</td></tr><tr style="font-weight:700;background:#e8e8e8"><td>TOTAL PHYSICAL</td><td></td><td style="text-align:right">'+physical.toFixed(2)+'</td></tr></tbody></table><table><thead><tr><th colspan="2">Deposit Calculation</th></tr></thead><tbody><tr><td>Server Cash Total</td><td class="amt">'+serverCash4.toFixed(2)+'</td></tr><tr><td>(-) Credit Tips Paid</td><td class="amt">('+approvedTips4.toFixed(2)+')</td></tr><tr style="font-weight:700;background:#e8f5e9"><td>Amount to Deposit</td><td class="amt">'+toDeposit4.toFixed(2)+'</td></tr><tr><td>Physical Cash Counted</td><td class="amt">'+physical.toFixed(2)+'</td></tr><tr style="font-weight:700;background:'+(Math.abs(diff)<0.01?'#e8f5e9':'#ffebee')+'"><td>Variance</td><td class="amt">'+(diff>=0?'+':'')+diff.toFixed(2)+'</td></tr></tbody></table></div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:30px;margin-top:28px"><div style="border-top:1px solid #333;padding-top:4px;text-align:center;font-size:9px;color:#666">Cashier / Supervisor</div><div style="border-top:1px solid #333;padding-top:4px;text-align:center;font-size:9px;color:#666">Manager</div><div style="border-top:1px solid #333;padding-top:4px;text-align:center;font-size:9px;color:#666">Date & Stamp</div></div><div style="text-align:center;margin-top:14px"><button onclick="window.print()" style="background:#1a2340;color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:13px;font-weight:700;cursor:pointer">Print</button></div></body></html>';var w=window.open('','_blank','width=900,height=600');if(w){w.document.write(html);w.document.close();}else showToast('Allow pop-ups','error');}
+// Load DSR from Firebase when entering DSR page — also picks up server drops from standalone page
+function dsrLoadFromFirebase(){if(!db||!NX.session||!NX.session.branchId)return;db.ref('branches/'+NX.session.branchId+'/dsr/'+TODAY_BS).once('value',function(snap){var data=snap.val()||{};if(data.date){if(!BS.dsrState)BS.dsrState={};var existing=BS.dsrState[TODAY_BS];if(!existing||!Object.keys(existing.servers||[]).length){BS.dsrState[TODAY_BS]=Object.assign({tab:'overview'},data);}}// Merge in server drops submitted from standalone server-drop.html
+var drops=data.server_drops?Object.values(data.server_drops):[];if(drops.length){var D=BS.dsrState[TODAY_BS];if(!D)return;var existingIds=(D.servers||[]).map(function(s){return s.id;});drops.forEach(function(d){if(existingIds.indexOf(d.id)<0){D.servers=(D.servers||[]);D.servers.push(d);}});if(drops.length){showToast(drops.length+' server drop(s) loaded from field','success');}}navTo('dsr');});}
+window['after_dsr']=function(){if(!BS._dsrLoaded){BS._dsrLoaded=true;dsrLoadFromFirebase();}};
+
 function clNxWk(){var now=new Date(),dow=now.getDay(),sun=new Date(now);sun.setDate(now.getDate()-dow);return sun.getFullYear()+'-'+String(sun.getMonth()+1).padStart(2,'0')+'-'+String(sun.getDate()).padStart(2,'0');}
 function clNxEnsureST(){var wk=clNxWk();if(!clNxState[wk])clNxState[wk]={};var state=clNxState[wk];['mod','foh','boh'].forEach(function(sec){(CL_DATA_NX[sec]||[]).forEach(function(cl){if(!state[cl.id])state[cl.id]={};var days=clNxWeekDates.length||7;for(var di=0;di<days;di++){if(!state[cl.id][di])state[cl.id][di]={};(cl.groups||[]).forEach(function(g){(g.items||[]).forEach(function(item){if(!state[cl.id][di][item.id])state[cl.id][di][item.id]={yn:'',temp:'',comment:'',flagged:false};});});}});});}
 var _clNxST=null;

@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Server Drop Entry — ALFA.CO</title>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<style>
+:root{
+  --bg:#070c18;--bg2:#0b1120;
+  --surface:rgba(255,255,255,.06);--surface2:rgba(255,255,255,.10);
+  --border:rgba(255,255,255,.08);--border2:rgba(255,255,255,.14);
+  --text:rgba(255,255,255,.93);--text2:rgba(255,255,255,.55);--text3:rgba(255,255,255,.28);
+  --gold:#f0a500;--danger:#f87171;--success:#34d399;--warn:#f59e0b;
+  --r:10px;--r2:7px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{min-height:100%;background:var(--bg);color:var(--text);font-family:'Plus Jakarta Sans',sans-serif;font-size:14px;-webkit-font-smoothing:antialiased}
+body{padding:0;background-image:radial-gradient(ellipse at 70% 10%,rgba(167,139,250,.07) 0%,transparent 60%),radial-gradient(ellipse at 10% 80%,rgba(96,165,250,.05) 0%,transparent 50%)}
+
+/* TOP BAR */
+.top{background:rgba(5,8,16,.97);border-bottom:1px solid var(--border);padding:14px 18px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100}
+.top-brand{font-size:15px;font-weight:800;color:var(--gold);letter-spacing:-.02em}
+.top-sub{font-size:10px;color:var(--text2);margin-top:2px}
+.conn-dot{width:7px;height:7px;border-radius:50%;background:#f87171;margin-left:auto;flex-shrink:0}
+.conn-dot.online{background:#34d399}
+
+/* LAYOUT */
+.wrap{max-width:520px;margin:0 auto;padding:20px 16px 40px}
+
+/* CARDS */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:18px;margin-bottom:14px}
+.card-title{font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.1em;margin-bottom:14px}
+
+/* FORM */
+label{display:block;font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px}
+input,select,textarea{width:100%;background:rgba(255,255,255,.07);border:1px solid var(--border2);border-radius:var(--r2);padding:10px 12px;color:var(--text);font-size:13px;font-family:'Plus Jakarta Sans',sans-serif;outline:none;transition:border-color .2s}
+input:focus,select:focus,textarea:focus{border-color:rgba(240,165,0,.5)}
+input[type=number]{font-family:'JetBrains Mono',monospace;font-weight:500}
+.fg{margin-bottom:12px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+
+/* BADGES */
+.badge{display:inline-block;border-radius:20px;padding:2px 10px;font-size:10px;font-weight:700}
+.badge-pend{background:rgba(245,158,11,.15);color:#f59e0b}
+.badge-ok{background:rgba(52,211,153,.15);color:#34d399}
+.badge-rej{background:rgba(248,113,113,.15);color:#f87171}
+
+/* TOTBAR */
+.totbar{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:var(--surface2);border-radius:var(--r2);margin-top:8px}
+.totbar-l{font-size:11px;color:var(--text2)}
+.totbar-v{font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--gold)}
+
+/* ROWS */
+.drow{display:grid;gap:7px;align-items:center;margin-bottom:8px}
+.vrow{background:rgba(248,113,113,.06);border:1px solid rgba(248,113,113,.12);border-radius:var(--r2);padding:10px;margin-bottom:8px}
+.retrow{background:rgba(245,158,11,.06);border:1px solid rgba(245,158,11,.12);border-radius:var(--r2);padding:10px;margin-bottom:8px}
+.tiprow{background:rgba(240,165,0,.06);border:1px solid rgba(240,165,0,.12);border-radius:var(--r2);padding:10px;margin-bottom:8px}
+.sect-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 18px;border-radius:var(--r);border:1px solid var(--border2);background:var(--surface);color:var(--text);font-size:12px;font-weight:600;font-family:'Plus Jakarta Sans',sans-serif;cursor:pointer;transition:all .15s}
+.btn:hover{background:var(--surface2)}
+.btn-primary{background:var(--gold);border-color:var(--gold);color:#000;font-weight:700}
+.btn-primary:hover{background:#e09800}
+.btn-sm{padding:5px 12px;font-size:11px;border-radius:6px}
+.btn-danger{border-color:rgba(248,113,113,.3);color:var(--danger);background:transparent}
+.btn-warn{border-color:rgba(245,158,11,.3);color:var(--warn);background:transparent}
+.xbtn{background:transparent;border:none;color:var(--danger);cursor:pointer;font-size:18px;line-height:1;padding:0;flex-shrink:0}
+
+/* STATUS */
+.bal-bar{display:flex;gap:10px;flex-wrap:wrap;padding:10px;background:var(--surface2);border-radius:var(--r2);margin-top:10px;font-size:11px;color:var(--text2)}
+.bal-val{margin-left:auto;font-weight:700;font-family:'JetBrains Mono',monospace}
+
+/* PAGES */
+.page{display:none}.page.active{display:block}
+
+/* LOGIN */
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+.login-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:32px 28px;width:100%;max-width:360px}
+.login-logo{font-size:22px;font-weight:800;color:var(--gold);margin-bottom:4px}
+.login-sub{font-size:12px;color:var(--text2);margin-bottom:28px}
+
+/* TOAST */
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1e293b;border:1px solid var(--border2);border-radius:10px;padding:12px 20px;font-size:13px;font-weight:600;z-index:999;opacity:0;pointer-events:none;transition:opacity .3s;white-space:nowrap}
+#toast.show{opacity:1}
+
+/* SUBMIT CONFIRM */
+.success-screen{text-align:center;padding:48px 24px}
+.success-icon{font-size:56px;margin-bottom:16px}
+.success-title{font-size:20px;font-weight:700;color:var(--success);margin-bottom:8px}
+</style>
+</head>
+<body>
+
+<div class="top">
+  <div>
+    <div class="top-brand">ALFA.CO</div>
+    <div class="top-sub">Server Drop Entry</div>
+  </div>
+  <div class="conn-dot" id="connDot"></div>
+</div>
+
+<!-- LOGIN PAGE -->
+<div class="page active" id="page-login">
+  <div class="login-wrap">
+    <div class="login-card">
+      <div class="login-logo">Server Drop</div>
+      <div class="login-sub">Enter your details to begin your drop</div>
+      <div class="fg"><label>Branch</label>
+        <select id="branchSel">
+          <option value="">Loading branches…</option>
+        </select>
+      </div>
+      <div class="fg"><label>Your Name *</label>
+        <input type="text" id="loginName" placeholder="Full name" autocomplete="off">
+      </div>
+      <div class="fg"><label>SAP Number</label>
+        <input type="text" id="loginSap" placeholder="SAP-XXXXXX" autocomplete="off">
+      </div>
+      <div class="fg"><label>Report Date</label>
+        <input type="date" id="loginDate">
+      </div>
+      <button class="btn btn-primary" style="width:100%;margin-top:8px;font-size:14px;padding:13px" onclick="doLogin()">Start Drop Entry →</button>
+    </div>
+  </div>
+</div>
+
+<!-- DROP ENTRY PAGE -->
+<div class="page" id="page-entry">
+  <div class="wrap">
+    <div id="entryHeader" style="margin-bottom:18px">
+      <div style="font-size:18px;font-weight:700" id="hdName">Server Drop</div>
+      <div style="font-size:11px;color:var(--text2)" id="hdMeta"></div>
+    </div>
+
+    <!-- Sales Totals -->
+    <div class="card">
+      <div class="card-title">Sales Totals</div>
+      <div class="row2">
+        <div class="fg"><label>Total Sales (SAR) *</label>
+          <input type="number" id="fTotal" step="0.01" placeholder="0.00" oninput="calcBal()">
+        </div>
+        <div class="fg"><label>Cash Sales (SAR) *</label>
+          <input type="number" id="fCash" step="0.01" placeholder="0.00" oninput="calcBal()">
+        </div>
+      </div>
+      <div class="row3">
+        <div class="fg"><label>MADA</label><input type="number" id="fMada" step="0.01" placeholder="0.00" oninput="calcBal()"></div>
+        <div class="fg"><label>VISA</label><input type="number" id="fVisa" step="0.01" placeholder="0.00" oninput="calcBal()"></div>
+        <div class="fg"><label>Master Card</label><input type="number" id="fMc" step="0.01" placeholder="0.00" oninput="calcBal()"></div>
+        <div class="fg"><label>AMEX</label><input type="number" id="fAmex" step="0.01" placeholder="0.00" oninput="calcBal()"></div>
+        <div class="fg"><label>Qlub</label><input type="number" id="fQlub" step="0.01" placeholder="0.00" oninput="calcBal()"></div>
+        <div class="fg"><label>Loyalty Point</label><input type="number" id="fLoy" step="0.01" placeholder="0.00" oninput="calcBal()"></div>
+      </div>
+      <div class="bal-bar" id="balBar">
+        <span>Cash: <span id="balCash" style="font-family:'JetBrains Mono',monospace;font-weight:700">0.00</span></span>
+        <span>Tips: <span id="balTips" style="font-family:'JetBrains Mono',monospace;font-weight:700">0.00</span></span>
+        <span>Drop: <span id="balDrop" style="font-family:'JetBrains Mono',monospace;font-weight:700">0.00</span></span>
+        <span class="bal-val" id="balStatus" style="color:var(--text3)">—</span>
+      </div>
+    </div>
+
+    <!-- Tips -->
+    <div class="card">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <span>Tips by Card</span>
+        <button class="btn btn-sm" onclick="addTip()">+ Tip</button>
+      </div>
+      <div id="tipsList"></div>
+    </div>
+
+    <!-- Voids -->
+    <div class="card">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <span style="color:var(--danger)">⊗ Voids</span>
+        <button class="btn btn-sm btn-danger" onclick="addVoid()">+ Void</button>
+      </div>
+      <div id="voidsList"></div>
+    </div>
+
+    <!-- Returns -->
+    <div class="card">
+      <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <span style="color:var(--warn)">↩ Returns</span>
+        <button class="btn btn-sm btn-warn" onclick="addReturn()">+ Return</button>
+      </div>
+      <div id="returnsList"></div>
+    </div>
+
+    <div style="display:flex;gap:10px;margin-top:4px">
+      <button class="btn" onclick="goLogin()">← Back</button>
+      <button class="btn btn-primary" style="flex:1;font-size:14px;padding:13px" onclick="submitDrop()">✓ Submit Drop</button>
+    </div>
+  </div>
+</div>
+
+<!-- SUCCESS PAGE -->
+<div class="page" id="page-success">
+  <div class="wrap">
+    <div class="success-screen">
+      <div class="success-icon">✅</div>
+      <div class="success-title">Drop Submitted!</div>
+      <p style="color:var(--text2);font-size:13px;margin-bottom:28px">Your server drop has been sent to the manager for review.</p>
+      <button class="btn btn-primary" onclick="anotherDrop()">+ New Drop</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ══ FIREBASE ══
+var firebaseConfig={apiKey:"AIzaSyCF9vPi_b8SstBbLo1ANLwnOt3hXAHXosc",authDomain:"opshub-f802f.firebaseapp.com",databaseURL:"https://opshub-f802f-default-rtdb.asia-southeast1.firebasedatabase.app",projectId:"opshub-f802f",storageBucket:"opshub-f802f.appspot.com",messagingSenderId:"123456789",appId:"1:opshub-f802f:web:abcdef"};
+var db=null;
+try{firebase.initializeApp(firebaseConfig);db=firebase.database();db.ref('.info/connected').on('value',function(s){document.getElementById('connDot').className='conn-dot'+(s.val()?' online':'');});}catch(e){console.warn('Firebase init failed:',e);}
+
+// ══ STATE ══
+var S={branchId:'',branchName:'',name:'',sap:'',date:'',tips:[],voids:[],returns:[]};
+var VR_REASONS=['Customer Complaint','Wrong Order','Burnt/Overcooked','Out of Stock','Manager Courtesy','Pricing Error','Other'];
+var CARD_METHODS=['MADA','VISA','Master Card','AMEX','Qlub'];
+
+function uid(){return Date.now()+''+Math.random().toString(36).substr(2,5);}
+function n(id){return parseFloat(document.getElementById(id)?.value)||0;}
+function xe(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function toast(msg,type){var t=document.getElementById('toast');t.textContent=msg;t.style.color=type==='error'?'#f87171':type==='success'?'#34d399':'#f0a500';t.classList.add('show');setTimeout(function(){t.classList.remove('show');},2800);}
+function showPage(id){document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});document.getElementById('page-'+id).classList.add('active');}
+
+// ══ INIT ══
+window.onload=function(){
+  var td=new Date();S.date=td.getFullYear()+'-'+String(td.getMonth()+1).padStart(2,'0')+'-'+String(td.getDate()).padStart(2,'0');
+  document.getElementById('loginDate').value=S.date;
+  loadBranches();
+};
+
+function loadBranches(){
+  var sel=document.getElementById('branchSel');
+  if(!db){sel.innerHTML='<option value="">Firebase unavailable</option>';return;}
+  db.ref('admin/branches').once('value',function(snap){
+    var raw=snap.val()||{};
+    var branches=Object.values(raw).filter(Boolean).sort(function(a,b){return (a.name||'').localeCompare(b.name||'');});
+    sel.innerHTML='<option value="">— Select branch —</option>';
+    branches.forEach(function(b){sel.innerHTML+='<option value="'+xe(b.id)+'">'+xe(b.name)+(b.location?' — '+xe(b.location):'')+'</option>';});
+  });
+}
+
+function doLogin(){
+  var branchId=document.getElementById('branchSel').value;
+  var name=document.getElementById('loginName').value.trim();
+  var sap=document.getElementById('loginSap').value.trim();
+  var date=document.getElementById('loginDate').value;
+  if(!branchId){toast('Select your branch','error');return;}
+  if(!name){toast('Enter your name','error');return;}
+  S.branchId=branchId;
+  S.name=name;S.sap=sap;S.date=date;
+  // Get branch name
+  var sel=document.getElementById('branchSel');
+  S.branchName=sel.options[sel.selectedIndex]?.text||branchId;
+  // Reset fields
+  S.tips=[];S.voids=[];S.returns=[];
+  document.getElementById('hdName').textContent=name;
+  document.getElementById('hdMeta').textContent=S.branchName+' · '+date+(sap?' · '+sap:'');
+  ['fTotal','fCash','fMada','fVisa','fMc','fAmex','fQlub','fLoy'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+  renderTips();renderVoids();renderReturns();calcBal();
+  showPage('entry');
+}
+function goLogin(){showPage('login');}
+
+// ══ CALC BALANCE ══
+function calcBal(){
+  var cash=n('fCash');
+  var approvedTips=S.tips.reduce(function(a,t){return a+(parseFloat(t.amount)||0);},0);
+  var drop=cash+approvedTips;
+  var total=n('fTotal');
+  var diff=drop-total;
+  document.getElementById('balCash').textContent=cash.toFixed(2);
+  document.getElementById('balTips').textContent=approvedTips.toFixed(2);
+  document.getElementById('balDrop').textContent=drop.toFixed(2);
+  var el=document.getElementById('balStatus');
+  if(total===0){el.textContent='—';el.style.color='var(--text3)';}
+  else if(Math.abs(diff)<0.01){el.textContent='✓ Balanced';el.style.color='#34d399';}
+  else if(diff<0){el.textContent='Short '+Math.abs(diff).toFixed(2);el.style.color='#f87171';}
+  else{el.textContent='Over '+diff.toFixed(2);el.style.color='#f59e0b';}
+}
+
+// ══ TIPS ══
+function addTip(){S.tips.push({id:uid(),method:'MADA',amount:'',approval:'',guest:''});renderTips();}
+function rmTip(id){S.tips=S.tips.filter(function(t){return t.id!==id;});renderTips();calcBal();}
+function renderTips(){
+  var list=document.getElementById('tipsList');
+  if(!S.tips.length){list.innerHTML='<div style="font-size:11px;color:var(--text3);padding:8px 0">No tips</div>';return;}
+  list.innerHTML='';
+  S.tips.forEach(function(t,i){
+    var opts=CARD_METHODS.map(function(m){return '<option'+(t.method===m?' selected':'')+'>'+m+'</option>';}).join('');
+    var el=document.createElement('div');el.className='tiprow';
+    el.innerHTML='<div class="row2" style="margin-bottom:6px"><div><label>Card Method</label><select onchange="S.tips['+i+'].method=this.value">'+opts+'</select></div><div><label>Amount SAR</label><input type="number" step="0.01" placeholder="0.00" value="'+(t.amount||'')+'" oninput="S.tips['+i+'].amount=this.value;calcBal()"></div></div>'+
+      '<div class="row2"><div><label>Approval Code</label><input type="text" placeholder="123456" value="'+xe(t.approval||'')+'" oninput="S.tips['+i+'].approval=this.value"></div><div><label>Guest #</label><input type="text" placeholder="Guest" value="'+xe(t.guest||'')+'" oninput="S.tips['+i+'].guest=this.value"></div></div>'+
+      '<button class="xbtn" style="position:absolute;top:10px;right:10px" onclick="rmTip(\''+t.id+'\')">×</button>';
+    el.style.position='relative';
+    list.appendChild(el);
+  });
+  calcBal();
+}
+
+// ══ VOIDS ══
+function addVoid(){S.voids.push({id:uid(),item:'',reason:'',check:'',manager:'',amount:''});renderVoids();}
+function rmVoid(id){S.voids=S.voids.filter(function(v){return v.id!==id;});renderVoids();}
+function renderVoids(){
+  var list=document.getElementById('voidsList');
+  if(!S.voids.length){list.innerHTML='<div style="font-size:11px;color:var(--text3);padding:8px 0">No voids</div>';return;}
+  list.innerHTML='';
+  S.voids.forEach(function(v,i){
+    var rr=VR_REASONS.map(function(r){return '<option'+(v.reason===r?' selected':'')+'>'+r+'</option>';}).join('');
+    var el=document.createElement('div');el.className='vrow';el.style.position='relative';
+    el.innerHTML='<div class="row2" style="margin-bottom:6px"><div><label>Item Name</label><input type="text" placeholder="Item" value="'+xe(v.item||'')+'" oninput="S.voids['+i+'].item=this.value"></div><div><label>Reason</label><select onchange="S.voids['+i+'].reason=this.value"><option value="">Select</option>'+rr+'</select></div></div>'+
+      '<div class="row3"><div><label>Check #</label><input type="text" placeholder="Check #" value="'+xe(v.check||'')+'" oninput="S.voids['+i+'].check=this.value"></div><div><label>Manager Approved</label><input type="text" placeholder="Name" value="'+xe(v.manager||'')+'" oninput="S.voids['+i+'].manager=this.value"></div><div><label>Amount SAR</label><input type="number" step="0.01" placeholder="0.00" value="'+(v.amount||'')+'" oninput="S.voids['+i+'].amount=this.value"></div></div>'+
+      '<button class="xbtn" style="position:absolute;top:10px;right:10px" onclick="rmVoid(\''+v.id+'\')">×</button>';
+    list.appendChild(el);
+  });
+}
+
+// ══ RETURNS ══
+function addReturn(){S.returns.push({id:uid(),item:'',reason:'',check:'',manager:'',amount:''});renderReturns();}
+function rmReturn(id){S.returns=S.returns.filter(function(v){return v.id!==id;});renderReturns();}
+function renderReturns(){
+  var list=document.getElementById('returnsList');
+  if(!S.returns.length){list.innerHTML='<div style="font-size:11px;color:var(--text3);padding:8px 0">No returns</div>';return;}
+  list.innerHTML='';
+  S.returns.forEach(function(v,i){
+    var rr=VR_REASONS.map(function(r){return '<option'+(v.reason===r?' selected':'')+'>'+r+'</option>';}).join('');
+    var el=document.createElement('div');el.className='retrow';el.style.position='relative';
+    el.innerHTML='<div class="row2" style="margin-bottom:6px"><div><label>Item Name</label><input type="text" placeholder="Item" value="'+xe(v.item||'')+'" oninput="S.returns['+i+'].item=this.value"></div><div><label>Reason</label><select onchange="S.returns['+i+'].reason=this.value"><option value="">Select</option>'+rr+'</select></div></div>'+
+      '<div class="row3"><div><label>Check #</label><input type="text" placeholder="Check #" value="'+xe(v.check||'')+'" oninput="S.returns['+i+'].check=this.value"></div><div><label>Manager Approved</label><input type="text" placeholder="Name" value="'+xe(v.manager||'')+'" oninput="S.returns['+i+'].manager=this.value"></div><div><label>Amount SAR</label><input type="number" step="0.01" placeholder="0.00" value="'+(v.amount||'')+'" oninput="S.returns['+i+'].amount=this.value"></div></div>'+
+      '<button class="xbtn" style="position:absolute;top:10px;right:10px" onclick="rmReturn(\''+v.id+'\')">×</button>';
+    list.appendChild(el);
+  });
+}
+
+// ══ SUBMIT ══
+function submitDrop(){
+  if(!S.name){toast('Please log in first','error');return;}
+  var total=n('fTotal'),cash=n('fCash');
+  if(!total&&!cash){toast('Enter at least your total or cash sales','error');return;}
+  if(!db){toast('Not connected to server','error');return;}
+  var drop={
+    id:uid(),name:S.name,sap:S.sap,date:S.date,
+    totalSales:document.getElementById('fTotal').value||'0',
+    cashSales:document.getElementById('fCash').value||'0',
+    madaSales:document.getElementById('fMada').value||'',
+    visaSales:document.getElementById('fVisa').value||'',
+    mcSales:document.getElementById('fMc').value||'',
+    amexSales:document.getElementById('fAmex').value||'',
+    qlubSales:document.getElementById('fQlub').value||'',
+    loyaltySales:document.getElementById('fLoy').value||'',
+    tips:S.tips.map(function(t){return Object.assign({},t,{status:'pending'});}),
+    voids:S.voids.map(function(v){return Object.assign({},v,{status:'pending'});}),
+    returns:S.returns.map(function(v){return Object.assign({},v,{status:'pending'});}),
+    submittedAt:Date.now()
+  };
+  // Write to branches/{branchId}/dsr/{date}/server_drops/{id}
+  var path='branches/'+S.branchId+'/dsr/'+S.date+'/server_drops/'+drop.id;
+  db.ref(path).set(drop,function(err){
+    if(err){toast('Submit failed: '+err.message,'error');return;}
+    // Also write to a pending review node
+    db.ref('branches/'+S.branchId+'/dsr/'+S.date+'/pending_drops/'+drop.id).set({id:drop.id,name:drop.name,submittedAt:drop.submittedAt,status:'pending'});
+    showPage('success');
+    toast('Drop submitted ✓','success');
+  });
+}
+
+function anotherDrop(){
+  S.tips=[];S.voids=[];S.returns=[];
+  ['fTotal','fCash','fMada','fVisa','fMc','fAmex','fQlub','fLoy'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+  renderTips();renderVoids();renderReturns();calcBal();
+  showPage('entry');
+}
+</script>
+</body>
+</html>
