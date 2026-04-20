@@ -4338,7 +4338,10 @@ var MONTHS_FULL = ['January','February','March','April','May','June','July','Aug
 var DAYS_WEEK = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 var TODAY_BS = (function(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');})();
 var DEFAULT_SUPPLIERS = ['Al Safi','Al Jazira Foods','Masdar Al Hayat','Modern Business Makers Company','Pepsi Co','Sitaf'];
-var DEFAULT_LOCATIONS = ['Dry Storage','Paper & Chemical','Freezer','Fridge'];
+var DEFAULT_LOCATIONS = ['Dry Storage','Beverage Storage','Production Cooler','Walk-in Chiller','Walk-in Freezer','Chemical Storage','Paper & Chemical','Freezer','Fridge','Small Wares','Front Line','General Storage','Unassigned'];
+
+function getLocations(){return (BS.locations&&BS.locations.length)?BS.locations:DEFAULT_LOCATIONS.slice();}
+function getSuppliers(){return (BS.suppliers&&BS.suppliers.length)?BS.suppliers:DEFAULT_SUPPLIERS.slice();}
 
 // ── Helpers (scoped to branch engine) ──
 function buid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
@@ -4519,6 +4522,17 @@ function attachBranchListeners() {
   db.ref(bPath('sch')).on('value', function(snap){ BS.sch=snap.val()||{}; });
   db.ref(bPath('tsAtt')).on('value', function(snap){ BS.tsAtt=snap.val()||{}; });
   db.ref(bPath('config')).on('value', function(snap){ BS._branchConfig=snap.val()||{}; });
+
+  // Locations — same as index.html: stored at branches/{id}/locations
+  db.ref(bPath('locations')).on('value', function(snap){
+    var v=snap.val();
+    BS.locations=(v&&Array.isArray(v))?v:DEFAULT_LOCATIONS.slice();
+  });
+  // Suppliers — stored at branches/{id}/suppliers
+  db.ref(bPath('suppliers')).on('value', function(snap){
+    var v=snap.val();
+    BS.suppliers=(v&&Array.isArray(v))?v:DEFAULT_SUPPLIERS.slice();
+  });
 
   // Inventory: shared catalog + branch stock
   var _cat={}, _stock={};
@@ -4938,17 +4952,125 @@ function pInvItems() {
   var rows=filtered.map(function(it){var isLow=it.min>0&&it.qty<=it.min;return '<tr><td class="bmono" style="color:var(--ceo);font-size:10px">'+bxe(it.code)+'</td><td style="font-weight:600;color:var(--text-primary)">'+bxe(it.name)+'</td><td><span class="chip">'+bxe(it.location||'\u2014')+'</span></td><td class="bmono" style="font-weight:700;font-size:14px;color:'+(isLow?'var(--danger)':'var(--text-primary)')+'">'+it.qty+'</td><td class="bmono">'+bxe(it.unit)+'</td><td class="bmono" style="color:var(--text-secondary)">'+it.min+'</td><td class="bmono" style="color:var(--text-secondary)">'+parseFloat(it.price||0).toFixed(2)+'</td><td>'+bpl(isLow?'Low':'OK',isLow?'#f87171':'#34d399')+'</td><td><div style="display:flex;gap:4px"><button class="btn btn-sm" onclick="openBranchItemModal(\''+bxe(it.code)+'\')">Edit</button><button class="btn btn-sm" style="color:var(--danger)" onclick="delBranchItem(\''+bxe(it.code)+'\')">Del</button></div></td></tr>';}).join('');
   var h='<div class="page-header"><h1>Inventory Items</h1><p>'+filtered.length+' of '+bItems.length+' items</p></div>';
   h+='<div class="bttb" style="border-radius:10px 10px 0 0;border:1px solid var(--border)"><input class="bfi" style="width:200px" id="binv-q" placeholder="Search items\u2026" value="'+bxe(BS.q||'')+'"><select class="bfi" style="width:auto" id="binv-loc"><option value="">All Locations</option>';
-  ['Dry Storage','Paper & Chemical','Freezer','Fridge'].forEach(function(l){h+='<option value="'+bxe(l)+'"'+(loc===l?' selected':'')+'>'+bxe(l)+'</option>';});
+  getLocations().slice().sort().forEach(function(l){h+='<option value="'+bxe(l)+'"'+(loc===l?' selected':'')+'>'+bxe(l)+'</option>';});
   h+='</select><select class="bfi" style="width:auto" id="binv-sts"><option value="">All Status</option><option value="ok"'+(sts==='ok'?' selected':'')+'>OK</option><option value="low"'+(sts==='low'?' selected':'')+'>Low</option></select>';
   h+='<div style="margin-left:auto;display:flex;gap:8px"><button class="btn btn-sm btn-primary" onclick="openBranchItemModal(null)">+ Add Item</button><button class="btn btn-sm" onclick="exportBranchItemsCSV()">\u2b07 CSV</button></div></div>';
   h+='<div class="btw"><div class="btw-s"><table class="btbl"><thead><tr><th>Code</th><th>Name</th><th>Location</th><th>Qty</th><th>Unit</th><th>Min</th><th>Price</th><th>Status</th><th></th></tr></thead><tbody>'+(rows||'<tr><td colspan="9" style="text-align:center;color:var(--text-tertiary);padding:24px">No items found</td></tr>')+'</tbody></table></div></div>';
   setTimeout(function(){var q2=document.getElementById('binv-q');if(q2)q2.oninput=function(){BS.q=this.value;navTo('inv-items');};var l2=document.getElementById('binv-loc');if(l2)l2.onchange=function(){BS.inv_loc=this.value;navTo('inv-items');};var s2=document.getElementById('binv-sts');if(s2)s2.onchange=function(){BS.inv_sts=this.value;navTo('inv-items');};},0);
   return h;
 }
-function openBranchItemModal(code){var it=code?bfindItem(code):null;var html='<div class="modal-head"><h2>'+(it?'Edit Item':'Add Item')+'</h2><button class="modal-close" onclick="closeModalForce()">&#x2715;</button></div>';html+='<div class="bfg"><label class="form-label">Code *</label><input class="form-input" id="bi-code" value="'+bxe(it?it.code:'')+'" '+(it?'readonly':'')+'></div>';html+='<div class="bfg"><label class="form-label">Name *</label><input class="form-input" id="bi-name" value="'+bxe(it?it.name:'')+'"></div>';html+='<div class="form-row"><div class="bfg"><label class="form-label">Unit</label><input class="form-input" id="bi-unit" value="'+bxe(it?it.unit:'EA')+'"></div><div class="bfg"><label class="form-label">Min Stock</label><input class="form-input" type="number" id="bi-min" value="'+(it?it.min:0)+'"></div></div>';html+='<div class="form-row"><div class="bfg"><label class="form-label">Price (SAR)</label><input class="form-input" type="number" id="bi-price" value="'+(it?it.price:0)+'"></div><div class="bfg"><label class="form-label">Location <button type="button" style="font-size:10px;padding:1px 6px;margin-left:6px;cursor:pointer;border:1px solid var(--border);border-radius:4px;background:var(--surface-3);color:var(--text-secondary)" onclick="manageInvList(\'loc\')">+ / −</button></label><select class="form-input form-select" id="bi-loc">'+DEFAULT_LOCATIONS.map(function(l){return '<option'+(it&&it.location===l?' selected':'')+'>'+bxe(l)+'</option>';}).join('')+'</select></div></div>';html+='<div class="bfg"><label class="form-label">Supplier <button type="button" style="font-size:10px;padding:1px 6px;margin-left:6px;cursor:pointer;border:1px solid var(--border);border-radius:4px;background:var(--surface-3);color:var(--text-secondary)" onclick="manageInvList(\'sup\')">+ / −</button></label><select class="form-input form-select" id="bi-sup"><option value="">None</option>'+DEFAULT_SUPPLIERS.map(function(s2){return '<option'+(it&&it.supplier===s2?' selected':'')+'>'+bxe(s2)+'</option>';}).join('')+'</select></div>';if(!it)html+='<div class="bfg"><label class="form-label">Opening Qty</label><input class="form-input" type="number" id="bi-qty" value="0"></div>';html+='<button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="saveBranchItem(\''+bxe(code||'')+'\')">Save</button>';openModal(html);}
-function manageInvList(type){var isSup=type==='sup';var list=isSup?DEFAULT_SUPPLIERS:DEFAULT_LOCATIONS;var title=isSup?'Manage Suppliers':'Manage Locations';var html='<div class="modal-head"><h2>'+title+'</h2><button class="modal-close" onclick="closeModalForce()">&#x2715;</button></div>';html+='<div id="inv-list-items">'+list.map(function(v,i){return '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)"><span style="flex:1;font-size:13px">'+bxe(v)+'</span><button class="btn btn-sm" style="color:var(--danger)" onclick="removeInvListItem(\''+type+'\','+i+')">Remove</button></div>';}).join('')+'</div>';html+='<div style="display:flex;gap:8px;margin-top:14px"><input class="form-input" id="inv-list-new" placeholder="Add new '+(isSup?'supplier':'location')+'…" style="flex:1"><button class="btn btn-primary" onclick="addInvListItem(\''+type+'\')">Add</button></div>';openModal(html);}
-function addInvListItem(type){var inp=document.getElementById('inv-list-new');if(!inp||!inp.value.trim())return;var val=inp.value.trim();var isSup=type==='sup';if(isSup){if(DEFAULT_SUPPLIERS.indexOf(val)<0)DEFAULT_SUPPLIERS.push(val);}else{if(DEFAULT_LOCATIONS.indexOf(val)<0)DEFAULT_LOCATIONS.push(val);}manageInvList(type);}
-function removeInvListItem(type,idx){var msg=type==='sup'?'Remove this supplier?':'Remove this location?';if(!confirm(msg))return;if(type==='sup')DEFAULT_SUPPLIERS.splice(idx,1);else DEFAULT_LOCATIONS.splice(idx,1);manageInvList(type);}
+function openBranchItemModal(code){
+  var it=code?bfindItem(code):null;
+  var locs=getLocations().slice().sort();
+  var sups=getSuppliers().slice().sort();
+  var locOpts=locs.map(function(l){return '<option'+(it&&it.location===l?' selected':'')+'>'+bxe(l)+'</option>';}).join('');
+  var supOpts='<option value="">None</option>'+sups.map(function(s2){return '<option'+(it&&it.supplier===s2?' selected':'')+'>'+bxe(s2)+'</option>';}).join('');
+  var html='<div class="modal-head"><h2>'+(it?'Edit Item':'Add Item')+'</h2><button class="modal-close" onclick="closeModalForce()">&#x2715;</button></div>';
+  html+='<div class="bfg"><label class="form-label">Code *</label><input class="form-input" id="bi-code" value="'+bxe(it?it.code:'')+'" '+(it?'readonly':'')+'></div>';
+  html+='<div class="bfg"><label class="form-label">Name *</label><input class="form-input" id="bi-name" value="'+bxe(it?it.name:'')+'"></div>';
+  html+='<div class="form-row"><div class="bfg"><label class="form-label">Unit</label><input class="form-input" id="bi-unit" value="'+bxe(it?it.unit:'EA')+'"></div><div class="bfg"><label class="form-label">Min Stock</label><input class="form-input" type="number" id="bi-min" value="'+(it?it.min:0)+'"></div></div>';
+  html+='<div class="form-row"><div class="bfg"><label class="form-label">Price (SAR)</label><input class="form-input" type="number" id="bi-price" value="'+(it?it.price:0)+'"></div></div>';
+  // Location row with + New and 🗑 buttons
+  html+='<div class="bfg"><label class="form-label" style="display:flex;align-items:center;gap:8px">Location <button type="button" class="btn btn-sm" style="padding:2px 8px;font-size:10px" onclick="nxAddLocationModal()">+ New</button><button type="button" class="btn btn-sm" style="padding:2px 8px;font-size:10px;color:var(--danger);border-color:rgba(248,113,113,.3)" onclick="nxDelLocationModal()">🗑 Delete</button></label>';
+  html+='<select class="form-input form-select" id="bi-loc">'+locOpts+'</select></div>';
+  // Supplier row with + New and 🗑 buttons
+  html+='<div class="bfg"><label class="form-label" style="display:flex;align-items:center;gap:8px">Supplier <button type="button" class="btn btn-sm" style="padding:2px 8px;font-size:10px" onclick="nxAddSupplierModal()">+ New</button><button type="button" class="btn btn-sm" style="padding:2px 8px;font-size:10px;color:var(--danger);border-color:rgba(248,113,113,.3)" onclick="nxDelSupplierModal()">🗑 Delete</button></label>';
+  html+='<select class="form-input form-select" id="bi-sup">'+supOpts+'</select></div>';
+  if(!it)html+='<div class="bfg"><label class="form-label">Opening Qty</label><input class="form-input" type="number" id="bi-qty" value="0"></div>';
+  html+='<button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="saveBranchItem(\''+bxe(code||'')+'\')">Save</button>';
+  openModal(html);
+}
+
+// ── Location management (Firebase-backed, same as index.html) ──────────────
+function nxAddLocationModal(){
+  var html='<div class="modal-head"><h2>Add Location</h2><button class="modal-close" onclick="closeModalForce()">&#x2715;</button></div>';
+  html+='<div class="bfg"><label class="form-label">Location Name *</label><input class="form-input" id="nx-new-loc" placeholder="e.g. Walk-in Chiller"></div>';
+  html+='<button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="nxConfirmAddLocation()">Add Location</button>';
+  openModal(html);
+  setTimeout(function(){var el=document.getElementById('nx-new-loc');if(el)el.focus();},80);
+}
+function nxConfirmAddLocation(){
+  var name=(bgv('nx-new-loc')||'').trim();
+  if(!name){showToast('Enter a location name','warning');return;}
+  if(!BS.locations)BS.locations=getLocations().slice();
+  if(BS.locations.indexOf(name)>=0){showToast('Location already exists','warning');return;}
+  BS.locations.push(name);
+  if(db)db.ref(bPath('locations')).set(BS.locations);
+  closeModalForce();
+  showToast('"'+name+'" added ✓','success');
+}
+function nxDelLocationModal(){
+  var locs=getLocations().slice().sort();
+  if(!locs.length){showToast('No locations','warning');return;}
+  var opts=locs.map(function(l){return '<option value="'+bxe(l)+'">'+bxe(l)+'</option>';}).join('');
+  var html='<div class="modal-head"><h2>Delete Location</h2><button class="modal-close" onclick="closeModalForce()">&#x2715;</button></div>';
+  html+='<div class="bfg"><label class="form-label">Select Location to Delete</label><select class="form-input form-select" id="nx-del-loc"><option value="">— Choose —</option>'+opts+'</select></div>';
+  html+='<div style="background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);border-radius:8px;padding:10px;font-size:11px;color:#f87171;margin-bottom:12px">⚠️ Items in this location will be moved to <strong>Dry Storage</strong>.</div>';
+  html+='<button class="btn btn-primary" style="width:100%;background:var(--danger);border-color:var(--danger)" onclick="nxConfirmDelLocation()">Delete</button>';
+  openModal(html);
+}
+function nxConfirmDelLocation(){
+  var name=bgv('nx-del-loc');
+  if(!name){showToast('Select a location','warning');return;}
+  if(!confirm('Delete location "'+name+'"? Items will move to Dry Storage.'))return;
+  if(!BS.locations)BS.locations=getLocations().slice();
+  var i=BS.locations.indexOf(name);
+  if(i<0){showToast('Not found','error');return;}
+  BS.locations.splice(i,1);
+  if(db)db.ref(bPath('locations')).set(BS.locations);
+  // Move items from deleted location to Dry Storage
+  var fallback=BS.locations.indexOf('Dry Storage')>=0?'Dry Storage':(BS.locations[0]||'Dry Storage');
+  var updates={};
+  bItems.forEach(function(it){
+    if(it.location===name){
+      it.location=fallback;
+      updates['shared/inv_items/'+String(it.code).replace(/[.#$\[\]\/]/g,'_')+'/location']=fallback;
+    }
+  });
+  if(db&&Object.keys(updates).length)db.ref().update(updates);
+  closeModalForce();
+  showToast('"'+name+'" deleted — items moved to "'+fallback+'"','success');
+}
+
+// ── Supplier management (Firebase-backed, same as index.html) ──────────────
+function nxAddSupplierModal(){
+  var html='<div class="modal-head"><h2>Add Supplier</h2><button class="modal-close" onclick="closeModalForce()">&#x2715;</button></div>';
+  html+='<div class="bfg"><label class="form-label">Supplier Name *</label><input class="form-input" id="nx-new-sup" placeholder="e.g. Al Safi"></div>';
+  html+='<button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="nxConfirmAddSupplier()">Add Supplier</button>';
+  openModal(html);
+  setTimeout(function(){var el=document.getElementById('nx-new-sup');if(el)el.focus();},80);
+}
+function nxConfirmAddSupplier(){
+  var name=(bgv('nx-new-sup')||'').trim();
+  if(!name){showToast('Enter a supplier name','warning');return;}
+  if(!BS.suppliers)BS.suppliers=getSuppliers().slice();
+  if(BS.suppliers.indexOf(name)>=0){showToast('Supplier already exists','warning');return;}
+  BS.suppliers.push(name);
+  if(db)db.ref(bPath('suppliers')).set(BS.suppliers);
+  closeModalForce();
+  showToast('"'+name+'" added ✓','success');
+}
+function nxDelSupplierModal(){
+  var sups=getSuppliers().slice().sort();
+  if(!sups.length){showToast('No suppliers','warning');return;}
+  var opts=sups.map(function(s2){return '<option value="'+bxe(s2)+'">'+bxe(s2)+'</option>';}).join('');
+  var html='<div class="modal-head"><h2>Delete Supplier</h2><button class="modal-close" onclick="closeModalForce()">&#x2715;</button></div>';
+  html+='<div class="bfg"><label class="form-label">Select Supplier to Delete</label><select class="form-input form-select" id="nx-del-sup"><option value="">— Choose —</option>'+opts+'</select></div>';
+  html+='<button class="btn btn-primary" style="width:100%;background:var(--danger);border-color:var(--danger)" onclick="nxConfirmDelSupplier()">Delete</button>';
+  openModal(html);
+}
+function nxConfirmDelSupplier(){
+  var name=bgv('nx-del-sup');
+  if(!name){showToast('Select a supplier','warning');return;}
+  if(!confirm('Delete supplier "'+name+'"?'))return;
+  if(!BS.suppliers)BS.suppliers=getSuppliers().slice();
+  var i=BS.suppliers.indexOf(name);
+  if(i<0){showToast('Not found','error');return;}
+  BS.suppliers.splice(i,1);
+  if(db)db.ref(bPath('suppliers')).set(BS.suppliers);
+  closeModalForce();
+  showToast('"'+name+'" deleted','success');
+}
 function saveBranchItem(origCode){var code=bgv('bi-code'),name=bgv('bi-name');if(!code||!name){showToast('Code and name required','error');return;}var unit=bgv('bi-unit')||'EA',loc=bgv('bi-loc')||'Dry Storage',min=parseFloat(bgv('bi-min'))||0,price=parseFloat(bgv('bi-price'))||0,sup=bgv('bi-sup')||'';if(origCode){var it=bfindItem(origCode);if(!it)return;it.code=code;it.name=name;it.unit=unit;it.location=loc;it.min=min;it.price=price;it.supplier=sup;if(db)db.ref('shared/inv_items/'+code.replace(/[.#$\[\]\/]/g,'_')).set({code:code,name:name,unit:unit,location:loc,min:min,price:price,supplier:sup});}else{if(bfindItem(code)){showToast('Duplicate code','error');return;}var qty=parseFloat(bgv('bi-qty'))||0;bItems.push({code:code,name:name,unit:unit,location:loc,min:min,price:price,qty:qty,supplier:sup});if(db){db.ref('shared/inv_items/'+code.replace(/[.#$\[\]\/]/g,'_')).set({code:code,name:name,unit:unit,location:loc,min:min,price:price,supplier:sup});if(qty>0)bSaveStock(code,qty);}}closeModalForce();showToast('Item saved','success');navTo('inv-items');}
 function delBranchItem(code){if(!confirm('Delete '+code+'?'))return;bItems=bItems.filter(function(x){return x.code!==code;});if(db)db.ref('shared/inv_items/'+code.replace(/[.#$\[\]\/]/g,'_')).remove();showToast('Deleted');navTo('inv-items');}
 function exportBranchItemsCSV(){var rows=[['Code','Name','Location','Qty','Unit','Min','Price','Supplier']];bItems.forEach(function(i){rows.push([i.code,i.name,i.location,i.qty,i.unit,i.min,i.price,i.supplier||'']);});var csv=rows.map(function(r){return r.map(function(v){return '"'+String(v).replace(/"/g,'""')+'"';}).join(',');}).join('\n');var a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);a.download='inventory.csv';a.click();}
@@ -4957,9 +5079,6 @@ function exportBranchItemsCSV(){var rows=[['Code','Name','Location','Qty','Unit'
 function pInvMoves() {
   attachBranchListeners();
   attachNXTransferListener();
-  var itemOpts='<option value="">Select item</option>'+bItems.map(function(i){
-    return '<option value="'+bxe(i.code)+'">'+bxe(i.code)+' \u2014 '+bxe(i.name)+' ('+bxe(i.unit)+') \xb7 '+i.qty+'</option>';
-  }).join('');
   var logRows=bLogs.slice().reverse().slice(0,30).map(function(l){
     var isR=l.type==='receive',isTO=l.type==='transfer-out',isTI=l.type==='transfer-in';
     var tc=isR?'#34d399':isTO||isTI?'#c084fc':'#f87171';
@@ -4971,25 +5090,48 @@ function pInvMoves() {
       '<td style="color:var(--text-secondary);font-size:11px">'+bxe(l.note||'\u2014')+'</td>'+
       '<td class="bmono" style="color:var(--text-tertiary);font-size:11px">'+bxe(l.date)+'</td></tr>';
   }).join('');
+
+  // Shared searchable item input style
+  var si='background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text-primary);font-size:13px;outline:none;width:100%;font-family:var(--font)';
+  var drop='position:absolute;top:100%;left:0;right:0;z-index:200;background:var(--body-bg);border:1px solid var(--border);border-radius:8px;max-height:220px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.5)';
+
   var h='<div class="page-header"><h1>Receive / Issue</h1></div>';
   h+='<div class="bgrid-2" style="margin-bottom:14px">';
+
+  // RECEIVE
   h+='<div class="bcard"><div style="font-size:13px;font-weight:700;color:var(--success);margin-bottom:12px">\u2705 Receive Stock</div>';
-  h+='<div class="bfg"><label class="form-label">Item</label><select class="form-input form-select" id="recv-code">'+itemOpts+'</select></div>';
+  h+='<div class="bfg"><label class="form-label">Item</label><div style="position:relative">';
+  h+='<input class="form-input" id="recv-search" placeholder="\ud83d\udd0d Search by code or name\u2026" oninput="invSearch(this,\'recv-code\',\'recv-drop\')" autocomplete="off" style="'+si+'">';
+  h+='<input type="hidden" id="recv-code">';
+  h+='<div id="recv-drop" style="'+drop+';display:none"></div></div></div>';
+  h+='<div id="recv-sel-info" style="font-size:11px;color:var(--ceo);font-family:var(--mono);margin-top:-6px;margin-bottom:10px;padding:0 2px"></div>';
   h+='<div class="bfg"><label class="form-label">Quantity</label><input class="form-input" type="number" id="recv-qty" min="0.01" step="0.01" placeholder="0"></div>';
   h+='<div class="bfg"><label class="form-label">Note</label><input class="form-input" id="recv-note" placeholder="Delivery note, PO ref\u2026"></div>';
   h+='<button class="btn btn-primary" style="width:100%" onclick="doReceive()">Confirm Receive</button></div>';
+
+  // ISSUE
   h+='<div class="bcard"><div style="font-size:13px;font-weight:700;color:var(--danger);margin-bottom:12px">\ud83d\udce4 Issue / Pull-Out</div>';
-  h+='<div class="bfg"><label class="form-label">Item</label><select class="form-input form-select" id="pull-code">'+itemOpts+'</select></div>';
+  h+='<div class="bfg"><label class="form-label">Item</label><div style="position:relative">';
+  h+='<input class="form-input" id="pull-search" placeholder="\ud83d\udd0d Search by code or name\u2026" oninput="invSearch(this,\'pull-code\',\'pull-drop\')" autocomplete="off" style="'+si+'">';
+  h+='<input type="hidden" id="pull-code">';
+  h+='<div id="pull-drop" style="'+drop+';display:none"></div></div></div>';
+  h+='<div id="pull-sel-info" style="font-size:11px;color:var(--danger);font-family:var(--mono);margin-top:-6px;margin-bottom:10px;padding:0 2px"></div>';
   h+='<div class="bfg"><label class="form-label">Quantity</label><input class="form-input" type="number" id="pull-qty" min="0.01" step="0.01" placeholder="0"></div>';
   h+='<div class="bfg"><label class="form-label">Note</label><input class="form-input" id="pull-note" placeholder="Reason\u2026"></div>';
   h+='<button class="btn" style="width:100%;border-color:rgba(248,113,113,.3);color:var(--danger)" onclick="doPull()">Confirm Issue</button></div>';
   h+='</div>';
+
+  // TRANSFER
   h+='<div class="bcard" style="margin-bottom:14px;border-color:rgba(192,132,252,.25);background:rgba(192,132,252,.03)">';
   h+='<div style="font-size:13px;font-weight:700;color:#c084fc;margin-bottom:12px">\ud83d\udd00 Transfer Stock to Another Branch</div>';
   h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">';
-  h+='<div class="bfg" style="margin-bottom:0"><label class="form-label">Item</label><select class="form-input form-select" id="tr-code">'+itemOpts+'</select></div>';
+  h+='<div class="bfg" style="margin-bottom:0"><label class="form-label">Item</label><div style="position:relative">';
+  h+='<input class="form-input" id="tr-search" placeholder="\ud83d\udd0d Search item\u2026" oninput="invSearch(this,\'tr-code\',\'tr-drop\')" autocomplete="off" style="'+si+'">';
+  h+='<input type="hidden" id="tr-code">';
+  h+='<div id="tr-drop" style="'+drop+';display:none"></div></div></div>';
   h+='<div class="bfg" style="margin-bottom:0"><label class="form-label">Quantity</label><input class="form-input" type="number" id="tr-qty" min="0.01" step="0.01" placeholder="0"></div>';
   h+='</div>';
+  h+='<div id="tr-sel-info" style="font-size:11px;color:#c084fc;font-family:var(--mono);margin-bottom:10px;padding:0 2px"></div>';
   h+='<div class="bfg" style="margin-bottom:10px"><label class="form-label">Destination Branch</label><select class="form-input form-select" id="tr-dest-branch"><option value="">\u2014 Select branch \u2014</option></select></div>';
   h+='<div class="bfg" style="margin-bottom:12px"><label class="form-label">Note</label><input class="form-input" id="tr-note" placeholder="Reason\u2026"></div>';
   h+='<div style="background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.2);border-radius:8px;padding:10px;font-size:11px;color:rgba(245,158,11,.9);margin-bottom:12px">';
@@ -5111,6 +5253,40 @@ function nxRejectTransfer(id){
     renderNXIncomingTransfers();
   });
 }
+function invSearch(inp,hiddenId,dropId){
+  var q=(inp.value||'').toLowerCase().trim();
+  var drop=document.getElementById(dropId);
+  var hidden=document.getElementById(hiddenId);
+  if(!drop)return;
+  if(!q){drop.style.display='none';if(hidden)hidden.value='';return;}
+  var matches=bItems.filter(function(i){
+    return String(i.code||'').toLowerCase().indexOf(q)>=0||String(i.name||'').toLowerCase().indexOf(q)>=0;
+  }).slice(0,40);
+  if(!matches.length){drop.innerHTML='<div style="padding:10px 12px;font-size:12px;color:var(--text-tertiary)">No items found</div>';drop.style.display='block';return;}
+  drop.innerHTML=matches.map(function(i){
+    var isLow=i.min>0&&i.qty<=i.min;
+    return '<div onclick="invSelect(\''+bxe(i.code)+'\',\''+hiddenId+'\',\''+dropId+'\',\''+bxe(inp.id)+'\')" style="padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:8px" onmouseover="this.style.background=\'var(--surface-2)\'" onmouseout="this.style.background=\'\'">'+
+      '<div><div style="font-size:12px;font-weight:600;color:var(--text-primary)">'+bxe(i.name)+'</div><div style="font-size:10px;color:var(--text-tertiary);font-family:var(--mono)">'+bxe(i.code)+' · '+bxe(i.unit)+'</div></div>'+
+      '<div style="text-align:right;flex-shrink:0"><div style="font-size:12px;font-weight:700;color:'+(isLow?'var(--danger)':'var(--ceo)')+'">'+i.qty+'</div><div style="font-size:9px;color:var(--text-tertiary)">'+(isLow?'LOW':'in stock')+'</div></div>'+
+      '</div>';
+  }).join('');
+  drop.style.display='block';
+  // Close dropdown when clicking outside
+  setTimeout(function(){document.addEventListener('click',function cl(e){if(!drop.contains(e.target)&&e.target!==inp){drop.style.display='none';document.removeEventListener('click',cl);}});},0);
+}
+function invSelect(code,hiddenId,dropId,inputId){
+  var it=bfindItem(code);if(!it)return;
+  var hidden=document.getElementById(hiddenId);
+  var inp=document.getElementById(inputId);
+  var drop=document.getElementById(dropId);
+  if(hidden)hidden.value=code;
+  if(inp)inp.value=it.code+' — '+it.name;
+  if(drop)drop.style.display='none';
+  // Update info line
+  var prefix=hiddenId.replace('-code','');
+  var info=document.getElementById(prefix+'-sel-info');
+  if(info)info.textContent=bxe(it.name)+' · '+it.qty+' '+bxe(it.unit||'')+' in stock'+(it.min>0&&it.qty<=it.min?' ⚠ LOW':'');
+}
 function doReceive(){var code=bgv('recv-code'),qty=parseFloat(bgv('recv-qty'))||0,note=bgv('recv-note');if(!code||qty<=0){showToast('Select item and enter quantity','error');return;}var it=bfindItem(code);if(!it){showToast('Item not found','error');return;}it.qty=parseFloat(it.qty||0)+qty;bSaveStock(code,it.qty);bLogs.push({code:code,name:it.name,type:'receive',qty:qty,note:note,date:TODAY_BS});bSaveLogs();showToast(it.name+' +'+qty+' received','success');navTo('inv-moves');}
 function doPull(){var code=bgv('pull-code'),qty=parseFloat(bgv('pull-qty'))||0,note=bgv('pull-note');if(!code||qty<=0){showToast('Select item and enter quantity','error');return;}var it=bfindItem(code);if(!it){showToast('Item not found','error');return;}if(qty>it.qty){showToast('Insufficient stock ('+it.qty+' '+it.unit+' available)','error');return;}it.qty=parseFloat(it.qty||0)-qty;bSaveStock(code,it.qty);bLogs.push({code:code,name:it.name,type:'issue',qty:qty,note:note,date:TODAY_BS});bSaveLogs();showToast(it.name+' -'+qty+' issued','success');navTo('inv-moves');}
 function exportBranchLogsCSV(){var rows=[['Code','Name','Type','Qty','Note','Date']];bLogs.forEach(function(l){rows.push([l.code,l.name,l.type,l.qty,l.note||'',l.date]);});var csv=rows.map(function(r){return r.map(function(v){return '"'+String(v).replace(/"/g,'""')+'"';}).join(',');}).join('\n');var a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);a.download='movements.csv';a.click();}
@@ -5134,8 +5310,8 @@ function pInvOrders() {
 }
 
 function pOrdersMarketNX() {
-  var suppliers = DEFAULT_SUPPLIERS.slice().sort();
-  var locations = DEFAULT_LOCATIONS.slice().sort();
+  var suppliers = getSuppliers().slice().sort();
+  var locations = getLocations().slice().sort();
   var selSup = BS.mktSup || '';
   var selLoc = BS.mktLoc || '';
   var q = (BS.mktQ || '').toLowerCase();
@@ -5347,7 +5523,7 @@ function submitBasketNX(){
   showToast('✅ '+created+' purchase order'+(created!==1?'s':'')+' created!','success');
   navTo('inv-orders');
 }
-function openBranchOrderModal(){bOrdItems=[];var html='<div class="modal-head"><h2>New Purchase Order</h2><button class="modal-close" onclick="closeModalForce()">&#x2715;</button></div>';html+='<div class="bfg"><label class="form-label">Supplier *</label><select class="form-input form-select" id="bord-sup" onchange="bOrdSupChange(this.value)"><option value="">Select supplier</option>'+DEFAULT_SUPPLIERS.map(function(s2){return '<option>'+bxe(s2)+'</option>';}).join('')+'</select></div>';html+='<div id="bord-sup-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;min-height:4px"></div>';html+='<div class="form-row"><div class="bfg"><label class="form-label">Add Any Item</label><select class="form-input form-select" id="bord-item-sel"><option value="">Select item</option>'+bItems.map(function(i){return '<option value="'+bxe(i.code)+'">'+bxe(i.code)+' \u2014 '+bxe(i.name)+'</option>';}).join('')+'</select></div><div class="bfg"><label class="form-label">Qty</label><input class="form-input" type="number" id="bord-qty" value="1" min="1"></div></div>';html+='<button class="btn" style="width:100%;margin-bottom:12px" onclick="bOrdAddItem()">+ Add to Order</button>';html+='<div class="bfg"><label class="form-label">Note</label><input class="form-input" id="bord-note" placeholder="Order note\u2026"></div>';html+='<div id="bord-items-wrap" style="margin-bottom:14px"><div style="color:var(--text-tertiary);font-size:12px;text-align:center;padding:12px" id="bord-empty">No items added yet</div><table class="btbl" id="bord-tbl" style="display:none"><thead><tr><th>Code</th><th>Name</th><th>Unit</th><th>Qty</th><th></th></tr></thead><tbody id="bord-tbody"></tbody></table></div>';html+='<button class="btn btn-primary" style="width:100%" onclick="submitBranchOrder()">Create Purchase Order</button>';openModal(html);}
+function openBranchOrderModal(){bOrdItems=[];var html='<div class="modal-head"><h2>New Purchase Order</h2><button class="modal-close" onclick="closeModalForce()">&#x2715;</button></div>';html+='<div class="bfg"><label class="form-label">Supplier *</label><select class="form-input form-select" id="bord-sup" onchange="bOrdSupChange(this.value)"><option value="">Select supplier</option>'+DEFAULT_SUPPLIERS.map(function(s2){return '<option>'+bxe(s2)+'</option>';}).join('')+'</select></div>';html+='<div id="bord-sup-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;min-height:4px"></div>';html+='<div class="form-row"><div class="bfg"><label class="form-label">Add Any Item</label><div style="position:relative"><input class="form-input" id="bord-item-search" placeholder="Search item code or name..." oninput="invSearch(this,&apos;bord-item-sel&apos;,&apos;bord-item-drop&apos;)" autocomplete="off"><input type="hidden" id="bord-item-sel"><div id="bord-item-drop" style="position:absolute;top:100%;left:0;right:0;z-index:300;background:var(--body-bg);border:1px solid var(--border);border-radius:8px;max-height:200px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.5);display:none"></div></div></div><div class="bfg"><label class="form-label">Qty</label><input class="form-input" type="number" id="bord-qty" value="1" min="1"></div></div>';html+='<button class="btn" style="width:100%;margin-bottom:12px" onclick="bOrdAddItem()">+ Add to Order</button>';html+='<div class="bfg"><label class="form-label">Note</label><input class="form-input" id="bord-note" placeholder="Order note..."></div>';html+='<div id="bord-items-wrap" style="margin-bottom:14px"><div style="color:var(--text-tertiary);font-size:12px;text-align:center;padding:12px" id="bord-empty">No items added yet</div><table class="btbl" id="bord-tbl" style="display:none"><thead><tr><th>Code</th><th>Name</th><th>Unit</th><th>Qty</th><th></th></tr></thead><tbody id="bord-tbody"></tbody></table></div>';html+='<button class="btn btn-primary" style="width:100%" onclick="submitBranchOrder()">Create Purchase Order</button>';openModal(html);}
 function bOrdSupChange(sup){var chips=document.getElementById('bord-sup-chips');if(!chips)return;chips.innerHTML='';bItems.filter(function(i){return i.supplier===sup;}).forEach(function(it){var btn=document.createElement('button');btn.className='chip';btn.style.cursor='pointer';btn.textContent=it.code+' \u2014 '+it.name;btn.onclick=function(){bOrdItems.push({code:it.code,name:it.name,unit:it.unit,qty:1,price:it.price||0,received:0});bOrdRenderTable();showToast(it.name+' added','success');};chips.appendChild(btn);});}
 function bOrdAddItem(){var code=bgv('bord-item-sel'),qty=parseInt(bgv('bord-qty'))||1;var it=bfindItem(code);if(!it){showToast('Select an item first','error');return;}var ex=bOrdItems.find(function(o2){return o2.code===code;});if(ex)ex.qty+=qty;else bOrdItems.push({code:it.code,name:it.name,unit:it.unit,qty:qty,price:it.price||0,received:0});bOrdRenderTable();}
 function bOrdRenderTable(){var tbl=document.getElementById('bord-tbl'),em=document.getElementById('bord-empty'),tbody=document.getElementById('bord-tbody');if(!tbl||!tbody)return;if(!bOrdItems.length){tbl.style.display='none';if(em)em.style.display='';return;}tbl.style.display='';if(em)em.style.display='none';tbody.innerHTML=bOrdItems.map(function(it,i){return '<tr><td class="bmono" style="font-size:10px;color:var(--ceo)">'+bxe(it.code)+'</td><td>'+bxe(it.name)+'</td><td class="bmono">'+bxe(it.unit)+'</td><td class="bmono" style="font-weight:700">'+it.qty+'</td><td><button class="btn btn-sm" style="color:var(--danger)" onclick="bOrdRemove('+i+')">&#x2715;</button></td></tr>';}).join('');}
@@ -5385,7 +5561,7 @@ function pStaff() {
     var wk2=bweekKey(),sc2=BS.sch[wk2]||{},ms=sc2[m.id]||{};
     var todayShift=ms[todayName]||m.shift||'\u2014';
     var shCol=todayShift.toUpperCase()==='OFF'||todayShift.toUpperCase()==='DAY OFF'?'var(--text-tertiary)':'var(--ceo)';
-    rows+='<tr><td><div style="display:flex;align-items:center;gap:10px"><div class="bav">'+bini(m.name)+'</div><div><div style="font-weight:600;font-size:12px">'+bxe(m.name)+'</div><div style="font-size:10px;color:var(--text-tertiary)">'+bxe(m.role||'No role')+'</div></div></div></td><td>'+bpl(m.dept||'\u2014',bdc(m.dept||'FOH'))+'</td><td class="bmono" style="color:'+shCol+';font-size:12px;font-weight:600">'+bxe(todayShift)+'</td><td>'+bpl(m.status,sc)+'</td><td class="bmono" style="color:var(--text-tertiary);font-size:11px">'+bxe(m.sap||'\u2014')+'</td><td style="font-size:11px">'+(m.phone?'<a href="tel:'+bxe(m.phone)+'" style="color:var(--ceo);text-decoration:none">'+bxe(m.phone)+'</a>':'<span style="color:var(--text-tertiary)">\u2014</span>')+'</td><td><div style="display:flex;gap:4px"><button class="btn btn-sm" onclick="openBranchStaffModal(\''+bxe(m.id)+'\')">Edit</button><button class="btn btn-sm" style="color:var(--danger)" onclick="delBranchStaff(\''+bxe(m.id)+'\')">Del</button><button class=\"btn btn-sm\" style=\"color:#c084fc\" onclick=\"openNXTransferStaffModal(\\\''+bxe(m.id)+'\\\')\">Transfer</button></div></td></tr>';
+    rows+='<tr><td><div style="display:flex;align-items:center;gap:10px"><div class="bav">'+bini(m.name)+'</div><div><div style="font-weight:600;font-size:12px">'+bxe(m.name)+'</div><div style="font-size:10px;color:var(--text-tertiary)">'+bxe(m.role||'No role')+'</div></div></div></td><td>'+bpl(m.dept||'\u2014',bdc(m.dept||'FOH'))+'</td><td class="bmono" style="color:'+shCol+';font-size:12px;font-weight:600">'+bxe(todayShift)+'</td><td>'+bpl(m.status,sc)+'</td><td class="bmono" style="color:var(--text-tertiary);font-size:11px">'+bxe(m.sap||'\u2014')+'</td><td style="font-size:11px">'+(m.phone?'<a href="tel:'+bxe(m.phone)+'" style="color:var(--ceo);text-decoration:none">'+bxe(m.phone)+'</a>':'<span style="color:var(--text-tertiary)">\u2014</span>')+'</td><td><div style="display:flex;gap:4px"><button class="btn btn-sm" onclick="openBranchStaffModal(\''+bxe(m.id)+'\')">Edit</button><button class="btn btn-sm" style="color:var(--danger)" onclick="delBranchStaff(\''+bxe(m.id)+'\')">Del</button><button class="btn btn-sm" style="color:#c084fc" data-staffid="'+bxe(m.id)+'" onclick="openNXTransferStaffModal(this.dataset.staffid)">Transfer</button></div></td></tr>';
   });
   var h='<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap"><span style="font-size:10px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.1em">Dept</span><div style="display:flex;gap:4px">'+dbt+'</div>';
   h+='<select class="bfi" style="width:auto" id="bstaff-rf"><option value="All">All Roles</option>'+ROLES.map(function(r){return '<option value="'+bxe(r)+'"'+(BS._roleFilter===r?' selected':'')+'>'+bxe(r)+'</option>';}).join('')+'</select>';
