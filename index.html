@@ -3266,7 +3266,8 @@ var NAV_CONFIG = {
       { id:'bm-leave',          icon:'🏖️', label:'Leave Management', badge:'bm-leave-pending' }
     ]},
     { section:'COMMUNICATIONS', items:[
-      { id:'bm-announcements',  icon:'📢', label:'Announcements', badge:'bm-ann-unread' }
+      { id:'bm-announcements',  icon:'📢', label:'Announcements', badge:'bm-ann-unread' },
+      { id:'bm-music-player',   icon:'🎵', label:'Music Player' }
     ]}
   ],
   staff: [
@@ -4469,6 +4470,7 @@ function renderPage(pageId) {
     'bm-payroll':        pBmPayroll,
     'bm-transfers':      pBmTransfers,
     'bm-announcements':  pBmAnnouncements,
+    'bm-music-player':   function(){ var s=NX.session||{}; window.open('music-player.html'+(s.branchId?'?branch='+encodeURIComponent(s.branchId):''),'_blank'); history.back(); return ''; },
     // ── HR & Finance Manager pages ──
     'hrf-hr-dash':    pHrfHrDash,
     'hrf-fin-dash':   pHrfFinDash,
@@ -7735,7 +7737,7 @@ function pBranchDash() {
   // Quick Actions
   h += '<div class="section"><h3 style="font-size:12px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">Quick Actions</h3>';
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px">';
-  [['inv-orders','\ud83d\uded2','Purchase Orders'],['inv-moves','\ud83d\udce6','Receive Stock'],['staff','\ud83d\udc65','Staff'],['sales','\ud83d\udcb0','Sales'],['timesheet','\u23f1\ufe0f','Timesheet'],['wastage','\ud83d\uddd1\ufe0f','Wastage'],['health-cards','\ud83d\udcb3','Health Cards'],['petty-cash','\ud83e\uddfe','Petty Cash']].forEach(function(a){
+  [['inv-orders','\ud83d\uded2','Purchase Orders'],['inv-moves','\ud83d\udce6','Receive Stock'],['staff','\ud83d\udc65','Staff'],['sales','\ud83d\udcb0','Sales'],['timesheet','\u23f1\ufe0f','Timesheet'],['wastage','\ud83d\uddd1\ufe0f','Wastage'],['health-cards','\ud83d\udcb3','Health Cards'],['petty-cash','\ud83e\uddfe','Petty Cash'],['bm-music-player','\ud83c\udfb5','Music Player']].forEach(function(a){
     h += '<div class="card" style="text-align:center;padding:14px 10px;cursor:pointer" onclick="navTo(\''+a[0]+'\')">';
     h += '<div style="font-size:24px;margin-bottom:6px">'+a[1]+'</div>';
     h += '<div style="font-size:11px;font-weight:600">'+a[2]+'</div></div>';
