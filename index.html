@@ -3266,7 +3266,8 @@ var NAV_CONFIG = {
       { id:'bm-leave',          icon:'🏖️', label:'Leave Management', badge:'bm-leave-pending' }
     ]},
     { section:'COMMUNICATIONS', items:[
-      { id:'bm-announcements',  icon:'📢', label:'Announcements', badge:'bm-ann-unread' }
+      { id:'bm-announcements',  icon:'📢', label:'Announcements', badge:'bm-ann-unread' },
+      { id:'bm-music-player',   icon:'🎵', label:'Music Player' }
     ]}
   ],
   staff: [
@@ -4469,6 +4470,7 @@ function renderPage(pageId) {
     'bm-payroll':        pBmPayroll,
     'bm-transfers':      pBmTransfers,
     'bm-announcements':  pBmAnnouncements,
+    'bm-music-player':   function(){ var s=NX.session||{}; window.open('music-player.html'+(s.branchId?'?branch='+encodeURIComponent(s.branchId):''),'_blank'); history.back(); return ''; },
     // ── HR & Finance Manager pages ──
     'hrf-hr-dash':    pHrfHrDash,
     'hrf-fin-dash':   pHrfFinDash,
@@ -7735,7 +7737,7 @@ function pBranchDash() {
   // Quick Actions
   h += '<div class="section"><h3 style="font-size:12px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px">Quick Actions</h3>';
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px">';
-  [['inv-orders','\ud83d\uded2','Purchase Orders'],['inv-moves','\ud83d\udce6','Receive Stock'],['staff','\ud83d\udc65','Staff'],['sales','\ud83d\udcb0','Sales'],['timesheet','\u23f1\ufe0f','Timesheet'],['wastage','\ud83d\uddd1\ufe0f','Wastage'],['health-cards','\ud83d\udcb3','Health Cards'],['petty-cash','\ud83e\uddfe','Petty Cash']].forEach(function(a){
+  [['inv-orders','\ud83d\uded2','Purchase Orders'],['inv-moves','\ud83d\udce6','Receive Stock'],['staff','\ud83d\udc65','Staff'],['sales','\ud83d\udcb0','Sales'],['timesheet','\u23f1\ufe0f','Timesheet'],['wastage','\ud83d\uddd1\ufe0f','Wastage'],['health-cards','\ud83d\udcb3','Health Cards'],['petty-cash','\ud83e\uddfe','Petty Cash'],['bm-music-player','\ud83c\udfb5','Music Player']].forEach(function(a){
     h += '<div class="card" style="text-align:center;padding:14px 10px;cursor:pointer" onclick="navTo(\''+a[0]+'\')">';
     h += '<div style="font-size:24px;margin-bottom:6px">'+a[1]+'</div>';
     h += '<div style="font-size:11px;font-weight:600">'+a[2]+'</div></div>';
@@ -9326,32 +9328,16 @@ function btsPgAtt(){
     return '<tr><td><div style="display:flex;align-items:center;gap:8px"><div class="bav">'+bini(e.name)+'</div><strong style="font-size:12px">'+bxe(e.name)+'</strong></div></td><td>'+bpl(e.dept||'\u2014',bdc(e.dept||'FOH'))+'</td><td class="bmono" style="font-size:11px">'+(r&&r.ci||'\u2014')+'</td><td class="bmono" style="font-size:11px">'+(r&&r.co||'\u2014')+'</td><td class="bmono" style="font-size:11px;color:var(--info);font-weight:600">'+(r&&r.brk||'\u2014')+'</td><td class="bmono" style="font-size:11px">'+(r?btsHrs(r.ci,r.co):'\u2014')+'</td><td>'+(r?btsBadge(r.st):'<span style="color:var(--text-tertiary);font-size:10px;font-style:italic">Not recorded</span>')+'</td><td style="font-size:11px;color:var(--text-secondary)">'+(r&&r.note||'')+'</td></tr>';
   }).join('');
   var dateLbl=vd===TODAY_BS?'Today \u2014 '+TODAY_BS:new Date(vd+'T00:00:00').toLocaleDateString('en-GB',{weekday:'short',day:'2-digit',month:'short',year:'numeric'});
-  var h='<div class="bcard" style="margin-bottom:16px">';
+  var h='<div class="bgrid-2" style="margin-bottom:16px"><div class="bcard">';
   h+='<div style="font-size:13px;font-weight:700;color:var(--ceo);margin-bottom:14px">Manual Entry</div>';
-  h+='<div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:10px;margin-bottom:10px">';
-  h+='<div class="bfg" style="margin-bottom:0"><label class="form-label">Employee</label><select class="form-input form-select" id="bts-emp" onchange="btsOnEmpChange(this.value,\''+vd+'\')" >'+eo+'</select></div>';
-  h+='<div class="bfg" style="margin-bottom:0"><label class="form-label">Date</label><input class="form-input" type="date" id="bts-date" value="'+vd+'"></div>';
-  h+='<div class="bfg" style="margin-bottom:0"><label class="form-label">Check In</label><input class="form-input" type="time" id="bts-in"></div>';
-  h+='<div class="bfg" style="margin-bottom:0"><label class="form-label">Check Out</label><input class="form-input" type="time" id="bts-out"></div>';
+  h+='<div class="bfg"><label class="form-label">Employee</label><select class="form-input form-select" id="bts-emp">'+eo+'</select></div>';
+  h+='<div class="form-row"><div class="bfg"><label class="form-label">Date</label><input class="form-input" type="date" id="bts-date" value="'+vd+'"></div><div class="bfg"><label class="form-label">Check In</label><input class="form-input" type="time" id="bts-in"></div></div>';
+  h+='<div class="form-row"><div class="bfg"><label class="form-label">Check Out</label><input class="form-input" type="time" id="bts-out"></div><div class="bfg"><label class="form-label">Break</label><input class="form-input" id="bts-brk" placeholder="e.g. 30m"></div></div>';
+  h+='<div class="bfg"><label class="form-label">Note</label><input class="form-input" id="bts-note" placeholder="Optional"></div>';
+  h+='<div class="bfg"><label class="form-label">Status</label><div id="bts-st-wrap" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">'+stBtns+'</div></div>';
+  h+='<button class="btn btn-primary" style="width:100%;margin-top:12px" id="bts-save-att">Save Attendance</button>';
   h+='</div>';
-  h+='<div style="display:grid;grid-template-columns:2fr 1fr auto auto;gap:10px;align-items:flex-end;margin-bottom:10px">';
-  h+='<div class="bfg" style="margin-bottom:0"><label class="form-label">Note</label><input class="form-input" id="bts-note" placeholder="Optional"></div>';
-  h+='<div class="bfg" style="margin-bottom:0"><label class="form-label">Break Total</label><input class="form-input" id="bts-brk" placeholder="Auto-calculated" readonly style="background:var(--surface-2);color:var(--text-secondary)"></div>';
-  h+='<div style="display:flex;flex-direction:column;gap:4px">';
-  h+='<label class="form-label">Break</label>';
-  h+='<div style="display:flex;gap:6px">';
-  h+='<button id="bts-brk-start" class="btn btn-sm" style="white-space:nowrap;background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.4);color:#b45309;font-weight:700" onclick="btsStartBreak()">☕ Start</button>';
-  h+='<button id="bts-brk-end" class="btn btn-sm" style="white-space:nowrap;background:rgba(0,135,90,.12);border-color:rgba(0,135,90,.4);color:#00875a;font-weight:700;display:none" onclick="btsEndBreak()">▶ End</button>';
-  h+='<span id="bts-brk-timer" style="font-size:11px;font-family:var(--mono);color:#b45309;display:none;align-self:center"></span>';
-  h+='</div></div>';
-  h+='<button class="btn btn-primary" style="align-self:flex-end" id="bts-save-att">Save Attendance</button>';
-  h+='</div>';
-  h+='<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">';
-  h+='<span class="form-label" style="margin:0">Status:</span>';
-  h+='<div id="bts-st-wrap" style="display:flex;flex-wrap:wrap;gap:6px">'+stBtns+'</div>';
-  h+='</div>';
-  h+='<div id="bts-brk-log" style="margin-top:8px;display:none"><div style="font-size:10px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Break Log</div><div id="bts-brk-log-items" style="font-size:11px;font-family:var(--mono);color:var(--text-secondary)"></div></div>';
-  h+='</div>';
+  h+=
   h+='<div class="btw"><div class="bttb" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">';
   h+='<label class="form-label" style="margin:0">Date:</label>';
   h+='<input class="bfi" type="date" id="bts-view-date" value="'+vd+'" max="'+TODAY_BS+'" style="width:auto">';
@@ -9412,7 +9398,7 @@ function saveBranchAttendance(){
   if(!BS.tsAtt[eid][key])BS.tsAtt[eid][key]=[];
   var recs=BS.tsAtt[eid][key];
   var ex=recs.findIndex(function(r){return r.date===dt;});
-  var rec={date:dt,ci:ci,co:co,brk:brk,note:note,st:st,brkLogs:(_btsBreak?_btsBreak.logs||[]:[])};
+  var rec={date:dt,ci:ci,co:co,brk:brk,note:note,st:st};
   if(ex>=0)recs[ex]=rec;else recs.push(rec);
   // Save to Firebase using targeted path (not full set) to avoid overwriting other employees
   if(db){
@@ -9420,7 +9406,6 @@ function saveBranchAttendance(){
     db.ref(path).set(recs,function(err){
       if(err){showToast('Save failed: '+err.message,'error');return;}
       showToast('Attendance saved \u2713','success');
-      if(typeof btsResetBreak==='function') btsResetBreak();
       // Refresh just the view date table without full page re-render
       var vd=BS.tsViewDate||TODAY_BS;
       if(vd===dt)_refreshAttTable(vd);
@@ -9437,90 +9422,6 @@ function saveBranchAttendance(){
       setTimeout(function(){window.location.href='https://wa.me/'+emp.phone.replace(/[^0-9]/g,'')+'?text='+msg;},300);
     }
   }
-}
-
-// ── Break Tracking State ──
-var _btsBreak = { active:false, startMs:null, logs:[], timerInt:null };
-
-function btsOnEmpChange(eid, vd) {
-  btsResetBreak();
-  if(!eid||!BS.tsAtt[eid]) return;
-  var key=vd.slice(0,7), recs=(BS.tsAtt[eid][key]||[]);
-  var r=recs.find(function(x){return x.date===vd;});
-  if(!r) return;
-  var ci=document.getElementById('bts-in'), co=document.getElementById('bts-out');
-  var brk=document.getElementById('bts-brk'), note=document.getElementById('bts-note');
-  if(ci&&r.ci) ci.value=r.ci;
-  if(co&&r.co) co.value=r.co;
-  if(brk&&r.brk) brk.value=r.brk;
-  if(note&&r.note) note.value=r.note;
-  if(r.st) BS.tsSt=r.st;
-  if(r.brkLogs&&r.brkLogs.length){ _btsBreak.logs=r.brkLogs.slice(); btsRenderBreakLog(); }
-}
-
-function btsStartBreak() {
-  if(_btsBreak.active) return;
-  _btsBreak.active=true;
-  _btsBreak.startMs=Date.now();
-  var s=document.getElementById('bts-brk-start');
-  var e=document.getElementById('bts-brk-end');
-  var t=document.getElementById('bts-brk-timer');
-  if(s) s.style.display='none';
-  if(e) e.style.display='inline-flex';
-  if(t) t.style.display='inline';
-  _btsBreak.timerInt=setInterval(function(){
-    var el=document.getElementById('bts-brk-timer');
-    if(el){ var sec=Math.floor((Date.now()-_btsBreak.startMs)/1000); el.textContent=Math.floor(sec/60)+'m '+(sec%60<10?'0':'')+sec%60+'s'; }
-  },1000);
-  showToast('☕ Break started','success');
-}
-
-function btsEndBreak() {
-  if(!_btsBreak.active) return;
-  clearInterval(_btsBreak.timerInt);
-  _btsBreak.active=false;
-  var endMs=Date.now(), durSec=Math.floor((endMs-_btsBreak.startMs)/1000);
-  var startTime=new Date(_btsBreak.startMs).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
-  var endTime=new Date(endMs).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
-  _btsBreak.logs.push({start:startTime,end:endTime,sec:durSec});
-  var s=document.getElementById('bts-brk-start'); if(s) s.style.display='inline-flex';
-  var e=document.getElementById('bts-brk-end');   if(e) e.style.display='none';
-  var t=document.getElementById('bts-brk-timer'); if(t){t.style.display='none';t.textContent='';}
-  btsUpdateBrkTotal();
-  btsRenderBreakLog();
-  showToast('Break ended: '+Math.floor(durSec/60)+'m','success');
-}
-
-function btsUpdateBrkTotal() {
-  var total=_btsBreak.logs.reduce(function(s,l){return s+l.sec;},0);
-  var el=document.getElementById('bts-brk');
-  if(el) el.value=Math.floor(total/60)+'m'+(total%60>0?(total%60<10?'0':'')+total%60+'s':'');
-}
-
-function btsRenderBreakLog() {
-  var logDiv=document.getElementById('bts-brk-log');
-  var logItems=document.getElementById('bts-brk-log-items');
-  if(!logDiv||!logItems) return;
-  if(!_btsBreak.logs.length){logDiv.style.display='none';return;}
-  logDiv.style.display='block';
-  var total=_btsBreak.logs.reduce(function(s,l){return s+l.sec;},0);
-  logItems.innerHTML=_btsBreak.logs.map(function(l,i){
-    return '<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid var(--border)">' +
-      '<span style="color:var(--text-tertiary)">#'+(i+1)+'</span>' +
-      '<span>'+l.start+' → '+l.end+'</span>' +
-      '<span style="color:#b45309;font-weight:700">'+Math.floor(l.sec/60)+'m'+(l.sec%60>0?l.sec%60+'s':'')+'</span>' +
-    '</div>';
-  }).join('')+'<div style="text-align:right;padding-top:3px;font-weight:700;color:#b45309">Total: '+Math.floor(total/60)+'m'+(total%60>0?total%60+'s':'')+'</div>';
-}
-
-function btsResetBreak() {
-  clearInterval(_btsBreak.timerInt);
-  _btsBreak={active:false,startMs:null,logs:[],timerInt:null};
-  var s=document.getElementById('bts-brk-start'); if(s) s.style.display='inline-flex';
-  var e=document.getElementById('bts-brk-end');   if(e) e.style.display='none';
-  var t=document.getElementById('bts-brk-timer'); if(t){t.style.display='none';t.textContent='';}
-  var logDiv=document.getElementById('bts-brk-log'); if(logDiv) logDiv.style.display='none';
-  var brk=document.getElementById('bts-brk'); if(brk) brk.value='';
 }
 
 // Refresh just the attendance table rows without full page re-render
