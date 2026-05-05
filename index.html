@@ -4069,7 +4069,6 @@ function renderLoginStep0(card) {
     { id:'branch_mgr',  label:'Branch Manager',   sub:'Select branch + enter PIN',     icon:'🏪', color:'#b45309' },
     { id:'hr_manager',  label:'HR Manager',        sub:'Enter PIN → auto-login',        icon:'🧑‍💼', color:'#94a3b8' },
     { id:'finance_dir', label:'Finance Director',  sub:'Enter PIN → auto-login',        icon:'💰', color:'#b45309' },
-    { id:'staff',       label:'Staff Member',     sub:'Login with SAP number + PIN',   icon:'👤', color:'#64748b' }
   ];
   card.innerHTML =
     '<div class="login-step-title">Select Your Role</div>' +
@@ -4080,7 +4079,16 @@ function renderLoginStep0(card) {
         '<div class="role-label"><strong>' + r.label + '</strong>' + r.sub + '</div>' +
       '</div>';
     }).join('') +
+    '<div class="role-card" onclick="openStaffPortal()" style="--role-color:#006666">' +
+      '<div class="role-icon" style="background:#00666618;color:#006666">👤</div>' +
+      '<div class="role-label"><strong>Staff Member</strong>Login with SAP + PIN</div>' +
+    '</div>' +
     '</div>';
+}
+
+function openStaffPortal() {
+  // Open staff-portal.html directly in a new tab
+  window.open('staff-portal.html', '_blank');
 }
 
 function selectRole(roleId) {
@@ -4316,17 +4324,24 @@ function _updateStaffDots(prefix, count) {
 }
 
 function _completeStaffLogin() {
-  // Store staff SAP in session for cross-page use
+  // Pass session to staff-portal via sessionStorage (tab-scoped, more secure than localStorage)
   var sap = loginState.staffSAP || '';
-  localStorage.setItem('alfa_staff_sap', sap);
-  localStorage.setItem('alfa_staff_name', loginState.staffName || '');
-  localStorage.setItem('alfa_staff_branch', loginState.branchName || '');
-  localStorage.setItem('alfa_staff_branchId', loginState.branchId || '');
+  sessionStorage.setItem('alfa_staff_sap', sap);
+  sessionStorage.setItem('alfa_staff_name', loginState.staffName || '');
+  sessionStorage.setItem('alfa_staff_branch', loginState.branchName || '');
+  sessionStorage.setItem('alfa_staff_branchId', loginState.branchId || '');
+
+  // Write session hint to Firebase so staff-portal can look up the full staff record
+  if (typeof db !== 'undefined' && db && sap) {
+    db.ref('staff/sessions/' + sap).update({
+      name: loginState.staffName || '',
+      branch: loginState.branchName || '',
+      branchId: loginState.branchId || '',
+      lastIndexLogin: Date.now()
+    });
+  }
 
   // Build session identical to normal staff login
-  loginState.role = 'staff';
-  loginState.pin = '0000'; // dummy to pass verifyPIN
-  // Patch verifyPIN for staff to succeed directly
   var branchId4 = loginState.branchId || '';
   var bObj4 = NX_BRANCHES[branchId4] || {};
   var sess = { role: 'staff' };
