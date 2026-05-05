@@ -3033,7 +3033,7 @@ function rand(min, max) {
 
 function navTo(pageId) {
   // Standalone portal links — open in new tab
-  var portalMap = { '_staff-portal':'staff.html', '_leave-portal':'leave.html', '_checklist-portal':'checklists.html', '_server-drop':'server-drop.html' };
+  var portalMap = { '_staff-portal':'staff.html', '_leave-portal':'leave.html', '_checklist-portal':'checklists.html', '_server-drop':'server-drop.html', '_my-portal':'staff-portal.html' };
   if (portalMap[pageId]) { window.open(portalMap[pageId], '_blank'); return; }
 
   NX.page = pageId;
@@ -3271,13 +3271,14 @@ var NAV_CONFIG = {
     ]}
   ],
   staff: [
-    { section:'MY BRANCH', items:[
-      { id:'branch-dash', icon:'📊', label:'Dashboard' },
-      { id:'checklists',  icon:'✅', label:'Checklists' },
-      { id:'qr-checkin',  icon:'📱', label:'Check-In' }
+    { section:'MY WORKSPACE', items:[
+      { id:'branch-dash',   icon:'📊', label:'Dashboard' },
+      { id:'_my-portal',    icon:'👤', label:'My Staff Portal' },
+      { id:'checklists',    icon:'✅', label:'Checklists' },
+      { id:'qr-checkin',    icon:'📱', label:'Check-In' }
     ]},
     { section:'PORTALS', items:[
-      { id:'_staff-portal',      icon:'🏃', label:'Check-In' },
+      { id:'_staff-portal',      icon:'🏃', label:'Daily Task' },
       { id:'_leave-portal',      icon:'📝', label:'Leave Request' },
       { id:'_checklist-portal',  icon:'📋', label:'Checklist App' },
       { id:'_server-drop',       icon:'💰', label:'Server Drop' }
@@ -4068,7 +4069,7 @@ function renderLoginStep0(card) {
     { id:'branch_mgr',  label:'Branch Manager',   sub:'Select branch + enter PIN',     icon:'🏪', color:'#b45309' },
     { id:'hr_manager',  label:'HR Manager',        sub:'Enter PIN → auto-login',        icon:'🧑‍💼', color:'#94a3b8' },
     { id:'finance_dir', label:'Finance Director',  sub:'Enter PIN → auto-login',        icon:'💰', color:'#b45309' },
-    { id:'staff',       label:'Staff',            sub:'Check-in & checklists only',    icon:'👤', color:'#64748b' }
+    { id:'staff',       label:'Staff Member',     sub:'Login with SAP number + PIN',   icon:'👤', color:'#64748b' }
   ];
   card.innerHTML =
     '<div class="login-step-title">Select Your Role</div>' +
@@ -4100,9 +4101,245 @@ function selectRole(roleId) {
   } else if (roleId === 'branch_mgr') {
     renderLoginEntitySelect('branch');
   } else {
-    // staff — pick branch then straight to dashboard
-    renderLoginEntitySelect('branch');
+    // staff — SAP number entry first
+    renderLoginStaffSAP();
   }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   STAFF — SAP Number + Personal PIN login flow
+   Step A: SAP entry → Step B: PIN setup (first time) or PIN entry
+══════════════════════════════════════════════════════════════ */
+var _staffSAPBuffer = '';
+var _staffPINBuffer = '';
+var _staffNewPIN    = '';
+
+function renderLoginStaffSAP() {
+  var card = document.getElementById('login-card');
+  card.innerHTML =
+    '<button class="login-back-btn" onclick="renderLogin(0)">← Back</button>' +
+    '<div style="text-align:center;margin-bottom:24px">' +
+      '<div style="font-size:36px;margin-bottom:8px">👤</div>' +
+      '<div class="login-step-title" style="color:var(--staff)">Staff Login</div>' +
+      '<div style="font-size:11px;color:var(--text-tertiary);margin-top:6px">Enter your SAP employee number</div>' +
+    '</div>' +
+    '<label style="font-size:9px;font-weight:700;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.12em;font-family:var(--mono);margin-bottom:8px;display:block">SAP Number</label>' +
+    '<input class="login-input" id="staff-sap-inp" type="text" inputmode="numeric" maxlength="12" placeholder="e.g. 10012345" autocomplete="off" style="letter-spacing:.06em;font-family:var(--mono);font-size:16px" onkeydown="if(event.key===\'Enter\')_checkStaffSAP()">' +
+    '<div id="staff-sap-err" style="color:#f87171;font-size:11px;min-height:18px;margin:6px 0 12px;text-align:center;font-family:var(--mono)"></div>' +
+    '<button class="btn btn-primary" style="width:100%" onclick="_checkStaffSAP()">Continue →</button>';
+  setTimeout(function(){ var i=document.getElementById('staff-sap-inp'); if(i)i.focus(); },120);
+}
+
+function _checkStaffSAP() {
+  var inp = document.getElementById('staff-sap-inp');
+  var err = document.getElementById('staff-sap-err');
+  if (!inp) return;
+  var sap = inp.value.trim();
+  if (!sap || sap.length < 4) { if(err) err.textContent = 'Please enter a valid SAP number'; return; }
+
+  // Check if this SAP exists in the branch staff loaded from Firebase
+  var staffFound = null;
+  var staffBranch = null;
+  Object.values(NX_BRANCHES).forEach(function(b) {
+    if (staffFound) return;
+    var brStaff = b._staff || [];
+    brStaff.forEach(function(m) {
+      if (String(m.sap||'') === sap) { staffFound = m; staffBranch = b; }
+    });
+  });
+  // Also check BS.staff (current branch staff in memory)
+  if (!staffFound) {
+    (window.BS && BS.staff || []).forEach(function(m) {
+      if (String(m.sap||'') === sap) { staffFound = m; }
+    });
+  }
+
+  // Store SAP in loginState regardless — we'll use it for the PIN key
+  loginState.staffSAP = sap;
+  loginState.staffName = staffFound ? staffFound.name : null;
+  loginState.staffIcon = '👤';
+  if (staffBranch) {
+    loginState.branchId   = staffBranch.id;
+    loginState.branchName = staffBranch.name || staffBranch.id;
+    loginState.brandName  = staffBranch.brand || '';
+    loginState.regionName = staffBranch.location || '';
+  }
+
+  // If staff not found in Firebase, still allow login (offline / demo mode)
+  var hasPIN = !!localStorage.getItem('staff_pin_' + sap);
+  if (hasPIN) {
+    _renderStaffPINEntry(sap, staffFound);
+  } else {
+    _renderStaffPINSetup(sap, staffFound);
+  }
+}
+
+function _renderStaffPINSetup(sap, staffMember) {
+  _staffNewPIN = '';
+  _staffPINBuffer = '';
+  var name = staffMember ? staffMember.name.split(' ')[0] : 'Staff Member';
+  var card = document.getElementById('login-card');
+  card.innerHTML =
+    '<button class="login-back-btn" onclick="renderLoginStaffSAP()">← Back</button>' +
+    '<div style="text-align:center;margin-bottom:20px">' +
+      '<div style="font-size:32px;margin-bottom:8px">🔐</div>' +
+      '<div class="login-step-title" style="color:var(--staff)">Set Your PIN</div>' +
+      '<div style="font-size:11px;color:var(--text-tertiary);margin-top:4px">Welcome, '+xe(name)+'! First login — choose a 4-digit PIN</div>' +
+      '<div style="display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.06);border-radius:8px;padding:4px 10px;font-size:9px;font-family:var(--mono);color:var(--text-tertiary);letter-spacing:.1em;margin-top:10px">🆕 FIRST LOGIN</div>' +
+    '</div>' +
+    '<div style="font-size:9px;font-weight:700;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.12em;font-family:var(--mono);margin-bottom:10px;text-align:center">Create your 4-digit PIN</div>' +
+    '<div style="display:flex;justify-content:center;gap:14px;margin-bottom:18px" id="staff-setup-dots">' +
+      '<span id="ssd0" style="width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,.2);display:inline-block;transition:all .15s"></span>' +
+      '<span id="ssd1" style="width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,.2);display:inline-block;transition:all .15s"></span>' +
+      '<span id="ssd2" style="width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,.2);display:inline-block;transition:all .15s"></span>' +
+      '<span id="ssd3" style="width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,.2);display:inline-block;transition:all .15s"></span>' +
+    '</div>' +
+    _buildStaffPinPad('_staffSetupPinKey') +
+    '<div id="staff-setup-err" style="color:#f87171;font-size:11px;min-height:18px;text-align:center;font-family:var(--mono);margin-top:8px"></div>';
+}
+
+function _staffSetupPinKey(k) {
+  if (k === 'del') { _staffPINBuffer = _staffPINBuffer.slice(0,-1); _updateStaffDots('ssd',_staffPINBuffer.length); return; }
+  if (_staffPINBuffer.length >= 4) return;
+  _staffPINBuffer += k;
+  _updateStaffDots('ssd', _staffPINBuffer.length);
+  if (_staffPINBuffer.length === 4) {
+    _staffNewPIN = _staffPINBuffer;
+    _staffPINBuffer = '';
+    setTimeout(function(){ _renderStaffPINConfirm(loginState.staffSAP, loginState.staffName); }, 200);
+  }
+}
+
+function _renderStaffPINConfirm(sap, name) {
+  _staffPINBuffer = '';
+  var firstName = name ? name.split(' ')[0] : '';
+  var card = document.getElementById('login-card');
+  card.innerHTML =
+    '<button class="login-back-btn" onclick="_renderStaffPINSetup(loginState.staffSAP, null)">← Back</button>' +
+    '<div style="text-align:center;margin-bottom:20px">' +
+      '<div style="font-size:32px;margin-bottom:8px">✅</div>' +
+      '<div class="login-step-title" style="color:var(--staff)">Confirm PIN</div>' +
+      '<div style="font-size:11px;color:var(--text-tertiary);margin-top:4px">Enter your new PIN again to confirm</div>' +
+    '</div>' +
+    '<div style="display:flex;justify-content:center;gap:14px;margin-bottom:18px" id="staff-confirm-dots">' +
+      '<span id="scd0" style="width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,.2);display:inline-block;transition:all .15s"></span>' +
+      '<span id="scd1" style="width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,.2);display:inline-block;transition:all .15s"></span>' +
+      '<span id="scd2" style="width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,.2);display:inline-block;transition:all .15s"></span>' +
+      '<span id="scd3" style="width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,.2);display:inline-block;transition:all .15s"></span>' +
+    '</div>' +
+    _buildStaffPinPad('_staffConfirmPinKey') +
+    '<div id="staff-confirm-err" style="color:#f87171;font-size:11px;min-height:18px;text-align:center;font-family:var(--mono);margin-top:8px"></div>';
+}
+
+function _staffConfirmPinKey(k) {
+  if (k === 'del') { _staffPINBuffer = _staffPINBuffer.slice(0,-1); _updateStaffDots('scd',_staffPINBuffer.length); return; }
+  if (_staffPINBuffer.length >= 4) return;
+  _staffPINBuffer += k;
+  _updateStaffDots('scd', _staffPINBuffer.length);
+  if (_staffPINBuffer.length === 4) {
+    if (_staffPINBuffer !== _staffNewPIN) {
+      var err = document.getElementById('staff-confirm-err');
+      if (err) err.textContent = 'PINs do not match — try again';
+      _staffPINBuffer = ''; _updateStaffDots('scd', 0);
+      return;
+    }
+    localStorage.setItem('staff_pin_' + loginState.staffSAP, _staffNewPIN);
+    showToast && showToast('PIN created — welcome! 🎉', 'success');
+    _completeStaffLogin();
+  }
+}
+
+function _renderStaffPINEntry(sap, staffMember) {
+  _staffPINBuffer = '';
+  var name = staffMember ? staffMember.name.split(' ')[0] : 'Welcome Back';
+  var branch = loginState.branchName || '';
+  var card = document.getElementById('login-card');
+  card.innerHTML =
+    '<button class="login-back-btn" onclick="renderLoginStaffSAP()">← Different SAP</button>' +
+    '<div style="text-align:center;margin-bottom:20px">' +
+      '<div style="font-size:32px;margin-bottom:8px">🔑</div>' +
+      '<div class="login-step-title" style="color:var(--staff)">'+xe(name)+'</div>' +
+      '<div style="font-size:11px;color:var(--text-tertiary);margin-top:4px">'+xe(branch)+'</div>' +
+    '</div>' +
+    '<div style="font-size:9px;font-weight:700;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.12em;font-family:var(--mono);margin-bottom:10px;text-align:center">Enter your PIN</div>' +
+    '<div style="display:flex;justify-content:center;gap:14px;margin-bottom:18px" id="staff-pin-dots">' +
+      '<span id="spd0" style="width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,.2);display:inline-block;transition:all .15s"></span>' +
+      '<span id="spd1" style="width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,.2);display:inline-block;transition:all .15s"></span>' +
+      '<span id="spd2" style="width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,.2);display:inline-block;transition:all .15s"></span>' +
+      '<span id="spd3" style="width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,.2);display:inline-block;transition:all .15s"></span>' +
+    '</div>' +
+    _buildStaffPinPad('_staffLoginPinKey') +
+    '<div id="staff-pin-err" style="color:#f87171;font-size:11px;min-height:18px;text-align:center;font-family:var(--mono);margin-top:8px"></div>';
+}
+
+function _staffLoginPinKey(k) {
+  if (k === 'del') { _staffPINBuffer = _staffPINBuffer.slice(0,-1); _updateStaffDots('spd',_staffPINBuffer.length); return; }
+  if (_staffPINBuffer.length >= 4) return;
+  _staffPINBuffer += k;
+  _updateStaffDots('spd', _staffPINBuffer.length);
+  if (_staffPINBuffer.length === 4) {
+    var stored = localStorage.getItem('staff_pin_' + loginState.staffSAP);
+    if (_staffPINBuffer !== stored) {
+      var err = document.getElementById('staff-pin-err');
+      if (err) err.textContent = 'Incorrect PIN — try again';
+      _staffPINBuffer = ''; _updateStaffDots('spd', 0);
+      return;
+    }
+    _completeStaffLogin();
+  }
+}
+
+function _buildStaffPinPad(fnName) {
+  var keys = [1,2,3,4,5,6,7,8,9,'empty',0,'del'];
+  return '<div class="pin-pad">' + keys.map(function(k) {
+    if (k==='empty') return '<div style="visibility:hidden"></div>';
+    var label = k==='del' ? '⌫' : k;
+    var arg = k==='del' ? "'del'" : k;
+    return '<button class="pin-btn" onclick="'+fnName+'('+arg+')">'+label+'</button>';
+  }).join('') + '</div>';
+}
+
+function _updateStaffDots(prefix, count) {
+  for (var i=0; i<4; i++) {
+    var d = document.getElementById(prefix+i);
+    if (!d) continue;
+    if (i < count) {
+      d.style.background = '#006666';
+      d.style.border = '2px solid #006666';
+      d.style.boxShadow = '0 0 8px rgba(0,102,102,.5)';
+    } else {
+      d.style.background = '';
+      d.style.border = '2px solid rgba(255,255,255,.2)';
+      d.style.boxShadow = '';
+    }
+  }
+}
+
+function _completeStaffLogin() {
+  // Store staff SAP in session for cross-page use
+  var sap = loginState.staffSAP || '';
+  localStorage.setItem('alfa_staff_sap', sap);
+  localStorage.setItem('alfa_staff_name', loginState.staffName || '');
+  localStorage.setItem('alfa_staff_branch', loginState.branchName || '');
+  localStorage.setItem('alfa_staff_branchId', loginState.branchId || '');
+
+  // Build session identical to normal staff login
+  loginState.role = 'staff';
+  loginState.pin = '0000'; // dummy to pass verifyPIN
+  // Patch verifyPIN for staff to succeed directly
+  var branchId4 = loginState.branchId || '';
+  var bObj4 = NX_BRANCHES[branchId4] || {};
+  var sess = { role: 'staff' };
+  sess.branchId   = branchId4;
+  sess.branchIds  = [branchId4];
+  sess.branchName = bObj4.name || loginState.branchName || branchId4;
+  sess.brandName  = bObj4.brand || loginState.brandName || '';
+  sess.regionName = bObj4.location || loginState.regionName || '';
+  sess.entityName = sess.branchName;
+  sess.staffSAP   = sap;
+  sess.staffName  = loginState.staffName || '';
+  saveSession(sess);
+  launchApp();
 }
 
 function renderLoginEntitySelect(type) {
