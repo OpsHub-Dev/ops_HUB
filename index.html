@@ -3266,8 +3266,7 @@ var NAV_CONFIG = {
       { id:'bm-leave',          icon:'🏖️', label:'Leave Management', badge:'bm-leave-pending' }
     ]},
     { section:'COMMUNICATIONS', items:[
-      { id:'bm-announcements',  icon:'📢', label:'Announcements', badge:'bm-ann-unread' },
-      { id:'bm-music-player',   icon:'🎵', label:'Music Player' }
+      { id:'bm-announcements',  icon:'📢', label:'Announcements', badge:'bm-ann-unread' }
     ]}
   ],
   staff: [
@@ -4470,7 +4469,6 @@ function renderPage(pageId) {
     'bm-payroll':        pBmPayroll,
     'bm-transfers':      pBmTransfers,
     'bm-announcements':  pBmAnnouncements,
-    'bm-music-player':   pBmMusicPlayer,
     // ── HR & Finance Manager pages ──
     'hrf-hr-dash':    pHrfHrDash,
     'hrf-fin-dash':   pHrfFinDash,
@@ -9330,14 +9328,22 @@ function btsPgAtt(){
   var dateLbl=vd===TODAY_BS?'Today \u2014 '+TODAY_BS:new Date(vd+'T00:00:00').toLocaleDateString('en-GB',{weekday:'short',day:'2-digit',month:'short',year:'numeric'});
   var h='<div class="bgrid-2" style="margin-bottom:16px"><div class="bcard">';
   h+='<div style="font-size:13px;font-weight:700;color:var(--ceo);margin-bottom:14px">Manual Entry</div>';
-  h+='<div class="bfg"><label class="form-label">Employee</label><select class="form-input form-select" id="bts-emp">'+eo+'</select></div>';
+  h+='<div class="bfg"><label class="form-label">Employee</label><select class="form-input form-select" id="bts-emp" onchange="btsOnEmpChange(this.value,\''+vd+'\')" >'+eo+'</select></div>';
   h+='<div class="form-row"><div class="bfg"><label class="form-label">Date</label><input class="form-input" type="date" id="bts-date" value="'+vd+'"></div><div class="bfg"><label class="form-label">Check In</label><input class="form-input" type="time" id="bts-in"></div></div>';
-  h+='<div class="form-row"><div class="bfg"><label class="form-label">Check Out</label><input class="form-input" type="time" id="bts-out"></div><div class="bfg"><label class="form-label">Break</label><input class="form-input" id="bts-brk" placeholder="e.g. 30m"></div></div>';
+  h+='<div class="form-row"><div class="bfg"><label class="form-label">Check Out</label><input class="form-input" type="time" id="bts-out"></div><div class="bfg"><label class="form-label">Break Total</label><input class="form-input" id="bts-brk" placeholder="Auto-calculated" readonly style="background:var(--surface-2);color:var(--text-secondary)"></div></div>';
+  h+='<div class="bfg" style="margin-bottom:10px">';
+  h+='<label class="form-label">Break Tracking</label>';
+  h+='<div style="display:flex;gap:8px;margin-top:6px;align-items:center">';
+  h+='<button id="bts-brk-start" class="btn btn-sm" style="flex:1;background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.4);color:#b45309;font-weight:700" onclick="btsStartBreak()">☕ Start Break</button>';
+  h+='<button id="bts-brk-end" class="btn btn-sm" style="flex:1;background:rgba(0,135,90,.12);border-color:rgba(0,135,90,.4);color:#00875a;font-weight:700;display:none" onclick="btsEndBreak()">▶ End Break</button>';
+  h+='<span id="bts-brk-timer" style="font-size:11px;font-family:var(--mono);color:#b45309;min-width:40px;display:none"></span>';
+  h+='</div>';
+  h+='<div id="bts-brk-log" style="margin-top:6px;display:none"><div style="font-size:10px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px">Break Log</div><div id="bts-brk-log-items" style="font-size:11px;font-family:var(--mono);color:var(--text-secondary)"></div></div>';
+  h+='</div>';
   h+='<div class="bfg"><label class="form-label">Note</label><input class="form-input" id="bts-note" placeholder="Optional"></div>';
   h+='<div class="bfg"><label class="form-label">Status</label><div id="bts-st-wrap" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">'+stBtns+'</div></div>';
   h+='<button class="btn btn-primary" style="width:100%;margin-top:12px" id="bts-save-att">Save Attendance</button>';
   h+='</div>';
-  h+=
   h+='<div class="btw"><div class="bttb" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">';
   h+='<label class="form-label" style="margin:0">Date:</label>';
   h+='<input class="bfi" type="date" id="bts-view-date" value="'+vd+'" max="'+TODAY_BS+'" style="width:auto">';
@@ -9398,7 +9404,7 @@ function saveBranchAttendance(){
   if(!BS.tsAtt[eid][key])BS.tsAtt[eid][key]=[];
   var recs=BS.tsAtt[eid][key];
   var ex=recs.findIndex(function(r){return r.date===dt;});
-  var rec={date:dt,ci:ci,co:co,brk:brk,note:note,st:st};
+  var rec={date:dt,ci:ci,co:co,brk:brk,note:note,st:st,brkLogs:(_btsBreak.logs||[])};
   if(ex>=0)recs[ex]=rec;else recs.push(rec);
   // Save to Firebase using targeted path (not full set) to avoid overwriting other employees
   if(db){
@@ -9406,6 +9412,7 @@ function saveBranchAttendance(){
     db.ref(path).set(recs,function(err){
       if(err){showToast('Save failed: '+err.message,'error');return;}
       showToast('Attendance saved \u2713','success');
+      btsResetBreak();
       // Refresh just the view date table without full page re-render
       var vd=BS.tsViewDate||TODAY_BS;
       if(vd===dt)_refreshAttTable(vd);
@@ -9422,6 +9429,113 @@ function saveBranchAttendance(){
       setTimeout(function(){window.location.href='https://wa.me/'+emp.phone.replace(/[^0-9]/g,'')+'?text='+msg;},300);
     }
   }
+}
+
+// ── Break Tracking State ──
+var _btsBreak = { active:false, startMs:null, logs:[], timerInt:null };
+
+function btsOnEmpChange(eid, vd) {
+  // Reset break state when switching employee
+  btsResetBreak();
+  // Pre-fill existing record if any
+  if(!eid||!BS.tsAtt[eid]) return;
+  var key=vd.slice(0,7), recs=(BS.tsAtt[eid][key]||[]);
+  var r=recs.find(function(x){return x.date===vd;});
+  if(!r) return;
+  var ci=document.getElementById('bts-in'), co=document.getElementById('bts-out');
+  var brk=document.getElementById('bts-brk'), note=document.getElementById('bts-note');
+  if(ci&&r.ci) ci.value=r.ci;
+  if(co&&r.co) co.value=r.co;
+  if(brk&&r.brk) brk.value=r.brk;
+  if(note&&r.note) note.value=r.note;
+  if(r.st) BS.tsSt=r.st;
+  // Restore break logs
+  if(r.brkLogs && r.brkLogs.length) {
+    _btsBreak.logs=r.brkLogs.slice();
+    btsRenderBreakLog();
+  }
+}
+
+function btsStartBreak() {
+  if(_btsBreak.active) return;
+  _btsBreak.active=true;
+  _btsBreak.startMs=Date.now();
+  var s=document.getElementById('bts-brk-start');
+  var e=document.getElementById('bts-brk-end');
+  var t=document.getElementById('bts-brk-timer');
+  if(s) s.style.display='none';
+  if(e) e.style.display='flex';
+  if(t) { t.style.display='inline'; }
+  // Live timer
+  _btsBreak.timerInt=setInterval(function(){
+    var elapsed=Math.floor((Date.now()-_btsBreak.startMs)/1000);
+    var mm=Math.floor(elapsed/60), ss=elapsed%60;
+    var el=document.getElementById('bts-brk-timer');
+    if(el) el.textContent=mm+'m '+(ss<10?'0':'')+ss+'s';
+  },1000);
+  showToast('☕ Break started','success');
+}
+
+function btsEndBreak() {
+  if(!_btsBreak.active) return;
+  clearInterval(_btsBreak.timerInt);
+  _btsBreak.active=false;
+  var endMs=Date.now();
+  var durSec=Math.floor((endMs-_btsBreak.startMs)/1000);
+  var startTime=new Date(_btsBreak.startMs).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  var endTime=new Date(endMs).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  _btsBreak.logs.push({start:startTime,end:endTime,sec:durSec});
+  // Reset UI
+  var s=document.getElementById('bts-brk-start');
+  var e=document.getElementById('bts-brk-end');
+  var t=document.getElementById('bts-brk-timer');
+  if(s){s.style.display='flex';}
+  if(e){e.style.display='none';}
+  if(t){t.style.display='none';t.textContent='';}
+  // Update total break field
+  btsUpdateBrkTotal();
+  btsRenderBreakLog();
+  showToast('Break ended: '+Math.floor(durSec/60)+'m','success');
+}
+
+function btsUpdateBrkTotal() {
+  var total=_btsBreak.logs.reduce(function(s,l){return s+l.sec;},0);
+  var mm=Math.floor(total/60), ss=total%60;
+  var el=document.getElementById('bts-brk');
+  if(el) el.value=mm+'m'+(ss>0?(ss<10?'0':'')+ss+'s':'');
+}
+
+function btsRenderBreakLog() {
+  var logDiv=document.getElementById('bts-brk-log');
+  var logItems=document.getElementById('bts-brk-log-items');
+  if(!logDiv||!logItems) return;
+  if(!_btsBreak.logs.length){logDiv.style.display='none';return;}
+  logDiv.style.display='block';
+  var total=_btsBreak.logs.reduce(function(s,l){return s+l.sec;},0);
+  logItems.innerHTML=_btsBreak.logs.map(function(l,i){
+    var mm=Math.floor(l.sec/60),ss=l.sec%60;
+    return '<div style="display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid var(--border)">'+
+      '<span style="color:var(--text-tertiary)">#'+(i+1)+'</span>'+
+      '<span>'+l.start+' → '+l.end+'</span>'+
+      '<span style="color:#b45309;font-weight:700">'+mm+'m'+(ss>0?ss+'s':'')+'</span>'+
+    '</div>';
+  }).join('')+
+  '<div style="text-align:right;padding-top:3px;font-weight:700;color:#b45309">Total: '+Math.floor(total/60)+'m'+(total%60>0?total%60+'s':'')+'</div>';
+}
+
+function btsResetBreak() {
+  clearInterval(_btsBreak.timerInt);
+  _btsBreak={active:false,startMs:null,logs:[],timerInt:null};
+  var s=document.getElementById('bts-brk-start');
+  var e=document.getElementById('bts-brk-end');
+  var t=document.getElementById('bts-brk-timer');
+  var logDiv=document.getElementById('bts-brk-log');
+  if(s){s.style.display='flex';}
+  if(e){e.style.display='none';}
+  if(t){t.style.display='none';t.textContent='';}
+  if(logDiv){logDiv.style.display='none';}
+  var brk=document.getElementById('bts-brk');
+  if(brk) brk.value='';
 }
 
 // Refresh just the attendance table rows without full page re-render
@@ -14966,540 +15080,9 @@ function bmAcknowledge(annId) {
   });
 }
 
-// ══════════════════════════════════════════════════════
-//  🎵 BRANCH MUSIC PLAYER  (pBmMusicPlayer)
-//  • Playlist stored in localStorage per branch
-//  • Cloud: Google Drive / OneDrive / Dropbox URLs
-//  • Auto-pause 10 min before prayer, resume 30 min after
-// ══════════════════════════════════════════════════════
-var _MP = {
-  playlist:[], currentIndex:-1, isPlaying:false,
-  isShuffle:false, isRepeat:false, isPrayerPaused:false,
-  audio:null, _checkInt:null,
-  prayerTimes:{ fajr:'05:00',dhuhr:'12:15',asr:'15:30',maghrib:'18:20',isha:'19:45', stopBefore:10,resumeAfter:30 }
-};
-var _MP_NAMES = ['Fajr','Dhuhr','Asr','Maghrib','Isha'];
-var _MP_KEYS  = ['fajr','dhuhr','asr','maghrib','isha'];
-
-function _mpKey(){ return 'alfa_mp_'+((NX.session&&NX.session.branchId)||'def'); }
-function _mpSave(){
-  try{
-    localStorage.setItem(_mpKey()+'_pl',  JSON.stringify(_MP.playlist));
-    localStorage.setItem(_mpKey()+'_idx', _MP.currentIndex);
-    localStorage.setItem(_mpKey()+'_pt',  JSON.stringify(_MP.prayerTimes));
-    if(_MP.audio) localStorage.setItem(_mpKey()+'_vol', Math.round(_MP.audio.volume*100));
-  }catch(e){}
-}
-function _mpLoad(){
-  try{
-    var pl=localStorage.getItem(_mpKey()+'_pl');
-    var idx=localStorage.getItem(_mpKey()+'_idx');
-    var pt=localStorage.getItem(_mpKey()+'_pt');
-    var vol=localStorage.getItem(_mpKey()+'_vol');
-    if(pl)  _MP.playlist=JSON.parse(pl);
-    if(idx!==null) _MP.currentIndex=parseInt(idx)||0;
-    if(pt)  _MP.prayerTimes=Object.assign({},_MP.prayerTimes,JSON.parse(pt));
-    if(vol&&_MP.audio) _MP.audio.volume=parseInt(vol)/100;
-  }catch(e){}
-}
-function _mpConvertUrl(raw){
-  var u=(raw||'').trim();
-  var gd=u.match(/drive\.google\.com\/file\/d\/([^\/\?]+)/);
-  if(gd) return 'https://drive.google.com/uc?export=download&id='+gd[1];
-  var gd2=u.match(/drive\.google\.com\/open\?id=([^&]+)/);
-  if(gd2) return 'https://drive.google.com/uc?export=download&id='+gd2[1];
-  if(u.includes('1drv.ms')||u.includes('onedrive.live.com')){
-    try{ var e=btoa(u).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,''); return 'https://api.onedrive.com/v1.0/shares/u!'+e+'/root/content'; }catch(ex){ return u; }
-  }
-  if(u.includes('dropbox.com')) return u.replace('dl=0','dl=1').replace('www.dropbox.com','dl.dropboxusercontent.com');
-  return u;
-}
-function _mpFmt(s){ s=Math.floor(s||0); var m=Math.floor(s/60),sec=s%60; return m+':'+(sec<10?'0':'')+sec; }
-function _mpNow(){ var d=new Date(); return d.getHours()*60+d.getMinutes(); }
-function _mpParse(t){ var p=(t||'00:00').split(':'); return parseInt(p[0])*60+parseInt(p[1]||0); }
-function _mpXe(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-function _mpEl(id){ return document.getElementById('mp_'+id); }
-
-function pBmMusicPlayer(){
-  // destroy old audio if navigating away re-renders
-  if(_MP._checkInt){ clearInterval(_MP._checkInt); _MP._checkInt=null; }
-  if(!_MP.audio){
-    _MP.audio=new Audio();
-    _MP.audio.volume=0.8;
-    _mpAttachAudioEvents();
-  }
-  _mpLoad();
-
-  var h='<style>';
-  h+='.mp-wrap{display:grid;grid-template-columns:1fr 320px;gap:0;height:calc(100vh - 140px);overflow:hidden;border:1px solid var(--border);border-radius:14px}';
-  h+='@media(max-width:900px){.mp-wrap{grid-template-columns:1fr;height:auto}}';
-  h+='.mp-left{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px 20px;border-right:1px solid var(--border)}';
-  h+='.mp-art{width:180px;height:180px;border-radius:20px;background:linear-gradient(135deg,#0f1e38,#1a0b3d);border:1px solid var(--border-strong);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;margin-bottom:20px;box-shadow:0 12px 48px rgba(0,0,0,.6);position:relative;overflow:hidden}';
-  h+='.mp-art::before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 30% 30%,rgba(139,92,246,.2),transparent 60%),radial-gradient(circle at 70% 70%,rgba(0,214,143,.12),transparent 60%)}';
-  h+='.mp-art-note{font-size:48px;position:relative;z-index:1}';
-  h+='.mp-wave{display:flex;gap:3px;align-items:flex-end;height:22px;position:relative;z-index:1}';
-  h+='.mp-wbar{width:3px;border-radius:2px;background:linear-gradient(to top,#00d68f,#8b5cf6);animation:mpwave 1.2s ease-in-out infinite}';
-  h+='.mp-wbar:nth-child(1){height:7px;animation-delay:0s}.mp-wbar:nth-child(2){height:16px;animation-delay:.15s}.mp-wbar:nth-child(3){height:22px;animation-delay:.3s}.mp-wbar:nth-child(4){height:14px;animation-delay:.45s}.mp-wbar:nth-child(5){height:10px;animation-delay:.6s}.mp-wbar:nth-child(6){height:18px;animation-delay:.75s}.mp-wbar:nth-child(7){height:9px;animation-delay:.9s}.mp-wbar:nth-child(8){height:14px;animation-delay:1.05s}';
-  h+='@keyframes mpwave{0%,100%{transform:scaleY(.4)}50%{transform:scaleY(1)}}';
-  h+='.mp-wbar.paused{animation-play-state:paused}';
-  h+='.mp-track-title{font-size:17px;font-weight:700;color:var(--text-primary);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:360px;margin-bottom:4px}';
-  h+='.mp-track-sub{font-size:12px;color:var(--text-tertiary);text-align:center;font-family:var(--mono)}';
-  h+='.mp-prog-wrap{width:100%;max-width:360px;margin:16px 0 12px}';
-  h+='.mp-prog-bar{width:100%;height:3px;border-radius:3px;background:var(--surface-2);cursor:pointer;position:relative;margin-bottom:6px}';
-  h+='.mp-prog-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,#00d68f,#8b5cf6);width:0%;pointer-events:none;transition:width .1s linear}';
-  h+='.mp-prog-times{display:flex;justify-content:space-between;font-size:10px;font-family:var(--mono);color:var(--text-tertiary)}';
-  h+='.mp-ctrls{display:flex;align-items:center;gap:14px;margin-bottom:16px}';
-  h+='.mp-btn{width:40px;height:40px;border-radius:50%;border:none;background:var(--surface-2);color:var(--text-secondary);font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s}';
-  h+='.mp-btn:hover{background:var(--surface-3);color:var(--text-primary);transform:scale(1.05)}';
-  h+='.mp-btn.mp-play{width:52px;height:52px;font-size:20px;background:linear-gradient(135deg,#00d68f,#00a86b);color:#000;box-shadow:0 4px 18px rgba(0,214,143,.35)}';
-  h+='.mp-btn.mp-play:hover{box-shadow:0 6px 24px rgba(0,214,143,.5)}';
-  h+='.mp-btn.mp-on{color:#00d68f}';
-  h+='.mp-vol{display:flex;align-items:center;gap:8px;width:100%;max-width:360px}';
-  h+='.mp-vol-icon{font-size:13px;color:var(--text-tertiary);width:18px;text-align:center}';
-  h+='.mp-vol-sl{flex:1;appearance:none;height:3px;border-radius:3px;background:var(--surface-2);cursor:pointer;outline:none}';
-  h+='.mp-vol-sl::-webkit-slider-thumb{appearance:none;width:13px;height:13px;border-radius:50%;background:var(--text-primary);cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.4)}';
-  h+='.mp-vol-val{font-size:10px;font-family:var(--mono);color:var(--text-tertiary);width:28px;text-align:right}';
-  h+='.mp-prayer-bar{display:none;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);border-radius:10px;padding:10px 14px;margin:12px 0;width:100%;max-width:360px;align-items:center;gap:10px}';
-  h+='.mp-prayer-bar.show{display:flex}';
-  h+='.mp-pb-info{flex:1}.mp-pb-title{font-size:12px;font-weight:700;color:#f59e0b}.mp-pb-sub{font-size:10px;color:var(--text-secondary);font-family:var(--mono)}';
-  h+='.mp-pb-timer{font-size:16px;font-weight:700;font-family:var(--mono);color:#f59e0b}';
-  h+='.mp-right{display:flex;flex-direction:column;overflow:hidden}';
-  h+='.mp-rhead{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}';
-  h+='.mp-rtitle{font-size:12px;font-weight:700;color:var(--text-primary);display:flex;align-items:center;gap:8px}';
-  h+='.mp-cnt{font-size:10px;font-family:var(--mono);color:var(--text-tertiary);background:var(--surface-2);padding:2px 8px;border-radius:10px}';
-  h+='.mp-ract{display:flex;gap:6px}';
-  h+='.mp-abtn{height:28px;padding:0 11px;border-radius:8px;border:1px solid var(--border-strong);background:var(--surface-1);color:var(--text-secondary);font-size:11px;cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap;transition:all .2s}';
-  h+='.mp-abtn:hover{background:var(--surface-2);color:var(--text-primary)}';
-  h+='.mp-abtn.mp-add{background:rgba(0,214,143,.1);border-color:rgba(0,214,143,.3);color:#00d68f}';
-  h+='.mp-abtn.mp-add:hover{background:rgba(0,214,143,.18)}';
-  h+='.mp-search{padding:8px 12px;border-bottom:1px solid var(--border);flex-shrink:0;position:relative}';
-  h+='.mp-sinput{width:100%;height:30px;padding:0 10px 0 28px;border-radius:8px;border:1px solid var(--border);background:var(--surface-1);color:var(--text-primary);font-size:12px;outline:none;transition:border-color .2s}';
-  h+='.mp-sinput:focus{border-color:var(--border-strong)}';
-  h+='.mp-si{position:absolute;left:20px;top:50%;transform:translateY(-50%);font-size:11px;color:var(--text-tertiary)}';
-  h+='.mp-list{flex:1;overflow-y:auto;padding:4px 0}';
-  h+='.mp-item{display:flex;align-items:center;gap:8px;padding:7px 14px;cursor:pointer;transition:background .15s;position:relative}';
-  h+='.mp-item:hover{background:var(--surface-1)}';
-  h+='.mp-item.mp-active{background:rgba(0,214,143,.06)}';
-  h+='.mp-item.mp-active::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:#00d68f}';
-  h+='.mp-inum{width:20px;text-align:center;font-size:10px;font-family:var(--mono);color:var(--text-tertiary);flex-shrink:0}';
-  h+='.mp-item.mp-active .mp-inum{color:#00d68f}';
-  h+='.mp-mini-wave{display:none;gap:1.5px;align-items:flex-end;height:12px}';
-  h+='.mp-item.mp-active.mp-playing .mp-mini-wave{display:flex}';
-  h+='.mp-item.mp-active.mp-playing .mp-inum-n{display:none}';
-  h+='.mp-mini-wave span{width:2px;border-radius:1px;background:#00d68f;animation:mpwave .8s ease-in-out infinite}';
-  h+='.mp-mini-wave span:nth-child(1){height:4px;animation-delay:0s}.mp-mini-wave span:nth-child(2){height:9px;animation-delay:.2s}.mp-mini-wave span:nth-child(3){height:12px;animation-delay:.4s}.mp-mini-wave span:nth-child(4){height:7px;animation-delay:.6s}';
-  h+='.mp-mini-wave span.mp-wpaused{animation-play-state:paused}';
-  h+='.mp-iname{font-size:12px;font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}';
-  h+='.mp-item.mp-active .mp-iname{color:#00d68f}';
-  h+='.mp-iart{font-size:10px;color:var(--text-tertiary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:var(--mono)}';
-  h+='.mp-idur{font-size:10px;font-family:var(--mono);color:var(--text-tertiary);flex-shrink:0}';
-  h+='.mp-idel{width:20px;height:20px;border-radius:50%;border:none;background:transparent;color:var(--text-tertiary);font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0;transition:all .2s;flex-shrink:0}';
-  h+='.mp-item:hover .mp-idel{opacity:1}.mp-idel:hover{background:rgba(255,71,87,.15);color:#ff4757}';
-  h+='.mp-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;text-align:center;gap:10px}';
-  h+='.mp-empty-icon{font-size:36px;opacity:.35}.mp-empty-txt{font-size:12px;color:var(--text-tertiary)}.mp-empty-sub{font-size:10px;color:var(--text-tertiary);opacity:.7;line-height:1.7;font-family:var(--mono)}';
-  h+='.mp-foot{padding:10px 14px;border-top:1px solid var(--border);flex-shrink:0}';
-  h+='.mp-prayer-tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}';
-  h+='.mp-ptag{font-size:9px;font-family:var(--mono);padding:2px 7px;border-radius:8px;background:var(--surface-2);color:var(--text-tertiary);border:1px solid var(--border)}';
-  h+='.mp-ptag.mp-ptag-on{background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.3);color:#f59e0b;font-weight:700}';
-  // Modal styles
-  h+='.mp-modal{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(8px);z-index:500;display:none;align-items:center;justify-content:center;padding:20px}';
-  h+='.mp-modal.show{display:flex}';
-  h+='.mp-mbox{background:var(--body-bg2,#0b1120);border:1px solid var(--border-strong);border-radius:18px;width:100%;max-width:480px;padding:24px;box-shadow:0 16px 64px rgba(0,0,0,.8);animation:mpslide .22s ease}';
-  h+='@keyframes mpslide{from{transform:translateY(16px);opacity:0}to{transform:translateY(0);opacity:1}}';
-  h+='.mp-mtitle{font-size:15px;font-weight:700;color:var(--text-primary);margin-bottom:5px}';
-  h+='.mp-msub{font-size:11px;color:var(--text-tertiary);margin-bottom:16px;line-height:1.6;font-family:var(--mono)}';
-  h+='.mp-minfo{background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.18);border-radius:9px;padding:10px 12px;margin-bottom:16px;font-size:11px;color:var(--text-secondary);line-height:1.7;font-family:var(--mono)}';
-  h+='.mp-minfo strong{color:#f59e0b}';
-  h+='.mp-field{margin-bottom:13px}';
-  h+='.mp-field label{display:block;font-size:10px;font-weight:700;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px}';
-  h+='.mp-field input,.mp-field select{width:100%;height:38px;padding:0 11px;border-radius:9px;border:1px solid var(--border);background:var(--surface-1);color:var(--text-primary);font-size:12px;outline:none;transition:border-color .2s;font-family:var(--font,"Plus Jakarta Sans",sans-serif)}';
-  h+='.mp-field input:focus,.mp-field select:focus{border-color:rgba(0,214,143,.4)}';
-  h+='.mp-field input::placeholder{color:var(--text-tertiary)}';
-  h+='.mp-tgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}';
-  h+='.mp-mfoot{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}';
-  h+='.mp-mcancel{height:36px;padding:0 16px;border-radius:9px;border:1px solid var(--border);background:transparent;color:var(--text-secondary);font-size:12px;cursor:pointer}';
-  h+='.mp-mcancel:hover{background:var(--surface-1)}';
-  h+='.mp-mok{height:36px;padding:0 18px;border-radius:9px;border:none;background:linear-gradient(135deg,#00d68f,#00a86b);color:#000;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s}';
-  h+='.mp-mok:hover{opacity:.9}';
-  h+='</style>';
-
-  var cur=(_MP.currentIndex>=0&&_MP.currentIndex<_MP.playlist.length)?_MP.playlist[_MP.currentIndex]:null;
-
-  h+='<div class="page-header"><h1>🎵 Music Player</h1><p>Branch playlist · Prayer-aware auto-pause</p></div>';
-
-  // Main player wrapper
-  h+='<div class="mp-wrap">';
-
-  // ── Left: playback ──
-  h+='<div class="mp-left">';
-  h+='<div class="mp-art">';
-  h+='<div class="mp-art-note">🎵</div>';
-  h+='<div class="mp-wave" id="mp_wave">';
-  for(var wb=0;wb<8;wb++) h+='<div class="mp-wbar paused"></div>';
-  h+='</div></div>';
-
-  h+='<div class="mp-track-title" id="mp_title">'+(cur?_mpXe(cur.name):'No Track Selected')+'</div>';
-  h+='<div class="mp-track-sub" id="mp_sub">'+(cur?_mpXe(cur.artist):'Add tracks to your playlist')+'</div>';
-
-  h+='<div class="mp-prayer-bar" id="mp_pbar">';
-  h+='<div style="font-size:18px">🕌</div>';
-  h+='<div class="mp-pb-info"><div class="mp-pb-title" id="mp_pb_title">Prayer Time</div><div class="mp-pb-sub">Music paused · resumes automatically</div></div>';
-  h+='<div class="mp-pb-timer" id="mp_pb_timer">--:--</div>';
-  h+='</div>';
-
-  h+='<div class="mp-prog-wrap">';
-  h+='<div class="mp-prog-bar" id="mp_prog" onclick="mpSeek(event)">';
-  h+='<div class="mp-prog-fill" id="mp_fill"></div>';
-  h+='</div>';
-  h+='<div class="mp-prog-times"><span id="mp_cur">0:00</span><span id="mp_dur">0:00</span></div>';
-  h+='</div>';
-
-  h+='<div class="mp-ctrls">';
-  h+='<button class="mp-btn'+((_MP.isShuffle)?' mp-on':'')+'" id="mp_bshuffle" onclick="mpToggleShuffle()" title="Shuffle">🔀</button>';
-  h+='<button class="mp-btn" onclick="mpPrev()" title="Previous">⏮</button>';
-  h+='<button class="mp-btn mp-play" id="mp_bplay" onclick="mpTogglePlay()" title="Play/Pause">▶</button>';
-  h+='<button class="mp-btn" onclick="mpNext()" title="Next">⏭</button>';
-  h+='<button class="mp-btn'+((_MP.isRepeat)?' mp-on':'')+'" id="mp_brepeat" onclick="mpToggleRepeat()" title="Repeat">🔁</button>';
-  h+='</div>';
-
-  var vol=Math.round((_MP.audio?_MP.audio.volume:0.8)*100);
-  h+='<div class="mp-vol">';
-  h+='<div class="mp-vol-icon" id="mp_vicon">🔊</div>';
-  h+='<input type="range" class="mp-vol-sl" id="mp_vol" min="0" max="100" value="'+vol+'" oninput="mpSetVol(this.value)">';
-  h+='<div class="mp-vol-val" id="mp_vval">'+vol+'</div>';
-  h+='</div>';
-  h+='</div>'; // end mp-left
-
-  // ── Right: playlist ──
-  h+='<div class="mp-right">';
-  h+='<div class="mp-rhead">';
-  h+='<div class="mp-rtitle">🎧 Playlist <span class="mp-cnt" id="mp_cnt">'+_MP.playlist.length+' tracks</span></div>';
-  h+='<div class="mp-ract">';
-  h+='<button class="mp-abtn mp-add" onclick="mpOpenAdd()">+ Add Track</button>';
-  h+='<button class="mp-abtn" onclick="mpOpenSettings()">⚙ Prayer</button>';
-  h+='<button class="mp-abtn" onclick="mpClearAll()" title="Clear playlist">🗑</button>';
-  h+='</div></div>';
-  h+='<div class="mp-search"><span class="mp-si">🔍</span><input type="text" class="mp-sinput" placeholder="Search tracks..." oninput="mpFilter(this.value)"></div>';
-  h+='<div class="mp-list" id="mp_list"></div>';
-  h+='<div class="mp-foot">';
-  h+='<div style="display:flex;justify-content:space-between;align-items:center">';
-  h+='<span style="font-size:10px;font-family:var(--mono);color:var(--text-tertiary)">🕌 Prayer auto-pause</span>';
-  h+='<span style="font-size:10px;font-family:var(--mono);color:var(--text-secondary)" id="mp_nextpr">—</span>';
-  h+='</div>';
-  h+='<div class="mp-prayer-tags" id="mp_ptags"></div>';
-  h+='</div>';
-  h+='</div>'; // end mp-right
-  h+='</div>'; // end mp-wrap
-
-  // Add Track Modal
-  h+='<div class="mp-modal" id="mp_addmodal">';
-  h+='<div class="mp-mbox">';
-  h+='<div class="mp-mtitle">Add Track to Playlist</div>';
-  h+='<div class="mp-msub">Paste a cloud link or any public audio URL. Supports Google Drive, OneDrive, Dropbox, and direct MP3/audio links.</div>';
-  h+='<div class="mp-minfo"><strong>Google Drive:</strong> Share file → "Anyone with link" → paste link<br><strong>OneDrive:</strong> Share → copy link (auto-converted)<br><strong>Dropbox:</strong> Share link (dl=0→dl=1 auto-fixed)<br><strong>Direct URL:</strong> Any public .mp3 / .ogg / .wav / .aac</div>';
-  h+='<div class="mp-field"><label>Track Name *</label><input type="text" id="mp_iname" placeholder="e.g. Morning Lofi Vibes"></div>';
-  h+='<div class="mp-field"><label>Artist / Source</label><input type="text" id="mp_iartist" placeholder="e.g. Lofi Radio"></div>';
-  h+='<div class="mp-field"><label>Audio URL or Cloud Link *</label><input type="text" id="mp_iurl" placeholder="https://drive.google.com/file/d/.../view  or  https://...mp3"></div>';
-  h+='<div class="mp-mfoot"><button class="mp-mcancel" onclick="mpCloseAdd()">Cancel</button><button class="mp-mok" onclick="mpAddTrack()">Add to Playlist</button></div>';
-  h+='</div></div>';
-
-  // Prayer Settings Modal
-  h+='<div class="mp-modal" id="mp_setmodal">';
-  h+='<div class="mp-mbox">';
-  h+='<div class="mp-mtitle">⚙ Prayer Time Settings</div>';
-  h+='<div class="mp-msub">Music stops <strong>10 min before</strong> each prayer and resumes <strong>30 min after</strong>. Set your local prayer times (24-hour format).</div>';
-  h+='<div class="mp-tgrid">';
-  h+='<div class="mp-field"><label>Fajr</label><input type="time" id="mp_ptfajr" value="'+_MP.prayerTimes.fajr+'"></div>';
-  h+='<div class="mp-field"><label>Dhuhr</label><input type="time" id="mp_ptdhuhr" value="'+_MP.prayerTimes.dhuhr+'"></div>';
-  h+='<div class="mp-field"><label>Asr</label><input type="time" id="mp_ptasr" value="'+_MP.prayerTimes.asr+'"></div>';
-  h+='<div class="mp-field"><label>Maghrib</label><input type="time" id="mp_ptmaghrib" value="'+_MP.prayerTimes.maghrib+'"></div>';
-  h+='<div class="mp-field"><label>Isha</label><input type="time" id="mp_ptisha" value="'+_MP.prayerTimes.isha+'"></div>';
-  h+='<div class="mp-field"><label>Stop Before (min)</label><input type="number" id="mp_ptstop" value="'+_MP.prayerTimes.stopBefore+'" min="0" max="60"></div>';
-  h+='<div class="mp-field"><label>Resume After (min)</label><input type="time" style="display:none"><input type="number" id="mp_ptresume" value="'+_MP.prayerTimes.resumeAfter+'" min="0" max="120"></div>';
-  h+='</div>';
-  h+='<div class="mp-mfoot"><button class="mp-mcancel" onclick="mpCloseSettings()">Cancel</button><button class="mp-mok" onclick="mpSavePrayer()">Save Settings</button></div>';
-  h+='</div></div>';
-
-  // Start prayer check loop
-  _MP._checkInt = setInterval(mpCheckPrayer, 30000);
-  setTimeout(function(){ mpCheckPrayer(); mpRenderList(''); mpUpdateStatus(); }, 80);
-
-  return h;
-}
-
-function _mpAttachAudioEvents(){
-  var a=_MP.audio;
-  a.addEventListener('play',function(){
-    _MP.isPlaying=true;
-    var b=_mpEl('bplay'); if(b) b.textContent='⏸';
-    mpSetWave(false);
-    mpUpdateStatus();
-    mpRenderList('');
-  });
-  a.addEventListener('pause',function(){
-    _MP.isPlaying=false;
-    var b=_mpEl('bplay'); if(b) b.textContent='▶';
-    mpSetWave(true);
-    mpUpdateStatus();
-    mpRenderList('');
-  });
-  a.addEventListener('ended',function(){
-    if(_MP.isRepeat){ a.play(); return; }
-    mpNext();
-  });
-  a.addEventListener('timeupdate',function(){
-    if(!a.duration) return;
-    var pct=(a.currentTime/a.duration)*100;
-    var f=_mpEl('fill'); if(f) f.style.width=pct+'%';
-    var c=_mpEl('cur'); if(c) c.textContent=_mpFmt(a.currentTime);
-  });
-  a.addEventListener('loadedmetadata',function(){
-    var d=_mpEl('dur'); if(d) d.textContent=_mpFmt(a.duration);
-    if(_MP.currentIndex>=0&&_MP.playlist[_MP.currentIndex]){
-      _MP.playlist[_MP.currentIndex].duration=a.duration;
-      _mpSave();
-      mpRenderList('');
-    }
-  });
-  a.addEventListener('error',function(){
-    showToast('Could not load audio — check the URL or sharing permissions','error');
-  });
-}
-
-function mpRenderList(q){
-  var list=_mpEl('list'); if(!list) return;
-  var query=(q||'').toLowerCase();
-  var filtered=_MP.playlist.filter(function(t){
-    return !query||(t.name||'').toLowerCase().includes(query)||(t.artist||'').toLowerCase().includes(query);
-  });
-  var cnt=_mpEl('cnt'); if(cnt) cnt.textContent=_MP.playlist.length+' track'+(_MP.playlist.length!==1?'s':'');
-  if(!filtered.length){
-    list.innerHTML='<div class="mp-empty"><div class="mp-empty-icon">'+(query?'🔍':'🎵')+'</div>'+
-      '<div class="mp-empty-txt">'+(query?'No results':'Playlist is empty')+'</div>'+
-      '<div class="mp-empty-sub">'+(query?'Try a different search':'Add tracks using Google Drive,<br>OneDrive, or any public audio URL')+'</div></div>';
-    return;
-  }
-  list.innerHTML=filtered.map(function(t){
-    var ri=_MP.playlist.indexOf(t);
-    var isA=ri===_MP.currentIndex;
-    var cls='mp-item'+(isA?' mp-active':'')+((isA&&_MP.isPlaying)?' mp-playing':'');
-    var dur=t.duration?_mpFmt(t.duration):'--:--';
-    return '<div class="'+cls+'" onclick="mpLoadTrack('+ri+',true)">'+
-      '<div class="mp-inum">'+
-        '<span class="mp-inum-n">'+(ri+1)+'</span>'+
-        '<div class="mp-mini-wave">'+
-          '<span'+((!_MP.isPlaying)?' class="mp-wpaused"':'')+'>'+
-          '</span><span'+((!_MP.isPlaying)?' class="mp-wpaused"':'')+'>'+
-          '</span><span'+((!_MP.isPlaying)?' class="mp-wpaused"':'')+'>'+
-          '</span><span'+((!_MP.isPlaying)?' class="mp-wpaused"':'')+'>'+
-          '</span>'+
-        '</div>'+
-      '</div>'+
-      '<div style="flex:1;min-width:0">'+
-        '<div class="mp-iname">'+_mpXe(t.name)+'</div>'+
-        '<div class="mp-iart">'+_mpXe(t.artist||'Unknown')+'</div>'+
-      '</div>'+
-      '<div class="mp-idur">'+dur+'</div>'+
-      '<button class="mp-idel" onclick="mpRemove('+t.id+',event)" title="Remove">✕</button>'+
-    '</div>';
-  }).join('');
-}
-
-function mpFilter(q){ mpRenderList(q); }
-
-function mpSetWave(paused){
-  document.querySelectorAll('.mp-wbar,.mp-mini-wave span').forEach(function(b){
-    b.classList.toggle('paused',paused);
-    b.classList.toggle('mp-wpaused',paused);
-  });
-}
-
-function mpUpdateStatus(){
-  // update play button icon
-  var b=_mpEl('bplay'); if(b) b.textContent=_MP.isPlaying?'⏸':'▶';
-}
-
-function mpLoadTrack(idx,autoplay){
-  if(idx<0||idx>=_MP.playlist.length) return;
-  _MP.currentIndex=idx;
-  var t=_MP.playlist[idx];
-  _MP.audio.src=t.url;
-  var el_t=_mpEl('title'); if(el_t) el_t.textContent=t.name;
-  var el_s=_mpEl('sub');   if(el_s) el_s.textContent=t.artist||'Unknown';
-  _mpSave();
-  mpRenderList('');
-  if(autoplay&&!_MP.isPrayerPaused){ _MP.audio.play().catch(function(){}); }
-}
-
-function mpTogglePlay(){
-  if(_MP.isPrayerPaused){ showToast('🕌 Music paused for prayer time','warning'); return; }
-  if(!_MP.playlist.length){ showToast('Add tracks first','warning'); return; }
-  if(_MP.currentIndex===-1){ mpLoadTrack(0,true); return; }
-  if(_MP.isPlaying){ _MP.audio.pause(); } else { _MP.audio.play().catch(function(){}); }
-}
-function mpPrev(){
-  if(!_MP.playlist.length) return;
-  var idx=_MP.currentIndex<=0?_MP.playlist.length-1:_MP.currentIndex-1;
-  mpLoadTrack(idx,_MP.isPlaying&&!_MP.isPrayerPaused);
-}
-function mpNext(){
-  if(!_MP.playlist.length) return;
-  var idx=_MP.isShuffle?Math.floor(Math.random()*_MP.playlist.length):(_MP.currentIndex+1)%_MP.playlist.length;
-  mpLoadTrack(idx,_MP.isPlaying&&!_MP.isPrayerPaused);
-}
-function mpToggleShuffle(){
-  _MP.isShuffle=!_MP.isShuffle;
-  var b=_mpEl('bshuffle'); if(b) b.classList.toggle('mp-on',_MP.isShuffle);
-  showToast(_MP.isShuffle?'Shuffle on':'Shuffle off','success');
-}
-function mpToggleRepeat(){
-  _MP.isRepeat=!_MP.isRepeat;
-  var b=_mpEl('brepeat'); if(b) b.classList.toggle('mp-on',_MP.isRepeat);
-  showToast(_MP.isRepeat?'Repeat on':'Repeat off','success');
-}
-function mpSetVol(v){
-  _MP.audio.volume=v/100;
-  var vv=_mpEl('vval'); if(vv) vv.textContent=v;
-  var vi=_mpEl('vicon'); if(vi) vi.textContent=v==0?'🔇':v<40?'🔉':'🔊';
-}
-function mpSeek(e){
-  if(!_MP.audio.duration) return;
-  var rect=_mpEl('prog').getBoundingClientRect();
-  var pct=Math.max(0,Math.min(1,(e.clientX-rect.left)/rect.width));
-  _MP.audio.currentTime=pct*_MP.audio.duration;
-}
-
-function mpCheckPrayer(){
-  var now=_mpNow();
-  var stop=parseInt(_MP.prayerTimes.stopBefore)||10;
-  var resume=parseInt(_MP.prayerTimes.resumeAfter)||30;
-  var inWindow=false, activeName=null, resumeAt=null, nextName=null, nextMin=null;
-
-  for(var i=0;i<_MP_KEYS.length;i++){
-    var pt=_mpParse(_MP.prayerTimes[_MP_KEYS[i]]);
-    var stopAt=pt-stop, endAt=pt+resume;
-    if(now>=stopAt&&now<endAt){ inWindow=true; activeName=_MP_NAMES[i]; resumeAt=endAt; break; }
-    if(pt>now&&(nextMin===null||pt<nextMin)){ nextMin=pt; nextName=_MP_NAMES[i]; }
-  }
-
-  // Render tags
-  var tags=_mpEl('ptags');
-  if(tags){
-    tags.innerHTML=_MP_KEYS.map(function(k,i){
-      var cls='mp-ptag'+((_MP_NAMES[i]===activeName)?' mp-ptag-on':'');
-      return '<span class="'+cls+'">'+_MP_NAMES[i]+' '+_MP.prayerTimes[k]+'</span>';
-    }).join('');
-  }
-
-  // Next prayer label
-  var np=_mpEl('nextpr');
-  if(np){
-    if(inWindow){ np.textContent=activeName+' now'; np.style.color='#f59e0b'; }
-    else if(nextName){ var diff=nextMin-now; np.textContent=nextName+' in '+diff+'m'; np.style.color=''; }
-    else { np.textContent='Fajr tomorrow'; np.style.color=''; }
-  }
-
-  if(inWindow&&!_MP.isPrayerPaused){
-    _MP.isPrayerPaused=true;
-    if(_MP.isPlaying) _MP.audio.pause();
-    var pb=_mpEl('pbar'); if(pb) pb.classList.add('show');
-    var pt2=_mpEl('pb_title'); if(pt2) pt2.textContent='🕌 '+activeName+' Prayer Time';
-    showToast('🕌 '+activeName+' prayer — music paused','warning');
-  } else if(!inWindow&&_MP.isPrayerPaused){
-    _MP.isPrayerPaused=false;
-    var pb2=_mpEl('pbar'); if(pb2) pb2.classList.remove('show');
-    if(_MP.playlist.length&&_MP.currentIndex>=0) _MP.audio.play().catch(function(){});
-    showToast('▶ Prayer ended — music resumed','success');
-  } else if(inWindow&&resumeAt!==null){
-    // update countdown
-    var rem=resumeAt-now;
-    var timer=_mpEl('pb_timer'); if(timer) timer.textContent=Math.floor(rem)+'m';
-  }
-}
-
-function mpAddTrack(){
-  var name=(document.getElementById('mp_iname')||{}).value||'';
-  var artist=(document.getElementById('mp_iartist')||{}).value||'';
-  var rawUrl=(document.getElementById('mp_iurl')||{}).value||'';
-  name=name.trim(); artist=artist.trim(); rawUrl=rawUrl.trim();
-  if(!name){ showToast('Enter a track name','warning'); return; }
-  if(!rawUrl){ showToast('Enter an audio URL','warning'); return; }
-  var t={ id:Date.now(), name:name, artist:artist||'Unknown', url:_mpConvertUrl(rawUrl), rawUrl:rawUrl, duration:null };
-  _MP.playlist.push(t);
-  _mpSave();
-  mpRenderList('');
-  mpCloseAdd();
-  showToast('Added: '+name,'success');
-  if(_MP.currentIndex===-1||_MP.playlist.length===1) mpLoadTrack(_MP.playlist.length-1,false);
-}
-
-function mpRemove(id,e){
-  e&&e.stopPropagation();
-  var idx=_MP.playlist.findIndex(function(t){ return t.id===id; });
-  if(idx===-1) return;
-  var wasPlaying=idx===_MP.currentIndex&&_MP.isPlaying;
-  _MP.playlist.splice(idx,1);
-  if(_MP.currentIndex>=_MP.playlist.length) _MP.currentIndex=_MP.playlist.length-1;
-  _mpSave();
-  mpRenderList('');
-  if(wasPlaying&&_MP.playlist.length>0) mpLoadTrack(_MP.currentIndex,true);
-  else if(!_MP.playlist.length){ _MP.audio.pause(); _MP.audio.src=''; }
-  showToast('Removed','success');
-}
-
-function mpClearAll(){
-  if(!_MP.playlist.length) return;
-  if(!confirm('Clear entire playlist?')) return;
-  _MP.playlist=[]; _MP.currentIndex=-1;
-  _MP.audio.pause(); _MP.audio.src='';
-  _mpSave();
-  mpRenderList('');
-  var t=_mpEl('title'); if(t) t.textContent='No Track Selected';
-  var s=_mpEl('sub'); if(s) s.textContent='Add tracks to your playlist';
-  showToast('Playlist cleared','success');
-}
-
-function mpOpenAdd(){
-  ['mp_iname','mp_iartist','mp_iurl'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
-  var m=_mpEl('addmodal'); if(m){ m.classList.add('show'); }
-  setTimeout(function(){ var n=document.getElementById('mp_iname'); if(n) n.focus(); },80);
-}
-function mpCloseAdd(){ var m=_mpEl('addmodal'); if(m) m.classList.remove('show'); }
-
-function mpOpenSettings(){
-  var map={mp_ptfajr:'fajr',mp_ptdhuhr:'dhuhr',mp_ptasr:'asr',mp_ptmaghrib:'maghrib',mp_ptisha:'isha'};
-  Object.keys(map).forEach(function(id){ var el=document.getElementById(id); if(el) el.value=_MP.prayerTimes[map[id]]; });
-  var ps=document.getElementById('mp_ptstop'); if(ps) ps.value=_MP.prayerTimes.stopBefore;
-  var pr=document.getElementById('mp_ptresume'); if(pr) pr.value=_MP.prayerTimes.resumeAfter;
-  var m=_mpEl('setmodal'); if(m) m.classList.add('show');
-}
-function mpCloseSettings(){ var m=_mpEl('setmodal'); if(m) m.classList.remove('show'); }
-
-function mpSavePrayer(){
-  var map={mp_ptfajr:'fajr',mp_ptdhuhr:'dhuhr',mp_ptasr:'asr',mp_ptmaghrib:'maghrib',mp_ptisha:'isha'};
-  Object.keys(map).forEach(function(id){ var el=document.getElementById(id); if(el) _MP.prayerTimes[map[id]]=el.value; });
-  var ps=document.getElementById('mp_ptstop'); if(ps) _MP.prayerTimes.stopBefore=parseInt(ps.value)||10;
-  var pr=document.getElementById('mp_ptresume'); if(pr) _MP.prayerTimes.resumeAfter=parseInt(pr.value)||30;
-  _mpSave();
-  mpCloseSettings();
-  mpCheckPrayer();
-  showToast('Prayer times saved','success');
-}
-
-// Close modals on overlay click
-document.addEventListener('click',function(e){
-  if(e.target&&e.target.id==='mp_addmodal') mpCloseAdd();
-  if(e.target&&e.target.id==='mp_setmodal') mpCloseSettings();
-});
-
-// ── End Music Player ──
-
 
 </script>
 <script>
-
-/* Patch iconHTML() helper used in pBranchDash, pBranchMgmt etc. */
-var _origKpiCard = (typeof kpiCard === 'function') ? kpiCard : null;
 
 /* ═══════════════════════════════════════════════════════════
    NEXUS SVG ICON SYSTEM — skill: Modern Outline · 1.6px
