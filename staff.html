@@ -499,6 +499,16 @@ html, body {
   box-shadow: 4px 4px 12px rgba(0,166,61,0.25), -3px -3px 8px rgba(255,255,255,0.85);
   color: var(--success);
 }
+#btn-break-end {
+  box-shadow: 4px 4px 14px rgba(0,166,61,0.3), -4px -4px 10px rgba(255,255,255,0.9);
+  color: var(--success);
+  animation: brk-pulse 2s ease-in-out infinite;
+}
+#btn-break-end:hover { box-shadow: 6px 6px 20px rgba(0,166,61,0.4), -4px -4px 12px rgba(255,255,255,0.95); transform: translateY(-1px); }
+@keyframes brk-pulse {
+  0%,100% { box-shadow: 4px 4px 14px rgba(0,166,61,0.25), -4px -4px 10px rgba(255,255,255,0.88); }
+  50%      { box-shadow: 4px 4px 20px rgba(0,166,61,0.45), -4px -4px 12px rgba(255,255,255,0.95); }
+}
 
 /* ── TEAM TAB ── */
 .sum-bar { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-bottom: 16px; }
@@ -789,16 +799,30 @@ html, body {
       </button>
     </div>
 
-    <!-- Break Button -->
+    <!-- Break Buttons -->
     <div style="margin-top:10px">
-      <button class="break-btn" id="btn-break">
+      <!-- Start Break -->
+      <button class="break-btn" id="btn-break-start" onclick="sfStartBreak()">
         <span style="font-size:24px">☕</span>
         <div style="text-align:left;flex:1">
-          <div class="btn-lbl" id="break-btn-label" style="font-size:14px">Start Break</div>
-          <div id="break-timer-display" style="font-size:10px;font-family:var(--mono);margin-top:2px;opacity:0.7">1 hour timer</div>
+          <div class="btn-lbl" style="font-size:14px">Start Break</div>
+          <div style="font-size:10px;font-family:var(--mono);margin-top:2px;opacity:0.7">Tap to begin break</div>
         </div>
-        <div id="break-clock" style="font-size:18px;font-weight:300;font-family:var(--mono);display:none">01:00:00</div>
       </button>
+      <!-- End Break (hidden until break active) -->
+      <button class="break-btn active" id="btn-break-end" onclick="sfEndBreak()" style="display:none;margin-top:8px">
+        <span style="font-size:24px">▶</span>
+        <div style="text-align:left;flex:1">
+          <div class="btn-lbl" style="font-size:14px">End Break</div>
+          <div id="sf-brk-timer" style="font-size:13px;font-family:var(--mono);margin-top:2px;font-weight:700">00:00</div>
+        </div>
+      </button>
+      <!-- Break Log -->
+      <div id="sf-brk-log" style="display:none;margin-top:10px;background:var(--base);border-radius:12px;box-shadow:var(--sh-inset-sm);padding:12px 14px">
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);margin-bottom:8px;font-family:var(--mono)">Break Log</div>
+        <div id="sf-brk-log-items"></div>
+        <div id="sf-brk-total" style="margin-top:6px;text-align:right;font-size:11px;font-family:var(--mono);font-weight:700;color:var(--orange)"></div>
+      </div>
     </div>
   </div>
 
@@ -1330,66 +1354,134 @@ function switchBranch(){
 }
 
 // ── BREAK TIMER ──
-var _breakKey='opshub_break_start';
-var _breakInt=null;
+// ── Break Tracking ──
+var _sfBrk = { active:false, startMs:null, logs:[], timerInt:null };
+var _breakKey='opshub_break_start'; // kept for backward compat cleanup
 
 function initBreakBtn(){
-  var btn=document.getElementById('btn-break');
-  var display=document.getElementById('break-timer-display');
-  var label=document.getElementById('break-btn-label');
-  var clock=document.getElementById('break-clock');
-  if(!btn) return;
-  function setActive(active){
-    if(active){
-      btn.classList.add('active');
-      if(label){label.textContent='End Break';}
-      if(clock) clock.style.display='block';
-    } else {
-      btn.classList.remove('active');
-      if(label){label.textContent='Start Break';}
-      if(display) display.textContent='1 hour timer';
-      if(clock){clock.textContent='01:00:00';clock.style.display='none';}
+  // Clean up any old single-button break state on load
+  localStorage.removeItem(_breakKey);
+  // Restore break state from localStorage if mid-break
+  try {
+    var saved = localStorage.getItem('sf_brk_state');
+    if(saved){
+      var st=JSON.parse(saved);
+      _sfBrk.logs=st.logs||[];
+      if(st.active && st.startMs){
+        _sfBrk.active=true;
+        _sfBrk.startMs=st.startMs;
+        _sfBrkShowEnd();
+        _sfBrk.timerInt=setInterval(_sfBrkTick,1000);
+        _sfBrkTick();
+      }
+      _sfBrkRenderLog();
     }
-  }
-  function updateDisplay(){
-    var st=localStorage.getItem(_breakKey);
-    if(!st){if(_breakInt){clearInterval(_breakInt);_breakInt=null;}setActive(false);return;}
-    var elapsed=Date.now()-parseInt(st);
-    var remain=Math.max(0,3600000-elapsed);
-    var h=Math.floor(remain/3600000);
-    var m=Math.floor((remain%3600000)/60000);
-    var s=Math.floor((remain%60000)/1000);
-    var timeStr=String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
-    if(clock) clock.textContent=timeStr;
-    if(display) display.textContent=timeStr+' remaining';
-    setActive(true);
-    if(remain<=0){
-      clearInterval(_breakInt);_breakInt=null;
-      localStorage.removeItem(_breakKey);
-      setActive(false);
-      toast('⏰ Break time over! Please return to work.','warning');
-    }
-  }
-  if(localStorage.getItem(_breakKey)){
-    setActive(true);
-    _breakInt=setInterval(updateDisplay,1000);
-    updateDisplay();
-  }
-  btn.onclick=function(){
-    if(localStorage.getItem(_breakKey)){
-      localStorage.removeItem(_breakKey);
-      if(_breakInt){clearInterval(_breakInt);_breakInt=null;}
-      setActive(false);
-      toast('Break ended — welcome back! ✅','success');
-    } else {
-      localStorage.setItem(_breakKey,String(Date.now()));
-      setActive(true);
-      if(_breakInt) clearInterval(_breakInt);
-      _breakInt=setInterval(updateDisplay,1000);
-      updateDisplay();
-      toast('☕ Break started — 1 hour timer running','info');
-    }
-  };
+  } catch(e){}
+}
+
+function _sfBrkSaveState(){
+  try{ localStorage.setItem('sf_brk_state',JSON.stringify({active:_sfBrk.active,startMs:_sfBrk.startMs,logs:_sfBrk.logs})); }catch(e){}
+}
+
+function sfStartBreak(){
+  if(_sfBrk.active) return;
+  _sfBrk.active=true;
+  _sfBrk.startMs=Date.now();
+  _sfBrkSaveState();
+  _sfBrkShowEnd();
+  _sfBrk.timerInt=setInterval(_sfBrkTick,1000);
+  _sfBrkTick();
+  toast('☕ Break started','info');
+}
+
+function sfEndBreak(){
+  if(!_sfBrk.active) return;
+  clearInterval(_sfBrk.timerInt);
+  _sfBrk.active=false;
+  var endMs=Date.now();
+  var durSec=Math.floor((endMs-_sfBrk.startMs)/1000);
+  var fmt=function(ts){ return new Date(ts).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}); };
+  _sfBrk.logs.push({start:fmt(_sfBrk.startMs),end:fmt(endMs),sec:durSec});
+  _sfBrk.startMs=null;
+  _sfBrkSaveState();
+  // Update break total on attendance record in Firebase
+  _sfBrkSaveToAtt();
+  var endBtn=document.getElementById('btn-break-end');
+  var startBtn=document.getElementById('btn-break-start');
+  if(endBtn) endBtn.style.display='none';
+  if(startBtn) startBtn.style.display='flex';
+  var t=document.getElementById('sf-brk-timer'); if(t) t.textContent='00:00';
+  _sfBrkRenderLog();
+  toast('Break ended — '+Math.floor(durSec/60)+'m — welcome back! ✅','success');
+}
+
+function _sfBrkShowEnd(){
+  var startBtn=document.getElementById('btn-break-start');
+  var endBtn=document.getElementById('btn-break-end');
+  if(startBtn) startBtn.style.display='none';
+  if(endBtn) endBtn.style.display='flex';
+}
+
+function _sfBrkTick(){
+  var el=document.getElementById('sf-brk-timer');
+  if(!el||!_sfBrk.startMs) return;
+  var sec=Math.floor((Date.now()-_sfBrk.startMs)/1000);
+  var m=Math.floor(sec/60), s=sec%60;
+  el.textContent=(m<10?'0':'')+m+':'+(s<10?'0':'')+s;
+  // Warn at 55 min, auto-end at 60 min
+  if(sec===3300) toast('⏰ 5 minutes left on break!','warning');
+  if(sec>=3600){ sfEndBreak(); toast('⏰ Break time over! Please return to work.','warning'); }
+}
+
+function _sfBrkRenderLog(){
+  var logDiv=document.getElementById('sf-brk-log');
+  var logItems=document.getElementById('sf-brk-log-items');
+  var logTotal=document.getElementById('sf-brk-total');
+  if(!logDiv||!logItems) return;
+  if(!_sfBrk.logs.length){ logDiv.style.display='none'; return; }
+  logDiv.style.display='block';
+  var total=_sfBrk.logs.reduce(function(s,l){return s+l.sec;},0);
+  logItems.innerHTML=_sfBrk.logs.map(function(l,i){
+    var mm=Math.floor(l.sec/60), ss=l.sec%60;
+    return '<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(0,0,0,0.06);font-size:11px;font-family:var(--mono)">' +
+      '<span style="color:var(--text3)">#'+(i+1)+'</span>' +
+      '<span>'+l.start+' → '+l.end+'</span>' +
+      '<span style="color:var(--orange);font-weight:700">'+mm+'m'+(ss>0?ss+'s':'')+'</span>' +
+    '</div>';
+  }).join('');
+  if(logTotal) logTotal.textContent='Total: '+Math.floor(total/60)+'m'+(total%60>0?total%60+'s':'');
+}
+
+function _sfBrkTotal(){
+  var total=_sfBrk.logs.reduce(function(s,l){return s+l.sec;},0);
+  var mm=Math.floor(total/60), ss=total%60;
+  return mm+'m'+(ss>0?(ss<10?'0':'')+ss+'s':'');
+}
+
+function _sfBrkSaveToAtt(){
+  // Save break total + log into today's attendance record
+  if(!selectedId||!db) return;
+  var path=bPath('tsAtt')+'/'+selectedId+'/'+MK;
+  db.ref(path).once('value',function(snap){
+    var arr=snap.val()||[];
+    if(!Array.isArray(arr)) arr=Object.values(arr).filter(Boolean);
+    var rec=null;
+    for(var i=0;i<arr.length;i++) if(arr[i]&&arr[i].date===TODAY){rec=arr[i];break;}
+    if(!rec){ rec={date:TODAY,ci:'',co:'',st:'present',brk:'',brkLogs:[]}; arr.push(rec); }
+    rec.brk=_sfBrkTotal();
+    rec.brkLogs=_sfBrk.logs.slice();
+    db.ref(path).set(arr,function(err){
+      if(!err && tsAtt[selectedId]){
+        if(!tsAtt[selectedId][MK]) tsAtt[selectedId][MK]=arr;
+        else {
+          var a2=tsAtt[selectedId][MK];
+          var found=false;
+          for(var j=0;j<a2.length;j++) if(a2[j]&&a2[j].date===TODAY){a2[j]=rec;found=true;break;}
+          if(!found) a2.push(rec);
+        }
+      }
+    });
+  });
 }
 
 // ── EMAIL ──
