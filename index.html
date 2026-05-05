@@ -4470,7 +4470,17 @@ function renderPage(pageId) {
     'bm-payroll':        pBmPayroll,
     'bm-transfers':      pBmTransfers,
     'bm-announcements':  pBmAnnouncements,
-    'bm-music-player':   function(){ var s=NX.session||{}; window.open('music-player.html'+(s.branchId?'?branch='+encodeURIComponent(s.branchId):''),'_blank'); history.back(); return ''; },
+    'bm-music-player':   function(){
+      var s=NX.session||{};
+      var url='music-player.html'+(s.branchId?'?branch='+encodeURIComponent(s.branchId):'');
+      window.open(url,'_blank');
+      return '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;text-align:center;padding:40px">' +
+        '<div style="font-size:56px;margin-bottom:20px">🎵</div>' +
+        '<div style="font-size:20px;font-weight:800;color:var(--text-primary);margin-bottom:8px">Music Player</div>' +
+        '<div style="font-size:13px;color:var(--text-secondary);margin-bottom:24px;max-width:360px;line-height:1.7">The music player has opened in a new tab. Use it to manage your branch playlist and prayer-aware auto-pause.</div>' +
+        '<a href="'+url+'" target="_blank" style="text-decoration:none"><button class="btn btn-primary" style="padding:12px 28px;font-size:13px">🎵 Open Music Player</button></a>' +
+        '</div>';
+    },
     // ── HR & Finance Manager pages ──
     'hrf-hr-dash':    pHrfHrDash,
     'hrf-fin-dash':   pHrfFinDash,
