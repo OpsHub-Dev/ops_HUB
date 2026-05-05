@@ -2,413 +2,537 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ALFA.CO — Branch Music Player</title>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Music Player — ALFA.CO</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-/* ─────────────────────────────────────────
-   ALFA.CO Music Player — Design System
-───────────────────────────────────────── */
+/* ═══════════════════════════════════════════
+   ALFA.CO Music Player — Neumorphism System
+   Surface #E7E5E4 · Primary #006666
+   Font: Space Mono + JetBrains Mono
+═══════════════════════════════════════════ */
 :root {
-  --bg:#070c18;
-  --bg2:#0b1120;
-  --bg3:#0f1828;
-  --surface:rgba(255,255,255,.040);
-  --surface2:rgba(255,255,255,.065);
-  --surface3:rgba(255,255,255,.09);
-  --border:rgba(255,255,255,.08);
-  --border2:rgba(255,255,255,.14);
-  --text:#f0f4ff;
-  --text2:rgba(240,244,255,.72);
-  --text3:rgba(240,244,255,.45);
-  --green:#00d68f;
-  --green2:#00a86b;
-  --gold:#f59e0b;
-  --red:#ff4757;
-  --blue:#3b82f6;
-  --purple:#8b5cf6;
-  --mono:'JetBrains Mono',monospace;
-  --font:'Plus Jakarta Sans',system-ui,sans-serif;
-  --radius:14px;
-  --radius-sm:8px;
-  --shadow:0 4px 24px rgba(0,0,0,.6);
-  --shadow-lg:0 16px 64px rgba(0,0,0,.8);
-  --prayer-color:#f59e0b;
+  --base:      #E7E5E4;
+  --base-dk:   #D4D2D1;
+  --base-lt:   #F4F2F1;
+  --base-dkk:  #C8C6C5;
+
+  --sh-raise:
+    6px 6px 16px rgba(0,0,0,0.18),
+    -6px -6px 16px rgba(255,255,255,0.88);
+  --sh-raise-sm:
+    3px 3px 8px rgba(0,0,0,0.15),
+    -3px -3px 8px rgba(255,255,255,0.85);
+  --sh-raise-lg:
+    12px 12px 32px rgba(0,0,0,0.22),
+    -12px -12px 32px rgba(255,255,255,0.94);
+  --sh-inset:
+    inset 4px 4px 10px rgba(0,0,0,0.13),
+    inset -4px -4px 10px rgba(255,255,255,0.75);
+  --sh-inset-sm:
+    inset 2px 2px 6px rgba(0,0,0,0.10),
+    inset -2px -2px 6px rgba(255,255,255,0.72);
+  --sh-flat:
+    2px 2px 6px rgba(0,0,0,0.13),
+    -2px -2px 6px rgba(255,255,255,0.75);
+
+  --primary:   #006666;
+  --primary-h: #008080;
+  --primary-dk:#004d4d;
+  --accent:    #F1A500;
+  --success:   #00A63D;
+  --danger:    #FF2157;
+  --warning:   #FE9900;
+  --orange:    #D95F02;
+  --prayer:    #b45309;
+
+  --font:  'Space Mono', 'Courier New', monospace;
+  --mono:  'JetBrains Mono', 'Fira Code', monospace;
+
+  --text:  #1E2938;
+  --text2: rgba(30,41,56,0.58);
+  --text3: rgba(30,41,56,0.35);
 }
 
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font);overflow-x:hidden}
-body{display:flex;flex-direction:column;min-height:100vh}
-
-/* ── Scrollbar ── */
-::-webkit-scrollbar{width:4px;height:4px}
-::-webkit-scrollbar-track{background:transparent}
-::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body {
+  min-height: 100vh;
+  background: var(--base);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+}
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-track { background: var(--base); }
+::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.14); border-radius: 3px; }
 
 /* ── Header ── */
-.header{
-  display:flex;align-items:center;justify-content:space-between;
-  padding:14px 24px;border-bottom:1px solid var(--border);
-  background:rgba(7,12,24,.95);backdrop-filter:blur(20px);
-  position:sticky;top:0;z-index:100;
+.header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 24px;
+  background: var(--base);
+  box-shadow: 0 3px 12px rgba(0,0,0,0.10), 0 -1px 0 rgba(255,255,255,0.8);
+  position: sticky; top: 0; z-index: 50;
 }
-.header-brand{display:flex;align-items:center;gap:10px}
-.header-logo{
-  width:36px;height:36px;border-radius:10px;
-  background:linear-gradient(135deg,#006644,#00a86b);
-  display:flex;align-items:center;justify-content:center;
-  font-size:16px;font-weight:800;color:#fff;letter-spacing:-1px;
+.hdr-brand { display: flex; align-items: center; gap: 12px; }
+.hdr-logo {
+  width: 38px; height: 38px; border-radius: 12px;
+  background: var(--base);
+  box-shadow: var(--sh-raise-sm);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; font-weight: 700; color: var(--primary);
 }
-.header-title{font-size:15px;font-weight:700;color:var(--text)}
-.header-sub{font-size:11px;color:var(--text3);font-family:var(--mono)}
-.header-status{display:flex;align-items:center;gap:8px}
-.status-dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green)}
-.status-dot.prayer{background:var(--prayer-color);box-shadow:0 0 8px var(--prayer-color);animation:pulse-dot 1s infinite}
-.status-dot.paused{background:var(--text3);box-shadow:none}
-.status-label{font-size:11px;font-family:var(--mono);color:var(--text2)}
-@keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:.4}}
+.hdr-title { font-size: 13px; font-weight: 700; color: var(--text); letter-spacing: 0.03em; }
+.hdr-sub { font-size: 10px; color: var(--text3); font-family: var(--mono); margin-top: 1px; }
+.hdr-right { display: flex; align-items: center; gap: 10px; }
+.status-pill {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--base); border-radius: 20px;
+  padding: 5px 12px;
+  box-shadow: var(--sh-inset-sm);
+  font-size: 10px; font-family: var(--mono); color: var(--text2);
+}
+.status-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--text3);
+}
+.status-dot.playing { background: var(--primary); box-shadow: 0 0 0 3px rgba(0,102,102,0.18); }
+.status-dot.prayer  { background: var(--accent);  box-shadow: 0 0 0 3px rgba(241,165,0,0.2); animation: dpulse 1.2s infinite; }
+@keyframes dpulse { 0%,100%{opacity:1} 50%{opacity:.4} }
 
 /* ── Prayer Banner ── */
-.prayer-banner{
-  display:none;
-  background:linear-gradient(135deg,rgba(245,158,11,.15),rgba(245,158,11,.05));
-  border-bottom:1px solid rgba(245,158,11,.25);
-  padding:10px 24px;
-  align-items:center;gap:12px;
+.prayer-banner {
+  display: none;
+  background: linear-gradient(90deg, rgba(241,165,0,0.10), rgba(241,165,0,0.04));
+  border-bottom: 2px solid rgba(241,165,0,0.25);
+  padding: 10px 24px;
+  align-items: center; gap: 12px;
 }
-.prayer-banner.show{display:flex}
-.pb-icon{font-size:20px}
-.pb-text{flex:1}
-.pb-title{font-size:13px;font-weight:700;color:var(--gold)}
-.pb-sub{font-size:11px;color:var(--text2);font-family:var(--mono)}
-.pb-timer{font-size:18px;font-weight:700;font-family:var(--mono);color:var(--gold)}
+.prayer-banner.show { display: flex; }
+.pb-icon { font-size: 22px; }
+.pb-info { flex: 1; }
+.pb-title { font-size: 12px; font-weight: 700; color: var(--prayer); }
+.pb-sub   { font-size: 10px; color: var(--text2); font-family: var(--mono); margin-top: 1px; }
+.pb-timer { font-size: 20px; font-weight: 700; font-family: var(--mono); color: var(--prayer); }
 
-/* ── Main layout ── */
-.main{flex:1;display:grid;grid-template-columns:1fr 340px;gap:0;max-height:calc(100vh - 65px)}
-@media(max-width:900px){.main{grid-template-columns:1fr;max-height:none}}
+/* ── Main grid ── */
+.main {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  gap: 0;
+  min-height: calc(100vh - 60px);
+}
+@media (max-width: 860px) { .main { grid-template-columns: 1fr; } }
 
-/* ── Player Area ── */
-.player-area{
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  padding:32px 24px;border-right:1px solid var(--border);
-  min-height:0;
+/* ── Player side ── */
+.player-side {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 36px 28px;
+  border-right: 2px solid rgba(0,0,0,0.06);
 }
-.album-art{
-  width:220px;height:220px;border-radius:24px;
-  background:linear-gradient(135deg,#1a1040,#0d1f3c);
-  border:1px solid var(--border2);
-  display:flex;align-items:center;justify-content:center;
-  position:relative;overflow:hidden;
-  box-shadow:var(--shadow-lg);
-  margin-bottom:28px;flex-shrink:0;
-}
-.album-art-inner{
-  width:100%;height:100%;
-  background:linear-gradient(135deg,#0f1e38 0%,#1a0b3d 50%,#0a1628 100%);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
-  position:relative;
-}
-.album-art-inner::before{
-  content:'';position:absolute;inset:0;
-  background:radial-gradient(circle at 30% 30%,rgba(139,92,246,.25),transparent 60%),
-              radial-gradient(circle at 70% 70%,rgba(0,214,143,.15),transparent 60%);
-}
-.album-art-note{font-size:56px;position:relative;z-index:1;filter:drop-shadow(0 4px 16px rgba(139,92,246,.5))}
-.album-art-wave{
-  display:flex;gap:3px;align-items:flex-end;height:24px;position:relative;z-index:1;
-}
-.wave-bar{
-  width:3px;border-radius:2px;
-  background:linear-gradient(to top,var(--green),var(--purple));
-  animation:wave 1.2s ease-in-out infinite;
-}
-.wave-bar:nth-child(1){height:8px;animation-delay:0s}
-.wave-bar:nth-child(2){height:18px;animation-delay:.15s}
-.wave-bar:nth-child(3){height:24px;animation-delay:.3s}
-.wave-bar:nth-child(4){height:16px;animation-delay:.45s}
-.wave-bar:nth-child(5){height:12px;animation-delay:.6s}
-.wave-bar:nth-child(6){height:20px;animation-delay:.75s}
-.wave-bar:nth-child(7){height:10px;animation-delay:.9s}
-.wave-bar:nth-child(8){height:16px;animation-delay:1.05s}
-@keyframes wave{0%,100%{transform:scaleY(.5)}50%{transform:scaleY(1)}}
-.wave-bar.paused{animation-play-state:paused}
 
-.track-info{text-align:center;width:100%;max-width:400px;margin-bottom:24px}
-.track-title{font-size:20px;font-weight:700;color:var(--text);margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.track-sub{font-size:13px;color:var(--text3);font-family:var(--mono)}
+/* Album art */
+.album-art {
+  width: 210px; height: 210px;
+  border-radius: 28px;
+  background: var(--base);
+  box-shadow: var(--sh-raise-lg);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 12px;
+  margin-bottom: 28px;
+  position: relative;
+  overflow: hidden;
+}
+.album-art::before {
+  content: '';
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(circle at 25% 25%, rgba(0,102,102,0.12), transparent 55%),
+    radial-gradient(circle at 75% 75%, rgba(241,165,0,0.08), transparent 55%);
+  border-radius: 28px;
+}
+.art-note { font-size: 56px; position: relative; z-index: 1; filter: drop-shadow(0 4px 12px rgba(0,102,102,0.3)); }
 
-/* ── Progress ── */
-.progress-wrap{width:100%;max-width:400px;margin-bottom:20px}
-.progress-bar-container{
-  width:100%;height:4px;border-radius:4px;background:var(--surface2);
-  cursor:pointer;position:relative;margin-bottom:8px;
+/* Wave bars */
+.art-wave { display: flex; gap: 4px; align-items: flex-end; height: 26px; position: relative; z-index: 1; }
+.wb {
+  width: 4px; border-radius: 3px;
+  background: linear-gradient(to top, var(--primary), var(--primary-h));
+  animation: wv 1.2s ease-in-out infinite;
 }
-.progress-bar-fill{
-  height:100%;border-radius:4px;
-  background:linear-gradient(90deg,var(--green),var(--purple));
-  width:0%;pointer-events:none;transition:width .1s linear;
-}
-.progress-bar-container:hover .progress-bar-thumb{opacity:1}
-.progress-bar-thumb{
-  width:12px;height:12px;border-radius:50%;background:#fff;
-  position:absolute;top:50%;transform:translate(-50%,-50%);
-  opacity:0;transition:opacity .2s;pointer-events:none;
-  box-shadow:0 2px 8px rgba(0,0,0,.5);
-}
-.progress-times{display:flex;justify-content:space-between;font-size:10px;font-family:var(--mono);color:var(--text3)}
+.wb:nth-child(1){height:8px; animation-delay:0s}
+.wb:nth-child(2){height:18px;animation-delay:.14s}
+.wb:nth-child(3){height:26px;animation-delay:.28s}
+.wb:nth-child(4){height:15px;animation-delay:.42s}
+.wb:nth-child(5){height:11px;animation-delay:.56s}
+.wb:nth-child(6){height:21px;animation-delay:.70s}
+.wb:nth-child(7){height:9px; animation-delay:.84s}
+.wb:nth-child(8){height:17px;animation-delay:.98s}
+@keyframes wv { 0%,100%{transform:scaleY(.3)} 50%{transform:scaleY(1)} }
+.wb.paused { animation-play-state: paused; opacity: 0.4; }
 
-/* ── Controls ── */
-.controls{display:flex;align-items:center;gap:16px;margin-bottom:24px}
-.ctrl-btn{
-  width:44px;height:44px;border-radius:50%;border:none;
-  background:var(--surface2);color:var(--text2);
-  font-size:16px;cursor:pointer;
-  display:flex;align-items:center;justify-content:center;
-  transition:all .2s;
+/* Track info */
+.track-title {
+  font-size: 16px; font-weight: 700; color: var(--text);
+  text-align: center; max-width: 380px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  margin-bottom: 4px; letter-spacing: -0.02em;
 }
-.ctrl-btn:hover{background:var(--surface3);color:var(--text);transform:scale(1.05)}
-.ctrl-btn:active{transform:scale(.95)}
-.ctrl-btn.primary{
-  width:56px;height:56px;font-size:20px;
-  background:linear-gradient(135deg,var(--green),var(--green2));
-  color:#000;box-shadow:0 4px 20px rgba(0,214,143,.35);
+.track-artist {
+  font-size: 11px; color: var(--text3); font-family: var(--mono);
+  text-align: center; margin-bottom: 22px;
 }
-.ctrl-btn.primary:hover{box-shadow:0 6px 28px rgba(0,214,143,.5)}
-.ctrl-btn.active{color:var(--green)}
-.ctrl-btn:disabled{opacity:.35;cursor:not-allowed;transform:none}
 
-/* ── Volume ── */
-.volume-row{display:flex;align-items:center;gap:10px;width:100%;max-width:400px}
-.vol-icon{font-size:14px;color:var(--text3);width:20px;text-align:center}
-.vol-slider{flex:1;appearance:none;height:3px;border-radius:3px;background:var(--surface2);cursor:pointer;outline:none}
-.vol-slider::-webkit-slider-thumb{
-  appearance:none;width:14px;height:14px;border-radius:50%;
-  background:var(--text);cursor:pointer;
-  box-shadow:0 2px 6px rgba(0,0,0,.4);
+/* Progress */
+.progress-wrap { width: 100%; max-width: 380px; margin-bottom: 8px; }
+.prog-track {
+  width: 100%; height: 6px; border-radius: 6px;
+  background: var(--base);
+  box-shadow: var(--sh-inset-sm);
+  cursor: pointer; position: relative; margin-bottom: 6px;
 }
-.vol-val{font-size:10px;font-family:var(--mono);color:var(--text3);width:30px;text-align:right}
+.prog-fill {
+  height: 100%; border-radius: 6px;
+  background: linear-gradient(90deg, var(--primary), var(--primary-h));
+  width: 0%; pointer-events: none; transition: width .1s linear;
+  box-shadow: 0 0 8px rgba(0,102,102,0.35);
+}
+.prog-thumb {
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--base);
+  box-shadow: var(--sh-raise-sm);
+  position: absolute; top: 50%; transform: translate(-50%,-50%);
+  opacity: 0; transition: opacity .2s; pointer-events: none;
+}
+.prog-track:hover .prog-thumb { opacity: 1; }
+.prog-times {
+  display: flex; justify-content: space-between;
+  font-size: 10px; font-family: var(--mono); color: var(--text3);
+  margin-bottom: 20px;
+}
 
-/* ── Playlist Panel ── */
-.playlist-panel{display:flex;flex-direction:column;overflow:hidden;height:100%}
-.playlist-header{
-  padding:16px 20px;border-bottom:1px solid var(--border);
-  display:flex;align-items:center;justify-content:space-between;flex-shrink:0;
+/* Controls */
+.controls { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
+.ctrl-btn {
+  width: 44px; height: 44px; border-radius: 50%;
+  border: none; cursor: pointer;
+  background: var(--base);
+  box-shadow: var(--sh-raise-sm);
+  color: var(--text2); font-size: 16px;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s; font-family: var(--font);
 }
-.playlist-title{font-size:13px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px}
-.playlist-count{font-size:10px;font-family:var(--mono);color:var(--text3);background:var(--surface2);padding:2px 8px;border-radius:12px}
-.playlist-actions{display:flex;gap:6px}
-.pl-btn{
-  height:30px;padding:0 12px;border-radius:var(--radius-sm);border:1px solid var(--border2);
-  background:var(--surface);color:var(--text2);font-size:11px;font-family:var(--font);
-  cursor:pointer;display:flex;align-items:center;gap:5px;transition:all .2s;white-space:nowrap;
+.ctrl-btn:hover  { box-shadow: var(--sh-raise); color: var(--text); transform: translateY(-1px); }
+.ctrl-btn:active { box-shadow: var(--sh-inset-sm); transform: none; }
+.ctrl-btn.on     { color: var(--primary); box-shadow: var(--sh-inset-sm); }
+.ctrl-play {
+  width: 58px; height: 58px; font-size: 22px;
+  background: var(--base);
+  box-shadow:
+    6px 6px 18px rgba(0,102,102,0.28),
+    -4px -4px 12px rgba(255,255,255,0.90);
+  color: var(--primary);
 }
-.pl-btn:hover{background:var(--surface2);color:var(--text)}
-.pl-btn.primary{
-  background:rgba(0,214,143,.12);border-color:rgba(0,214,143,.3);color:var(--green);
+.ctrl-play:hover {
+  box-shadow:
+    8px 8px 24px rgba(0,102,102,0.36),
+    -5px -5px 14px rgba(255,255,255,0.95);
+  color: var(--primary-dk);
 }
-.pl-btn.primary:hover{background:rgba(0,214,143,.2)}
+.ctrl-play:active { box-shadow: var(--sh-inset); }
 
-/* ── Search ── */
-.playlist-search{padding:10px 14px;border-bottom:1px solid var(--border);flex-shrink:0}
-.search-input{
-  width:100%;height:32px;padding:0 10px 0 32px;
-  border-radius:var(--radius-sm);border:1px solid var(--border);
-  background:var(--surface);color:var(--text);font-size:12px;font-family:var(--font);
-  outline:none;transition:border-color .2s;position:relative;
+/* Volume */
+.vol-row { display: flex; align-items: center; gap: 10px; width: 100%; max-width: 380px; }
+.vol-icon { font-size: 14px; color: var(--text3); width: 20px; text-align: center; }
+.vol-slider {
+  flex: 1; appearance: none; height: 6px; border-radius: 6px;
+  background: var(--base);
+  box-shadow: var(--sh-inset-sm);
+  cursor: pointer; outline: none;
 }
-.search-input:focus{border-color:var(--border2)}
-.search-wrap{position:relative}
-.search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:12px;color:var(--text3);pointer-events:none}
+.vol-slider::-webkit-slider-thumb {
+  appearance: none; width: 16px; height: 16px; border-radius: 50%;
+  background: var(--base);
+  box-shadow: var(--sh-raise-sm);
+  cursor: pointer;
+}
+.vol-val { font-size: 10px; font-family: var(--mono); color: var(--text3); width: 28px; text-align: right; }
 
-/* ── Track List ── */
-.track-list{flex:1;overflow-y:auto;padding:8px 0}
-.track-item{
-  display:flex;align-items:center;gap:10px;padding:8px 16px;
-  cursor:pointer;transition:background .15s;border-radius:0;position:relative;
+/* ── Playlist side ── */
+.playlist-side {
+  display: flex; flex-direction: column; overflow: hidden;
+  background: var(--base);
 }
-.track-item:hover{background:var(--surface)}
-.track-item.active{background:rgba(0,214,143,.07)}
-.track-item.active::before{
-  content:'';position:absolute;left:0;top:0;bottom:0;width:2px;
-  background:var(--green);border-radius:0 2px 2px 0;
+
+.pl-header {
+  padding: 14px 16px; display: flex; align-items: center; justify-content: space-between;
+  border-bottom: 2px solid rgba(0,0,0,0.06); flex-shrink: 0;
 }
-.track-num{
-  width:22px;text-align:center;font-size:11px;font-family:var(--mono);
-  color:var(--text3);flex-shrink:0;
+.pl-title {
+  font-size: 11px; font-weight: 700; color: var(--text);
+  text-transform: uppercase; letter-spacing: 0.10em;
+  display: flex; align-items: center; gap: 8px;
 }
-.track-item.active .track-num{color:var(--green)}
-.track-playing-icon{width:14px;height:14px;display:none}
-.track-item.active.is-playing .track-playing-icon{display:flex;align-items:center;justify-content:center}
-.track-item.active.is-playing .track-num-n{display:none}
-.mini-wave{display:flex;gap:1.5px;align-items:flex-end;height:14px}
-.mini-wave span{width:2px;border-radius:1px;background:var(--green);animation:wave .8s ease-in-out infinite}
-.mini-wave span:nth-child(1){height:5px;animation-delay:0s}
+.pl-count {
+  font-size: 9px; font-family: var(--mono); color: var(--text3);
+  background: var(--base); border-radius: 10px; padding: 2px 8px;
+  box-shadow: var(--sh-inset-sm);
+}
+.pl-actions { display: flex; gap: 6px; }
+
+/* Neu button */
+.neu-btn {
+  height: 30px; padding: 0 12px; border-radius: 8px; border: none;
+  background: var(--base); color: var(--text2); font-size: 10px;
+  font-family: var(--font); cursor: pointer;
+  box-shadow: var(--sh-flat);
+  display: flex; align-items: center; gap: 5px;
+  transition: all 0.15s; white-space: nowrap; letter-spacing: 0.03em;
+}
+.neu-btn:hover  { box-shadow: var(--sh-raise-sm); color: var(--text); transform: translateY(-1px); }
+.neu-btn:active { box-shadow: var(--sh-inset-sm); transform: none; }
+.neu-btn.primary {
+  color: var(--primary);
+  box-shadow: 3px 3px 8px rgba(0,102,102,0.2), -2px -2px 6px rgba(255,255,255,0.85);
+}
+.neu-btn.primary:hover {
+  box-shadow: 5px 5px 12px rgba(0,102,102,0.28), -3px -3px 8px rgba(255,255,255,0.90);
+  color: var(--primary-dk);
+}
+
+/* Search */
+.pl-search { padding: 10px 14px; border-bottom: 2px solid rgba(0,0,0,0.06); flex-shrink: 0; position: relative; }
+.search-ico { position: absolute; left: 22px; top: 50%; transform: translateY(-50%); font-size: 11px; color: var(--text3); }
+.search-inp {
+  width: 100%; height: 32px; padding: 0 10px 0 30px;
+  border-radius: 8px; border: none;
+  background: var(--base);
+  box-shadow: var(--sh-inset-sm);
+  color: var(--text); font-size: 11px; font-family: var(--font);
+  outline: none;
+}
+.search-inp::placeholder { color: var(--text3); }
+
+/* Track list */
+.track-list { flex: 1; overflow-y: auto; padding: 6px 0; }
+.track-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 16px; cursor: pointer;
+  transition: background 0.12s; position: relative;
+}
+.track-item:hover { background: rgba(0,0,0,0.03); }
+.track-item.active {
+  background: linear-gradient(90deg, rgba(0,102,102,0.06), transparent);
+}
+.track-item.active::before {
+  content: ''; position: absolute; left: 0; top: 6px; bottom: 6px;
+  width: 3px; border-radius: 0 3px 3px 0;
+  background: var(--primary);
+  box-shadow: 0 0 8px rgba(0,102,102,0.4);
+}
+.track-num {
+  width: 20px; text-align: center; font-size: 10px;
+  font-family: var(--mono); color: var(--text3); flex-shrink: 0;
+}
+.track-item.active .track-num { color: var(--primary); }
+
+/* Mini wave in list */
+.mini-wave { display: none; gap: 2px; align-items: flex-end; height: 13px; }
+.track-item.active.playing .mini-wave  { display: flex; }
+.track-item.active.playing .num-n { display: none; }
+.mini-wave span {
+  width: 2px; border-radius: 1px; background: var(--primary);
+  animation: wv .8s ease-in-out infinite;
+}
+.mini-wave span:nth-child(1){height:4px;animation-delay:0s}
 .mini-wave span:nth-child(2){height:10px;animation-delay:.2s}
-.mini-wave span:nth-child(3){height:14px;animation-delay:.4s}
-.mini-wave span:nth-child(4){height:8px;animation-delay:.6s}
-.mini-wave span.paused{animation-play-state:paused}
-.track-info-mini{flex:1;min-width:0}
-.track-name{font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.track-item.active .track-name{color:var(--green)}
-.track-artist{font-size:10px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:var(--mono)}
-.track-dur{font-size:10px;font-family:var(--mono);color:var(--text3);flex-shrink:0}
-.track-del{
-  width:22px;height:22px;border-radius:50%;border:none;
-  background:transparent;color:var(--text3);font-size:12px;
-  cursor:pointer;display:flex;align-items:center;justify-content:center;
-  opacity:0;transition:all .2s;flex-shrink:0;
-}
-.track-item:hover .track-del{opacity:1}
-.track-del:hover{background:rgba(255,71,87,.15);color:var(--red)}
+.mini-wave span:nth-child(3){height:13px;animation-delay:.4s}
+.mini-wave span:nth-child(4){height:7px;animation-delay:.6s}
+.mini-wave span.paused { animation-play-state: paused; }
 
-/* ── Empty state ── */
-.empty-state{
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  padding:48px 24px;text-align:center;gap:12px;
+.track-info-cell { flex: 1; min-width: 0; }
+.track-name {
+  font-size: 11px; font-weight: 700; color: var(--text);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.empty-icon{font-size:40px;opacity:.4}
-.empty-text{font-size:13px;color:var(--text3)}
-.empty-sub{font-size:11px;color:var(--text3);opacity:.7;line-height:1.6;font-family:var(--mono)}
+.track-item.active .track-name { color: var(--primary); }
+.track-artist-lbl {
+  font-size: 9px; color: var(--text3); font-family: var(--mono);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px;
+}
+.track-dur { font-size: 10px; font-family: var(--mono); color: var(--text3); flex-shrink: 0; }
+.track-del {
+  width: 22px; height: 22px; border-radius: 50%; border: none;
+  background: transparent; color: var(--text3); font-size: 11px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  opacity: 0; transition: all 0.15s; flex-shrink: 0;
+}
+.track-item:hover .track-del { opacity: 1; }
+.track-del:hover { background: rgba(255,33,87,0.10); color: var(--danger); box-shadow: var(--sh-flat); }
 
-/* ── Add Track Modal ── */
-.modal-overlay{
-  position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(8px);
-  z-index:200;display:none;align-items:center;justify-content:center;padding:20px;
+/* Empty state */
+.empty-state {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 48px 24px; text-align: center; gap: 10px;
 }
-.modal-overlay.show{display:flex}
-.modal{
-  background:var(--bg2);border:1px solid var(--border2);border-radius:20px;
-  width:100%;max-width:520px;padding:28px;box-shadow:var(--shadow-lg);
-  animation:slide-up .25s ease;
-}
-@keyframes slide-up{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
-.modal-title{font-size:16px;font-weight:700;color:var(--text);margin-bottom:6px}
-.modal-sub{font-size:12px;color:var(--text3);margin-bottom:20px;line-height:1.6;font-family:var(--mono)}
-.field{margin-bottom:16px}
-.field label{display:block;font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
-.field input,.field select{
-  width:100%;height:40px;padding:0 12px;border-radius:10px;
-  border:1px solid var(--border);background:var(--surface);
-  color:var(--text);font-size:13px;font-family:var(--font);outline:none;
-  transition:border-color .2s;
-}
-.field input:focus,.field select:focus{border-color:rgba(0,214,143,.4)}
-.field input::placeholder{color:var(--text3)}
-.modal-info{
-  background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);
-  border-radius:10px;padding:12px 14px;margin-bottom:20px;
-  font-size:11px;color:var(--text2);line-height:1.7;font-family:var(--mono);
-}
-.modal-info strong{color:var(--gold)}
-.modal-footer{display:flex;gap:10px;justify-content:flex-end}
-.btn-cancel{
-  height:38px;padding:0 18px;border-radius:10px;border:1px solid var(--border);
-  background:transparent;color:var(--text2);font-size:13px;font-family:var(--font);cursor:pointer;
-}
-.btn-cancel:hover{background:var(--surface)}
-.btn-add{
-  height:38px;padding:0 20px;border-radius:10px;border:none;
-  background:linear-gradient(135deg,var(--green),var(--green2));
-  color:#000;font-size:13px;font-weight:700;font-family:var(--font);cursor:pointer;
-  transition:all .2s;
-}
-.btn-add:hover{opacity:.9;transform:scale(1.02)}
+.empty-ico { font-size: 38px; opacity: 0.25; }
+.empty-txt { font-size: 12px; color: var(--text2); font-weight: 700; }
+.empty-sub { font-size: 10px; color: var(--text3); line-height: 1.7; font-family: var(--mono); }
 
-/* ── Prayer Settings ── */
-.settings-panel{
-  margin:0 12px 0;border-top:1px solid var(--border);padding:12px 4px;flex-shrink:0;
+/* Prayer footer in playlist */
+.pl-footer {
+  padding: 10px 14px; border-top: 2px solid rgba(0,0,0,0.06); flex-shrink: 0;
 }
-.settings-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
-.settings-label{font-size:11px;color:var(--text3);font-family:var(--mono)}
-.settings-val{font-size:11px;color:var(--text2);font-family:var(--mono)}
-.prayer-times-row{display:flex;gap:6px;flex-wrap:wrap;padding-top:6px}
-.prayer-tag{
-  font-size:9px;font-family:var(--mono);padding:2px 8px;border-radius:10px;
-  background:var(--surface2);color:var(--text3);border:1px solid var(--border);
+.pl-footer-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.pl-footer-lbl { font-size: 9px; font-family: var(--mono); color: var(--text3); text-transform: uppercase; letter-spacing: .08em; }
+.pl-footer-val { font-size: 10px; font-family: var(--mono); color: var(--text2); }
+.prayer-tags { display: flex; gap: 4px; flex-wrap: wrap; }
+.ptag {
+  font-size: 8px; font-family: var(--mono); padding: 2px 7px;
+  border-radius: 8px;
+  background: var(--base); color: var(--text3);
+  box-shadow: var(--sh-inset-sm);
 }
-.prayer-tag.active-prayer{
-  background:rgba(245,158,11,.15);border-color:rgba(245,158,11,.3);color:var(--gold);font-weight:700;
+.ptag.active-prayer {
+  background: var(--base); color: var(--prayer); font-weight: 700;
+  box-shadow: 2px 2px 6px rgba(180,83,9,0.2), -2px -2px 6px rgba(255,255,255,0.85);
 }
+
+/* ── Modals ── */
+.modal-ov {
+  position: fixed; inset: 0;
+  background: rgba(30,41,56,0.35); backdrop-filter: blur(6px);
+  z-index: 200; display: none; align-items: center; justify-content: center; padding: 20px;
+}
+.modal-ov.show { display: flex; }
+.modal-box {
+  background: var(--base); border-radius: 22px;
+  width: 100%; max-width: 480px; padding: 26px;
+  box-shadow: var(--sh-raise-lg);
+  animation: mslide .22s ease;
+}
+@keyframes mslide { from{transform:translateY(16px);opacity:0} to{transform:translateY(0);opacity:1} }
+.modal-title { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+.modal-sub { font-size: 10px; color: var(--text3); font-family: var(--mono); margin-bottom: 16px; line-height: 1.7; }
+.modal-info {
+  background: var(--base); border-radius: 10px;
+  box-shadow: var(--sh-inset-sm);
+  padding: 12px 14px; margin-bottom: 16px;
+  font-size: 10px; color: var(--text2); line-height: 1.8; font-family: var(--mono);
+}
+.modal-info strong { color: var(--orange); }
+.field { margin-bottom: 14px; }
+.field label {
+  display: block; font-size: 9px; font-weight: 700; color: var(--text3);
+  text-transform: uppercase; letter-spacing: .08em; margin-bottom: 6px;
+}
+.field input, .field select {
+  width: 100%; height: 38px; padding: 0 12px;
+  border-radius: 10px; border: none;
+  background: var(--base); color: var(--text);
+  font-size: 11px; font-family: var(--font);
+  box-shadow: var(--sh-inset-sm); outline: none;
+  transition: box-shadow 0.2s;
+}
+.field input:focus, .field select:focus {
+  box-shadow: var(--sh-inset), 0 0 0 2px rgba(0,102,102,0.15);
+}
+.field input::placeholder { color: var(--text3); }
+.time-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.modal-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+.btn-cancel {
+  height: 36px; padding: 0 16px; border-radius: 10px; border: none;
+  background: var(--base); color: var(--text2); font-size: 11px; font-family: var(--font);
+  cursor: pointer; box-shadow: var(--sh-flat);
+}
+.btn-cancel:hover { box-shadow: var(--sh-raise-sm); }
+.btn-ok {
+  height: 36px; padding: 0 20px; border-radius: 10px; border: none;
+  background: var(--base); color: var(--primary); font-size: 11px;
+  font-weight: 700; font-family: var(--font); cursor: pointer;
+  box-shadow: 4px 4px 10px rgba(0,102,102,0.22), -3px -3px 8px rgba(255,255,255,0.88);
+  transition: all 0.15s;
+}
+.btn-ok:hover { box-shadow: 6px 6px 14px rgba(0,102,102,0.3), -4px -4px 10px rgba(255,255,255,0.92); }
+.btn-ok:active { box-shadow: var(--sh-inset-sm); }
 
 /* ── Toast ── */
-.toast{
-  position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);
-  background:#1e293b;border:1px solid var(--border2);border-radius:12px;
-  padding:10px 20px;font-size:12px;color:var(--text);
-  box-shadow:var(--shadow);z-index:300;transition:transform .3s ease;
-  display:flex;align-items:center;gap:8px;
+.toast-wrap { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 300; }
+.toast {
+  background: var(--base); border-radius: 12px;
+  padding: 10px 18px; font-size: 11px; color: var(--text);
+  box-shadow: var(--sh-raise);
+  display: flex; align-items: center; gap: 8px;
+  animation: tslide .25s ease;
+  font-family: var(--font);
 }
-.toast.show{transform:translateX(-50%) translateY(0)}
-.toast.success .toast-dot{background:var(--green)}
-.toast.warning .toast-dot{background:var(--gold)}
-.toast.error .toast-dot{background:var(--red)}
-.toast-dot{width:6px;height:6px;border-radius:50%;background:var(--blue);flex-shrink:0}
-
-/* ── Prayer settings modal specific ── */
-.time-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@keyframes tslide { from{transform:translateY(12px);opacity:0} to{transform:translateY(0);opacity:1} }
+.t-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.t-dot.success { background: var(--success); }
+.t-dot.warning { background: var(--accent); }
+.t-dot.error   { background: var(--danger); }
+.t-dot.info    { background: var(--primary); }
 </style>
 </head>
 <body>
 
 <!-- Header -->
 <div class="header">
-  <div class="header-brand">
-    <div class="header-logo">α</div>
+  <div class="hdr-brand">
+    <div class="hdr-logo">α</div>
     <div>
-      <div class="header-title">Branch Music Player</div>
-      <div class="header-sub" id="hdr-sub">Powered by ALFA.CO</div>
+      <div class="hdr-title">Music Player</div>
+      <div class="hdr-sub" id="hdr-sub">ALFA.CO Branch Operations</div>
     </div>
   </div>
-  <div class="header-status">
-    <div class="status-dot" id="status-dot"></div>
-    <span class="status-label" id="status-label">Ready</span>
-    <button class="pl-btn" onclick="openSettings()" style="margin-left:8px">⚙ Prayer Times</button>
+  <div class="hdr-right">
+    <div class="status-pill">
+      <div class="status-dot" id="status-dot"></div>
+      <span id="status-lbl">Ready</span>
+    </div>
+    <button class="neu-btn" onclick="openSettings()">⚙ Prayer Times</button>
   </div>
 </div>
 
 <!-- Prayer Banner -->
 <div class="prayer-banner" id="prayer-banner">
   <div class="pb-icon">🕌</div>
-  <div class="pb-text">
+  <div class="pb-info">
     <div class="pb-title" id="pb-title">Prayer Time</div>
-    <div class="pb-sub" id="pb-sub">Music paused</div>
+    <div class="pb-sub">Music paused · will resume automatically</div>
   </div>
-  <div class="pb-timer" id="pb-timer">00:00</div>
+  <div class="pb-timer" id="pb-timer">--m</div>
 </div>
 
 <!-- Main -->
 <div class="main">
 
-  <!-- Player Area -->
-  <div class="player-area">
-
+  <!-- Player -->
+  <div class="player-side">
     <div class="album-art">
-      <div class="album-art-inner">
-        <div class="album-art-note">🎵</div>
-        <div class="album-art-wave" id="main-wave">
-          <div class="wave-bar paused"></div>
-          <div class="wave-bar paused"></div>
-          <div class="wave-bar paused"></div>
-          <div class="wave-bar paused"></div>
-          <div class="wave-bar paused"></div>
-          <div class="wave-bar paused"></div>
-          <div class="wave-bar paused"></div>
-          <div class="wave-bar paused"></div>
-        </div>
+      <div class="art-note">🎵</div>
+      <div class="art-wave" id="main-wave">
+        <div class="wb paused"></div>
+        <div class="wb paused"></div>
+        <div class="wb paused"></div>
+        <div class="wb paused"></div>
+        <div class="wb paused"></div>
+        <div class="wb paused"></div>
+        <div class="wb paused"></div>
+        <div class="wb paused"></div>
       </div>
     </div>
 
-    <div class="track-info">
-      <div class="track-title" id="now-title">No Track Selected</div>
-      <div class="track-sub" id="now-sub">Add tracks to your playlist →</div>
-    </div>
+    <div class="track-title" id="now-title">No Track Selected</div>
+    <div class="track-artist" id="now-artist">Add tracks to your playlist →</div>
 
     <div class="progress-wrap">
-      <div class="progress-bar-container" id="progress-container" onclick="seekTo(event)">
-        <div class="progress-bar-fill" id="progress-fill"></div>
-        <div class="progress-bar-thumb" id="progress-thumb"></div>
+      <div class="prog-track" id="prog-track" onclick="seekTo(event)">
+        <div class="prog-fill" id="prog-fill"></div>
+        <div class="prog-thumb" id="prog-thumb"></div>
       </div>
-      <div class="progress-times">
+      <div class="prog-times">
         <span id="time-cur">0:00</span>
         <span id="time-dur">0:00</span>
       </div>
@@ -417,321 +541,259 @@ body{display:flex;flex-direction:column;min-height:100vh}
     <div class="controls">
       <button class="ctrl-btn" id="btn-shuffle" onclick="toggleShuffle()" title="Shuffle">🔀</button>
       <button class="ctrl-btn" onclick="prevTrack()" title="Previous">⏮</button>
-      <button class="ctrl-btn primary" id="btn-play" onclick="togglePlay()" title="Play/Pause">▶</button>
+      <button class="ctrl-btn ctrl-play" id="btn-play" onclick="togglePlay()">▶</button>
       <button class="ctrl-btn" onclick="nextTrack()" title="Next">⏭</button>
       <button class="ctrl-btn" id="btn-repeat" onclick="toggleRepeat()" title="Repeat">🔁</button>
     </div>
 
-    <div class="volume-row">
-      <div class="vol-icon" id="vol-icon">🔊</div>
+    <div class="vol-row">
+      <div class="vol-icon" id="vol-ico">🔊</div>
       <input type="range" class="vol-slider" id="vol-slider" min="0" max="100" value="80" oninput="setVolume(this.value)">
       <div class="vol-val" id="vol-val">80</div>
     </div>
 
-    <!-- Hidden audio element -->
     <audio id="audio" preload="auto"></audio>
   </div>
 
-  <!-- Playlist Panel -->
-  <div class="playlist-panel">
-    <div class="playlist-header">
-      <div class="playlist-title">
+  <!-- Playlist -->
+  <div class="playlist-side">
+    <div class="pl-header">
+      <div class="pl-title">
         🎧 Playlist
-        <span class="playlist-count" id="pl-count">0 tracks</span>
+        <span class="pl-count" id="pl-count">0 tracks</span>
       </div>
-      <div class="playlist-actions">
-        <button class="pl-btn primary" onclick="openAddModal()">+ Add Track</button>
-        <button class="pl-btn" onclick="clearPlaylist()">🗑</button>
-      </div>
-    </div>
-
-    <div class="playlist-search">
-      <div class="search-wrap">
-        <span class="search-icon">🔍</span>
-        <input type="text" class="search-input" id="search-input" placeholder="Search tracks..." oninput="filterTracks()">
+      <div class="pl-actions">
+        <button class="neu-btn primary" onclick="openAddModal()">+ Add Track</button>
+        <button class="neu-btn" onclick="clearPlaylist()" title="Clear all">🗑</button>
       </div>
     </div>
 
-    <div class="track-list" id="track-list">
-      <div class="empty-state">
-        <div class="empty-icon">🎵</div>
-        <div class="empty-text">Your playlist is empty</div>
-        <div class="empty-sub">Add tracks using Google Drive,<br>OneDrive, or any public audio URL</div>
-      </div>
+    <div class="pl-search">
+      <span class="search-ico">🔍</span>
+      <input type="text" class="search-inp" id="search-inp" placeholder="Search tracks…" oninput="filterTracks(this.value)">
     </div>
 
-    <div class="settings-panel">
-      <div class="settings-row">
-        <span class="settings-label">🕌 Prayer Auto-Pause</span>
-        <span class="settings-val" id="next-prayer-label">—</span>
+    <div class="track-list" id="track-list"></div>
+
+    <div class="pl-footer">
+      <div class="pl-footer-row">
+        <span class="pl-footer-lbl">🕌 Prayer Auto-Pause</span>
+        <span class="pl-footer-val" id="next-prayer-lbl">—</span>
       </div>
-      <div class="prayer-times-row" id="prayer-tags"></div>
+      <div class="prayer-tags" id="prayer-tags"></div>
     </div>
   </div>
 
 </div>
 
 <!-- Add Track Modal -->
-<div class="modal-overlay" id="add-modal">
-  <div class="modal">
+<div class="modal-ov" id="add-modal">
+  <div class="modal-box">
     <div class="modal-title">Add Track to Playlist</div>
-    <div class="modal-sub">Paste a cloud file link or any direct audio URL. Supported: Google Drive, OneDrive, Dropbox, and direct MP3/audio links.</div>
-
+    <div class="modal-sub">Paste a cloud link or any public audio URL. Google Drive, OneDrive, Dropbox, or direct MP3/audio links all work.</div>
     <div class="modal-info">
-      <strong>Google Drive:</strong> Share file → "Anyone with link" → copy link<br>
-      <strong>OneDrive:</strong> Share → copy link (will auto-convert)<br>
-      <strong>Dropbox:</strong> Share → copy link (dl=0 → dl=1 auto-fixed)<br>
-      <strong>Direct URL:</strong> Any public .mp3 / .ogg / .wav / .aac link
-    </div>
-
-    <div class="field">
-      <label>Track Name</label>
-      <input type="text" id="inp-name" placeholder="e.g. Chill Morning Vibes">
+      <strong>Google Drive:</strong> Share → "Anyone with link" → paste URL<br>
+      <strong>OneDrive:</strong> Share → copy link (auto-converted)<br>
+      <strong>Dropbox:</strong> Share link (dl=0→dl=1 auto-fixed)<br>
+      <strong>Direct URL:</strong> Any public .mp3 / .ogg / .wav / .aac
     </div>
     <div class="field">
-      <label>Artist / Source (optional)</label>
+      <label>Track Name *</label>
+      <input type="text" id="inp-name" placeholder="e.g. Morning Lofi Vibes">
+    </div>
+    <div class="field">
+      <label>Artist / Source</label>
       <input type="text" id="inp-artist" placeholder="e.g. Lofi Radio">
     </div>
     <div class="field">
-      <label>Audio URL or Cloud Link</label>
-      <input type="text" id="inp-url" placeholder="https://drive.google.com/file/d/.../view  or  https://...mp3">
+      <label>Audio URL or Cloud Link *</label>
+      <input type="text" id="inp-url" placeholder="https://drive.google.com/file/d/.../view">
     </div>
-
     <div class="modal-footer">
       <button class="btn-cancel" onclick="closeAddModal()">Cancel</button>
-      <button class="btn-add" onclick="addTrack()">Add to Playlist</button>
+      <button class="btn-ok" onclick="addTrack()">Add to Playlist</button>
     </div>
   </div>
 </div>
 
 <!-- Prayer Settings Modal -->
-<div class="modal-overlay" id="settings-modal">
-  <div class="modal">
+<div class="modal-ov" id="settings-modal">
+  <div class="modal-box">
     <div class="modal-title">⚙ Prayer Time Settings</div>
-    <div class="modal-sub">
-      Music stops <strong>10 min before</strong> each prayer and resumes <strong>30 min after</strong> the prayer time.
-      Set your local prayer times below (24-hour format).
-    </div>
+    <div class="modal-sub">Music stops <strong>before</strong> each prayer and resumes <strong>after</strong>. Set your local prayer times in 24-hour format.</div>
     <div class="time-grid">
       <div class="field"><label>Fajr</label><input type="time" id="pt-fajr"></div>
       <div class="field"><label>Dhuhr</label><input type="time" id="pt-dhuhr"></div>
       <div class="field"><label>Asr</label><input type="time" id="pt-asr"></div>
       <div class="field"><label>Maghrib</label><input type="time" id="pt-maghrib"></div>
       <div class="field"><label>Isha</label><input type="time" id="pt-isha"></div>
-      <div class="field"><label>Stop Before (min)</label><input type="number" id="pt-stop-before" value="10" min="0" max="60"></div>
-      <div class="field"><label>Resume After (min)</label><input type="number" id="pt-resume-after" value="30" min="0" max="120"></div>
+      <div class="field"><label>Stop Before (min)</label><input type="number" id="pt-stop" min="0" max="60" value="10"></div>
+      <div class="field"><label>Resume After (min)</label><input type="number" id="pt-resume" min="0" max="120" value="30"></div>
     </div>
     <div class="modal-footer">
       <button class="btn-cancel" onclick="closeSettings()">Cancel</button>
-      <button class="btn-add" onclick="savePrayerSettings()">Save Settings</button>
+      <button class="btn-ok" onclick="savePrayer()">Save Settings</button>
     </div>
   </div>
 </div>
 
 <!-- Toast -->
-<div class="toast" id="toast">
-  <div class="toast-dot"></div>
-  <span id="toast-msg">Done</span>
-</div>
+<div class="toast-wrap" id="toast-wrap"></div>
 
 <script>
-// ═══════════════════════════════════════════
+// ═══════════════════════════════════════
 //  STATE
-// ═══════════════════════════════════════════
+// ═══════════════════════════════════════
 var playlist = [];
 var currentIndex = -1;
 var isPlaying = false;
 var isShuffle = false;
 var isRepeat = false;
 var isPrayerPaused = false;
-var filterQuery = '';
-
-// Prayer defaults (24h format "HH:MM")
+var filterQ = '';
 var prayerTimes = {
-  fajr:    '05:00',
-  dhuhr:   '12:15',
-  asr:     '15:30',
-  maghrib: '18:20',
-  isha:    '19:45',
-  stopBefore: 10,
-  resumeAfter: 30
+  fajr:'05:00', dhuhr:'12:15', asr:'15:30', maghrib:'18:20', isha:'19:45',
+  stopBefore:10, resumeAfter:30
 };
+var PRAYER_NAMES = ['Fajr','Dhuhr','Asr','Maghrib','Isha'];
+var PRAYER_KEYS  = ['fajr','dhuhr','asr','maghrib','isha'];
 
 var audio = document.getElementById('audio');
 
-// ═══════════════════════════════════════════
+// ═══════════════════════════════════════
 //  STORAGE
-// ═══════════════════════════════════════════
-function saveState() {
+// ═══════════════════════════════════════
+var SK = 'alfa_mp_' + (new URLSearchParams(location.search).get('branch') || 'default');
+function save() {
   try {
-    localStorage.setItem('alfa_music_playlist', JSON.stringify(playlist));
-    localStorage.setItem('alfa_prayer_times', JSON.stringify(prayerTimes));
-    localStorage.setItem('alfa_music_index', currentIndex);
-    localStorage.setItem('alfa_music_vol', document.getElementById('vol-slider').value);
-  } catch(e){}
+    localStorage.setItem(SK+'_pl',  JSON.stringify(playlist));
+    localStorage.setItem(SK+'_idx', currentIndex);
+    localStorage.setItem(SK+'_pt',  JSON.stringify(prayerTimes));
+    localStorage.setItem(SK+'_vol', document.getElementById('vol-slider').value);
+  } catch(e) {}
 }
-
-function loadState() {
+function load() {
   try {
-    var pl = localStorage.getItem('alfa_music_playlist');
-    if (pl) playlist = JSON.parse(pl);
-    var pt = localStorage.getItem('alfa_prayer_times');
-    if (pt) prayerTimes = Object.assign({}, prayerTimes, JSON.parse(pt));
-    var idx = localStorage.getItem('alfa_music_index');
+    var pl  = localStorage.getItem(SK+'_pl');
+    var idx = localStorage.getItem(SK+'_idx');
+    var pt  = localStorage.getItem(SK+'_pt');
+    var vol = localStorage.getItem(SK+'_vol');
+    if (pl)  playlist = JSON.parse(pl);
     if (idx !== null) currentIndex = parseInt(idx) || 0;
-    var vol = localStorage.getItem('alfa_music_vol');
+    if (pt)  prayerTimes = Object.assign({}, prayerTimes, JSON.parse(pt));
     if (vol) { document.getElementById('vol-slider').value = vol; setVolume(vol); }
-  } catch(e){}
+  } catch(e) {}
 }
 
-// ═══════════════════════════════════════════
-//  URL CONVERSION (Drive / OneDrive / Dropbox)
-// ═══════════════════════════════════════════
+// ═══════════════════════════════════════
+//  URL CONVERSION
+// ═══════════════════════════════════════
 function convertUrl(raw) {
-  var url = (raw || '').trim();
-
-  // Google Drive: /file/d/FILE_ID/view → direct download
-  var gdMatch = url.match(/drive\.google\.com\/file\/d\/([^\/\?]+)/);
-  if (gdMatch) {
-    return 'https://drive.google.com/uc?export=download&id=' + gdMatch[1];
+  var u = (raw || '').trim();
+  var gd = u.match(/drive\.google\.com\/file\/d\/([^\/\?]+)/);
+  if (gd) return 'https://drive.google.com/uc?export=download&id=' + gd[1];
+  var gd2 = u.match(/drive\.google\.com\/open\?id=([^&]+)/);
+  if (gd2) return 'https://drive.google.com/uc?export=download&id=' + gd2[1];
+  if (u.includes('1drv.ms') || u.includes('onedrive.live.com')) {
+    try { var e = btoa(u).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,''); return 'https://api.onedrive.com/v1.0/shares/u!'+e+'/root/content'; } catch(ex) { return u; }
   }
-
-  // Google Drive open?id= format
-  var gdMatch2 = url.match(/drive\.google\.com\/open\?id=([^&]+)/);
-  if (gdMatch2) {
-    return 'https://drive.google.com/uc?export=download&id=' + gdMatch2[1];
-  }
-
-  // OneDrive share link → direct download
-  // https://1drv.ms/u/... or https://onedrive.live.com/...
-  if (url.includes('1drv.ms') || url.includes('onedrive.live.com')) {
-    // Encode and use OneDrive embed trick
-    var encoded = btoa(url).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
-    return 'https://api.onedrive.com/v1.0/shares/u!' + encoded + '/root/content';
-  }
-
-  // Dropbox: dl=0 → dl=1
-  if (url.includes('dropbox.com')) {
-    return url.replace('dl=0','dl=1').replace('www.dropbox.com','dl.dropboxusercontent.com');
-  }
-
-  // Already a direct URL
-  return url;
+  if (u.includes('dropbox.com')) return u.replace('dl=0','dl=1').replace('www.dropbox.com','dl.dropboxusercontent.com');
+  return u;
 }
 
-// ═══════════════════════════════════════════
-//  PLAYLIST MANAGEMENT
-// ═══════════════════════════════════════════
+// ═══════════════════════════════════════
+//  UTILS
+// ═══════════════════════════════════════
+function fmtTime(s) { s = Math.floor(s||0); return Math.floor(s/60) + ':' + (s%60<10?'0':'') + s%60; }
+function nowMin()   { var d = new Date(); return d.getHours()*60 + d.getMinutes(); }
+function parsePT(t) { var p=(t||'00:00').split(':'); return parseInt(p[0])*60+parseInt(p[1]||0); }
+function xe(s)      { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ═══════════════════════════════════════
+//  PLAYLIST
+// ═══════════════════════════════════════
 function addTrack() {
-  var name   = document.getElementById('inp-name').value.trim();
-  var artist = document.getElementById('inp-artist').value.trim();
-  var rawUrl = document.getElementById('inp-url').value.trim();
-
-  if (!name) { showToast('Enter a track name', 'warning'); return; }
-  if (!rawUrl) { showToast('Enter an audio URL', 'warning'); return; }
-
-  var finalUrl = convertUrl(rawUrl);
-  var track = {
-    id: Date.now(),
-    name: name,
-    artist: artist || 'Unknown',
-    url: finalUrl,
-    rawUrl: rawUrl,
-    duration: null
-  };
-  playlist.push(track);
-  saveState();
-  renderPlaylist();
-  closeAddModal();
-  showToast('Track added: ' + name, 'success');
-
-  // If nothing playing, start this track
-  if (currentIndex === -1 || playlist.length === 1) {
-    loadTrack(playlist.length - 1, false);
-  }
+  var name   = (document.getElementById('inp-name').value   || '').trim();
+  var artist = (document.getElementById('inp-artist').value || '').trim();
+  var rawUrl = (document.getElementById('inp-url').value    || '').trim();
+  if (!name)   { toast('Enter a track name', 'warning'); return; }
+  if (!rawUrl) { toast('Enter an audio URL', 'warning'); return; }
+  playlist.push({ id: Date.now(), name: name, artist: artist || 'Unknown', url: convertUrl(rawUrl), duration: null });
+  save(); renderList(); closeAddModal();
+  toast('Added: ' + name, 'success');
+  if (currentIndex === -1 || playlist.length === 1) loadTrack(playlist.length - 1, false);
 }
 
 function removeTrack(id, e) {
   e && e.stopPropagation();
   var idx = playlist.findIndex(function(t){ return t.id === id; });
-  if (idx === -1) return;
-  var wasPlaying = idx === currentIndex && isPlaying;
+  if (idx < 0) return;
+  var wasActive = idx === currentIndex && isPlaying;
   playlist.splice(idx, 1);
   if (currentIndex >= playlist.length) currentIndex = playlist.length - 1;
-  saveState();
-  renderPlaylist();
-  if (wasPlaying && playlist.length > 0) loadTrack(currentIndex, true);
-  else if (playlist.length === 0) { resetPlayer(); }
-  showToast('Removed', 'success');
+  save(); renderList();
+  if (wasActive && playlist.length > 0) loadTrack(currentIndex, true);
+  else if (!playlist.length) resetPlayer();
+  toast('Removed', 'info');
 }
 
 function clearPlaylist() {
   if (!playlist.length) return;
   if (!confirm('Clear entire playlist?')) return;
-  playlist = [];
-  currentIndex = -1;
-  isPlaying = false;
-  audio.pause();
-  audio.src = '';
-  saveState();
-  renderPlaylist();
-  resetPlayer();
-  showToast('Playlist cleared', 'success');
+  playlist = []; currentIndex = -1;
+  audio.pause(); audio.src = '';
+  save(); renderList(); resetPlayer();
+  toast('Playlist cleared', 'info');
 }
 
 function resetPlayer() {
-  document.getElementById('now-title').textContent = 'No Track Selected';
-  document.getElementById('now-sub').textContent = 'Add tracks to your playlist →';
-  document.getElementById('progress-fill').style.width = '0%';
-  document.getElementById('progress-thumb').style.left = '0%';
-  document.getElementById('time-cur').textContent = '0:00';
-  document.getElementById('time-dur').textContent = '0:00';
-  document.getElementById('btn-play').textContent = '▶';
+  document.getElementById('now-title').textContent  = 'No Track Selected';
+  document.getElementById('now-artist').textContent = 'Add tracks to your playlist →';
+  document.getElementById('prog-fill').style.width  = '0%';
+  document.getElementById('time-cur').textContent   = '0:00';
+  document.getElementById('time-dur').textContent   = '0:00';
+  document.getElementById('btn-play').textContent   = '▶';
+  document.getElementById('hdr-sub').textContent    = 'ALFA.CO Branch Operations';
   setWavePaused(true);
   updateStatus();
 }
 
-// ═══════════════════════════════════════════
-//  RENDER
-// ═══════════════════════════════════════════
-function renderPlaylist() {
+// ═══════════════════════════════════════
+//  RENDER LIST
+// ═══════════════════════════════════════
+function renderList(q) {
+  q = q !== undefined ? q : filterQ;
+  filterQ = q;
   var list = document.getElementById('track-list');
-  var q = filterQuery.toLowerCase();
-  var filtered = playlist.filter(function(t){
-    return !q || t.name.toLowerCase().includes(q) || t.artist.toLowerCase().includes(q);
+  var query = (q || '').toLowerCase();
+  var filtered = playlist.filter(function(t) {
+    return !query || t.name.toLowerCase().includes(query) || t.artist.toLowerCase().includes(query);
   });
-
   document.getElementById('pl-count').textContent = playlist.length + ' track' + (playlist.length !== 1 ? 's' : '');
-
   if (!filtered.length) {
-    list.innerHTML = '<div class="empty-state">' +
-      '<div class="empty-icon">' + (q ? '🔍' : '🎵') + '</div>' +
-      '<div class="empty-text">' + (q ? 'No results' : 'Your playlist is empty') + '</div>' +
-      '<div class="empty-sub">' + (q ? 'Try a different search' : 'Add tracks using Google Drive,<br>OneDrive, or any public audio URL') + '</div>' +
-      '</div>';
+    list.innerHTML = '<div class="empty-state"><div class="empty-ico">' + (query ? '🔍' : '🎵') + '</div>' +
+      '<div class="empty-txt">' + (query ? 'No results' : 'Playlist is empty') + '</div>' +
+      '<div class="empty-sub">' + (query ? 'Try a different search' : 'Add tracks using Google Drive,\nOneDrive, or any public audio URL') + '</div></div>';
     return;
   }
-
   list.innerHTML = filtered.map(function(t, i) {
-    var realIdx = playlist.indexOf(t);
-    var isActive = realIdx === currentIndex;
-    var cls = 'track-item' + (isActive ? ' active' : '') + (isActive && isPlaying ? ' is-playing' : '');
+    var ri = playlist.indexOf(t);
+    var isA = ri === currentIndex;
+    var cls = 'track-item' + (isA ? ' active' : '') + (isA && isPlaying ? ' playing' : '');
     var dur = t.duration ? fmtTime(t.duration) : '--:--';
-    return '<div class="' + cls + '" onclick="loadTrack(' + realIdx + ', true)">' +
+    return '<div class="' + cls + '" onclick="loadTrack(' + ri + ', true)">' +
       '<div class="track-num">' +
-        '<span class="track-num-n">' + (realIdx + 1) + '</span>' +
-        '<div class="track-playing-icon">' +
-          '<div class="mini-wave">' +
-            '<span' + (!isPlaying ? ' class="paused"' : '') + '></span>' +
-            '<span' + (!isPlaying ? ' class="paused"' : '') + '></span>' +
-            '<span' + (!isPlaying ? ' class="paused"' : '') + '></span>' +
-            '<span' + (!isPlaying ? ' class="paused"' : '') + '></span>' +
-          '</div>' +
+        '<span class="num-n">' + (ri + 1) + '</span>' +
+        '<div class="mini-wave">' +
+          '<span' + (!isPlaying ? ' class="paused"' : '') + '></span>' +
+          '<span' + (!isPlaying ? ' class="paused"' : '') + '></span>' +
+          '<span' + (!isPlaying ? ' class="paused"' : '') + '></span>' +
+          '<span' + (!isPlaying ? ' class="paused"' : '') + '></span>' +
         '</div>' +
       '</div>' +
-      '<div class="track-info-mini">' +
+      '<div class="track-info-cell">' +
         '<div class="track-name">' + xe(t.name) + '</div>' +
-        '<div class="track-artist">' + xe(t.artist) + '</div>' +
+        '<div class="track-artist-lbl">' + xe(t.artist) + '</div>' +
       '</div>' +
       '<div class="track-dur">' + dur + '</div>' +
       '<button class="track-del" onclick="removeTrack(' + t.id + ', event)" title="Remove">✕</button>' +
@@ -739,85 +801,58 @@ function renderPlaylist() {
   }).join('');
 }
 
-function xe(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') }
+function filterTracks(q) { renderList(q); }
 
-function filterTracks() {
-  filterQuery = document.getElementById('search-input').value;
-  renderPlaylist();
-}
-
-// ═══════════════════════════════════════════
+// ═══════════════════════════════════════
 //  PLAYBACK
-// ═══════════════════════════════════════════
+// ═══════════════════════════════════════
 function loadTrack(idx, autoplay) {
   if (idx < 0 || idx >= playlist.length) return;
   currentIndex = idx;
   var t = playlist[idx];
   audio.src = t.url;
-  document.getElementById('now-title').textContent = t.name;
-  document.getElementById('now-sub').textContent = t.artist;
-  document.getElementById('hdr-sub').textContent = 'Now: ' + t.name;
-  document.title = t.name + ' — ALFA.CO Player';
-  saveState();
-  renderPlaylist();
-  if (autoplay && !isPrayerPaused) { audio.play().catch(function(){}); }
+  document.getElementById('now-title').textContent  = t.name;
+  document.getElementById('now-artist').textContent = t.artist;
+  document.getElementById('hdr-sub').textContent    = 'Now: ' + t.name;
+  document.title = t.name + ' — ALFA.CO';
+  save(); renderList();
+  if (autoplay && !isPrayerPaused) audio.play().catch(function(){});
 }
 
 function togglePlay() {
-  if (isPrayerPaused) { showToast('🕌 Music paused for prayer time', 'warning'); return; }
-  if (!playlist.length) { showToast('Add tracks first', 'warning'); return; }
-  if (currentIndex === -1) { loadTrack(0, true); return; }
-  if (isPlaying) { audio.pause(); } else { audio.play().catch(function(){}); }
+  if (isPrayerPaused) { toast('🕌 Paused for prayer time', 'warning'); return; }
+  if (!playlist.length) { toast('Add tracks first', 'warning'); return; }
+  if (currentIndex < 0) { loadTrack(0, true); return; }
+  isPlaying ? audio.pause() : audio.play().catch(function(){});
 }
-
 function prevTrack() {
   if (!playlist.length) return;
-  var idx = currentIndex <= 0 ? playlist.length - 1 : currentIndex - 1;
-  loadTrack(idx, isPlaying && !isPrayerPaused);
+  loadTrack(currentIndex <= 0 ? playlist.length - 1 : currentIndex - 1, isPlaying && !isPrayerPaused);
 }
-
 function nextTrack() {
   if (!playlist.length) return;
-  var idx;
-  if (isShuffle) {
-    idx = Math.floor(Math.random() * playlist.length);
-  } else {
-    idx = (currentIndex + 1) % playlist.length;
-  }
+  var idx = isShuffle ? Math.floor(Math.random() * playlist.length) : (currentIndex + 1) % playlist.length;
   loadTrack(idx, isPlaying && !isPrayerPaused);
 }
-
 function toggleShuffle() {
   isShuffle = !isShuffle;
-  document.getElementById('btn-shuffle').classList.toggle('active', isShuffle);
-  showToast(isShuffle ? 'Shuffle on' : 'Shuffle off', 'success');
+  document.getElementById('btn-shuffle').classList.toggle('on', isShuffle);
+  toast(isShuffle ? 'Shuffle on' : 'Shuffle off', 'info');
 }
-
 function toggleRepeat() {
   isRepeat = !isRepeat;
-  document.getElementById('btn-repeat').classList.toggle('active', isRepeat);
-  showToast(isRepeat ? 'Repeat on' : 'Repeat off', 'success');
+  document.getElementById('btn-repeat').classList.toggle('on', isRepeat);
+  toast(isRepeat ? 'Repeat on' : 'Repeat off', 'info');
 }
-
-function setVolume(val) {
-  audio.volume = val / 100;
-  document.getElementById('vol-val').textContent = val;
-  var icon = val == 0 ? '🔇' : val < 40 ? '🔉' : '🔊';
-  document.getElementById('vol-icon').textContent = icon;
+function setVolume(v) {
+  audio.volume = v / 100;
+  document.getElementById('vol-val').textContent = v;
+  document.getElementById('vol-ico').textContent = v == 0 ? '🔇' : v < 40 ? '🔉' : '🔊';
 }
-
 function seekTo(e) {
   if (!audio.duration) return;
-  var rect = document.getElementById('progress-container').getBoundingClientRect();
-  var pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-  audio.currentTime = pct * audio.duration;
-}
-
-function fmtTime(s) {
-  s = Math.floor(s || 0);
-  var m = Math.floor(s / 60);
-  var sec = s % 60;
-  return m + ':' + (sec < 10 ? '0' : '') + sec;
+  var rect = document.getElementById('prog-track').getBoundingClientRect();
+  audio.currentTime = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)) * audio.duration;
 }
 
 // Audio events
@@ -825,15 +860,13 @@ audio.addEventListener('play', function() {
   isPlaying = true;
   document.getElementById('btn-play').textContent = '⏸';
   setWavePaused(false);
-  updateStatus();
-  renderPlaylist();
+  updateStatus(); renderList();
 });
 audio.addEventListener('pause', function() {
   isPlaying = false;
   document.getElementById('btn-play').textContent = '▶';
   setWavePaused(true);
-  updateStatus();
-  renderPlaylist();
+  updateStatus(); renderList();
 });
 audio.addEventListener('ended', function() {
   if (isRepeat) { audio.play(); return; }
@@ -842,253 +875,162 @@ audio.addEventListener('ended', function() {
 audio.addEventListener('timeupdate', function() {
   if (!audio.duration) return;
   var pct = (audio.currentTime / audio.duration) * 100;
-  document.getElementById('progress-fill').style.width = pct + '%';
-  document.getElementById('progress-thumb').style.left = pct + '%';
+  document.getElementById('prog-fill').style.width = pct + '%';
+  document.getElementById('prog-thumb').style.left = pct + '%';
   document.getElementById('time-cur').textContent = fmtTime(audio.currentTime);
 });
 audio.addEventListener('loadedmetadata', function() {
   document.getElementById('time-dur').textContent = fmtTime(audio.duration);
-  // store duration
   if (currentIndex >= 0 && playlist[currentIndex]) {
     playlist[currentIndex].duration = audio.duration;
-    saveState();
-    renderPlaylist();
+    save(); renderList();
   }
 });
 audio.addEventListener('error', function() {
-  showToast('Could not load audio. Check the URL or sharing settings.', 'error');
+  toast('Could not load audio — check the URL or sharing settings', 'error');
 });
 
 function setWavePaused(p) {
-  document.querySelectorAll('.wave-bar').forEach(function(b){
-    b.classList.toggle('paused', p);
-  });
+  document.querySelectorAll('.wb, .mini-wave span').forEach(function(b) { b.classList.toggle('paused', p); });
 }
 
-// ═══════════════════════════════════════════
-//  STATUS BAR
-// ═══════════════════════════════════════════
 function updateStatus() {
   var dot = document.getElementById('status-dot');
-  var lbl = document.getElementById('status-label');
-  if (isPrayerPaused) {
-    dot.className = 'status-dot prayer';
-    lbl.textContent = 'Prayer Time';
-  } else if (isPlaying) {
-    dot.className = 'status-dot';
-    lbl.textContent = 'Playing';
-  } else {
-    dot.className = 'status-dot paused';
-    lbl.textContent = 'Paused';
-  }
+  var lbl = document.getElementById('status-lbl');
+  if (isPrayerPaused) { dot.className = 'status-dot prayer'; lbl.textContent = 'Prayer Time'; }
+  else if (isPlaying) { dot.className = 'status-dot playing'; lbl.textContent = 'Playing'; }
+  else                { dot.className = 'status-dot'; lbl.textContent = 'Paused'; }
 }
 
-// ═══════════════════════════════════════════
-//  PRAYER TIME LOGIC
-// ═══════════════════════════════════════════
-var prayerNames = ['Fajr','Dhuhr','Asr','Maghrib','Isha'];
-var prayerKeys  = ['fajr','dhuhr','asr','maghrib','isha'];
-var prayerCountdownInterval = null;
+// ═══════════════════════════════════════
+//  PRAYER LOGIC
+// ═══════════════════════════════════════
+function checkPrayer() {
+  var now = nowMin();
+  var stop = parseInt(prayerTimes.stopBefore) || 10;
+  var resume = parseInt(prayerTimes.resumeAfter) || 30;
+  var inWindow = false, activeName = null, resumeAt = null;
+  var nextName = null, nextMin = null;
 
-function parseTime(str) {
-  // Returns minutes since midnight
-  var parts = (str || '00:00').split(':');
-  return parseInt(parts[0]) * 60 + parseInt(parts[1] || 0);
-}
-
-function nowMinutes() {
-  var d = new Date();
-  return d.getHours() * 60 + d.getMinutes();
-}
-
-function checkPrayerTime() {
-  var now = nowMinutes();
-  var stopBefore  = parseInt(prayerTimes.stopBefore)  || 10;
-  var resumeAfter = parseInt(prayerTimes.resumeAfter) || 30;
-
-  var inPrayerWindow = false;
-  var activePrayer   = null;
-  var resumeAt       = null;
-  var nextPrayer     = null;
-  var nextPrayerMins = null;
-
-  for (var i = 0; i < prayerKeys.length; i++) {
-    var k   = prayerKeys[i];
-    var pt  = parseTime(prayerTimes[k]);
-    var stopAt   = pt - stopBefore;
-    var endAt    = pt + resumeAfter;
-
-    if (now >= stopAt && now < endAt) {
-      inPrayerWindow = true;
-      activePrayer   = prayerNames[i];
-      resumeAt       = endAt;
-      break;
-    }
-
-    // Find next prayer
-    if (pt > now) {
-      if (nextPrayerMins === null || pt < nextPrayerMins) {
-        nextPrayerMins = pt;
-        nextPrayer     = prayerNames[i];
-      }
-    }
+  for (var i = 0; i < PRAYER_KEYS.length; i++) {
+    var pt = parsePT(prayerTimes[PRAYER_KEYS[i]]);
+    var stopAt = pt - stop, endAt = pt + resume;
+    if (now >= stopAt && now < endAt) { inWindow = true; activeName = PRAYER_NAMES[i]; resumeAt = endAt; break; }
+    if (pt > now && (nextMin === null || pt < nextMin)) { nextMin = pt; nextName = PRAYER_NAMES[i]; }
   }
 
-  // Update prayer tags
-  renderPrayerTags(activePrayer);
+  // Prayer tags
+  var tags = document.getElementById('prayer-tags');
+  if (tags) tags.innerHTML = PRAYER_KEYS.map(function(k, i) {
+    return '<span class="ptag' + (PRAYER_NAMES[i] === activeName ? ' active-prayer' : '') + '">' + PRAYER_NAMES[i] + ' ' + prayerTimes[k] + '</span>';
+  }).join('');
 
-  // Update next prayer label
-  var lbl = document.getElementById('next-prayer-label');
-  if (inPrayerWindow) {
-    lbl.textContent = activePrayer + ' now';
-    lbl.style.color = 'var(--gold)';
-  } else if (nextPrayer && nextPrayerMins !== null) {
-    var diff = nextPrayerMins - now;
-    lbl.textContent = nextPrayer + ' in ' + diff + 'm';
-    lbl.style.color = 'var(--text2)';
-  } else {
-    lbl.textContent = 'Fajr tomorrow';
-    lbl.style.color = 'var(--text3)';
+  // Next prayer label
+  var np = document.getElementById('next-prayer-lbl');
+  if (np) {
+    if (inWindow)        { np.textContent = activeName + ' now'; np.style.color = 'var(--prayer)'; }
+    else if (nextName)   { np.textContent = nextName + ' in ' + (nextMin - now) + 'm'; np.style.color = ''; }
+    else                 { np.textContent = 'Fajr tomorrow'; np.style.color = ''; }
   }
 
-  if (inPrayerWindow && !isPrayerPaused) {
-    // Entering prayer window — pause
+  if (inWindow && !isPrayerPaused) {
     isPrayerPaused = true;
     if (isPlaying) audio.pause();
-    showPrayerBanner(activePrayer, resumeAt);
-    showToast('🕌 ' + activePrayer + ' prayer time — Music paused', 'warning');
+    var banner = document.getElementById('prayer-banner');
+    if (banner) banner.classList.add('show');
+    document.getElementById('pb-title').textContent = '🕌 ' + activeName + ' Prayer Time';
     updateStatus();
-  } else if (!inPrayerWindow && isPrayerPaused) {
-    // Leaving prayer window — resume
+    toast('🕌 ' + activeName + ' — music paused', 'warning');
+  } else if (!inWindow && isPrayerPaused) {
     isPrayerPaused = false;
-    hidePrayerBanner();
-    if (playlist.length > 0 && currentIndex >= 0) {
-      audio.play().catch(function(){});
-    }
-    showToast('▶ Music resumed after prayer', 'success');
+    var banner2 = document.getElementById('prayer-banner');
+    if (banner2) banner2.classList.remove('show');
+    if (playlist.length && currentIndex >= 0) audio.play().catch(function(){});
     updateStatus();
-  } else if (inPrayerWindow) {
-    // Still in prayer window — update banner countdown
-    updatePrayerCountdown(resumeAt);
+    toast('▶ Prayer ended — music resumed', 'success');
+  }
+
+  // Countdown
+  if (inWindow && resumeAt !== null) {
+    var rem = resumeAt - now;
+    document.getElementById('pb-timer').textContent = Math.floor(rem) + 'm';
   }
 }
 
-function showPrayerBanner(name, resumeAt) {
-  var banner = document.getElementById('prayer-banner');
-  banner.classList.add('show');
-  document.getElementById('pb-title').textContent = '🕌 ' + name + ' Prayer Time';
-  document.getElementById('pb-sub').textContent = 'Music paused · Will resume automatically';
-  updatePrayerCountdown(resumeAt);
-}
+setInterval(checkPrayer, 30000);
+setTimeout(checkPrayer, 500);
 
-function updatePrayerCountdown(resumeAt) {
-  var now = nowMinutes();
-  var remaining = resumeAt - now;
-  if (remaining < 0) remaining = 0;
-  var m = Math.floor(remaining);
-  var s = Math.round((remaining - m) * 60);
-  document.getElementById('pb-timer').textContent = m + ':' + (s < 10 ? '0' : '') + s;
-}
-
-function hidePrayerBanner() {
-  document.getElementById('prayer-banner').classList.remove('show');
-}
-
-function renderPrayerTags(activeName) {
-  var container = document.getElementById('prayer-tags');
-  container.innerHTML = prayerKeys.map(function(k, i) {
-    var cls = 'prayer-tag' + (prayerNames[i] === activeName ? ' active-prayer' : '');
-    return '<span class="' + cls + '">' + prayerNames[i] + ' ' + prayerTimes[k] + '</span>';
-  }).join('');
-}
-
-// Check every 30 seconds
-setInterval(checkPrayerTime, 30000);
-checkPrayerTime(); // immediate check on load
-
-// ═══════════════════════════════════════════
+// ═══════════════════════════════════════
 //  PRAYER SETTINGS MODAL
-// ═══════════════════════════════════════════
+// ═══════════════════════════════════════
 function openSettings() {
   document.getElementById('pt-fajr').value    = prayerTimes.fajr;
   document.getElementById('pt-dhuhr').value   = prayerTimes.dhuhr;
   document.getElementById('pt-asr').value     = prayerTimes.asr;
   document.getElementById('pt-maghrib').value = prayerTimes.maghrib;
   document.getElementById('pt-isha').value    = prayerTimes.isha;
-  document.getElementById('pt-stop-before').value  = prayerTimes.stopBefore;
-  document.getElementById('pt-resume-after').value = prayerTimes.resumeAfter;
+  document.getElementById('pt-stop').value    = prayerTimes.stopBefore;
+  document.getElementById('pt-resume').value  = prayerTimes.resumeAfter;
   document.getElementById('settings-modal').classList.add('show');
 }
-
-function closeSettings() {
-  document.getElementById('settings-modal').classList.remove('show');
+function closeSettings() { document.getElementById('settings-modal').classList.remove('show'); }
+function savePrayer() {
+  prayerTimes.fajr        = document.getElementById('pt-fajr').value    || '05:00';
+  prayerTimes.dhuhr       = document.getElementById('pt-dhuhr').value   || '12:15';
+  prayerTimes.asr         = document.getElementById('pt-asr').value     || '15:30';
+  prayerTimes.maghrib     = document.getElementById('pt-maghrib').value  || '18:20';
+  prayerTimes.isha        = document.getElementById('pt-isha').value     || '19:45';
+  prayerTimes.stopBefore  = parseInt(document.getElementById('pt-stop').value)   || 10;
+  prayerTimes.resumeAfter = parseInt(document.getElementById('pt-resume').value) || 30;
+  save(); closeSettings(); checkPrayer();
+  toast('Prayer times saved', 'success');
 }
 
-function savePrayerSettings() {
-  prayerTimes.fajr    = document.getElementById('pt-fajr').value    || '05:00';
-  prayerTimes.dhuhr   = document.getElementById('pt-dhuhr').value   || '12:15';
-  prayerTimes.asr     = document.getElementById('pt-asr').value     || '15:30';
-  prayerTimes.maghrib = document.getElementById('pt-maghrib').value  || '18:20';
-  prayerTimes.isha    = document.getElementById('pt-isha').value     || '19:45';
-  prayerTimes.stopBefore  = parseInt(document.getElementById('pt-stop-before').value) || 10;
-  prayerTimes.resumeAfter = parseInt(document.getElementById('pt-resume-after').value) || 30;
-  saveState();
-  closeSettings();
-  checkPrayerTime();
-  showToast('Prayer times saved', 'success');
-}
-
-// ═══════════════════════════════════════════
+// ═══════════════════════════════════════
 //  ADD MODAL
-// ═══════════════════════════════════════════
+// ═══════════════════════════════════════
 function openAddModal() {
-  document.getElementById('inp-name').value   = '';
-  document.getElementById('inp-artist').value = '';
-  document.getElementById('inp-url').value    = '';
+  ['inp-name','inp-artist','inp-url'].forEach(function(id) { document.getElementById(id).value = ''; });
   document.getElementById('add-modal').classList.add('show');
-  setTimeout(function(){ document.getElementById('inp-name').focus(); }, 100);
+  setTimeout(function(){ document.getElementById('inp-name').focus(); }, 80);
 }
+function closeAddModal() { document.getElementById('add-modal').classList.remove('show'); }
 
-function closeAddModal() {
-  document.getElementById('add-modal').classList.remove('show');
-}
-
-// Close modals on overlay click
+// Close on overlay click
 document.getElementById('add-modal').addEventListener('click', function(e){ if(e.target===this) closeAddModal(); });
 document.getElementById('settings-modal').addEventListener('click', function(e){ if(e.target===this) closeSettings(); });
 
-// Keyboard shortcuts
+// Keyboard
 document.addEventListener('keydown', function(e) {
   if (e.target.tagName === 'INPUT') return;
-  if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
+  if (e.code === 'Space')      { e.preventDefault(); togglePlay(); }
   if (e.code === 'ArrowRight') nextTrack();
   if (e.code === 'ArrowLeft')  prevTrack();
-  if (e.code === 'Escape') { closeAddModal(); closeSettings(); }
+  if (e.code === 'Escape')     { closeAddModal(); closeSettings(); }
 });
 
-// ═══════════════════════════════════════════
+// ═══════════════════════════════════════
 //  TOAST
-// ═══════════════════════════════════════════
-var _toastTimer = null;
-function showToast(msg, type) {
-  var t = document.getElementById('toast');
-  document.getElementById('toast-msg').textContent = msg;
-  t.className = 'toast show ' + (type || 'success');
-  clearTimeout(_toastTimer);
-  _toastTimer = setTimeout(function(){ t.classList.remove('show'); }, 3000);
+// ═══════════════════════════════════════
+var _tt = null;
+function toast(msg, type) {
+  var w = document.getElementById('toast-wrap');
+  w.innerHTML = '<div class="toast"><div class="t-dot ' + (type||'info') + '"></div><span>' + xe(msg) + '</span></div>';
+  clearTimeout(_tt);
+  _tt = setTimeout(function(){ w.innerHTML = ''; }, 3200);
 }
 
-// ═══════════════════════════════════════════
+// ═══════════════════════════════════════
 //  INIT
-// ═══════════════════════════════════════════
-loadState();
-renderPlaylist();
+// ═══════════════════════════════════════
+load();
+renderList();
 updateStatus();
 if (currentIndex >= 0 && currentIndex < playlist.length) {
   var t = playlist[currentIndex];
-  document.getElementById('now-title').textContent = t.name;
-  document.getElementById('now-sub').textContent = t.artist;
-  document.getElementById('hdr-sub').textContent = 'Ready: ' + t.name;
+  document.getElementById('now-title').textContent  = t.name;
+  document.getElementById('now-artist').textContent = t.artist;
+  document.getElementById('hdr-sub').textContent    = 'Ready: ' + t.name;
   audio.src = t.url;
 }
 </script>
