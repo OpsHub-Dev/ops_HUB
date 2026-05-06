@@ -7105,7 +7105,21 @@ function bSaveOrders() {
   var obj={};bOrders.forEach(function(o){obj[String(o.id).replace(/[.#$\[\]\/]/g,'_')]=o;});
   db.ref(bPath('inv_orders')).set(obj);
 }
-function bSaveSch() { if(db) db.ref(bPath('sch')).set(BS.sch); }
+function bSaveSch() {
+  if(!db) return;
+  db.ref(bPath('sch')).set(BS.sch);
+  // Rebuild sapIndex on every schedule save so Staff Portal always stays in sync
+  if (NX.session && NX.session.branchId) {
+    var sapIdx = {};
+    BS.staff.forEach(function(m) {
+      var sap = String(m.sap || '').trim();
+      if (sap) sapIdx[sap] = { staffId: String(m.id), name: m.name, dept: m.dept || '' };
+    });
+    if (Object.keys(sapIdx).length) {
+      db.ref('branches/' + NX.session.branchId + '/sapIndex').set(sapIdx);
+    }
+  }
+}
 function bSaveTsAtt() { if(db) db.ref(bPath('tsAtt')).set(BS.tsAtt); }
 
 // ── Attach Firebase listeners when entering branch pages ──
@@ -9294,7 +9308,7 @@ function pSchedule() {
   dates.forEach(function(dt,i){var it=dt===TODAY_BS;th+='<th style="'+(it?'color:var(--ceo)':'')+';text-align:center">'+DAYS_WEEK[i]+'<br><span style="font-weight:400;font-size:9px;opacity:.7">'+new Date(dt+'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short'})+'</span></th>';});
   th+='</tr>';
   var tb='';
-  DEPTS.forEach(function(dep){var mem=BS.staff.filter(function(m){return m.dept===dep;});if(!mem.length)return;tb+='<tr class="bdr"><td colspan="8">'+bxe(dep)+'</td></tr>';mem.forEach(function(m){var ms=(sc[m.id]||{});tb+='<tr><td><div style="display:flex;align-items:center;gap:8px"><div class="bav" style="width:24px;height:24px;font-size:9px">'+bini(m.name)+'</div><span style="font-size:12px;font-weight:500">'+bxe(m.name)+'</span></div></td>';DAYS_WEEK.forEach(function(day){tb+='<td style="padding:4px"><input class="bsinp bsc-inp" data-id="'+bxe(m.id)+'" data-day="'+bxe(day)+'" value="'+bxe(ms[day]||'')+'" placeholder="\u2014"></td>';});tb+='</tr>';});});
+  DEPTS.forEach(function(dep){var mem=BS.staff.filter(function(m){return m.dept===dep;});if(!mem.length)return;tb+='<tr class="bdr"><td colspan="8">'+bxe(dep)+'</td></tr>';mem.forEach(function(m){var ms=(sc[m.id]||{});tb+='<tr><td><div style="display:flex;align-items:center;gap:8px"><div class="bav" style="width:24px;height:24px;font-size:9px">'+bini(m.name)+'</div><span style="font-size:12px;font-weight:500">'+bxe(m.name)+'</span>'+(m.sap?'<div style="font-size:9px;color:#94a3b8;font-family:monospace">'+bxe(m.sap)+'</div>':'')+' </div></div></td>';DAYS_WEEK.forEach(function(day){tb+='<td style="padding:4px"><input class="bsinp bsc-inp" data-id="'+bxe(m.id)+'" data-day="'+bxe(day)+'" value="'+bxe(ms[day]||'')+'" placeholder="\u2014"></td>';});tb+='</tr>';});});
   var h='<div class="page-header"><h1>Weekly Schedule</h1></div>';
   h+='<div class="bwnav"><button class="btn btn-sm" onclick="BS.wo=(BS.wo||0)-1;navTo(\'schedule\')">\u2190 Prev</button><span class="bmono" style="font-size:12px;color:var(--text-secondary)">'+bxe(wk)+' \u00b7 '+d0+' \u2014 '+d6+'</span><button class="btn btn-sm" onclick="BS.wo=(BS.wo||0)+1;navTo(\'schedule\')">Next \u2192</button><span style="margin-left:auto;font-size:11px;color:var(--success);opacity:.8">● Auto-saves</span><button class="btn btn-sm" onclick="printBranchSched(\'All\')">Print All</button><button class="btn btn-sm" onclick="printBranchSched(\'Manager\')">Print Mgr</button><button class="btn btn-sm" onclick="printBranchSched(\'Kitchen\')">Print Kitchen</button><button class="btn btn-sm" onclick="printBranchSched(\'FOH\')">Print FOH</button></div>';
   h+='<div class="bswrap"><table class="bstbl"><thead>'+th+'</thead><tbody>'+tb+'</tbody></table></div>';
