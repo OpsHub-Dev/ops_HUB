@@ -919,36 +919,99 @@ function weekKey() {
 }
 
 /* ═══════════════════════════════════════════════════════
-   SCHEDULE — from Firebase branches/{branchId}/schedule
+   SCHEDULE — mirrors branch manager schedule
+   Path: branches/{branchId}/sch/{weekKey}/{staffId}/{day}
+   This is the exact same data the branch manager edits in
+   the Schedule page of index.html (bSaveSch writes here)
 ═══════════════════════════════════════════════════════ */
 function renderSchedule() {
   var u = CU;
-  var wk = weekKey();
   var sb = document.getElementById('schedule-body');
-  // Try staff-specific schedule first
-  db.ref('staff/schedule/' + u.sap + '/' + wk).once('value', function(snap) {
-    var sch = snap.val();
-    if (sch) {
-      renderSchTable(sch, sb, u.dept);
-    } else if (u.branchId) {
-      // Try branch schedule
-      db.ref('branches/' + u.branchId + '/schedule/' + u.sap + '/' + wk).once('value', function(s2) {
-        var sch2 = s2.val();
-        if (sch2) { renderSchTable(sch2, sb, u.dept); }
-        else {
-          // Try BS schedule format (branch schedule keyed by week then staff)
-          db.ref('branches/' + u.branchId + '/sch/' + wk).once('value', function(s3) {
-            var branchSch = s3.val() || {};
-            var staffSch = branchSch[u.staffId || u.sap] || {};
-            if (Object.keys(staffSch).length > 0) { renderSchTable(staffSch, sb, u.dept); }
-            else { sb.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text3);font-size:12px;font-family:var(--mono)">📅 No schedule found for this week.<br>Contact your manager.</div>'; }
+  if (!u.branchId) {
+    sb.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text3);font-size:12px;font-family:var(--mono)">📅 No branch linked to your profile.<br>Contact HR to update your record.</div>';
+    return;
+  }
+
+  var wk = weekKey();
+  // weekKey() returns Sun-start date (YYYY-MM-DD)
+  // Branch manager uses format YYYY-Www — try both formats
+  var now = new Date();
+  var yr = now.getFullYear();
+  var jan1 = new Date(yr, 0, 1);
+  var wn = Math.ceil(((now - jan1) / 86400000 + jan1.getDay() + 1) / 7);
+  var isoWk = yr + '-W' + String(wn).padStart(2, '0');
+
+  sb.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text3);font-size:12px;font-family:var(--mono)">⏳ Loading schedule…</div>';
+
+  // Try ISO week key first (format used by branch manager: YYYY-Www)
+  db.ref('branches/' + u.branchId + '/sch/' + isoWk).once('value', function(snap) {
+    var weekData = snap.val();
+    if (weekData) {
+      extractMySchedule(weekData, u, sb, isoWk, wk);
+    } else {
+      // Also try YYYY-Www-1 and Www+1 for edge cases at week boundaries
+      var wkAlt = yr + '-W' + String(wn - 1).padStart(2, '0');
+      db.ref('branches/' + u.branchId + '/sch/' + wkAlt).once('value', function(snap2) {
+        var weekData2 = snap2.val();
+        if (weekData2) {
+          extractMySchedule(weekData2, u, sb, wkAlt, wk);
+        } else {
+          // Fallback: try the date-based key this portal generates
+          db.ref('branches/' + u.branchId + '/sch/' + wk).once('value', function(snap3) {
+            var weekData3 = snap3.val();
+            if (weekData3) {
+              extractMySchedule(weekData3, u, sb, wk, wk);
+            } else {
+              sb.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text3);font-size:12px;font-family:var(--mono)">📅 No schedule set for this week.<br>Check back after your manager publishes the schedule.</div>';
+            }
           });
         }
       });
-    } else {
-      sb.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text3);font-size:12px;font-family:var(--mono)">📅 No schedule found.<br>Contact your manager.</div>';
     }
   });
+}
+
+function extractMySchedule(weekData, u, sb, foundWk, displayWk) {
+  // weekData = { staffId1: { Sun:'08:00-16:00', Mon:'OFF', ... }, staffId2: {...} }
+  // Find this staff member's row by staffId, then by SAP match
+  var mySchedule = null;
+
+  // Try direct staffId match
+  if (u.staffId && weekData[u.staffId]) {
+    mySchedule = weekData[u.staffId];
+  }
+
+  // Try SAP match — look through all entries to find one whose staff record has this SAP
+  if (!mySchedule) {
+    Object.keys(weekData).forEach(function(eid) {
+      if (mySchedule) return;
+      // Each value is the day-map object { Sun:..., Mon:... }
+      // We can't know SAP from schedule alone, so try all IDs
+    });
+    // If branchId is known, cross-reference with staff list
+    db.ref('branches/' + u.branchId + '/staff').once('value', function(staffSnap) {
+      var staffList = staffSnap.val() || {};
+      var matchId = null;
+      Object.keys(staffList).forEach(function(sid) {
+        var m = staffList[sid];
+        if (String(m.sap || '') === String(u.sap) || m.name === u.name) {
+          matchId = sid;
+        }
+      });
+      if (matchId && weekData[matchId]) {
+        // Save staffId for future use
+        if (!u.staffId) { u.staffId = matchId; db.ref('staff/sessions/' + u.sap).update({ staffId: matchId }); }
+        renderSchTable(weekData[matchId], sb, u.dept);
+      } else if (Object.keys(weekData).length > 0 && !matchId) {
+        // Show all schedule as a fallback (no personal match found)
+        sb.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text3);font-size:12px;font-family:var(--mono)">⚠️ Your schedule entry was not found.<br>Your manager may use a different ID — contact them to verify.</div>';
+      } else {
+        renderSchTable(weekData[matchId] || {}, sb, u.dept);
+      }
+    });
+    return;
+  }
+  renderSchTable(mySchedule, sb, u.dept);
 }
 
 function renderSchTable(sch, sb, dept) {
@@ -1048,19 +1111,34 @@ function submitIncident() {
   var desc = document.getElementById('inc-desc').value.trim();
   var loc  = document.getElementById('inc-loc').value.trim();
   if (!type || !desc) { showToast('Fill all required fields', 'error'); return; }
-  var record = { type: type, sev: incSev, desc: desc, loc: loc, date: new Date().toISOString(), staffName: CU.name, branch: CU.branch, branchId: CU.branchId, status: 'submitted' };
-  var ref = db.ref('staff/incidents/' + CU.sap).push();
-  ref.set(record, function(err) {
+  var incDate = document.getElementById('inc-dt').value || new Date().toISOString();
+  var record = {
+    type: type, sev: incSev, desc: desc, loc: loc,
+    date: incDate, submittedAt: new Date().toISOString(),
+    staffName: CU.name, staffSAP: CU.sap,
+    branch: CU.branch, branchId: CU.branchId,
+    dept: CU.dept || '', status: 'submitted',
+    reviewedBy: null, reviewNote: null
+  };
+
+  var staffRef = db.ref('staff/incidents/' + CU.sap).push();
+  staffRef.set(record, function(err) {
     if (err) { showToast('Error saving incident', 'error'); return; }
-    // Also write to branch incidents for manager visibility
+
+    // ── Mirror to branch manager's view ──
+    // Branch manager sees this in branches/{branchId}/incidents
     if (CU.branchId) {
-      db.ref('branches/' + CU.branchId + '/incidents/' + ref.key).set(record);
+      db.ref('branches/' + CU.branchId + '/incidents/' + staffRef.key).set(record);
     }
+
+    // ── Mirror to HR incident log ──
+    db.ref('hrf/incidents/' + staffRef.key).set(record);
+
     document.getElementById('inc-type').value = '';
     document.getElementById('inc-desc').value = '';
     document.getElementById('inc-loc').value = '';
     loadIncidents();
-    showToast('Incident report submitted ✅', 'success');
+    showToast('Incident report submitted to your branch manager ✅', 'success');
   });
 }
 function loadIncidents() {
