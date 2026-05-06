@@ -892,23 +892,62 @@ function renderDashboard() {
       '<div style="margin-left:auto;font-size:16px;color:var(--text3)">›</div></button>';
   }).join('');
 
-  // Today's shift from Firebase
-  var wk = weekKey();
-  db.ref('staff/schedule/' + u.sap + '/' + wk).once('value', function(snap) {
-    var sch = snap.val() || {};
+  // Today's shift — read from branch manager's schedule (same path as My Schedule page)
+  var tsb = document.getElementById('today-shift');
+  tsb.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text3);font-size:11px;font-family:var(--mono)">⏳ Loading…</div>';
+  if (u.branchId) {
+    // Use same week key formula as branch manager
+    var yr = now.getFullYear();
+    var jan1 = new Date(yr, 0, 1);
+    var wn = Math.ceil(((now - jan1) / 86400000 + jan1.getDay() + 1) / 7);
+    var isoWk = yr + '-W' + String(wn).padStart(2, '0');
     var dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-    var today = dayNames[now.getDay()];
-    var shift = sch[today] || 'OFF';
-    var tsb = document.getElementById('today-shift');
-    if (shift && shift !== 'OFF') {
-      tsb.innerHTML = '<div class="srow"><div><div style="font-size:14px;font-weight:700;color:var(--primary)">' + shift + '</div>' +
-        '<div style="font-size:11px;color:var(--text3);margin-top:2px">' + (u.dept||'') + ' Shift</div></div>' +
-        '<div class="sbar" style="flex:1"><div class="sbar-f" style="width:60%"></div></div>' +
-        '<span class="badge bg-g">On Duty</span></div>';
-    } else {
-      tsb.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text3);font-size:12px">🌙 Rest Day — No shift today</div>';
+    var todayName = dayNames[now.getDay()];
+
+    // Resolve internal staff ID then load today's shift
+    function loadTodayShift(internalId) {
+      if (!internalId) { tsb.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text3);font-size:11px">❓ Staff ID not linked yet</div>'; return; }
+      db.ref('branches/' + u.branchId + '/sch/' + isoWk + '/' + internalId + '/' + todayName).once('value', function(snap) {
+        var raw = (snap.val() || '').toString().trim();
+        var upper = raw.toUpperCase();
+        var off = !raw || upper === 'OFF' || upper === 'DAY OFF' || upper === 'DAYOFF';
+        if (off || !raw) {
+          tsb.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text3);font-size:12px">🌙 Rest Day — No shift today</div>';
+        } else {
+          tsb.innerHTML = '<div class="srow" style="border-left:3px solid var(--primary)">' +
+            '<div><div style="font-size:18px;font-weight:700;color:var(--primary)">' + raw + '</div>' +
+            '<div style="font-size:11px;color:var(--text3);margin-top:2px">' + (u.dept||'Operations') + ' Shift</div></div>' +
+            '<div class="sbar" style="flex:1"><div class="sbar-f" style="width:70%"></div></div>' +
+            '<span class="badge bg-g">ON DUTY</span></div>';
+        }
+      });
     }
-  });
+
+    if (u.staffId) {
+      loadTodayShift(u.staffId);
+    } else {
+      // Resolve by name/SAP from branch staff
+      db.ref('branches/' + u.branchId + '/staff').once('value', function(staffSnap) {
+        var staffList = staffSnap.val() || {};
+        var foundId = null;
+        Object.keys(staffList).forEach(function(sid) {
+          if (foundId) return;
+          var m = staffList[sid];
+          if ((u.sap && String(m.sap||'').trim() === String(u.sap).trim()) ||
+              (u.name && String(m.name||'').toLowerCase().trim() === String(u.name||'').toLowerCase().trim())) {
+            foundId = sid;
+          }
+        });
+        if (foundId) {
+          u.staffId = foundId;
+          db.ref('staff/sessions/' + u.sap).update({ staffId: foundId });
+        }
+        loadTodayShift(foundId);
+      });
+    }
+  } else {
+    tsb.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text3);font-size:11px">No branch linked</div>';
+  }
 }
 
 function weekKey() {
@@ -919,111 +958,141 @@ function weekKey() {
 }
 
 /* ═══════════════════════════════════════════════════════
-   SCHEDULE — mirrors branch manager schedule
-   Path: branches/{branchId}/sch/{weekKey}/{staffId}/{day}
-   This is the exact same data the branch manager edits in
-   the Schedule page of index.html (bSaveSch writes here)
+   SCHEDULE — mirrors branch manager schedule exactly
+   Firebase path: branches/{branchId}/sch/{YYYY-Www}/{internalStaffId}/{day}
+   The internal staff ID is assigned by branch manager (e.g. '3', 'abc123')
+   We resolve it by matching staff name or SAP from branches/{branchId}/staff
 ═══════════════════════════════════════════════════════ */
 function renderSchedule() {
   var u = CU;
   var sb = document.getElementById('schedule-body');
+
   if (!u.branchId) {
-    sb.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text3);font-size:12px;font-family:var(--mono)">📅 No branch linked to your profile.<br>Contact HR to update your record.</div>';
+    sb.innerHTML = noSchMsg('No branch linked to your profile. Contact HR.');
     return;
   }
-
-  var wk = weekKey();
-  // weekKey() returns Sun-start date (YYYY-MM-DD)
-  // Branch manager uses format YYYY-Www — try both formats
-  var now = new Date();
-  var yr = now.getFullYear();
-  var jan1 = new Date(yr, 0, 1);
-  var wn = Math.ceil(((now - jan1) / 86400000 + jan1.getDay() + 1) / 7);
-  var isoWk = yr + '-W' + String(wn).padStart(2, '0');
 
   sb.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text3);font-size:12px;font-family:var(--mono)">⏳ Loading schedule…</div>';
 
-  // Try ISO week key first (format used by branch manager: YYYY-Www)
-  db.ref('branches/' + u.branchId + '/sch/' + isoWk).once('value', function(snap) {
-    var weekData = snap.val();
-    if (weekData) {
-      extractMySchedule(weekData, u, sb, isoWk, wk);
-    } else {
-      // Also try YYYY-Www-1 and Www+1 for edge cases at week boundaries
-      var wkAlt = yr + '-W' + String(wn - 1).padStart(2, '0');
-      db.ref('branches/' + u.branchId + '/sch/' + wkAlt).once('value', function(snap2) {
-        var weekData2 = snap2.val();
-        if (weekData2) {
-          extractMySchedule(weekData2, u, sb, wkAlt, wk);
-        } else {
-          // Fallback: try the date-based key this portal generates
-          db.ref('branches/' + u.branchId + '/sch/' + wk).once('value', function(snap3) {
-            var weekData3 = snap3.val();
-            if (weekData3) {
-              extractMySchedule(weekData3, u, sb, wk, wk);
-            } else {
-              sb.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text3);font-size:12px;font-family:var(--mono)">📅 No schedule set for this week.<br>Check back after your manager publishes the schedule.</div>';
-            }
-          });
-        }
-      });
+  // Use exact same week key formula as branch manager (bweekKey in index.html)
+  // Formula: YYYY-Www based on local date
+  function getISOWeekKey(offsetWeeks) {
+    var d = new Date();
+    d.setDate(d.getDate() + (offsetWeeks || 0) * 7);
+    var y = d.getFullYear();
+    var j = new Date(y, 0, 1);
+    var w = Math.ceil(((d - j) / 86400000 + j.getDay() + 1) / 7);
+    return y + '-W' + (w < 10 ? '0' : '') + w;
+  }
+
+  var wk = getISOWeekKey(0);
+  var wkPrev = getISOWeekKey(-1);
+  var wkNext = getISOWeekKey(1);
+
+  // Step 1: Load the branch staff list to find this staff's internal ID
+  db.ref('branches/' + u.branchId + '/staff').once('value', function(staffSnap) {
+    var staffList = staffSnap.val() || {};
+    var myInternalId = null;
+
+    // Match by SAP first (most accurate), then by name
+    Object.keys(staffList).forEach(function(sid) {
+      var m = staffList[sid];
+      if (myInternalId) return;
+      var sapMatch  = u.sap  && String(m.sap  || '').trim() === String(u.sap).trim();
+      var nameMatch = u.name && String(m.name  || '').toLowerCase().trim() === String(u.name).toLowerCase().trim();
+      if (sapMatch || nameMatch) myInternalId = sid;
+    });
+
+    // Persist the resolved ID so future loads skip the staff lookup
+    if (myInternalId && !u.staffId) {
+      u.staffId = myInternalId;
+      db.ref('staff/sessions/' + u.sap).update({ staffId: myInternalId });
     }
+
+    var resolvedId = myInternalId || u.staffId;
+
+    if (!resolvedId) {
+      sb.innerHTML = noSchMsg('Your profile was not found in this branch.<br>Contact your manager to link your SAP number (' + u.sap + ') to your staff record.');
+      return;
+    }
+
+    // Step 2: Load schedule for the resolved internal ID
+    db.ref('branches/' + u.branchId + '/sch/' + wk + '/' + resolvedId).once('value', function(schSnap) {
+      var myDays = schSnap.val();
+      if (myDays && Object.keys(myDays).length > 0) {
+        renderSchTable(myDays, sb, u.dept);
+      } else {
+        // Try previous / next week keys in case of boundary
+        db.ref('branches/' + u.branchId + '/sch/' + wkPrev + '/' + resolvedId).once('value', function(s2) {
+          var d2 = s2.val();
+          if (d2 && Object.keys(d2).length > 0) {
+            renderSchTable(d2, sb, u.dept);
+          } else {
+            db.ref('branches/' + u.branchId + '/sch/' + wkNext + '/' + resolvedId).once('value', function(s3) {
+              var d3 = s3.val();
+              if (d3 && Object.keys(d3).length > 0) {
+                renderSchTable(d3, sb, u.dept);
+              } else {
+                sb.innerHTML = noSchMsg('No schedule set for this week (' + wk + ').<br>Check back after your manager publishes the schedule.');
+              }
+            });
+          }
+        });
+      }
+    });
   });
 }
 
+function noSchMsg(msg) {
+  return '<div style="text-align:center;padding:28px 16px;color:var(--text3);font-size:12px;font-family:var(--mono);line-height:1.8">📅 ' + msg + '</div>';
+}
+
 function extractMySchedule(weekData, u, sb, foundWk, displayWk) {
-  // weekData = { staffId1: { Sun:'08:00-16:00', Mon:'OFF', ... }, staffId2: {...} }
-  // Find this staff member's row by staffId, then by SAP match
-  var mySchedule = null;
-
-  // Try direct staffId match
-  if (u.staffId && weekData[u.staffId]) {
-    mySchedule = weekData[u.staffId];
-  }
-
-  // Try SAP match — look through all entries to find one whose staff record has this SAP
-  if (!mySchedule) {
-    Object.keys(weekData).forEach(function(eid) {
-      if (mySchedule) return;
-      // Each value is the day-map object { Sun:..., Mon:... }
-      // We can't know SAP from schedule alone, so try all IDs
-    });
-    // If branchId is known, cross-reference with staff list
-    db.ref('branches/' + u.branchId + '/staff').once('value', function(staffSnap) {
-      var staffList = staffSnap.val() || {};
-      var matchId = null;
-      Object.keys(staffList).forEach(function(sid) {
-        var m = staffList[sid];
-        if (String(m.sap || '') === String(u.sap) || m.name === u.name) {
-          matchId = sid;
-        }
-      });
-      if (matchId && weekData[matchId]) {
-        // Save staffId for future use
-        if (!u.staffId) { u.staffId = matchId; db.ref('staff/sessions/' + u.sap).update({ staffId: matchId }); }
-        renderSchTable(weekData[matchId], sb, u.dept);
-      } else if (Object.keys(weekData).length > 0 && !matchId) {
-        // Show all schedule as a fallback (no personal match found)
-        sb.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text3);font-size:12px;font-family:var(--mono)">⚠️ Your schedule entry was not found.<br>Your manager may use a different ID — contact them to verify.</div>';
-      } else {
-        renderSchTable(weekData[matchId] || {}, sb, u.dept);
-      }
-    });
-    return;
-  }
-  renderSchTable(mySchedule, sb, u.dept);
+  // Legacy function kept for compatibility — now unused
+  renderSchTable({}, sb, u.dept);
 }
 
 function renderSchTable(sch, sb, dept) {
   var days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  var dayFull = { Sun:'Sunday', Mon:'Monday', Tue:'Tuesday', Wed:'Wednesday', Thu:'Thursday', Fri:'Friday', Sat:'Saturday' };
+
+  // Figure out today's day name to highlight it
+  var todayIdx = new Date().getDay();
+  var todayName = days[todayIdx];
+
   sb.innerHTML = days.map(function(d) {
-    var shift = sch[d] || 'OFF';
-    var off = shift.toUpperCase() === 'OFF' || shift.toUpperCase() === 'DAY OFF';
-    return '<div class="srow"><div style="font-size:10px;font-weight:700;color:var(--text2);font-family:var(--mono);width:30px">' + d + '</div>' +
-      '<div style="flex:1"><div style="font-size:12px;font-weight:700">' + (off ? '🌙 Day Off' : shift) + '</div>' +
-      '<div style="font-size:10px;color:var(--text3)">' + (off ? 'Rest Day' : (dept||'') + ' Shift') + '</div></div>' +
-      (off ? '<span class="badge bg-a">OFF</span>' : '<div class="sbar" style="width:90px"><div class="sbar-f" style="width:65%"></div></div>') +
-      '</div>';
+    var raw = (sch[d] || '').toString().trim();
+    var isToday = d === todayName;
+
+    // Detect OFF / Day Off / empty
+    var upper = raw.toUpperCase();
+    var off = !raw || upper === 'OFF' || upper === 'DAY OFF' || upper === 'DAYOFF' || upper === 'REST';
+
+    // Progress bar width — estimate from shift label
+    // e.g. "8 AM" → morning shift ~40%, "5 PM" → afternoon ~75%, "2 PM" ~60%
+    var barPct = 65;
+    if (!off && raw) {
+      var hour = parseInt(raw);
+      if (!isNaN(hour)) {
+        if (raw.toUpperCase().includes('AM')) barPct = Math.max(20, Math.min(50, (hour / 12) * 50));
+        else if (raw.toUpperCase().includes('PM')) barPct = Math.max(55, Math.min(95, 50 + (hour / 12) * 45));
+      }
+    }
+
+    return '<div class="srow" style="' + (isToday ? 'box-shadow:var(--raise);border-left:3px solid var(--primary)' : '') + '">' +
+      '<div style="width:36px;flex-shrink:0">' +
+        '<div style="font-size:10px;font-weight:700;color:' + (isToday ? 'var(--primary)' : 'var(--text2)') + ';font-family:var(--mono)">' + d + '</div>' +
+        (isToday ? '<div style="font-size:7px;color:var(--primary);font-family:var(--mono);letter-spacing:.06em">TODAY</div>' : '') +
+      '</div>' +
+      '<div style="flex:1">' +
+        '<div style="font-size:13px;font-weight:700;color:' + (off ? 'var(--text3)' : isToday ? 'var(--primary)' : 'var(--text)') + '">' +
+          (off ? '🌙 Day Off' : raw) +
+        '</div>' +
+        '<div style="font-size:10px;color:var(--text3);margin-top:1px">' + (off ? 'Rest Day' : (dept || 'Operations') + ' Shift') + '</div>' +
+        (off ? '' : '<div class="sbar" style="margin-top:6px"><div class="sbar-f" style="width:' + barPct + '%"></div></div>') +
+      '</div>' +
+      (off ? '<span class="badge bg-a">OFF</span>' : '<span class="badge bg-g" style="' + (isToday ? '' : 'opacity:.6') + '">SHIFT</span>') +
+    '</div>';
   }).join('');
 }
 
