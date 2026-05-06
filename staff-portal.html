@@ -507,15 +507,45 @@ var FB_CONFIG = {
   appId: "1:84176854270:web:f7a66b3b38e98b630859af"
 };
 var db = null;
+var _fbInitTried = false;
 function initFirebase() {
-  if (!firebase.apps.length) firebase.initializeApp(FB_CONFIG);
-  db = firebase.database();
-  db.ref('.info/connected').on('value', function(s) {
-    var connected = s.val();
-    document.querySelectorAll('.conn-dot').forEach(function(el) {
-      el.style.background = connected ? 'var(--success)' : 'var(--danger)';
+  _fbInitTried = true;
+  try {
+    if (typeof firebase === 'undefined') {
+      console.error('[StaffPortal] Firebase SDK not loaded');
+      return false;
+    }
+    if (!firebase.apps.length) firebase.initializeApp(FB_CONFIG);
+    db = firebase.database();
+    db.ref('.info/connected').on('value', function(s) {
+      var connected = s.val();
+      document.querySelectorAll('.conn-dot').forEach(function(el) {
+        el.style.background = connected ? 'var(--success)' : 'var(--danger)';
+      });
     });
-  });
+    return true;
+  } catch (e) {
+    console.error('[StaffPortal] Firebase init failed:', e);
+    return false;
+  }
+}
+
+function showLoginUI() {
+  var ov = document.getElementById('loading-overlay');
+  var ls = document.getElementById('login-screen');
+  if (ov) ov.classList.add('gone');
+  if (ls) ls.classList.remove('gone');
+  var idxSAP = sessionStorage.getItem('alfa_staff_sap') || '';
+  if (idxSAP) {
+    var sapInp = document.getElementById('sap-inp');
+    if (sapInp) sapInp.value = idxSAP;
+    var banner = document.getElementById('idx-banner');
+    var idxName = sessionStorage.getItem('alfa_staff_name') || idxSAP;
+    var idxBranch = sessionStorage.getItem('alfa_staff_branch') || '';
+    var bn = document.getElementById('idx-name'); if (bn) bn.textContent = idxName;
+    var bs = document.getElementById('idx-sub');  if (bs) bs.textContent = (idxBranch || 'ALFA.CO') + ' · Enter PIN to continue';
+    if (banner) banner.style.display = 'flex';
+  }
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -539,27 +569,34 @@ var pinBuf = { ss: '', cf: '', pd: '' };
 var incSev = 'low', leaveType = 'annual';
 
 /* ═══════════════════════════════════════════════════════
-   BOOT
+   BOOT — robust: shows login UI even if Firebase is slow/failed
 ═══════════════════════════════════════════════════════ */
-window.addEventListener('load', function() {
-  initFirebase();
-  // Try auto-login from index.html session stored in Firebase
-  var idxSAP = sessionStorage.getItem('alfa_staff_sap') || '';
+function bootStaffPortal() {
+  var ok = initFirebase();
+  // Show UI immediately — don't wait
+  showLoginUI();
+  if (!ok) {
+    setTimeout(function() {
+      var err = document.getElementById('sap-err');
+      if (err) err.textContent = '⚠ Firebase connection issue. You can still try to log in.';
+    }, 100);
+  }
+}
+
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+  // DOM already ready
+  setTimeout(bootStaffPortal, 50);
+} else {
+  document.addEventListener('DOMContentLoaded', bootStaffPortal);
+  // Safety net — if DOMContentLoaded never fires, force show after 3s
   setTimeout(function() {
-    document.getElementById('loading-overlay').classList.add('gone');
-    document.getElementById('login-screen').classList.remove('gone');
-    if (idxSAP) {
-      document.getElementById('sap-inp').value = idxSAP;
-      // Show banner
-      var banner = document.getElementById('idx-banner');
-      var idxName = sessionStorage.getItem('alfa_staff_name') || idxSAP;
-      var idxBranch = sessionStorage.getItem('alfa_staff_branch') || '';
-      document.getElementById('idx-name').textContent = idxName;
-      document.getElementById('idx-sub').textContent = (idxBranch || 'ALFA.CO') + ' · Enter PIN to continue';
-      banner.style.display = 'flex';
+    var ov = document.getElementById('loading-overlay');
+    if (ov && !ov.classList.contains('gone')) {
+      console.warn('[StaffPortal] forcing UI show after timeout');
+      bootStaffPortal();
     }
-  }, 1200);
-});
+  }, 3000);
+}
 
 /* ═══════════════════════════════════════════════════════
    LOGIN FLOW

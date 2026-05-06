@@ -7417,36 +7417,36 @@ function pBranchDash() {
   var h = '<div class="page-header"><h1>'+(b.icon||'\ud83c\udfea')+' '+xe(branchName)+' Dashboard</h1>';
   h += '<p>'+xe(b.brand||'')+(b.location?' \xb7 '+xe(b.location):'')+' \xb7 '+fmtDate(now2)+'</p></div>';
 
-  // ROW 1: Today vs LW | Month vs LM | Week vs LW | YTD
-  h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px">';
-  h += '<div class="card"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-tertiary);margin-bottom:4px">Today vs Last Week</div>';
-  h += '<div class="mono" style="font-size:22px;font-weight:300;color:var(--ceo)">'+fsar(todaySales)+'</div>';
-  h += '<div style="font-size:11px;color:var(--text-secondary);margin-top:2px">'+chgArrow(tdChg)+' vs '+fsar(lwSameDay)+'</div></div>';
-  h += '<div class="card"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-tertiary);margin-bottom:4px">This Month vs Last</div>';
-  h += '<div class="mono" style="font-size:22px;font-weight:300;color:var(--ceo)">'+fsar(tA)+'</div>';
-  h += '<div style="font-size:11px;color:var(--text-secondary);margin-top:2px">'+chgArrow(mChg)+' vs '+fsar(lmA)+'</div></div>';
-  h += '<div class="card"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-tertiary);margin-bottom:4px">This Week vs Last</div>';
-  h += '<div class="mono" style="font-size:22px;font-weight:300;color:var(--ceo)">'+fsar(thisWk)+'</div>';
-  h += '<div style="font-size:11px;color:var(--text-secondary);margin-top:2px">'+chgArrow(wChg)+' vs '+fsar(lastWk)+'</div></div>';
-  h += '<div class="card"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-tertiary);margin-bottom:4px">YTD '+cy+'</div>';
-  h += '<div class="mono" style="font-size:22px;font-weight:300;color:var(--ceo)">'+fsar(ytdA)+'</div>';
-  h += '<div style="font-size:11px;color:var(--text-secondary);margin-top:2px">'+chgArrow(ytdChg)+' vs '+ly+' YTD</div></div>';
+  // ROW 1: Today vs LW | Month vs LM | Week vs LW | YTD — sales-dashboard sizing
+  h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:14px">';
+  h += '<div class="card" style="padding:18px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--text-tertiary);margin-bottom:8px;font-weight:600">Today vs Last Week</div>';
+  h += '<div class="mono" style="font-size:28px;font-weight:700;color:var(--ceo);letter-spacing:-1px;line-height:1">'+fsar(todaySales)+'</div>';
+  h += '<div style="font-size:12px;color:var(--text-secondary);margin-top:8px">'+chgArrow(tdChg)+' vs '+fsar(lwSameDay)+'</div></div>';
+  h += '<div class="card" style="padding:18px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--text-tertiary);margin-bottom:8px;font-weight:600">This Month vs Last</div>';
+  h += '<div class="mono" style="font-size:28px;font-weight:700;color:var(--ceo);letter-spacing:-1px;line-height:1">'+fsar(tA)+'</div>';
+  h += '<div style="font-size:12px;color:var(--text-secondary);margin-top:8px">'+chgArrow(mChg)+' vs '+fsar(lmA)+'</div></div>';
+  h += '<div class="card" style="padding:18px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--text-tertiary);margin-bottom:8px;font-weight:600">This Week vs Last</div>';
+  h += '<div class="mono" style="font-size:28px;font-weight:700;color:var(--ceo);letter-spacing:-1px;line-height:1">'+fsar(thisWk)+'</div>';
+  h += '<div style="font-size:12px;color:var(--text-secondary);margin-top:8px">'+chgArrow(wChg)+' vs '+fsar(lastWk)+'</div></div>';
+  h += '<div class="card" style="padding:18px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--text-tertiary);margin-bottom:8px;font-weight:600">YTD '+cy+'</div>';
+  h += '<div class="mono" style="font-size:28px;font-weight:700;color:var(--ceo);letter-spacing:-1px;line-height:1">'+fsar(ytdA)+'</div>';
+  h += '<div style="font-size:12px;color:var(--text-secondary);margin-top:8px">'+chgArrow(ytdChg)+' vs '+ly+' YTD</div></div>';
   h += '</div>';
 
-  // ROW 2: Active Staff | Low Stock | Wastage Today | Stock Value
-  h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px">';
-  h += '<div class="card"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-tertiary);margin-bottom:4px">Active Staff</div>';
-  h += '<div class="mono" style="font-size:32px;font-weight:300;color:#00875a">'+act2+'</div>';
-  h += '<div style="font-size:11px;color:var(--text-secondary)">of '+BS.staff.length+' \xb7 '+onL2+' on leave</div></div>';
-  h += '<div class="card" style="'+(low>0?'border-color:rgba(248,113,113,.3)':'')+'"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-tertiary);margin-bottom:4px">Low Stock Items</div>';
-  h += '<div class="mono" style="font-size:32px;font-weight:300;color:#c0392b">'+low+'</div>';
-  h += '<div style="font-size:11px;color:var(--text-secondary)">'+pendOrders+' orders open</div></div>';
-  h += '<div class="card"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-tertiary);margin-bottom:4px">Wastage Today</div>';
-  h += '<div class="mono" style="font-size:22px;font-weight:300;color:var(--text-secondary)">'+fsar(wv)+'</div>';
-  h += '<div style="font-size:11px;color:var(--text-secondary)">'+BS.waste.filter(function(w){return w.date===todayStr;}).length+' entries</div></div>';
-  h += '<div class="card"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--text-tertiary);margin-bottom:4px">Stock Value</div>';
-  h += '<div class="mono" style="font-size:22px;font-weight:300;color:#0057ff">'+fsar(invValue)+'</div>';
-  h += '<div style="font-size:11px;color:var(--text-secondary)">'+bItems.length+' items</div></div>';
+  // ROW 2: Active Staff | Low Stock | Wastage Today | Stock Value — sales-dashboard sizing
+  h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:14px">';
+  h += '<div class="card" style="padding:18px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--text-tertiary);margin-bottom:8px;font-weight:600">Active Staff</div>';
+  h += '<div class="mono" style="font-size:32px;font-weight:700;color:#00875a;letter-spacing:-1px;line-height:1">'+act2+'</div>';
+  h += '<div style="font-size:12px;color:var(--text-secondary);margin-top:8px">of '+BS.staff.length+' \xb7 '+onL2+' on leave</div></div>';
+  h += '<div class="card" style="padding:18px;'+(low>0?'border-color:rgba(248,113,113,.3)':'')+'"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--text-tertiary);margin-bottom:8px;font-weight:600">Low Stock Items</div>';
+  h += '<div class="mono" style="font-size:32px;font-weight:700;color:#c0392b;letter-spacing:-1px;line-height:1">'+low+'</div>';
+  h += '<div style="font-size:12px;color:var(--text-secondary);margin-top:8px">'+pendOrders+' orders open</div></div>';
+  h += '<div class="card" style="padding:18px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--text-tertiary);margin-bottom:8px;font-weight:600">Wastage Today</div>';
+  h += '<div class="mono" style="font-size:28px;font-weight:700;color:var(--text-primary);letter-spacing:-1px;line-height:1">'+fsar(wv)+'</div>';
+  h += '<div style="font-size:12px;color:var(--text-secondary);margin-top:8px">'+BS.waste.filter(function(w){return w.date===todayStr;}).length+' entries</div></div>';
+  h += '<div class="card" style="padding:18px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--text-tertiary);margin-bottom:8px;font-weight:600">Stock Value</div>';
+  h += '<div class="mono" style="font-size:28px;font-weight:700;color:#0057ff;letter-spacing:-1px;line-height:1">'+fsar(invValue)+'</div>';
+  h += '<div style="font-size:12px;color:var(--text-secondary);margin-top:8px">'+bItems.length+' items</div></div>';
   h += '</div>';
 
   // FOOD COST PANEL
