@@ -605,10 +605,10 @@ body{
   font-size:18px;margin-bottom:16px;
   background:rgba(255,255,255,.06);
 }
-.kpi-label{font-size:11px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px}
+.kpi-label{font-size:11px;font-weight:700;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px}
 .kpi-value{
-  font-family:var(--font-display),sans-serif;font-size:28px;font-weight:700;
-  letter-spacing:-1px;line-height:1;color:var(--text-primary);
+  font-family:var(--mono),var(--font-display),sans-serif;font-size:32px;font-weight:700;
+  letter-spacing:-1.5px;line-height:1;color:var(--text-primary);
 }
 .kpi-meta{
   margin-top:8px;font-size:12px;color:var(--text-secondary);
@@ -1710,8 +1710,11 @@ html, body {
   letter-spacing: 0.1em !important;
 }
 .kpi-value {
-  font-family: 'Space Mono', monospace !important;
-  font-size: 24px !important;
+  font-family: 'JetBrains Mono', 'Space Mono', monospace !important;
+  font-size: 32px !important;
+  font-weight: 700 !important;
+  letter-spacing: -1.5px !important;
+  line-height: 1 !important;
   color: var(--text-primary) !important;
 }
 .kpi-meta {
@@ -2229,10 +2232,10 @@ h1, h2, h3, .page-header h1 {
   font-weight: 700 !important;
 }
 .kpi-value {
-  font-size: 26px !important;
-  font-weight: 600 !important;
-  letter-spacing: -0.03em !important;
-  line-height: 1.1 !important;
+  font-size: 32px !important;
+  font-weight: 700 !important;
+  letter-spacing: -1.5px !important;
+  line-height: 1 !important;
 }
 
 /* ── Tables — neumorphic wrapper + refined rows ── */
@@ -12808,7 +12811,8 @@ function pHrfEmployees(){
     var h=hrfHeader('Employee Directory',filtered.length+' of '+allStaff.length+' staff',
       '<button class="btn" onclick="openHrfBranchAccessMgr()">\uD83D\uDD11 Branch Access</button>'+
       '<button class="btn" onclick="hrfExportEmployees()">&#x2B07; Export CSV</button>'+
-      '<button class="btn btn-primary" onclick="openHrfEmpModal(null,null)">+ Add Employee</button>');
+      '<button class="btn btn-primary" onclick="openHrfEmpModal(null,null)">+ Add Employee</button>'+
+      '<button class="btn" style="background:rgba(0,102,102,.1);color:#006666;border:1px solid rgba(0,102,102,.2)" onclick="hrfSyncAllSapIndex()" title="Sync SAP numbers to branch schedule index">🔗 Sync SAP to Schedule</button>');
     h+='<div style="display:flex;gap:8px;padding:12px 0;flex-wrap:wrap;border-bottom:1px solid var(--border);margin-bottom:16px">'+
       '<input style="flex:1;min-width:200px;'+INP+'" placeholder="Search name or SAP\u2026" value="'+hxe(filterQ)+'" oninput="NX._hrfQ=this.value;navTo(\'hrf-employees\')">'+
       '<select style="'+INP+'" onchange="NX._hrfBranch=this.value;navTo(\'hrf-employees\')">'+brOpts+'</select>'+
@@ -12847,6 +12851,60 @@ function pHrfEmployees(){
   if(cached.length===branches.length&&branches.length>0)return renderEmps();
   hrfLoadAll('staff','staff',function(){navTo('hrf-employees');});
   return hrfLoading('Loading staff\u2026');
+}
+
+function hrfSyncAllSapIndex() {
+  if (!db) { showToast('Firebase not connected', 'error'); return; }
+  var branches = hrfBranches();
+  if (!branches.length) { showToast('No branches loaded', 'error'); return; }
+  showToast('Syncing SAP index…');
+  var done = 0;
+  var total = branches.length;
+  branches.forEach(function(b) {
+    var hrArr = HRF.staff[b.id] || [];
+    // Load branch schedule staff (object keyed by schedule ID)
+    db.ref('branches/' + b.id + '/staff').once('value', function(snap) {
+      var raw = snap.val();
+      var nameToSchId = {};
+      if (raw) {
+        if (Array.isArray(raw)) {
+          raw.forEach(function(m) { if (m && m.name) nameToSchId[m.name.toLowerCase().trim()] = String(m.id || ''); });
+        } else {
+          Object.keys(raw).forEach(function(sid) {
+            var m = raw[sid];
+            if (m && m.name) nameToSchId[m.name.toLowerCase().trim()] = sid;
+          });
+        }
+      }
+      // Build sapIndex from HR staff for this branch
+      var sapIdx = {};
+      hrArr.forEach(function(m) {
+        var sap = String(m.sap || '').trim();
+        if (!sap) return;
+        var mNameNorm = String(m.name || '').toLowerCase().trim();
+        var staffId = nameToSchId[mNameNorm] || '';
+        // Try partial match if exact fails
+        if (!staffId) {
+          Object.keys(nameToSchId).forEach(function(schName) {
+            if (staffId) return;
+            var sParts = schName.split(' ').filter(Boolean);
+            var mParts = mNameNorm.split(' ').filter(Boolean);
+            if (mParts.length > 0 && sParts.length > 0 && mParts[0] === sParts[0] &&
+                mParts[mParts.length-1] === sParts[sParts.length-1]) {
+              staffId = nameToSchId[schName];
+            }
+          });
+        }
+        sapIdx[sap] = { staffId: staffId, name: m.name, dept: m.dept || '', branchId: b.id };
+      });
+      if (Object.keys(sapIdx).length > 0) {
+        db.ref('branches/' + b.id + '/sapIndex').set(sapIdx);
+        console.log('[HR Sync] branch', b.id, '(', b.name, ') sapIndex:', JSON.stringify(sapIdx));
+      }
+      done++;
+      if (done === total) showToast('SAP index synced for ' + total + ' branches ✅', 'success');
+    });
+  });
 }
 
 // ── HR Employee Add/Edit Modal ──
@@ -12968,6 +13026,8 @@ function saveHrfEmp(empId,oldBranchId){
       db.ref('branches/'+branchId+'/staff').set(newArr,function(e2){
         if(e2){showToast('Save failed: '+e2.message,'error');return;}
         HRF.staff[oldBranchId]=oldArr;HRF.staff[branchId]=newArr;
+        _hrfWriteSapIndex(oldBranchId, oldArr);
+        _hrfWriteSapIndex(branchId, newArr);
         closeModalForce();showToast('Employee moved & updated','success');navTo('hrf-employees');
       });
     });
@@ -12978,12 +13038,54 @@ function saveHrfEmp(empId,oldBranchId){
     db.ref('branches/'+branchId+'/staff').set(arr,function(err){
       if(err){showToast('Save failed: '+err.message,'error');return;}
       HRF.staff[branchId]=arr;
+      // Write SAP→staffId index so Staff Portal can find schedule by SAP
+      // Uses the branch schedule's internal ID (m.id from the BS.staff list)
+      // We build the index from ALL staff in this branch
+      _hrfWriteSapIndex(branchId, arr);
       closeModalForce();showToast(empId?'Employee updated':'Employee added','success');navTo('hrf-employees');
     });
   }
 }
 
 // ── Managed Roles CRUD ──
+function _hrfWriteSapIndex(branchId, hrStaffArr) {
+  // Bridge HR staff (has SAP numbers) → Branch schedule staff (has numeric IDs from defStaff)
+  // Reads branches/{branchId}/staff as OBJECT (keyed by numeric id from defStaff)
+  // to find each person's schedule id, then writes sapIndex for the portal
+  if (!db || !branchId) return;
+  db.ref('branches/' + branchId + '/staff').once('value', function(snap) {
+    var raw = snap.val();
+    if (!raw) return;
+    // Build name→scheduleId map from branch staff object
+    var nameToSchId = {};
+    if (Array.isArray(raw)) {
+      // Branch manager saved as array — use array index+1 or item.id
+      raw.forEach(function(m) {
+        if (m && m.name) nameToSchId[m.name.toLowerCase().trim()] = String(m.id || '');
+      });
+    } else {
+      // Branch manager saved as object keyed by id (defStaff format)
+      Object.keys(raw).forEach(function(sid) {
+        var m = raw[sid];
+        if (m && m.name) nameToSchId[m.name.toLowerCase().trim()] = sid;
+      });
+    }
+    // Now build sapIndex from HR staff array
+    var sapIdx = {};
+    var hrArr = Array.isArray(hrStaffArr) ? hrStaffArr : Object.values(hrStaffArr || {});
+    hrArr.forEach(function(m) {
+      var sap = String(m.sap || '').trim();
+      if (!sap) return;
+      var staffId = nameToSchId[String(m.name || '').toLowerCase().trim()] || '';
+      sapIdx[sap] = { staffId: staffId, name: m.name, dept: m.dept, branchId: branchId };
+    });
+    if (Object.keys(sapIdx).length > 0) {
+      db.ref('branches/' + branchId + '/sapIndex').set(sapIdx);
+      console.log('[HR] sapIndex written for branch', branchId, ':', Object.keys(sapIdx).length, 'entries');
+    }
+  });
+}
+
 function openHrfRolesMgr(){
   var rows=HRF_ROLES.map(function(r,i){return '<tr><td style="font-weight:600">'+hxe(r)+'</td><td style="text-align:right;white-space:nowrap">'+
     '<button class="btn btn-sm" data-ri="'+i+'" onclick="renameHrfRole(parseInt(this.dataset.ri))">Edit</button> '+
