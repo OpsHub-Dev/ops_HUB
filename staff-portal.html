@@ -709,12 +709,24 @@ function checkBranchStaff(sap, branches, cb) {
           if (String(m.sap || '') === sap) {
             var b = branches[bid];
             cb({
-              name: m.name, role: m.role === 'Captain' ? 'captain' : 'staff',
-              branch: b ? b.name : bid, branchId: bid,
-              dept: m.dept || 'Operations', icon: '👤',
-              salary: parseInt(m.salary || 6000),
-              joinDate: m.joinDate || '2023-01-01',
-              staffId: ids[i]
+              name: m.name,
+              role: (m.role || 'staff').toLowerCase() === 'captain' ? 'captain' : (m.role || 'staff').toLowerCase() === 'branch_mgr' ? 'branch_mgr' : 'staff',
+              branch: b ? (b.name || b.entityName || bid) : bid,
+              branchId: bid,
+              dept: m.dept || 'Operations',
+              icon: '👤',
+              salary: parseInt(m.salary || m.basicSalary || 0),
+              joinDate: m.joinDate || '',
+              staffId: ids[i],
+              phone: m.phone || '',
+              email: m.email || '',
+              shift: m.shift || '',
+              contractType: m.contractType || '',
+              status: m.status || 'Active',
+              nationality: m.nationality || '',
+              probationStatus: m.probationStatus || '',
+              notes: m.notes || '',
+              sap: String(m.sap || sap)
             });
             return;
           }
@@ -850,13 +862,79 @@ function launchPortal(sap, staffData) {
   }
 
   startClock();
-  renderDashboard();
-  renderSchedule();
-  renderPayslip();
-  renderHistory();
-  renderLeave();
-  renderTraining();
-  if (CU.role === 'captain' || CU.role === 'branch_mgr') { renderCapStaff(); renderCapTraining(); }
+
+  // ALWAYS refresh live data from branches/{branchId}/staff before rendering
+  if (CU.branchId && CU.staffId) {
+    db.ref('branches/' + CU.branchId + '/staff/' + CU.staffId).once('value', function(snap) {
+      var m = snap.val();
+      if (m && m.name) {
+        // Merge all live fields into CU — this is the authoritative source
+        CU.name = m.name || CU.name;
+        CU.dept = m.dept || CU.dept;
+        CU.role = (m.role || CU.role || 'staff').toLowerCase() === 'captain' ? 'captain' : (m.role || '').toLowerCase() === 'branch_mgr' ? 'branch_mgr' : 'staff';
+        CU.salary = parseInt(m.salary || m.basicSalary || CU.salary || 0);
+        CU.joinDate = m.joinDate || CU.joinDate;
+        CU.phone = m.phone || CU.phone || '';
+        CU.email = m.email || CU.email || '';
+        CU.shift = m.shift || CU.shift || '';
+        CU.contractType = m.contractType || CU.contractType || '';
+        CU.status = m.status || CU.status || 'Active';
+        CU.nationality = m.nationality || CU.nationality || '';
+        CU.probationStatus = m.probationStatus || CU.probationStatus || '';
+        CU.sap = String(m.sap || CU.sap);
+        // Update header with real name
+        document.getElementById('hdr-name').textContent = CU.name;
+        document.getElementById('hdr-sub').textContent = (CU.role || 'staff').toUpperCase() + ' · SAP: ' + CU.sap + ' · ' + (CU.branch || '');
+        // Persist refreshed session
+        db.ref('staff/sessions/' + CU.sap).update({
+          name: CU.name, dept: CU.dept, role: CU.role,
+          salary: CU.salary, joinDate: CU.joinDate, phone: CU.phone,
+          email: CU.email, shift: CU.shift, contractType: CU.contractType,
+          status: CU.status, branchId: CU.branchId, branch: CU.branch, staffId: CU.staffId
+        });
+      }
+      // Render after live data is loaded
+      renderDashboard();
+      renderSchedule();
+      renderPayslip();
+      renderHistory();
+      renderLeave();
+      renderTraining();
+      if (CU.role === 'captain' || CU.role === 'branch_mgr') { renderCapStaff(); renderCapTraining(); }
+    });
+  } else if (CU.branchId && CU.sap) {
+    // staffId not cached yet — find it via sapIndex or full scan
+    db.ref('branches/' + CU.branchId + '/sapIndex/' + CU.sap).once('value', function(idxSnap) {
+      var idxEntry = idxSnap.val();
+      if (idxEntry && idxEntry.staffId) {
+        CU.staffId = idxEntry.staffId;
+        db.ref('branches/' + CU.branchId + '/staff/' + CU.staffId).once('value', function(snap) {
+          var m = snap.val();
+          if (m) {
+            CU.name = m.name || CU.name;
+            CU.dept = m.dept || CU.dept;
+            CU.salary = parseInt(m.salary || m.basicSalary || CU.salary || 0);
+            CU.joinDate = m.joinDate || CU.joinDate;
+            CU.phone = m.phone || ''; CU.email = m.email || ''; CU.shift = m.shift || '';
+            CU.contractType = m.contractType || ''; CU.nationality = m.nationality || '';
+            document.getElementById('hdr-name').textContent = CU.name;
+            db.ref('staff/sessions/' + CU.sap).update({ name: CU.name, dept: CU.dept, salary: CU.salary, joinDate: CU.joinDate, staffId: CU.staffId });
+          }
+          renderDashboard(); renderSchedule(); renderPayslip(); renderHistory(); renderLeave(); renderTraining();
+        });
+      } else {
+        renderDashboard(); renderSchedule(); renderPayslip(); renderHistory(); renderLeave(); renderTraining();
+      }
+    });
+  } else {
+    renderDashboard();
+    renderSchedule();
+    renderPayslip();
+    renderHistory();
+    renderLeave();
+    renderTraining();
+    if (CU.role === 'captain' || CU.role === 'branch_mgr') { renderCapStaff(); renderCapTraining(); }
+  }
 
   // Set incident datetime
   var now = new Date();
@@ -915,6 +993,7 @@ function renderDashboard() {
     '<div class="avatar"><span style="font-size:26px">' + (u.icon||'👤') + '</span><div class="rpip">' + (u.role==='captain'||u.role==='branch_mgr'?'⭐':'👤') + '</div></div>' +
     '<div><div style="font-size:18px;font-weight:700;letter-spacing:-.4px">' + greet + ', ' + (u.name||'').split(' ')[0] + '</div>' +
     '<div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:3px">' + days[now.getDay()] + ', ' + now.getDate() + ' ' + months[now.getMonth()] + ' · ' + (u.branch||'') + '</div>' +
+    (u.dept ? '<div style="font-size:9px;color:var(--text3);font-family:var(--mono);margin-top:2px">' + u.dept + (u.shift ? ' · ' + u.shift : '') + '</div>' : '') +
     (u.role==='captain'||u.role==='branch_mgr'?'<span class="badge bg-p" style="margin-top:6px">⭐ ' + (u.role==='captain'?'CAPTAIN':'BRANCH MGR') + '</span>':'') + '</div></div></div>';
 
   // KPIs from Firebase
@@ -987,22 +1066,21 @@ function renderDashboard() {
     if (u.staffId) {
       showTodayShift(u.staffId);
     } else {
-      // FIXED: Use sapIndex first (O(1)), fall back to full staff scan — mirrors renderSchedule logic
-      var _sl = null, _si = null, _pd2 = 2;
-      function _onL2() {
-        _pd2--;
-        if (_pd2 > 0) return;
-        resolveStaffId(u, _sl || {}, _si, function(foundId, foundName) {
-          if (foundId) {
-            u.staffId = foundId;
-            if (foundName && (!u.name || u.name.startsWith('Staff '))) u.name = foundName;
-            db.ref('staff/sessions/' + u.sap).update({ staffId: foundId, name: u.name });
-          }
-          showTodayShift(foundId);
+      db.ref('branches/' + u.branchId + '/staff').once('value', function(staffSnap) {
+        var staffList = staffSnap.val() || {};
+        var foundId = null;
+        Object.keys(staffList).forEach(function(sid) {
+          if (foundId) return;
+          var m = staffList[sid];
+          var mSap = String(m.sap || '').trim();
+          var mNm  = String(m.name || '').toLowerCase().replace(/\s+/g,' ').trim();
+          var mySap = String(u.sap || '').trim();
+          var myNm  = String(u.name || '').toLowerCase().replace(/\s+/g,' ').trim();
+          if ((mySap && mSap === mySap) || (myNm && mNm === myNm)) foundId = sid;
         });
-      }
-      db.ref('branches/' + u.branchId + '/staff').once('value', function(s) { _sl = s.val() || {}; _onL2(); }, function() { _sl = {}; _onL2(); });
-      db.ref('branches/' + u.branchId + '/sapIndex').once('value', function(s) { _si = s.val() || null; _onL2(); }, function() { _si = null; _onL2(); });
+        if (foundId) { u.staffId = foundId; db.ref('staff/sessions/' + u.sap).update({ staffId: foundId }); }
+        showTodayShift(foundId);
+      });
     }
   }
 }
@@ -1020,71 +1098,13 @@ function weekKey() {
    So Firebase path is: branches/{branchId}/sch (one big object)
 ═══════════════════════════════════════════════════════ */
 
-// FIXED: Matches bweekKey() in index.html exactly (same formula, no week offset since portal always shows current week)
+// Match bweekKey() in index.html EXACTLY — copied verbatim
 function bweekKeyPortal() {
   var d = new Date();
-  var y = d.getFullYear(), j = new Date(y, 0, 1), w = Math.ceil(((d - j) / 86400000 + j.getDay() + 1) / 7);
+  var y = d.getFullYear();
+  var j = new Date(y, 0, 1);
+  var w = Math.ceil(((d - j) / 86400000 + j.getDay() + 1) / 7);
   return y + '-W' + (w < 10 ? '0' : '') + w;
-}
-
-// FIXED: Resolve staff internal ID using sapIndex first (fast), then full staff scan (fallback)
-// This ensures SAP from staff/sessions matches branches/{branchId}/staff[id].sap
-function resolveStaffId(u, staffList, sapIndexData, callback) {
-  var resolvedId = null, resolvedName = null;
-
-  // Priority 1: Use cached staffId if already resolved
-  if (u.staffId) {
-    resolvedId = u.staffId;
-    var cached = staffList[resolvedId];
-    resolvedName = cached ? cached.name : u.name;
-    console.log('[StaffPortal] ✅ using cached staffId:', resolvedId);
-    return callback(resolvedId, resolvedName);
-  }
-
-  // Priority 2: sapIndex lookup (O(1)) — branches/{branchId}/sapIndex/{sap}
-  if (sapIndexData && u.sap) {
-    var idxEntry = sapIndexData[String(u.sap).trim()];
-    if (idxEntry && idxEntry.staffId) {
-      resolvedId = idxEntry.staffId;
-      resolvedName = idxEntry.name || u.name;
-      console.log('[StaffPortal] ✅ matched via sapIndex SAP=' + u.sap + ' → staffId=' + resolvedId);
-      return callback(resolvedId, resolvedName);
-    }
-  }
-
-  // Priority 3: Full staff list scan by SAP then by name (fallback when sapIndex missing/stale)
-  var mySap  = String(u.sap  || '').trim();
-  var myName = String(u.name || '').toLowerCase().replace(/\s+/g, ' ').trim();
-  Object.keys(staffList).forEach(function(sid) {
-    if (resolvedId) return;
-    var m = staffList[sid] || {};
-    var mSap  = String(m.sap  || '').trim();
-    var mName = String(m.name || '').toLowerCase().replace(/\s+/g, ' ').trim();
-    if (mySap && mSap === mySap) {
-      resolvedId = sid; resolvedName = m.name;
-      console.log('[StaffPortal] ✅ matched by SAP scan:', mySap, '→ staffId:', sid);
-    } else if (!resolvedId && myName && mName === myName) {
-      resolvedId = sid; resolvedName = m.name;
-      console.log('[StaffPortal] ✅ matched by NAME scan:', myName, '→ staffId:', sid);
-    }
-  });
-
-  if (!resolvedId) {
-    console.warn('[StaffPortal] ❌ No match for SAP=' + mySap + ' name=' + myName);
-    console.warn('[StaffPortal] Available staff (up to 10):');
-    Object.keys(staffList).slice(0, 10).forEach(function(sid) {
-      var m = staffList[sid] || {};
-      console.warn('  staffId=' + sid + '  sap=' + (m.sap||'(none)') + '  name=' + (m.name||'(none)'));
-    });
-    if (sapIndexData) {
-      console.warn('[StaffPortal] sapIndex keys:', Object.keys(sapIndexData).slice(0, 10));
-      console.warn('[StaffPortal] ⚠ SAP may not be filled in the staff list by the branch manager.');
-    } else {
-      console.warn('[StaffPortal] ⚠ sapIndex not found — branch manager must save staff with SAP number.');
-    }
-  }
-
-  callback(resolvedId, resolvedName);
 }
 
 function renderSchedule() {
@@ -1098,110 +1118,104 @@ function renderSchedule() {
   sb.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text3);font-size:12px;font-family:var(--mono)">⏳ Loading schedule…</div>';
 
   var wk = bweekKeyPortal();
-  console.log('[StaffPortal] renderSchedule — branch:', u.branchId, 'week:', wk, 'sap:', u.sap, 'name:', u.name, 'cached staffId:', u.staffId || '(none)');
+  console.log('[StaffPortal] Loading schedule for branch:', u.branchId, 'week:', wk, 'sap:', u.sap, 'name:', u.name);
 
-  // STEP 1: Load schedule, staff list, and sapIndex in parallel
-  var allSch = null, staffList = null, sapIndexData = null;
-  var pending = 3;
-
-  function onAllLoaded() {
-    pending--;
-    if (pending > 0) return;
+  // STEP 1: Load the entire branches/{branchId}/sch object and the staff list
+  // Sequential .once() is more reliable than Promise.all with Firebase compat SDK
+  db.ref('branches/' + u.branchId + '/sch').once('value', function(schSnap) {
+    var allSch = schSnap.val() || {};
+    db.ref('branches/' + u.branchId + '/staff').once('value', function(staffSnap) {
+      var staffList = staffSnap.val() || {};
 
     console.log('[StaffPortal] schedule weeks available:', Object.keys(allSch));
     console.log('[StaffPortal] staff list size:', Object.keys(staffList).length);
-    console.log('[StaffPortal] sapIndex size:', sapIndexData ? Object.keys(sapIndexData).length : 0);
-    console.log('[StaffPortal] week', wk, 'keys:', allSch[wk] ? Object.keys(allSch[wk]).length + ' staff' : '(none)');
+    console.log('[StaffPortal] week', wk, 'data:', allSch[wk]);
 
-    // STEP 2: Resolve this staff member's internal Firebase staffId
-    resolveStaffId(u, staffList, sapIndexData, function(resolvedId, resolvedName) {
-      if (!resolvedId) {
-        sb.innerHTML = noSchMsg(
-          'Your record was not found in the branch staff list.<br>' +
-          'Looking for SAP=' + (u.sap||'(none)') + ' · Name=' + (u.name||'(none)') + '<br>' +
-          '<strong>Action required:</strong> Ask your branch manager to open Staff page, edit your record, and ensure your SAP number is entered and saved.'
-        );
-        return;
-      }
+    // STEP 2: Find this staff's internal id from the staff list
+    var resolvedId = null;
+    var resolvedName = null;
+    Object.keys(staffList).forEach(function(sid) {
+      if (resolvedId) return;
+      var m = staffList[sid] || {};
+      var mSap  = String(m.sap || '').trim();
+      var mName = String(m.name || '').toLowerCase().replace(/\s+/g, ' ').trim();
+      var mySap  = String(u.sap || '').trim();
+      var myName = String(u.name || '').toLowerCase().replace(/\s+/g, ' ').trim();
 
-      // Cache resolved ID so future renders are instant
-      if (resolvedId !== u.staffId) {
-        u.staffId = resolvedId;
-        if (resolvedName && (!u.name || u.name.startsWith('Staff '))) {
-          u.name = resolvedName;
-          document.getElementById('hdr-name').textContent = resolvedName;
-        }
-        db.ref('staff/sessions/' + u.sap).update({ staffId: resolvedId, name: resolvedName || u.name });
-      }
-
-      // STEP 3: Find schedule for this staff id — try exact week first, then nearest week with data
-      var weekData = allSch[wk] || null;
-      var usedWeek = wk;
-
-      if (!weekData || !weekData[resolvedId]) {
-        var allWeeks = Object.keys(allSch).sort();
-        console.warn('[StaffPortal] no data for week', wk, '— searching all weeks for staffId', resolvedId);
-        // Try most recent weeks first
-        for (var i = allWeeks.length - 1; i >= 0; i--) {
-          if (allSch[allWeeks[i]] && allSch[allWeeks[i]][resolvedId]) {
-            weekData = allSch[allWeeks[i]];
-            usedWeek = allWeeks[i];
-            console.log('[StaffPortal] using week', usedWeek, 'as fallback');
-            break;
-          }
-        }
-      }
-
-      if (!weekData) {
-        sb.innerHTML = noSchMsg('No schedule has been published for this branch yet (' + wk + ').<br>Ask your manager to create the schedule.');
-        return;
-      }
-
-      var myDays = weekData[resolvedId];
-      console.log('[StaffPortal] staffId=' + resolvedId + ' week=' + usedWeek + ' days:', myDays);
-
-      if (!myDays || Object.keys(myDays).length === 0) {
-        sb.innerHTML = noSchMsg(
-          'Your row exists in the schedule but has no shifts entered for ' + usedWeek + '.<br>' +
-          'Ask your manager to fill in your shifts (staffId=' + resolvedId + ').'
-        );
-        return;
-      }
-
-      if (usedWeek !== wk) {
-        sb.innerHTML = '<div style="text-align:center;padding:6px;font-size:10px;color:var(--text3);font-family:var(--mono)">⚠ Showing schedule for ' + usedWeek + ' (current week not yet published)</div>';
-        var tempSb = document.createElement('div');
-        renderSchTable(myDays, tempSb, u.dept);
-        sb.appendChild(tempSb);
-      } else {
-        renderSchTable(myDays, sb, u.dept);
+      if (mySap && mSap === mySap) {
+        resolvedId = sid; resolvedName = m.name;
+        console.log('[StaffPortal] ✅ matched by SAP:', mySap, '→ staff id:', sid, 'name:', m.name);
+      } else if (myName && mName === myName) {
+        resolvedId = sid; resolvedName = m.name;
+        console.log('[StaffPortal] ✅ matched by NAME:', myName, '→ staff id:', sid);
       }
     });
-  }
 
-  db.ref('branches/' + u.branchId + '/sch').once('value', function(snap) {
-    allSch = snap.val() || {};
-    onAllLoaded();
+    if (!resolvedId) {
+      console.warn('[StaffPortal] ❌ No match. Showing list of available staff:');
+      Object.keys(staffList).slice(0, 10).forEach(function(sid) {
+        var m = staffList[sid] || {};
+        console.warn('  id=' + sid + '  sap=' + (m.sap||'(none)') + '  name=' + (m.name||'(none)'));
+      });
+      sb.innerHTML = noSchMsg(
+        'Your record was not found in branch staff list.<br>' +
+        'Looking for SAP=' + (u.sap||'(none)') + ' or name=' + (u.name||'(none)') + '<br>' +
+        'Open browser console (F12) to see the available staff.'
+      );
+      return;
+    }
+
+    // Save resolved ID
+    if (resolvedId !== u.staffId) {
+      u.staffId = resolvedId;
+      if (resolvedName && (!u.name || u.name.startsWith('Staff '))) {
+        u.name = resolvedName;
+        document.getElementById('hdr-name').textContent = resolvedName;
+      }
+      db.ref('staff/sessions/' + u.sap).update({ staffId: resolvedId, name: resolvedName || u.name });
+    }
+
+    // STEP 3: Find this week's schedule for this staff id
+    var weekData = allSch[wk] || null;
+
+    if (!weekData) {
+      // Try previous and next week as fallback
+      var allWeeks = Object.keys(allSch).sort();
+      console.warn('[StaffPortal] no data for week', wk, '— trying neighbors');
+      for (var i = allWeeks.length - 1; i >= 0; i--) {
+        if (allSch[allWeeks[i]] && allSch[allWeeks[i]][resolvedId]) {
+          weekData = allSch[allWeeks[i]];
+          console.log('[StaffPortal] using week', allWeeks[i], 'as fallback');
+          break;
+        }
+      }
+    }
+
+    if (!weekData) {
+      sb.innerHTML = noSchMsg('No schedule data found for this branch (' + wk + ').<br>Ask your manager to publish the schedule.');
+      return;
+    }
+
+    var myDays = weekData[resolvedId];
+    console.log('[StaffPortal] my days:', myDays);
+
+    if (!myDays || Object.keys(myDays).length === 0) {
+      sb.innerHTML = noSchMsg(
+        'Your schedule row is empty for ' + wk + '.<br>' +
+        '(Looking under id=' + resolvedId + ' in week=' + wk + ')<br>' +
+        'Ask your manager to fill in your shifts.'
+      );
+      return;
+    }
+
+    renderSchTable(myDays, sb, u.dept);
+    }, function(err) {
+      console.error('[StaffPortal] staff list error:', err);
+      sb.innerHTML = noSchMsg('Cannot read staff list. Check Firebase rules for branches/' + u.branchId + '/staff');
+    });
   }, function(err) {
-    console.error('[StaffPortal] sch read error:', err);
+    console.error('[StaffPortal] schedule error:', err);
     sb.innerHTML = noSchMsg('Cannot read schedule. Check Firebase rules for branches/' + u.branchId + '/sch');
-  });
-
-  db.ref('branches/' + u.branchId + '/staff').once('value', function(snap) {
-    staffList = snap.val() || {};
-    onAllLoaded();
-  }, function(err) {
-    console.error('[StaffPortal] staff list read error:', err);
-    staffList = {};
-    onAllLoaded();
-  });
-
-  db.ref('branches/' + u.branchId + '/sapIndex').once('value', function(snap) {
-    sapIndexData = snap.val() || null;
-    onAllLoaded();
-  }, function() {
-    sapIndexData = null; // sapIndex is optional — fall through to full scan
-    onAllLoaded();
   });
 }
 
@@ -1258,10 +1272,51 @@ function renderSchTable(sch, sb, dept) {
 ═══════════════════════════════════════════════════════ */
 function renderPayslip() {
   var u = CU; if (!u) return;
-  // Reload from Firebase for accuracy
-  db.ref('staff/sessions/' + u.sap).once('value', function(snap) {
-    var data = snap.val() || {};
-    var base = parseInt(data.salary || u.salary || 6000);
+  // Read salary DIRECTLY from branch staff record (the authoritative source)
+  function doRender(base) {
+    base = parseInt(base) || 0;
+    var housing = Math.round(base * 0.25);
+    var transport = Math.round(base * 0.10);
+    var gross = base + housing + transport;
+    var gosi = Math.round(gross * 0.09);
+    var net = gross - gosi;
+    var month = document.getElementById('payslip-month')?.value || new Date().toISOString().slice(0,7);
+    var mn = new Date(month + '-01').toLocaleDateString('en-US', {month:'long', year:'numeric'});
+    var body = document.getElementById('payslip-body');
+    if (!body) return;
+    body.innerHTML =
+      '<div class="card" style="display:flex;gap:14px;align-items:flex-start">' +
+      '<div class="avatar"><span style="font-size:24px">👤</span></div>' +
+      '<div><div style="font-size:15px;font-weight:700">' + (u.name||'') + '</div>' +
+      '<div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:2px">SAP: ' + u.sap + ' · ' + (u.dept||'') + ' · ' + (u.branch||'') + '</div>' +
+      '<div style="font-size:10px;color:var(--primary);font-family:var(--mono);margin-top:4px">Pay Period: ' + mn + '</div>' +
+      (u.contractType ? '<div style="font-size:9px;color:var(--text3);font-family:var(--mono)">' + u.contractType + ' · ' + (u.status||'Active') + '</div>' : '') +
+      '</div></div>' +
+      (base === 0 ? '<div class="card" style="text-align:center;color:var(--text3);font-size:11px;font-family:var(--mono);padding:20px">⚠️ Salary not configured yet.<br>Contact HR to set your salary in the system.</div>' :
+      '<div class="card"><div class="ctitle"><div class="cdot"></div>Earnings</div>' +
+      pr('Basic Salary','SAR ' + base.toLocaleString()) + pr('Housing Allowance','SAR ' + housing.toLocaleString()) + pr('Transport Allowance','SAR ' + transport.toLocaleString()) +
+      '<div class="prow" style="font-weight:700"><span>Gross Total</span><span>SAR ' + gross.toLocaleString() + '</span></div></div>' +
+      '<div class="card"><div class="ctitle"><div class="cdot" style="background:var(--danger)"></div>Deductions</div>' + pr('GOSI (9%)','− SAR ' + gosi.toLocaleString()) + pr('Salary Advance','− SAR 0') + '</div>' +
+      '<div class="net-box"><div class="netlbl">Net Salary — ' + mn + '</div><div class="net">SAR ' + net.toLocaleString('en-SA', {minimumFractionDigits:2}) + '</div>' +
+      '<div style="font-size:10px;color:var(--text3);margin-top:8px;font-family:var(--mono)">✅ Paid to registered bank account</div></div>');
+  }
+
+  if (u.branchId && u.staffId) {
+    db.ref('branches/' + u.branchId + '/staff/' + u.staffId).once('value', function(snap) {
+      var m = snap.val() || {};
+      var base = parseInt(m.salary || m.basicSalary || u.salary || 0);
+      doRender(base);
+    });
+  } else {
+    doRender(u.salary || 0);
+  }
+}
+function renderPayslip_UNUSED_REMOVED() {
+  // Deprecated - now using live branch staff data
+  var unused = true;
+  if(unused) return;
+  db.ref('dead').once('value', function(snap) {
+    var base = 0;
     var housing = Math.round(base * 0.25);
     var transport = Math.round(base * 0.10);
     var gross = base + housing + transport;
@@ -1269,18 +1324,7 @@ function renderPayslip() {
     var net = gross - gosi;
     var month = document.getElementById('payslip-month')?.value || '2025-04';
     var mn = {'2025-04':'April 2025','2025-03':'March 2025','2025-02':'February 2025','2025-01':'January 2025'}[month] || month;
-    document.getElementById('payslip-body').innerHTML =
-      '<div class="card" style="display:flex;gap:14px;align-items:flex-start">' +
-      '<div class="avatar"><span style="font-size:24px">' + (u.icon||'👤') + '</span></div>' +
-      '<div><div style="font-size:15px;font-weight:700">' + (u.name||'') + '</div>' +
-      '<div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:2px">SAP: ' + u.sap + ' · ' + (u.dept||'') + ' · ' + (u.branch||'') + '</div>' +
-      '<div style="font-size:10px;color:var(--primary);font-family:var(--mono);margin-top:4px">Pay Period: ' + mn + '</div></div></div>' +
-      '<div class="card"><div class="ctitle"><div class="cdot"></div>Earnings</div>' +
-      pr('Basic Salary','SAR ' + base.toLocaleString()) + pr('Housing Allowance','SAR ' + housing.toLocaleString()) + pr('Transport Allowance','SAR ' + transport.toLocaleString()) +
-      '<div class="prow" style="font-weight:700"><span>Gross Total</span><span>SAR ' + gross.toLocaleString() + '</span></div></div>' +
-      '<div class="card"><div class="ctitle"><div class="cdot" style="background:var(--danger)"></div>Deductions</div>' + pr('GOSI (9%)','− SAR ' + gosi.toLocaleString()) + pr('Salary Advance','− SAR 0') + '</div>' +
-      '<div class="net-box"><div class="netlbl">Net Salary — ' + mn + '</div><div class="net">SAR ' + net.toLocaleString('en-SA', {minimumFractionDigits:2}) + '</div>' +
-      '<div style="font-size:10px;color:var(--text3);margin-top:8px;font-family:var(--mono)">✅ Paid to registered bank account</div></div>';
+    // This old version used staff/sessions for salary — replaced by live branch read above
   });
 }
 function pr(l, v) { return '<div class="prow"><span style="color:var(--text2)">' + l + '</span><span style="font-family:var(--mono)">' + v + '</span></div>'; }
@@ -1290,7 +1334,7 @@ function pr(l, v) { return '<div class="prow"><span style="color:var(--text2)">'
 ═══════════════════════════════════════════════════════ */
 function renderHistory() {
   var u = CU; if (!u) return;
-  var join = new Date(u.joinDate || '2023-01-01');
+  var join = new Date(u.joinDate && u.joinDate.length > 4 ? u.joinDate : (new Date().toISOString().split('T')[0]));
   var now = new Date();
   var mos = (now.getFullYear() - join.getFullYear()) * 12 + now.getMonth() - join.getMonth();
   document.getElementById('hist-kpi').innerHTML =
