@@ -1019,13 +1019,12 @@ function renderSchedule() {
   var wk = bweekKeyPortal();
   console.log('[StaffPortal] Loading schedule for branch:', u.branchId, 'week:', wk, 'sap:', u.sap, 'name:', u.name);
 
-  // STEP 1: Load the entire branches/{branchId}/sch object and the staff list together
-  var schPromise = db.ref('branches/' + u.branchId + '/sch').once('value');
-  var staffPromise = db.ref('branches/' + u.branchId + '/staff').once('value');
-
-  Promise.all([schPromise, staffPromise]).then(function(snaps) {
-    var allSch = snaps[0].val() || {};
-    var staffList = snaps[1].val() || {};
+  // STEP 1: Load the entire branches/{branchId}/sch object and the staff list
+  // Sequential .once() is more reliable than Promise.all with Firebase compat SDK
+  db.ref('branches/' + u.branchId + '/sch').once('value', function(schSnap) {
+    var allSch = schSnap.val() || {};
+    db.ref('branches/' + u.branchId + '/staff').once('value', function(staffSnap) {
+      var staffList = staffSnap.val() || {};
 
     console.log('[StaffPortal] schedule weeks available:', Object.keys(allSch));
     console.log('[StaffPortal] staff list size:', Object.keys(staffList).length);
@@ -1109,9 +1108,13 @@ function renderSchedule() {
     }
 
     renderSchTable(myDays, sb, u.dept);
-  }).catch(function(e) {
-    console.error('[StaffPortal] schedule load error:', e);
-    sb.innerHTML = noSchMsg('Failed to load schedule: ' + e.message);
+    }, function(err) {
+      console.error('[StaffPortal] staff list error:', err);
+      sb.innerHTML = noSchMsg('Cannot read staff list. Check Firebase rules for branches/' + u.branchId + '/staff');
+    });
+  }, function(err) {
+    console.error('[StaffPortal] schedule error:', err);
+    sb.innerHTML = noSchMsg('Cannot read schedule. Check Firebase rules for branches/' + u.branchId + '/sch');
   });
 }
 
@@ -1268,8 +1271,10 @@ function submitIncident() {
       db.ref('branches/' + CU.branchId + '/incidents/' + staffRef.key).set(record);
     }
 
-    // ── Mirror to HR incident log ──
-    db.ref('hrf/incidents/' + staffRef.key).set(record);
+    // ── Mirror to HR incident log (optional — silently skip if rule denies) ──
+    db.ref('hrf/incidents/' + staffRef.key).set(record, function(hrfErr) {
+      if (hrfErr) console.warn('[StaffPortal] hrf/incidents write skipped (rule denied)');
+    });
 
     document.getElementById('inc-type').value = '';
     document.getElementById('inc-desc').value = '';
@@ -1346,8 +1351,10 @@ function submitLeave() {
     if (err) { showToast('Error saving leave request', 'error'); return; }
     // Write to branch leave requests for manager approval
     if (CU.branchId) db.ref('branches/' + CU.branchId + '/leaveRequests/' + ref.key).set(record);
-    // Also write to hrf leave table
-    db.ref('hrf/leaveRequests/' + ref.key).set(record);
+    // Also write to hrf leave table (optional — silently skip if rule denies)
+    db.ref('hrf/leaveRequests/' + ref.key).set(record, function(hrfErr) {
+      if (hrfErr) console.warn('[StaffPortal] hrf/leaveRequests write skipped (rule denied)');
+    });
     document.getElementById('lv-reason').value = '';
     renderLeave();
     showToast('Leave request submitted — pending approval 📋', 'success');
