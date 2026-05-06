@@ -227,7 +227,7 @@ textarea.fi{resize:vertical;min-height:80px}
 </div>
 
 <!-- LOGIN -->
-<div id="login-screen" class="gone">
+<div id="login-screen">
   <div class="lcard" id="lcard">
     <!-- STEP: SAP -->
     <div id="step-sap">
@@ -569,34 +569,51 @@ var pinBuf = { ss: '', cf: '', pd: '' };
 var incSev = 'low', leaveType = 'annual';
 
 /* ═══════════════════════════════════════════════════════
-   BOOT — robust: shows login UI even if Firebase is slow/failed
+   BOOT — bulletproof: hides loading overlay immediately
 ═══════════════════════════════════════════════════════ */
-function bootStaffPortal() {
-  var ok = initFirebase();
-  // Show UI immediately — don't wait
-  showLoginUI();
-  if (!ok) {
-    setTimeout(function() {
-      var err = document.getElementById('sap-err');
-      if (err) err.textContent = '⚠ Firebase connection issue. You can still try to log in.';
-    }, 100);
+function showLoginUINow() {
+  var ov = document.getElementById('loading-overlay');
+  var ls = document.getElementById('login-screen');
+  if (ov) ov.style.display = 'none';
+  if (ls) { ls.classList.remove('gone'); ls.style.display = 'flex'; }
+  var idxSAP = sessionStorage.getItem('alfa_staff_sap') || '';
+  if (idxSAP) {
+    var sapInp = document.getElementById('sap-inp');
+    if (sapInp) sapInp.value = idxSAP;
+    var banner = document.getElementById('idx-banner');
+    var idxName = sessionStorage.getItem('alfa_staff_name') || idxSAP;
+    var idxBranch = sessionStorage.getItem('alfa_staff_branch') || '';
+    var bn = document.getElementById('idx-name'); if (bn) bn.textContent = idxName;
+    var bs = document.getElementById('idx-sub');  if (bs) bs.textContent = (idxBranch || 'ALFA.CO') + ' · Enter PIN to continue';
+    if (banner) banner.style.display = 'flex';
   }
 }
 
-if (document.readyState === 'complete' || document.readyState === 'interactive') {
-  // DOM already ready
-  setTimeout(bootStaffPortal, 50);
-} else {
-  document.addEventListener('DOMContentLoaded', bootStaffPortal);
-  // Safety net — if DOMContentLoaded never fires, force show after 3s
-  setTimeout(function() {
-    var ov = document.getElementById('loading-overlay');
-    if (ov && !ov.classList.contains('gone')) {
-      console.warn('[StaffPortal] forcing UI show after timeout');
-      bootStaffPortal();
-    }
-  }, 3000);
+function bootStaffPortal() {
+  try {
+    initFirebase();
+  } catch (e) {
+    console.error('[StaffPortal] init error:', e);
+  }
+  showLoginUINow();
+  attachSAPEnterListener();
 }
+
+// Run boot ASAP — multiple triggers to catch any case
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', bootStaffPortal);
+} else {
+  // DOM is already parsed
+  bootStaffPortal();
+}
+// Final safety net — force show after 2 seconds no matter what
+setTimeout(function() {
+  var ov = document.getElementById('loading-overlay');
+  if (ov && ov.style.display !== 'none') {
+    console.warn('[StaffPortal] safety timeout — forcing UI');
+    showLoginUINow();
+  }
+}, 2000);
 
 /* ═══════════════════════════════════════════════════════
    LOGIN FLOW
@@ -608,7 +625,10 @@ function showStep(id) {
   pinBuf.ss = ''; pinBuf.cf = ''; pinBuf.pd = '';
 }
 
-document.getElementById('sap-inp').addEventListener('keydown', function(e) { if (e.key === 'Enter') handleSAP(); });
+function attachSAPEnterListener() {
+  var sapInp = document.getElementById('sap-inp');
+  if (sapInp) sapInp.addEventListener('keydown', function(e) { if (e.key === 'Enter') handleSAP(); });
+}
 
 function handleSAP() {
   var sap = document.getElementById('sap-inp').value.trim();
@@ -814,7 +834,8 @@ function launchPortal(sap, staffData) {
     }, 1500);
   }
 
-  document.getElementById('login-screen').classList.add('gone');
+  var ls = document.getElementById('login-screen');
+  ls.classList.add('gone'); ls.style.display = 'none';
   var app = document.getElementById('app');
   app.style.display = 'flex'; app.classList.add('show');
   document.getElementById('hdr-ico').textContent = CU.icon || '👤';
@@ -846,7 +867,8 @@ function launchPortal(sap, staffData) {
 
 function logout() {
   CU = null;
-  document.getElementById('login-screen').classList.remove('gone');
+  var ls = document.getElementById('login-screen');
+  ls.classList.remove('gone'); ls.style.display = 'flex';
   document.getElementById('app').style.display = 'none';
   showStep('step-sap');
   document.getElementById('sap-err').textContent = '';
@@ -1120,7 +1142,6 @@ function renderSchedule() {
 
 function noSchMsg(msg) {
   return '<div style="text-align:center;padding:28px 16px;color:var(--text3);font-size:12px;font-family:var(--mono);line-height:1.8">📅 ' + msg + '</div>';
-}, sb, u.dept);
 }
 
 function renderSchTable(sch, sb, dept) {
