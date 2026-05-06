@@ -7422,33 +7422,33 @@ function pBranchDash() {
 
   // ROW 1: Today vs LW | Month vs LM | Week vs LW | YTD — sales-dashboard sizing
   h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:14px">';
-  h += '<div class="card" style="padding:18px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--text-tertiary);margin-bottom:8px;font-weight:600">Today vs Last Week</div>';
-  h += '<div class="mono" style="font-size:28px;font-weight:700;color:var(--ceo);letter-spacing:-1px;line-height:1">'+fsar(todaySales)+'</div>';
+  h += '<div class="card" style="padding:18px"><div class="kpi-label">Today vs Last Week</div>';
+  h += '<div class="kpi-value mono" style="color:var(--ceo)">'+fsar(todaySales)+'</div>';
   h += '<div style="font-size:12px;color:var(--text-secondary);margin-top:8px">'+chgArrow(tdChg)+' vs '+fsar(lwSameDay)+'</div></div>';
-  h += '<div class="card" style="padding:18px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--text-tertiary);margin-bottom:8px;font-weight:600">This Month vs Last</div>';
-  h += '<div class="mono" style="font-size:28px;font-weight:700;color:var(--ceo);letter-spacing:-1px;line-height:1">'+fsar(tA)+'</div>';
+  h += '<div class="card" style="padding:18px"><div class="kpi-label">This Month vs Last</div>';
+  h += '<div class="kpi-value mono" style="color:var(--ceo)">'+fsar(tA)+'</div>';
   h += '<div style="font-size:12px;color:var(--text-secondary);margin-top:8px">'+chgArrow(mChg)+' vs '+fsar(lmA)+'</div></div>';
-  h += '<div class="card" style="padding:18px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--text-tertiary);margin-bottom:8px;font-weight:600">This Week vs Last</div>';
-  h += '<div class="mono" style="font-size:28px;font-weight:700;color:var(--ceo);letter-spacing:-1px;line-height:1">'+fsar(thisWk)+'</div>';
+  h += '<div class="card" style="padding:18px"><div class="kpi-label">This Week vs Last</div>';
+  h += '<div class="kpi-value mono" style="color:var(--ceo)">'+fsar(thisWk)+'</div>';
   h += '<div style="font-size:12px;color:var(--text-secondary);margin-top:8px">'+chgArrow(wChg)+' vs '+fsar(lastWk)+'</div></div>';
-  h += '<div class="card" style="padding:18px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--text-tertiary);margin-bottom:8px;font-weight:600">YTD '+cy+'</div>';
-  h += '<div class="mono" style="font-size:28px;font-weight:700;color:var(--ceo);letter-spacing:-1px;line-height:1">'+fsar(ytdA)+'</div>';
+  h += '<div class="card" style="padding:18px"><div class="kpi-label">YTD '+cy+'</div>';
+  h += '<div class="kpi-value mono" style="color:var(--ceo)">'+fsar(ytdA)+'</div>';
   h += '<div style="font-size:12px;color:var(--text-secondary);margin-top:8px">'+chgArrow(ytdChg)+' vs '+ly+' YTD</div></div>';
   h += '</div>';
 
   // ROW 2: Active Staff | Low Stock | Wastage Today | Stock Value — sales-dashboard sizing
   h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:14px">';
-  h += '<div class="card" style="padding:18px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--text-tertiary);margin-bottom:8px;font-weight:600">Active Staff</div>';
-  h += '<div class="mono" style="font-size:32px;font-weight:700;color:#00875a;letter-spacing:-1px;line-height:1">'+act2+'</div>';
+  h += '<div class="card" style="padding:18px"><div class="kpi-label">Active Staff</div>';
+  h += '<div class="kpi-value mono" style="color:#00875a">'+act2+'</div>';
   h += '<div style="font-size:12px;color:var(--text-secondary);margin-top:8px">of '+BS.staff.length+' \xb7 '+onL2+' on leave</div></div>';
-  h += '<div class="card" style="padding:18px;'+(low>0?'border-color:rgba(248,113,113,.3)':'')+'"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--text-tertiary);margin-bottom:8px;font-weight:600">Low Stock Items</div>';
-  h += '<div class="mono" style="font-size:32px;font-weight:700;color:#c0392b;letter-spacing:-1px;line-height:1">'+low+'</div>';
+  h += '<div class="card" style="padding:18px;'+(low>0?'border-color:rgba(248,113,113,.3)':'')+'"><div class="kpi-label">Low Stock Items</div>';
+  h += '<div class="kpi-value mono" style="color:#c0392b">'+low+'</div>';
   h += '<div style="font-size:12px;color:var(--text-secondary);margin-top:8px">'+pendOrders+' orders open</div></div>';
-  h += '<div class="card" style="padding:18px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--text-tertiary);margin-bottom:8px;font-weight:600">Wastage Today</div>';
-  h += '<div class="mono" style="font-size:28px;font-weight:700;color:var(--text-primary);letter-spacing:-1px;line-height:1">'+fsar(wv)+'</div>';
+  h += '<div class="card" style="padding:18px"><div class="kpi-label">Wastage Today</div>';
+  h += '<div class="kpi-value mono" style="color:var(--text-primary)">'+fsar(wv)+'</div>';
   h += '<div style="font-size:12px;color:var(--text-secondary);margin-top:8px">'+BS.waste.filter(function(w){return w.date===todayStr;}).length+' entries</div></div>';
-  h += '<div class="card" style="padding:18px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--text-tertiary);margin-bottom:8px;font-weight:600">Stock Value</div>';
-  h += '<div class="mono" style="font-size:28px;font-weight:700;color:#0057ff;letter-spacing:-1px;line-height:1">'+fsar(invValue)+'</div>';
+  h += '<div class="card" style="padding:18px"><div class="kpi-label">Stock Value</div>';
+  h += '<div class="kpi-value mono" style="color:#0057ff">'+fsar(invValue)+'</div>';
   h += '<div style="font-size:12px;color:var(--text-secondary);margin-top:8px">'+bItems.length+' items</div></div>';
   h += '</div>';
 
