@@ -951,7 +951,7 @@ function renderDashboard() {
       '<div style="margin-left:auto;font-size:16px;color:var(--text3)">›</div></button>';
   }).join('');
 
-  // Today's shift — uses same logic as renderSchedule (reads from branches/{id}/sch)
+  // Today's shift — reads same sapIndex + sch path as renderSchedule
   var tsb = document.getElementById('today-shift');
   tsb.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text3);font-size:11px;font-family:var(--mono)">⏳ Loading…</div>';
 
@@ -959,6 +959,31 @@ function renderDashboard() {
     tsb.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text3);font-size:11px">No branch linked</div>';
   } else {
     var isoWkt = bweekKeyPortal();
+    var dayNames2 = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    var todayName2 = dayNames2[now.getDay()];
+
+    function showTodayFromStaffId(sid) {
+      if (!sid) { tsb.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text3);font-size:11px">Schedule not linked yet</div>'; return; }
+      db.ref('branches/' + u.branchId + '/sch/' + isoWkt + '/' + sid + '/' + todayName2).once('value', function(snap) {
+        var raw = (snap.val() || '').toString().trim();
+        var off = !raw || raw.toUpperCase() === 'OFF' || raw.toUpperCase() === 'DAY OFF';
+        tsb.innerHTML = off
+          ? '<div style="text-align:center;padding:20px;color:var(--text3);font-size:12px">🌙 Rest Day — No shift today</div>'
+          : '<div class="srow" style="border-left:3px solid var(--primary)"><div><div style="font-size:20px;font-weight:700;color:var(--primary);letter-spacing:-.3px">' + raw + '</div><div style="font-size:11px;color:var(--text3);margin-top:2px">' + (u.dept||'Operations') + ' Shift · Today</div></div><div class="sbar" style="flex:1"><div class="sbar-f" style="width:70%"></div></div><span class="badge bg-g">ON DUTY</span></div>';
+      });
+    }
+
+    if (u.staffId) { showTodayFromStaffId(u.staffId); }
+    else {
+      db.ref('branches/' + u.branchId + '/sapIndex/' + String(u.sap||'').trim()).once('value', function(snap) {
+        var idx = snap.val();
+        if (idx && idx.staffId) { u.staffId = idx.staffId; showTodayFromStaffId(idx.staffId); }
+        else { tsb.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text3);font-size:11px">Schedule pending — open My Schedule</div>'; }
+      });
+    }
+    // Skip the old logic below
+    return;
+    var isoWktOld = isoWkt;
     var dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
     var todayName = dayNames[now.getDay()];
 
@@ -1014,12 +1039,12 @@ function weekKey() {
 }
 
 /* ═══════════════════════════════════════════════════════
-   SCHEDULE — reads branches/{branchId}/sch/{wk}/{staffId}/{day}
-   Branch manager saves: BS.sch[wk][m.id][day] = "5 PM"
-   So Firebase path is: branches/{branchId}/sch (one big object)
+   SCHEDULE — 3-step lookup using sapIndex for reliability
+   Step 1: branches/{branchId}/sapIndex/{sap}  → staffId (fastest, set by branch mgr)
+   Step 2: branches/{branchId}/staff name match → staffId (fallback)
+   Step 3: branches/{branchId}/sch/{wk}/{staffId} → { Sun, Mon, ... }
 ═══════════════════════════════════════════════════════ */
 
-// Match bweekKey() in index.html EXACTLY — copied verbatim
 function bweekKeyPortal() {
   var d = new Date();
   var y = d.getFullYear();
@@ -1031,115 +1056,150 @@ function bweekKeyPortal() {
 function renderSchedule() {
   var u = CU;
   var sb = document.getElementById('schedule-body');
-  if (!u.branchId) {
-    sb.innerHTML = noSchMsg('No branch linked. Contact HR.');
-    return;
-  }
+  if (!u.branchId) { sb.innerHTML = noSchMsg('No branch linked. Contact HR.'); return; }
 
   sb.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text3);font-size:12px;font-family:var(--mono)">⏳ Loading schedule…</div>';
-
   var wk = bweekKeyPortal();
-  console.log('[StaffPortal] Loading schedule for branch:', u.branchId, 'week:', wk, 'sap:', u.sap, 'name:', u.name);
+  console.log('[Schedule] week:', wk, 'branch:', u.branchId, 'sap:', u.sap, 'name:', u.name);
 
-  // STEP 1: Load the entire branches/{branchId}/sch object and the staff list
-  // Sequential .once() is more reliable than Promise.all with Firebase compat SDK
-  db.ref('branches/' + u.branchId + '/sch').once('value', function(schSnap) {
-    var allSch = schSnap.val() || {};
-    db.ref('branches/' + u.branchId + '/staff').once('value', function(staffSnap) {
-      var staffList = staffSnap.val() || {};
-
-    console.log('[StaffPortal] schedule weeks available:', Object.keys(allSch));
-    console.log('[StaffPortal] staff list size:', Object.keys(staffList).length);
-    console.log('[StaffPortal] week', wk, 'data:', allSch[wk]);
-
-    // STEP 2: Find this staff's internal id from the staff list
-    var resolvedId = null;
-    var resolvedName = null;
-    Object.keys(staffList).forEach(function(sid) {
-      if (resolvedId) return;
-      var m = staffList[sid] || {};
-      var mSap  = String(m.sap || '').trim();
-      var mName = String(m.name || '').toLowerCase().replace(/\s+/g, ' ').trim();
-      var mySap  = String(u.sap || '').trim();
-      var myName = String(u.name || '').toLowerCase().replace(/\s+/g, ' ').trim();
-
-      if (mySap && mSap === mySap) {
-        resolvedId = sid; resolvedName = m.name;
-        console.log('[StaffPortal] ✅ matched by SAP:', mySap, '→ staff id:', sid, 'name:', m.name);
-      } else if (myName && mName === myName) {
-        resolvedId = sid; resolvedName = m.name;
-        console.log('[StaffPortal] ✅ matched by NAME:', myName, '→ staff id:', sid);
-      }
-    });
-
-    if (!resolvedId) {
-      console.warn('[StaffPortal] ❌ No match. Showing list of available staff:');
-      Object.keys(staffList).slice(0, 10).forEach(function(sid) {
-        var m = staffList[sid] || {};
-        console.warn('  id=' + sid + '  sap=' + (m.sap||'(none)') + '  name=' + (m.name||'(none)'));
-      });
+  // Once we have the staffId, load the schedule
+  function loadSchedule(staffId) {
+    if (!staffId) {
       sb.innerHTML = noSchMsg(
-        'Your record was not found in branch staff list.<br>' +
-        'Looking for SAP=' + (u.sap||'(none)') + ' or name=' + (u.name||'(none)') + '<br>' +
-        'Open browser console (F12) to see the available staff.'
+        'Could not find your schedule entry.<br>' +
+        'Ask your branch manager to open Staff page → find your name → save to link your SAP number.'
       );
       return;
     }
-
-    // Save resolved ID
-    if (resolvedId !== u.staffId) {
-      u.staffId = resolvedId;
-      if (resolvedName && (!u.name || u.name.startsWith('Staff '))) {
-        u.name = resolvedName;
-        document.getElementById('hdr-name').textContent = resolvedName;
-      }
-      db.ref('staff/sessions/' + u.sap).update({ staffId: resolvedId, name: resolvedName || u.name });
+    // Save for future fast lookups
+    if (staffId !== u.staffId) {
+      u.staffId = staffId;
+      db.ref('staff/sessions/' + u.sap).update({ staffId: staffId });
     }
 
-    // STEP 3: Find this week's schedule for this staff id
-    var weekData = allSch[wk] || null;
+    // Load ALL weeks at once and find the best match
+    db.ref('branches/' + u.branchId + '/sch').once('value', function(snap) {
+      var allSch = snap.val() || {};
+      var weeks  = Object.keys(allSch).sort();
+      console.log('[Schedule] weeks in Firebase:', weeks, '| looking for staffId:', staffId);
 
-    if (!weekData) {
-      // Try previous and next week as fallback
-      var allWeeks = Object.keys(allSch).sort();
-      console.warn('[StaffPortal] no data for week', wk, '— trying neighbors');
-      for (var i = allWeeks.length - 1; i >= 0; i--) {
-        if (allSch[allWeeks[i]] && allSch[allWeeks[i]][resolvedId]) {
-          weekData = allSch[allWeeks[i]];
-          console.log('[StaffPortal] using week', allWeeks[i], 'as fallback');
-          break;
+      // Try current week first, then most recent week that has data for this staff
+      var myDays = null;
+      var usedWk  = null;
+
+      if (allSch[wk] && allSch[wk][staffId]) {
+        myDays = allSch[wk][staffId];
+        usedWk = wk;
+      } else {
+        // Find most recent week with data for this staff
+        for (var i = weeks.length - 1; i >= 0; i--) {
+          if (allSch[weeks[i]] && allSch[weeks[i]][staffId] && Object.keys(allSch[weeks[i]][staffId]).length > 0) {
+            myDays = allSch[weeks[i]][staffId];
+            usedWk = weeks[i];
+            break;
+          }
         }
       }
-    }
 
-    if (!weekData) {
-      sb.innerHTML = noSchMsg('No schedule data found for this branch (' + wk + ').<br>Ask your manager to publish the schedule.');
-      return;
-    }
+      console.log('[Schedule] used week:', usedWk, '| days:', myDays);
 
-    var myDays = weekData[resolvedId];
-    console.log('[StaffPortal] my days:', myDays);
+      if (!myDays || Object.keys(myDays).length === 0) {
+        sb.innerHTML = noSchMsg(
+          'No schedule published yet for this week (' + wk + ').<br>' +
+          'Check back after your manager publishes the schedule.'
+        );
+        return;
+      }
 
-    if (!myDays || Object.keys(myDays).length === 0) {
-      sb.innerHTML = noSchMsg(
-        'Your schedule row is empty for ' + wk + '.<br>' +
-        '(Looking under id=' + resolvedId + ' in week=' + wk + ')<br>' +
-        'Ask your manager to fill in your shifts.'
-      );
-      return;
-    }
-
-    renderSchTable(myDays, sb, u.dept);
+      // Show a banner if not current week
+      var banner = (usedWk && usedWk !== wk)
+        ? '<div style="background:rgba(254,153,0,.12);border-radius:10px;padding:8px 14px;font-size:10px;font-family:var(--mono);color:var(--warning);margin-bottom:10px">⚠️ Showing schedule for ' + usedWk + ' (current week ' + wk + ' not published yet)</div>'
+        : '';
+      sb.innerHTML = banner;
+      renderSchTable(myDays, sb, u.dept);
     }, function(err) {
-      console.error('[StaffPortal] staff list error:', err);
-      sb.innerHTML = noSchMsg('Cannot read staff list. Check Firebase rules for branches/' + u.branchId + '/staff');
+      console.error('[Schedule] sch read error:', err);
+      sb.innerHTML = noSchMsg('Failed to read schedule: ' + err.message);
+    });
+  }
+
+  // STEP 1: Use saved staffId if available
+  if (u.staffId) { loadSchedule(u.staffId); return; }
+
+  var mySap = String(u.sap || '').trim();
+
+  // STEP 2: Try sapIndex (fastest — written by index.html when manager saves staff)
+  db.ref('branches/' + u.branchId + '/sapIndex/' + mySap).once('value', function(snap) {
+    var idx = snap.val();
+    if (idx && idx.staffId) {
+      console.log('[Schedule] ✅ sapIndex hit → staffId:', idx.staffId);
+      // Update name from index if needed
+      if (idx.name && (!u.name || u.name.startsWith('Staff '))) {
+        u.name = idx.name;
+        document.getElementById('hdr-name').textContent = idx.name;
+        db.ref('staff/sessions/' + mySap).update({ name: idx.name });
+      }
+      loadSchedule(idx.staffId);
+      return;
+    }
+
+    // STEP 3: Fall back to scanning staff list by name
+    console.log('[Schedule] sapIndex miss — scanning staff list by name');
+    db.ref('branches/' + u.branchId + '/staff').once('value', function(staffSnap) {
+      var staffList = staffSnap.val() || {};
+      var myName = String(u.name || '').toLowerCase().replace(/\s+/g, ' ').trim();
+      var resolvedId = null;
+      var resolvedName = null;
+
+      Object.keys(staffList).forEach(function(sid) {
+        if (resolvedId) return;
+        var m = staffList[sid] || {};
+        var mSap  = String(m.sap  || '').trim();
+        var mName = String(m.name || '').toLowerCase().replace(/\s+/g, ' ').trim();
+
+        // SAP match
+        if (mySap && mSap === mySap) { resolvedId = sid; resolvedName = m.name; return; }
+        // Full name match
+        if (myName && mName === myName) { resolvedId = sid; resolvedName = m.name; return; }
+        // First + last name match (handles middle name differences)
+        if (myName && mName) {
+          var myP = myName.split(' ').filter(Boolean);
+          var mP  = mName.split(' ').filter(Boolean);
+          if (myP.length > 1 && mP.length > 1 &&
+              myP[0] === mP[0] && myP[myP.length-1] === mP[mP.length-1]) {
+            resolvedId = sid; resolvedName = m.name;
+          }
+        }
+      });
+
+      if (resolvedId) {
+        console.log('[Schedule] ✅ name match → staffId:', resolvedId, 'name:', resolvedName);
+        if (resolvedName && (!u.name || u.name.startsWith('Staff '))) {
+          u.name = resolvedName;
+          document.getElementById('hdr-name').textContent = resolvedName;
+        }
+        // Write sapIndex for future fast lookups
+        if (mySap) {
+          db.ref('branches/' + u.branchId + '/sapIndex/' + mySap).set({ staffId: resolvedId, name: resolvedName || u.name });
+        }
+        loadSchedule(resolvedId);
+      } else {
+        var names = Object.values(staffList).map(function(m){ return m.name || ''; }).filter(Boolean);
+        console.warn('[Schedule] ❌ no match. Staff names:', names.join(' | '));
+        sb.innerHTML = noSchMsg(
+          'Your name was not found in the branch staff list.<br>' +
+          'Portal name: <strong>' + (u.name || u.sap) + '</strong><br>' +
+          'Ask your manager to go to Staff page → find your name → enter your SAP number (' + mySap + ') → Save.'
+        );
+      }
+    }, function(err) {
+      sb.innerHTML = noSchMsg('Failed to read staff list: ' + err.message);
     });
   }, function(err) {
-    console.error('[StaffPortal] schedule error:', err);
-    sb.innerHTML = noSchMsg('Cannot read schedule. Check Firebase rules for branches/' + u.branchId + '/sch');
+    console.error('[Schedule] sapIndex error:', err.message);
+    loadSchedule(null);
   });
 }
-
 function noSchMsg(msg) {
   return '<div style="text-align:center;padding:28px 16px;color:var(--text3);font-size:12px;font-family:var(--mono);line-height:1.8">📅 ' + msg + '</div>';
 }

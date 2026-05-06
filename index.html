@@ -9062,7 +9062,20 @@ function saveBranchStaff(id){
     BS.staff.push(entry);
     showToast('Staff added','success');
   }
-  bSaveColl('staff',BS.staff);bsyncTSFromStaff();closeModalForce();navTo('staff');
+  bSaveColl('staff',BS.staff);bsyncTSFromStaff();
+
+  // Write SAP→staffId index so Staff Portal can find schedule by SAP
+  // Path: branches/{branchId}/sapIndex/{sap} = { staffId, name }
+  if (db && NX.session && NX.session.branchId) {
+    var sapIdx = {};
+    BS.staff.forEach(function(m) {
+      var sap = String(m.sap || '').trim();
+      if (sap) sapIdx[sap] = { staffId: String(m.id), name: m.name, dept: m.dept };
+    });
+    db.ref('branches/' + NX.session.branchId + '/sapIndex').set(sapIdx);
+  }
+
+  closeModalForce();navTo('staff');
 }
 function delBranchStaff(id){var sess=NX.session||{};var allowedRoles=['hr_manager','super_admin','ceo','branch_mgr'];if(allowedRoles.indexOf(sess.role)<0){showToast('You do not have permission to delete staff','error');return;}if(!confirm('Delete this staff member?'))return;BS.staff=BS.staff.filter(function(m){return m.id!==id;});bSaveColl('staff',BS.staff);showToast('Staff deleted');navTo('staff');}
 function openNXTransferStaffModal(staffId) {
