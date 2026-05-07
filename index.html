@@ -2635,7 +2635,7 @@ body { font-size: 13px !important; color: var(--text-primary) !important; }
 /* Inline mono/code text in tables */
 .bmono, .mono { font-size: 13px !important; }
 /* KPI value numbers — must NOT be shrunk by .mono override above */
-.kpi-value, .kpi-value.mono { font-size: 34px !important; font-weight: 300 !important; letter-spacing: -1px !important; }
+.kpi-value, .kpi-value.mono { font-size: 28px !important; font-weight: 300 !important; letter-spacing: -0.5px !important; }
 
 /* Chip / badge text */
 .chip { font-size: 12px !important; }
@@ -7439,16 +7439,16 @@ function pBranchDash() {
   // ROW 1: Today vs LW | Month vs LM | Week vs LW | YTD — sales-dashboard sizing
   h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:14px">';
   h += '<div class="card" style="padding:18px"><div class="kpi-label">Today vs Last Week</div>';
-  h += '<div class="kpi-value mono" style="color:'+(tdChg===null?'var(--ceo)':tdChg>=0?'#00875a':'#c0392b')+'">'+fsar(todaySales)+'</div>';
+  h += '<div class="kpi-value mono" style="color:'+(tdChg===null?'var(--ceo)':tdChg>=0?'#00875a':'#c0392b')+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+fsar(todaySales)+'</div>';
   h += '<div style="font-size:12px;color:var(--text-secondary);margin-top:8px">'+chgArrow(tdChg)+' vs '+fsar(lwSameDay)+'</div></div>';
   h += '<div class="card" style="padding:18px"><div class="kpi-label">This Month vs Last</div>';
-  h += '<div class="kpi-value mono" style="color:'+(mChg===null?'var(--ceo)':mChg>=0?'#00875a':'#c0392b')+'">'+fsar(tA)+'</div>';
+  h += '<div class="kpi-value mono" style="color:'+(mChg===null?'var(--ceo)':mChg>=0?'#00875a':'#c0392b')+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+fsar(tA)+'</div>';
   h += '<div style="font-size:12px;color:var(--text-secondary);margin-top:8px">'+chgArrow(mChg)+' vs '+fsar(lmA)+'</div></div>';
   h += '<div class="card" style="padding:18px"><div class="kpi-label">This Week vs Last</div>';
-  h += '<div class="kpi-value mono" style="color:'+(wChg===null?'var(--ceo)':wChg>=0?'#00875a':'#c0392b')+'">'+fsar(thisWk)+'</div>';
+  h += '<div class="kpi-value mono" style="color:'+(wChg===null?'var(--ceo)':wChg>=0?'#00875a':'#c0392b')+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+fsar(thisWk)+'</div>';
   h += '<div style="font-size:12px;color:var(--text-secondary);margin-top:8px">'+chgArrow(wChg)+' vs '+fsar(lastWk)+'</div></div>';
   h += '<div class="card" style="padding:18px"><div class="kpi-label">YTD '+cy+'</div>';
-  h += '<div class="kpi-value mono" style="color:'+(ytdChg===null?'var(--ceo)':ytdChg>=0?'#00875a':'#c0392b')+'">'+fsar(ytdA)+'</div>';
+  h += '<div class="kpi-value mono" style="color:'+(ytdChg===null?'var(--ceo)':ytdChg>=0?'#00875a':'#c0392b')+';white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+fsar(ytdA)+'</div>';
   h += '<div style="font-size:12px;color:var(--text-secondary);margin-top:8px">'+chgArrow(ytdChg)+' vs '+ly+' YTD</div></div>';
   h += '</div>';
 
@@ -7485,10 +7485,10 @@ function pBranchDash() {
   h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
   h += '<div style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:16px;text-align:center">';
   h += '<div style="font-size:9px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;font-family:var(--mono)">Tables</div>';
-  h += '<div style="font-size:34px;font-weight:300;color:var(--ceo);font-family:var(--mono)">'+(_bc2.tables||b.tables||'—')+'</div></div>';
+  h += '<div style="font-size:28px;font-weight:300;color:var(--ceo);font-family:var(--mono)">'+(_bc2.tables||b.tables||'—')+'</div></div>';
   h += '<div style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:16px;text-align:center">';
   h += '<div style="font-size:9px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;font-family:var(--mono)">Seats</div>';
-  h += '<div style="font-size:34px;font-weight:300;color:#0057ff;font-family:var(--mono)">'+(_bc2.seats||b.seats||'—')+'</div></div>';
+  h += '<div style="font-size:28px;font-weight:300;color:#0057ff;font-family:var(--mono)">'+(_bc2.seats||b.seats||'—')+'</div></div>';
   h += '</div></div>';
   // Right: Branch Info
   h += '<div class="card" style="padding:16px">';
