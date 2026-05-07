@@ -1069,14 +1069,20 @@ function renderDashboard() {
       db.ref('branches/' + u.branchId + '/staff').once('value', function(staffSnap) {
         var staffList = staffSnap.val() || {};
         var foundId = null;
+        var mySap = String(u.sap || '').trim().replace(/^0+/, '');
+        var myNm  = String(u.name || '').toLowerCase().replace(/\s+/g,' ').trim();
         Object.keys(staffList).forEach(function(sid) {
           if (foundId) return;
           var m = staffList[sid];
-          var mSap = String(m.sap || '').trim();
+          // Use m.id as the schedule key (same as manager side), fallback to sid
+          var schedKey = String(m.id || sid).trim();
+          var mSap = String(m.sap || '').trim().replace(/^0+/, '');
           var mNm  = String(m.name || '').toLowerCase().replace(/\s+/g,' ').trim();
-          var mySap = String(u.sap || '').trim();
-          var myNm  = String(u.name || '').toLowerCase().replace(/\s+/g,' ').trim();
-          if ((mySap && mSap === mySap) || (myNm && mNm === myNm)) foundId = sid;
+          if (mySap && mSap && mSap === mySap) {
+            foundId = schedKey;
+          } else if (myNm && mNm && mNm === myNm) {
+            foundId = schedKey;
+          }
         });
         if (foundId) { u.staffId = foundId; db.ref('staff/sessions/' + u.sap).update({ staffId: foundId }); }
         showTodayShift(foundId);
@@ -1132,22 +1138,37 @@ function renderSchedule() {
     console.log('[StaffPortal] week', wk, 'data:', allSch[wk]);
 
     // STEP 2: Find this staff's internal id from the staff list
+    // The schedule is keyed by m.id (the id field inside the staff object),
+    // which equals the Firebase key (sid) because bSaveColl uses m.id as key.
+    // Priority: (1) staffId cache, (2) SAP number, (3) exact name match.
     var resolvedId = null;
     var resolvedName = null;
+    var mySap   = String(u.sap || '').trim().replace(/^0+/, ''); // strip leading zeros
+    var myName  = String(u.name || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    var myStaffId = String(u.staffId || '').trim();
+
     Object.keys(staffList).forEach(function(sid) {
       if (resolvedId) return;
       var m = staffList[sid] || {};
-      var mSap  = String(m.sap || '').trim();
+      // The schedule key is m.id (internal id field), which should equal sid
+      // because the manager saves staff with m.id as the Firebase key.
+      // Use m.id if it exists, otherwise fall back to sid.
+      var schedKey = String(m.id || sid).trim();
+      var mSap  = String(m.sap || '').trim().replace(/^0+/, ''); // strip leading zeros
       var mName = String(m.name || '').toLowerCase().replace(/\s+/g, ' ').trim();
-      var mySap  = String(u.sap || '').trim();
-      var myName = String(u.name || '').toLowerCase().replace(/\s+/g, ' ').trim();
 
-      if (mySap && mSap === mySap) {
-        resolvedId = sid; resolvedName = m.name;
-        console.log('[StaffPortal] ✅ matched by SAP:', mySap, '→ staff id:', sid, 'name:', m.name);
-      } else if (myName && mName === myName) {
-        resolvedId = sid; resolvedName = m.name;
-        console.log('[StaffPortal] ✅ matched by NAME:', myName, '→ staff id:', sid);
+      if (myStaffId && (schedKey === myStaffId || sid === myStaffId)) {
+        // Match by cached staffId — most reliable
+        resolvedId = schedKey; resolvedName = m.name;
+        console.log('[StaffPortal] ✅ matched by staffId cache:', myStaffId, '→ schedule key:', schedKey, 'name:', m.name);
+      } else if (mySap && mSap && mSap === mySap) {
+        // Match by SAP number (leading zeros stripped for safety)
+        resolvedId = schedKey; resolvedName = m.name;
+        console.log('[StaffPortal] ✅ matched by SAP:', mySap, '→ schedule key:', schedKey, 'name:', m.name);
+      } else if (myName && mName && mName === myName) {
+        // Match by exact full name — only if no SAP match found
+        resolvedId = schedKey; resolvedName = m.name;
+        console.log('[StaffPortal] ✅ matched by NAME:', myName, '→ schedule key:', schedKey);
       }
     });
 
