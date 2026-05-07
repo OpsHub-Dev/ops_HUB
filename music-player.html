@@ -607,7 +607,7 @@ html, body {
     </div>
     <div class="field">
       <label>Audio URL or Cloud Link *</label>
-      <input type="text" id="inp-url" placeholder="https://drive.google.com/file/d/.../view">
+      <input type="text" id="inp-url" placeholder="Paste Google Drive share link — sharing must be set to Anyone with link">
     </div>
     <div class="modal-footer">
       <button class="btn-cancel" onclick="closeAddModal()">Cancel</button>
@@ -696,7 +696,18 @@ function load() {
     var idx = localStorage.getItem(SK+'_idx');
     var pt  = localStorage.getItem(SK+'_pt');
     var vol = localStorage.getItem(SK+'_vol');
-    if (pl)  playlist = JSON.parse(pl);
+    if (pl)  {
+      playlist = JSON.parse(pl);
+      // Migrate old Google Drive export=download URLs → export=view (fixes cloud error)
+      var migrated = false;
+      playlist.forEach(function(t) {
+        if (t.url && t.url.includes('drive.google.com') && t.url.includes('export=download')) {
+          t.url = t.url.replace('export=download', 'export=view').replace(/confirm=[^&]*/,'').replace(/&&/,'&').replace(/\?&/,'?') + (t.url.includes('?') ? '&confirm=t' : '?confirm=t');
+          migrated = true;
+        }
+      });
+      if (migrated) save();
+    }
     if (idx !== null) currentIndex = parseInt(idx) || 0;
     if (pt)  prayerTimes = Object.assign({}, prayerTimes, JSON.parse(pt));
     if (vol) { document.getElementById('vol-slider').value = vol; setVolume(vol); }
@@ -708,10 +719,21 @@ function load() {
 // ═══════════════════════════════════════
 function convertUrl(raw) {
   var u = (raw || '').trim();
-  var gd = u.match(/drive\.google\.com\/file\/d\/([^\/\?]+)/);
-  if (gd) return 'https://drive.google.com/uc?export=download&id=' + gd[1];
-  var gd2 = u.match(/drive\.google\.com\/open\?id=([^&]+)/);
-  if (gd2) return 'https://drive.google.com/uc?export=download&id=' + gd2[1];
+
+  // Google Drive: extract file ID from any share/view/open URL
+  var gdId = null;
+  var gd1 = u.match(/drive\.google\.com\/file\/d\/([^\/\?&]+)/);
+  if (gd1) gdId = gd1[1];
+  if (!gdId) { var gd2 = u.match(/drive\.google\.com\/open\?id=([^&]+)/); if (gd2) gdId = gd2[1]; }
+  if (!gdId) { var gd3 = u.match(/[?&]id=([^&]+)/); if (u.includes('drive.google.com') && gd3) gdId = gd3[1]; }
+
+  if (gdId) {
+    // export=view + confirm=t streams the file directly and bypasses
+    // Google's virus-scan warning page (which was causing the audio error).
+    // export=download was triggering a redirect HTML page instead of audio bytes.
+    return 'https://drive.google.com/uc?export=view&confirm=t&id=' + gdId;
+  }
+
   if (u.includes('1drv.ms') || u.includes('onedrive.live.com')) {
     try { var e = btoa(u).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,''); return 'https://api.onedrive.com/v1.0/shares/u!'+e+'/root/content'; } catch(ex) { return u; }
   }
