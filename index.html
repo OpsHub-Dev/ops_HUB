@@ -607,7 +607,7 @@ body{
 }
 .kpi-label{font-size:11px;font-weight:700;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px}
 .kpi-value{
-  font-family:var(--mono),var(--font-display),sans-serif;font-size:40px;font-weight:300;
+  font-family:var(--mono),var(--font-display),sans-serif;font-size:32px;font-weight:700;
   letter-spacing:-1.5px;line-height:1;color:var(--text-primary);
 }
 .kpi-meta{
@@ -1711,8 +1711,8 @@ html, body {
 }
 .kpi-value {
   font-family: 'JetBrains Mono', 'Space Mono', monospace !important;
-  font-size: 40px !important;
-  font-weight: 300 !important;
+  font-size: 32px !important;
+  font-weight: 700 !important;
   letter-spacing: -1.5px !important;
   line-height: 1 !important;
   color: var(--text-primary) !important;
@@ -2232,8 +2232,8 @@ h1, h2, h3, .page-header h1 {
   font-weight: 700 !important;
 }
 .kpi-value {
-  font-size: 40px !important;
-  font-weight: 300 !important;
+  font-size: 32px !important;
+  font-weight: 700 !important;
   letter-spacing: -1.5px !important;
   line-height: 1 !important;
 }
@@ -2634,8 +2634,8 @@ body { font-size: 13px !important; color: var(--text-primary) !important; }
 
 /* Inline mono/code text in tables */
 .bmono, .mono { font-size: 13px !important; }
-/* KPI value numbers must not be shrunk by .mono */
-.kpi-value.mono, .kpi-value { font-size: 40px !important; font-weight: 300 !important; }
+/* KPI value numbers — must NOT be shrunk by .mono override above */
+.kpi-value, .kpi-value.mono { font-size: 34px !important; font-weight: 300 !important; letter-spacing: -1px !important; }
 
 /* Chip / badge text */
 .chip { font-size: 12px !important; }
@@ -7439,16 +7439,16 @@ function pBranchDash() {
   // ROW 1: Today vs LW | Month vs LM | Week vs LW | YTD — sales-dashboard sizing
   h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:14px">';
   h += '<div class="card" style="padding:18px"><div class="kpi-label">Today vs Last Week</div>';
-  h += '<div class="kpi-value mono" style="color:var(--ceo)">'+fsar(todaySales)+'</div>';
+  h += '<div class="kpi-value mono" style="color:'+(tdChg===null?'var(--ceo)':tdChg>=0?'#00875a':'#c0392b')+'">'+fsar(todaySales)+'</div>';
   h += '<div style="font-size:12px;color:var(--text-secondary);margin-top:8px">'+chgArrow(tdChg)+' vs '+fsar(lwSameDay)+'</div></div>';
   h += '<div class="card" style="padding:18px"><div class="kpi-label">This Month vs Last</div>';
-  h += '<div class="kpi-value mono" style="color:var(--ceo)">'+fsar(tA)+'</div>';
+  h += '<div class="kpi-value mono" style="color:'+(mChg===null?'var(--ceo)':mChg>=0?'#00875a':'#c0392b')+'">'+fsar(tA)+'</div>';
   h += '<div style="font-size:12px;color:var(--text-secondary);margin-top:8px">'+chgArrow(mChg)+' vs '+fsar(lmA)+'</div></div>';
   h += '<div class="card" style="padding:18px"><div class="kpi-label">This Week vs Last</div>';
-  h += '<div class="kpi-value mono" style="color:var(--ceo)">'+fsar(thisWk)+'</div>';
+  h += '<div class="kpi-value mono" style="color:'+(wChg===null?'var(--ceo)':wChg>=0?'#00875a':'#c0392b')+'">'+fsar(thisWk)+'</div>';
   h += '<div style="font-size:12px;color:var(--text-secondary);margin-top:8px">'+chgArrow(wChg)+' vs '+fsar(lastWk)+'</div></div>';
   h += '<div class="card" style="padding:18px"><div class="kpi-label">YTD '+cy+'</div>';
-  h += '<div class="kpi-value mono" style="color:var(--ceo)">'+fsar(ytdA)+'</div>';
+  h += '<div class="kpi-value mono" style="color:'+(ytdChg===null?'var(--ceo)':ytdChg>=0?'#00875a':'#c0392b')+'">'+fsar(ytdA)+'</div>';
   h += '<div style="font-size:12px;color:var(--text-secondary);margin-top:8px">'+chgArrow(ytdChg)+' vs '+ly+' YTD</div></div>';
   h += '</div>';
 
