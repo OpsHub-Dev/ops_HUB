@@ -538,6 +538,10 @@ html, body {
       </div>
     </div>
 
+    <!-- Google Drive embed player (shown instead of native audio for GDrive links) -->
+    <div id="gdrive-wrap" style="display:none;margin:10px 0;"></div>
+    <div id="audio-error" style="font-size:11px;color:#e74c3c;text-align:center;min-height:14px;margin:-4px 0 6px"></div>
+
     <div class="controls">
       <button class="ctrl-btn" id="btn-shuffle" onclick="toggleShuffle()" title="Shuffle">🔀</button>
       <button class="ctrl-btn" onclick="prevTrack()" title="Previous">⏮</button>
@@ -607,7 +611,7 @@ html, body {
     </div>
     <div class="field">
       <label>Audio URL or Cloud Link *</label>
-      <input type="text" id="inp-url" placeholder="Paste Google Drive share link — sharing must be set to Anyone with link">
+      <input type="text" id="inp-url" placeholder="https://drive.google.com/file/d/.../view">
     </div>
     <div class="modal-footer">
       <button class="btn-cancel" onclick="closeAddModal()">Cancel</button>
@@ -696,14 +700,19 @@ function load() {
     var idx = localStorage.getItem(SK+'_idx');
     var pt  = localStorage.getItem(SK+'_pt');
     var vol = localStorage.getItem(SK+'_vol');
-    if (pl)  {
+    if (pl) {
       playlist = JSON.parse(pl);
-      // Migrate old Google Drive export=download URLs → export=view (fixes cloud error)
+      // Migrate old Google Drive URLs (export=download or export=view) → gdrive://
       var migrated = false;
       playlist.forEach(function(t) {
-        if (t.url && t.url.includes('drive.google.com') && t.url.includes('export=download')) {
-          t.url = t.url.replace('export=download', 'export=view').replace(/confirm=[^&]*/,'').replace(/&&/,'&').replace(/\?&/,'?') + (t.url.includes('?') ? '&confirm=t' : '?confirm=t');
-          migrated = true;
+        if (t.url && t.url.includes('drive.google.com') && !t.url.startsWith('gdrive://')) {
+          var id = extractGDriveId(t.url);
+          if (!id) {
+            // Try matching uc?export= format
+            var m = t.url.match(/[?&]id=([^&]+)/);
+            if (m) id = m[1];
+          }
+          if (id) { t.url = 'gdrive://' + id; migrated = true; }
         }
       });
       if (migrated) save();
@@ -717,23 +726,20 @@ function load() {
 // ═══════════════════════════════════════
 //  URL CONVERSION
 // ═══════════════════════════════════════
+function extractGDriveId(u) {
+  var m = u.match(/drive\.google\.com\/file\/d\/([^\/\?&]+)/);
+  if (m) return m[1];
+  var m2 = u.match(/drive\.google\.com\/open\?id=([^&]+)/);
+  if (m2) return m2[1];
+  var m3 = u.match(/[?&]id=([^&]+)/);
+  if (m3 && u.includes('drive.google.com')) return m3[1];
+  return null;
+}
 function convertUrl(raw) {
   var u = (raw || '').trim();
-
-  // Google Drive: extract file ID from any share/view/open URL
-  var gdId = null;
-  var gd1 = u.match(/drive\.google\.com\/file\/d\/([^\/\?&]+)/);
-  if (gd1) gdId = gd1[1];
-  if (!gdId) { var gd2 = u.match(/drive\.google\.com\/open\?id=([^&]+)/); if (gd2) gdId = gd2[1]; }
-  if (!gdId) { var gd3 = u.match(/[?&]id=([^&]+)/); if (u.includes('drive.google.com') && gd3) gdId = gd3[1]; }
-
-  if (gdId) {
-    // export=view + confirm=t streams the file directly and bypasses
-    // Google's virus-scan warning page (which was causing the audio error).
-    // export=download was triggering a redirect HTML page instead of audio bytes.
-    return 'https://drive.google.com/uc?export=view&confirm=t&id=' + gdId;
-  }
-
+  // Google Drive — we store the special gdrive:// prefix so loadTrack can use iframe
+  var gdId = extractGDriveId(u);
+  if (gdId) return 'gdrive://' + gdId;
   if (u.includes('1drv.ms') || u.includes('onedrive.live.com')) {
     try { var e = btoa(u).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,''); return 'https://api.onedrive.com/v1.0/shares/u!'+e+'/root/content'; } catch(ex) { return u; }
   }
@@ -846,23 +852,70 @@ function filterTracks(q) { renderList(q); }
 // ═══════════════════════════════════════
 //  PLAYBACK
 // ═══════════════════════════════════════
+function isGDrive(url) { return url && url.indexOf('gdrive://') === 0; }
+function gdId(url) { return url.replace('gdrive://',''); }
+
 function loadTrack(idx, autoplay) {
   if (idx < 0 || idx >= playlist.length) return;
   currentIndex = idx;
   var t = playlist[idx];
-  audio.src = t.url;
   document.getElementById('now-title').textContent  = t.name;
   document.getElementById('now-artist').textContent = t.artist;
   document.getElementById('hdr-sub').textContent    = 'Now: ' + t.name;
   document.title = t.name + ' — ALFA.CO';
+
+  if (isGDrive(t.url)) {
+    // Google Drive: use iframe embed — avoids CORS restriction entirely
+    var id = gdId(t.url);
+    audio.pause(); audio.src = '';
+    showGDrivePlayer(id, autoplay);
+  } else {
+    hideGDrivePlayer();
+    audio.src = t.url;
+    if (autoplay && !isPrayerPaused) audio.play().catch(function(){});
+  }
   save(); renderList();
-  if (autoplay && !isPrayerPaused) audio.play().catch(function(){});
+}
+
+function showGDrivePlayer(fileId, autoplay) {
+  var wrap = document.getElementById('gdrive-wrap');
+  if (!wrap) return;
+  var src = 'https://drive.google.com/file/d/' + fileId + '/preview';
+  wrap.innerHTML = '<iframe id="gdrive-iframe" src="' + src + '" width="100%" height="80" frameborder="0" allow="autoplay" allowfullscreen style="border:none;border-radius:10px;background:#000"></iframe>';
+  wrap.style.display = 'block';
+  // Show a message so user knows it loaded
+  document.getElementById('audio-error') && (document.getElementById('audio-error').textContent = '');
+  isPlaying = autoplay;
+  document.getElementById('btn-play').textContent = autoplay ? '⏸' : '▶';
+  setWavePaused(!autoplay);
+}
+
+function hideGDrivePlayer() {
+  var wrap = document.getElementById('gdrive-wrap');
+  if (wrap) { wrap.innerHTML = ''; wrap.style.display = 'none'; }
 }
 
 function togglePlay() {
   if (isPrayerPaused) { toast('🕌 Paused for prayer time', 'warning'); return; }
   if (!playlist.length) { toast('Add tracks first', 'warning'); return; }
   if (currentIndex < 0) { loadTrack(0, true); return; }
+  var t = playlist[currentIndex];
+  if (isGDrive(t.url)) {
+    // GDrive iframe controls itself — just toggle the visual state
+    if (isPlaying) {
+      isPlaying = false;
+      document.getElementById('btn-play').textContent = '▶';
+      setWavePaused(true);
+      hideGDrivePlayer();
+      toast('Paused — click play to resume', 'info');
+    } else {
+      isPlaying = true;
+      document.getElementById('btn-play').textContent = '⏸';
+      setWavePaused(false);
+      showGDrivePlayer(gdId(t.url), true);
+    }
+    return;
+  }
   isPlaying ? audio.pause() : audio.play().catch(function(){});
 }
 function prevTrack() {
