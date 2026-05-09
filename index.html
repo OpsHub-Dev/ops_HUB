@@ -9024,7 +9024,7 @@ function pWastage(){
       '<td>'+bpl(w.reason||'\u2014','#c0392b')+'</td>'+
       '<td class="bmono" style="color:var(--danger);font-weight:600">'+bfsar(w.value)+' '+costBadge+'</td>'+
       '<td style="color:var(--text-secondary)">'+bxe(w.by||'\u2014')+'</td>'+
-      '<td><button class="btn btn-sm" style="color:var(--danger)" onclick="delBranchWaste(''+bxe(w.id)+'')">Del</button></td>'+
+      '<td><button class="btn btn-sm" style="color:var(--danger)" onclick="delBranchWaste(\''+bxe(w.id)+'\')">Del</button></td>'+
     '</tr>';
   }).join('');
   var h='<div class="page-header"><h1>Wastage Log</h1></div>';
