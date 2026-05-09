@@ -991,54 +991,52 @@ function hideParseOverlay() {
 }
 
 async function callClaudeVision(base64Data, mediaType, isPdf) {
-  var prompt = 'You are reading an ALFA.CO recipe card. Extract ALL information and return ONLY a JSON object with these exact keys:\n' +
-    '{\n' +
-    '  "name": "ITEM NAME from the card",\n' +
-    '  "concept": "CONCEPT value (e.g. STEAK HOUSE, PIATTO)",\n' +
-    '  "recipeType": "PREP RECIPE type (e.g. SUB-PREP, PREP RECIPE, LINE RECIPE)",\n' +
-    '  "recipeCode": "RECIPE # or RECIPE code",\n' +
-    '  "yield": "YIELD value",\n' +
-    '  "prepTime": "PREP TIME value",\n' +
-    '  "shelfLife": "SHELF LIFE value",\n' +
-    '  "storing": "STORING value",\n' +
-    '  "created": "CREATED date in YYYY-MM-DD format if possible",\n' +
-    '  "revised": "REVISED date in YYYY-MM-DD format if possible",\n' +
-    '  "technique": "Full TECHNIQUE text, preserve numbered steps",\n' +
-    '  "ingredients": [\n' +
-    '    { "name": "ingredient name", "qty": numeric_quantity, "unit": "unit string" }\n' +
-    '  ]\n' +
-    '}\n' +
-    'For ingredients: extract exact names and quantities. Convert units: gm/grams->g, kilo/kg->kg, ml->ml, liters->L, pcs->pcs, oz->oz, tbsp->tbsp, tsp->tsp, cup->cup.\n' +
-    'If a field is not visible, use empty string. Return ONLY the JSON object, no markdown, no explanation.';
+  // The Anthropic API blocks direct browser calls due to CORS.
+  // We use the artifact-embedded API endpoint which is allowed.
+  var prompt = 'You are reading an ALFA.CO recipe card image or PDF. Extract ALL information visible and return ONLY a valid JSON object (no markdown, no explanation) with these exact keys:\n{\n  "name": "ITEM NAME",\n  "concept": "CONCEPT (e.g. STEAK HOUSE, PIATTO, HYBRID, SH - SALAD BAR)",\n  "recipeType": "PREP RECIPE type (e.g. SUB-PREP, PREP RECIPE, LINE RECIPE, SERVING RECIPE)",\n  "recipeCode": "RECIPE # code",\n  "yield": "YIELD value as written",\n  "prepTime": "PREP TIME value",\n  "shelfLife": "SHELF LIFE value",\n  "storing": "STORING value",\n  "created": "CREATED date as YYYY-MM-DD if possible, else as written",\n  "revised": "REVISED date as YYYY-MM-DD if possible, else empty",\n  "technique": "Full TECHNIQUE/METHOD text preserving all numbered steps",\n  "ingredients": [\n    { "name": "ingredient name exactly as written", "qty": numeric_value_only, "unit": "unit abbreviation" }\n  ]\n}\nUnit conversions: gm/grams/gm.->g, kilo/kilos->kg, liters/liter->L, pieces/pcs->pcs, ounces->oz.\nIf qty uses mixed text like "1 kilo" split to qty:1 unit:"kg".\nReturn ONLY the JSON object.';
 
-  var contentBlock = isPdf
-    ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64Data } }
-    : { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64Data } };
+  var contentBlocks = [];
+
+  if (isPdf) {
+    contentBlocks.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64Data } });
+  } else {
+    contentBlocks.push({ type: 'image', source: { type: 'base64', media_type: mediaType, data: base64Data } });
+  }
+  contentBlocks.push({ type: 'text', text: prompt });
 
   try {
     var response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 1500,
-        messages: [{
-          role: 'user',
-          content: [contentBlock, { type: 'text', text: prompt }]
-        }]
+        max_tokens: 2000,
+        messages: [{ role: 'user', content: contentBlocks }]
       })
     });
 
     if (!response.ok) {
-      var errText = await response.text();
-      throw new Error('API error ' + response.status + ': ' + errText.slice(0, 200));
+      var errBody = '';
+      try { errBody = await response.text(); } catch(e2) {}
+      throw new Error('HTTP ' + response.status + (errBody ? ': ' + errBody.slice(0,120) : ''));
     }
 
     var data = await response.json();
-    var text = (data.content || []).filter(function(b) { return b.type === 'text'; }).map(function(b) { return b.text; }).join('');
+    var text = (data.content || [])
+      .filter(function(b) { return b.type === 'text'; })
+      .map(function(b) { return b.text; })
+      .join('');
 
-    // Strip any markdown fences if present
-    text = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+    // Strip markdown fences
+    text = text.replace(/^```[a-z]*\s*/i, '').replace(/\s*```$/i, '').trim();
+    // Find JSON object boundaries
+    var start = text.indexOf('{');
+    var end = text.lastIndexOf('}');
+    if (start >= 0 && end > start) text = text.slice(start, end + 1);
 
     var parsed = JSON.parse(text);
     hideParseOverlay();
@@ -1047,8 +1045,43 @@ async function callClaudeVision(base64Data, mediaType, isPdf) {
   } catch (err) {
     hideParseOverlay();
     console.error('Claude API error:', err);
-    toast('AI parse error: ' + err.message.slice(0, 80), 'error');
+
+    // Show helpful error with manual fallback
+    var msg = err.message || 'Unknown error';
+    if (msg.toLowerCase().includes('failed to fetch') || msg.toLowerCase().includes('load failed') || msg.toLowerCase().includes('cors')) {
+      showManualFallback();
+    } else {
+      toast('AI error: ' + msg.slice(0, 80), 'error');
+    }
   }
+}
+
+function showManualFallback() {
+  // CORS blocked — open review modal with empty fields for manual fill
+  hideParseOverlay();
+  document.getElementById('parse-overlay').classList.remove('open');
+
+  var empty = {
+    name:'', concept:'', recipeType:'', recipeCode:'',
+    yield:'', prepTime:'', shelfLife:'', storing:'',
+    created: new Date().toISOString().slice(0,10), revised:'',
+    technique:'', ingredients:[
+      {name:'',qty:0,unit:'g'},{name:'',qty:0,unit:'g'},{name:'',qty:0,unit:'g'}
+    ]
+  };
+
+  openReview(empty);
+
+  // Show a notice inside the review modal
+  setTimeout(function() {
+    var grid = document.getElementById('review-grid');
+    if (grid) {
+      var notice = document.createElement('div');
+      notice.style.cssText = 'grid-column:1/-1;background:rgba(254,153,0,.12);border:1px solid rgba(254,153,0,.3);border-radius:8px;padding:9px 12px;font-size:10px;color:#b45309;font-family:var(--mono);margin-bottom:4px;line-height:1.6';
+      notice.innerHTML = '&#x26A0; Auto-read blocked by browser security (CORS). The form is open — fill it manually from your PDF, then click Apply.';
+      grid.insertBefore(notice, grid.firstChild);
+    }
+  }, 100);
 }
 
 // ── Review Modal ──

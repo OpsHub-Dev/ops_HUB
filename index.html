@@ -7289,17 +7289,14 @@ function attachBranchListeners() {
 // Helper to re-render current page without destroying charts (used by listeners)
 function renderPage_(pageId) {
   try {
-    // Recipe Builder opens in a new tab (standalone HTML)
+    // Recipe Builder opens in a new tab (standalone HTML) — always return the launch card
     if (pageId === 'recipe-builder') {
-      // Pass Firebase config so Recipe Builder can connect to same DB
       var fbCfg = '';
       try {
         var stored = localStorage.getItem('alfa_fb_config');
         if (stored) fbCfg = '?fbcfg=' + btoa(stored);
       } catch(e) {}
       window.open('recipe-builder.html' + fbCfg, '_blank');
-      // Return to previous page after launching
-      if (NX.page !== 'recipe-builder') return renderPage_(NX.page);
       return pRecipeBuilderLaunch();
     }
     var fns = {
