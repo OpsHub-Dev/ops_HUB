@@ -15852,14 +15852,14 @@ var _origKpiCard = (typeof kpiCard === 'function') ? kpiCard : null;
 </style>
 
 <!-- Floating Button -->
-<button id="ai-fab" onclick="toggleAIPanel()" title="Claude AI Assistant">✦</button>
+<button id="ai-fab" onclick="toggleAIPanel()" title="AI Assistant">✦</button>
 
 <!-- AI Panel -->
 <div id="ai-panel">
   <div id="ai-panel-head">
     <span class="ai-head-icon">✦</span>
     <div>
-      <div class="ai-head-title">Claude AI Assistant</div>
+      <div class="ai-head-title">AI Assistant</div>
       <div class="ai-head-sub" id="ai-head-sub">ALFA.CO · Branch Intelligence</div>
     </div>
     <button id="ai-clear-btn" onclick="clearAIChat()">Clear</button>
@@ -15868,7 +15868,7 @@ var _origKpiCard = (typeof kpiCard === 'function') ? kpiCard : null;
 
   <div id="ai-messages">
     <div class="ai-msg assistant">
-      👋 Hi! I'm your AI assistant. I have access to your live branch data — sales, staff, inventory, wastage and more.<br><br>
+      👋 Hi! I'm your AI assistant powered by Google Gemini. I have access to your live branch data — sales, staff, inventory, wastage and more.<br><br>
       You can also <strong>📄 upload a PDF invoice</strong> and I'll extract all items and add them to your inventory automatically.
     </div>
   </div>
@@ -15887,6 +15887,15 @@ var _origKpiCard = (typeof kpiCard === 'function') ? kpiCard : null;
       <input type="file" id="ai-pdf-input" accept=".pdf,image/*" onchange="aiHandleFile(this)">
       <span id="ai-pdf-name"></span>
       <button id="ai-clear-pdf" onclick="aiClearFile()" style="display:none;background:none;border:none;color:var(--danger);cursor:pointer;font-size:13px;flex-shrink:0">✕</button>
+    </div>
+    <!-- Gemini API Key — one time entry, saved to localStorage -->
+    <div style="display:flex;align-items:center;gap:5px;padding:5px 10px;border-top:1px solid rgba(255,255,255,0.08)">
+      <span style="font-size:9px;color:rgba(255,255,255,0.45);font-family:var(--mono);white-space:nowrap">Gemini Key:</span>
+      <input id="ai-gemini-key" type="password" placeholder="Paste from aistudio.google.com/apikey" autocomplete="off"
+        style="flex:1;min-width:0;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:4px 7px;font-family:var(--mono);font-size:10px;color:#fff;outline:none"
+        oninput="aiSaveGeminiKey(this.value)">
+      <button onclick="var i=document.getElementById('ai-gemini-key');i.type=i.type==='password'?'text':'password'"
+        style="background:none;border:none;color:rgba(255,255,255,0.4);cursor:pointer;font-size:11px;flex-shrink:0" title="Show/Hide">👁</button>
     </div>
     <div id="ai-input-row">
       <textarea id="ai-input" placeholder="Ask anything about your branch…" rows="1"
@@ -15917,10 +15926,10 @@ function toggleAIPanel() {
     panel.classList.add('show');
     fab.classList.add('open');
     fab.textContent = '✕';
-    // Update sub with branch name
     var s = (typeof NX !== 'undefined' && NX.session) || {};
     var sub = document.getElementById('ai-head-sub');
     if (sub && s.branchName) sub.textContent = s.branchName + ' · Branch Intelligence';
+    aiLoadGeminiKey();
     setTimeout(function(){ document.getElementById('ai-input').focus(); }, 100);
   } else {
     panel.classList.remove('show');
@@ -16083,15 +16092,69 @@ function aiSend(overrideText) {
 
   var systemPrompt = aiGetContext();
 
-  fetch('https://api.anthropic.com/v1/messages', {
+// ── Gemini Key persistence ──
+function aiSaveGeminiKey(val) {
+  try { localStorage.setItem('alfa_gemini_key', val.trim()); } catch(e) {}
+}
+function aiLoadGeminiKey() {
+  try {
+    var k = localStorage.getItem('alfa_gemini_key') || '';
+    var inp = document.getElementById('ai-gemini-key');
+    if (inp && k) inp.value = k;
+    return k;
+  } catch(e) { return ''; }
+}
+function aiGetGeminiKey() {
+  var inp = document.getElementById('ai-gemini-key');
+  if (inp && inp.value.trim()) return inp.value.trim();
+  return aiLoadGeminiKey();
+}
+
+// ── Build Gemini contents array from _aiHistory ──
+function aiHistoryToGemini() {
+  return _aiHistory.map(function(msg) {
+    var role = msg.role === 'assistant' ? 'model' : 'user';
+    var parts;
+    if (typeof msg.content === 'string') {
+      parts = [{ text: msg.content }];
+    } else if (Array.isArray(msg.content)) {
+      parts = msg.content.map(function(c) {
+        if (c.type === 'text') return { text: c.text };
+        if (c.type === 'image') return { inlineData: { mimeType: c.source.media_type, data: c.source.data } };
+        if (c.type === 'document') return { inlineData: { mimeType: 'application/pdf', data: c.source.data } };
+        return { text: '' };
+      }).filter(function(p) { return p.text !== '' || p.inlineData; });
+    } else {
+      parts = [{ text: '' }];
+    }
+    return { role: role, parts: parts };
+  });
+}
+
+  var apiKey = aiGetGeminiKey();
+  if (!apiKey) {
+    removeTyping(typingId);
+    _aiLoading = false;
+    document.getElementById('ai-send-btn').disabled = false;
+    aiAddMsg('error-msg', '⚠️ Paste your free Gemini API key in the field below. Get it free at aistudio.google.com/apikey — no credit card needed.');
+    document.getElementById('ai-gemini-key') && document.getElementById('ai-gemini-key').focus();
+    return;
+  }
+
+  // Gemini API — key in URL param, no CORS issues
+  var geminiModel = 'gemini-2.0-flash';
+  var geminiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/' + geminiModel + ':generateContent?key=' + encodeURIComponent(apiKey);
+
+  var geminiBody = {
+    system_instruction: { parts: [{ text: systemPrompt }] },
+    contents: aiHistoryToGemini(),
+    generationConfig: { maxOutputTokens: 1500, temperature: 0.7 }
+  };
+
+  fetch(geminiUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 1500,
-      system: systemPrompt,
-      messages: _aiHistory
-    })
+    body: JSON.stringify(geminiBody)
   })
   .then(function(r) { return r.json(); })
   .then(function(data) {
@@ -16100,17 +16163,22 @@ function aiSend(overrideText) {
     document.getElementById('ai-send-btn').disabled = false;
 
     if (data.error) {
-      aiAddMsg('error-msg', '⚠️ ' + (data.error.message || 'API error'));
+      var errMsg = data.error.message || 'API error';
+      if (data.error.code === 400) errMsg = 'Invalid API key — check your key at aistudio.google.com/apikey';
+      aiAddMsg('error-msg', '⚠️ ' + errMsg);
       return;
     }
 
-    var reply = (data.content || []).map(function(c){ return c.text || ''; }).join('');
+    var reply = '';
+    try {
+      reply = data.candidates[0].content.parts[0].text || '';
+    } catch(e) { reply = ''; }
     if (!reply) { aiAddMsg('error-msg', '⚠️ No response received.'); return; }
 
-    // Push to history (text only for next turns)
+    // Push to history
     _aiHistory.push({ role: 'assistant', content: reply });
 
-    // Try to detect JSON invoice items in reply
+    // Detect JSON invoice items
     var jsonMatch = reply.match(/\[\s*\{[\s\S]*?\}\s*\]/);
     if (jsonMatch && isInvoiceExtract) {
       try {
@@ -16120,12 +16188,8 @@ function aiSend(overrideText) {
           var textPart = reply.replace(jsonMatch[0], '').trim();
           aiAddMsg('assistant', textPart || ('✅ Found ' + extracted.length + ' items in the invoice:'));
           aiShowInvoiceTable(extracted);
-        } else {
-          aiAddMsg('assistant', reply);
-        }
-      } catch(e) {
-        aiAddMsg('assistant', reply);
-      }
+        } else { aiAddMsg('assistant', reply); }
+      } catch(e) { aiAddMsg('assistant', reply); }
     } else {
       aiAddMsg('assistant', reply);
     }
@@ -16134,8 +16198,8 @@ function aiSend(overrideText) {
     removeTyping(typingId);
     _aiLoading = false;
     document.getElementById('ai-send-btn').disabled = false;
-    aiAddMsg('error-msg', '⚠️ Connection error. Make sure you\'re logged in to Claude.ai');
-    console.error('Claude API error:', err);
+    aiAddMsg('error-msg', '⚠️ Network error: ' + (err.message || err));
+    console.error('Gemini API error:', err);
   });
 }
 
