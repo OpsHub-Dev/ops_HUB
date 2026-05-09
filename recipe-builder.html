@@ -274,13 +274,16 @@ html,body{height:100%;background:var(--base);color:var(--tx);font-family:var(--f
                 <th style="width:50px">Unit</th>
                 <th style="text-align:right;width:64px">SAR/unit</th>
                 <th style="text-align:right;width:56px">Total</th>
+                <th style="width:22px" title="Auto-fill cost">↻</th>
                 <th style="width:18px"></th>
               </tr></thead>
               <tbody id="itbody"></tbody>
             </table>
 
-            <div style="display:flex;gap:5px;margin-top:6px">
+            <div style="display:flex;gap:5px;margin-top:6px;align-items:center">
               <button class="btn btn-sm btn-p" onclick="addRow()">+ Add Ingredient</button>
+              <button class="btn btn-sm" onclick="autoFillAllCosts()" title="Auto-fill all costs from inventory" style="color:var(--primary)">↻ Auto-cost All</button>
+              <span id="inv-badge" style="font-size:9px;color:var(--tx3);font-family:var(--mono);margin-left:4px">📦 Connecting…</span>
             </div>
           </div>
           <div class="tc-col">
@@ -307,6 +310,12 @@ html,body{height:100%;background:var(--base);color:var(--tx);font-family:var(--f
             <button class="btn btn-p" onclick="saveRecipe()">&#x1F4BE; Save to Firebase</button>
             <button class="btn btn-d btn-sm" id="bdel" style="display:none" onclick="deleteRecipe()">&#x1F5D1; Del</button>
           </div>
+        </div>
+        <div style="padding:4px 12px 6px;display:flex;gap:12px;font-size:9px;color:var(--tx3);font-family:var(--mono);background:rgba(0,0,0,.03);border-top:1px solid rgba(0,0,0,.04)">
+          <span><span style="color:var(--ok)">✓</span> Matched from inventory (auto-costed)</span>
+          <span><span style="color:var(--warn)">⚠</span> Unit mismatch — change UOM or enter manually</span>
+          <span><span style="color:var(--tx3)">○</span> Not found in inventory</span>
+          <span><b>↻</b> Click to force-fill from inventory</span>
         </div>
 
         <!-- Signature block -->
@@ -448,6 +457,75 @@ html,body{height:100%;background:var(--base);color:var(--tx);font-family:var(--f
 //  STATE
 // ═══════════════════════════════════════════════════
 var db=null, RECIPES=[], INGS=[], CID=null, ROWS=[], DSI=null;
+var INV_ITEMS=[]; // live inventory items from branches/.../inv_items (has price + unit)
+var BRANCH_ID=null;
+
+// ═══════════════════════════════════════════════════
+//  UOM CONVERSION ENGINE
+//  All conversions are relative to a base unit per family.
+//  Base: g (weight), ml (volume), pc (count)
+// ═══════════════════════════════════════════════════
+var UOM_BASE={
+  // Weight → g
+  g:1, kg:1000, oz:28.3495, lb:453.592,
+  // Volume → ml
+  ml:1, L:1000, l:1000, tsp:4.92892, tbsp:14.7868, cup:236.588, 'fl oz':29.5735,
+  // Count → pc (no conversion needed within family)
+  pc:1, pcs:1, piece:1, pieces:1,
+  // No-convert
+  slice:1, portion:1, bunch:1, pack:1, can:1, bottle:1, bag:1, box:1
+};
+
+var UOM_FAMILY={
+  g:'weight',kg:'weight',oz:'weight',lb:'weight',
+  ml:'volume',L:'volume',l:'volume',tsp:'volume',tbsp:'volume',cup:'volume','fl oz':'volume',
+  pc:'count',pcs:'count',piece:'count',pieces:'count',
+  slice:'noconv',portion:'noconv',bunch:'noconv',pack:'noconv',can:'noconv',bottle:'noconv',bag:'noconv',box:'noconv'
+};
+
+/**
+ * Convert a cost from (invPrice per invUnit) → cost per recipeUnit
+ * e.g. invUnit=kg, invPrice=10 SAR/kg, recipeUnit=g → returns 0.01 SAR/g
+ * Returns null if units are incompatible families.
+ */
+function convertCost(invPrice, invUnit, recipeUnit){
+  if(!invUnit || !recipeUnit) return null;
+  var iu=invUnit.trim(), ru=recipeUnit.trim();
+  if(iu===ru) return invPrice; // same unit, no conversion needed
+  var ifam=UOM_FAMILY[iu]||'noconv', rfam=UOM_FAMILY[ru]||'noconv';
+  if(ifam==='noconv'||rfam==='noconv') return null; // can't convert
+  if(ifam!==rfam) return null; // weight vs volume — incompatible
+  var ibase=UOM_BASE[iu]||1, rbase=UOM_BASE[ru]||1;
+  // invPrice is per 1 invUnit = per ibase baseUnits
+  // we want price per 1 recipeUnit = per rbase baseUnits
+  // costPerRecipeUnit = invPrice * rbase / ibase
+  return invPrice * rbase / ibase;
+}
+
+/**
+ * Find best inventory match for an ingredient name.
+ * Returns {item, cpu, converted} or null.
+ * cpu = cost per the recipe's selected unit (after UOM conversion).
+ */
+function findInvMatch(name, recipeUnit){
+  if(!name||!INV_ITEMS.length) return null;
+  var n=name.toLowerCase().replace(/[^a-z0-9\s]/g,'').trim();
+  // 1. Exact name match
+  var match=INV_ITEMS.find(function(i){ return (i.name||'').toLowerCase().replace(/[^a-z0-9\s]/g,'').trim()===n; });
+  // 2. Starts-with match
+  if(!match) match=INV_ITEMS.find(function(i){ var in2=(i.name||'').toLowerCase().replace(/[^a-z0-9\s]/g,'').trim(); return in2.startsWith(n.slice(0,6))||n.startsWith(in2.slice(0,6)); });
+  // 3. Contains match (both ways, min 4 chars)
+  if(!match&&n.length>=4) match=INV_ITEMS.find(function(i){ var in2=(i.name||'').toLowerCase().replace(/[^a-z0-9\s]/g,'').trim(); return in2.includes(n)||n.includes(in2); });
+  if(!match) return null;
+  var invPrice=parseFloat(match.price)||0;
+  if(!invPrice) return {item:match,cpu:0,converted:false};
+  var cpu=convertCost(invPrice, match.unit, recipeUnit||'g');
+  if(cpu===null){
+    // Return raw price with no conversion — user will see a warning
+    return {item:match,cpu:invPrice,converted:false,incompatible:true,invUnit:match.unit};
+  }
+  return {item:match,cpu:cpu,converted:true,invUnit:match.unit,invPrice:invPrice};
+}
 
 var CAT_ICON={meat:'🥩',seafood:'🐟',veg:'🥦',dairy:'🧀',bakery:'🍞',sauce:'🫙',spice:'🧂',grain:'🌾',bev:'🥤',other:'📦'};
 
@@ -490,7 +568,7 @@ function initFB(){
     if(!firebase.apps.length)firebase.initializeApp(cfg);
     db=firebase.database();
     ['cbadge'].forEach(function(id){var el=document.getElementById(id);if(el){el.textContent='Live';el.className='cbadge live';}});
-    document.getElementById('fbstat').textContent='Connected to shared/recipes';
+    var _fs=document.getElementById('fbstat');if(_fs)_fs.textContent='Connected to shared/recipes';
     // Load recipes from Firebase
     db.ref('shared/recipes').on('value',function(snap){
       var raw=snap.val();
@@ -508,10 +586,42 @@ function initFB(){
         if(arr.length){INGS=arr;renderLib(gv('lib-srch'));renderIngModal();}
       }
     });
+
+    // ── Sync inventory items from branch (for auto-costing) ──
+    // Try to get branchId from URL param or localStorage
+    var params2=new URLSearchParams(location.search);
+    BRANCH_ID=params2.get('branchId')||localStorage.getItem('alfa_branch_id')||null;
+    function loadBranchInv(bid){
+      db.ref('branches/'+bid+'/inv_items').on('value',function(snap){
+        var raw2=snap.val();
+        if(raw2){
+          var arr2=Array.isArray(raw2)?raw2.filter(Boolean):Object.values(raw2).filter(Boolean);
+          INV_ITEMS=arr2.filter(function(i){return i&&i.name;});
+          updateInvBadge();
+          toast('Inventory synced: '+INV_ITEMS.length+' items linked for auto-costing','info');
+        }
+      });
+    }
+    if(BRANCH_ID){
+      loadBranchInv(BRANCH_ID);
+    } else {
+      // Try to discover branch by listing branches node
+      db.ref('branches').once('value',function(snap){
+        var braw=snap.val();
+        if(braw){
+          var bkeys=Object.keys(braw);
+          if(bkeys.length){
+            BRANCH_ID=bkeys[0];
+            localStorage.setItem('alfa_branch_id',BRANCH_ID);
+            loadBranchInv(BRANCH_ID);
+          }
+        }
+      });
+    }
   }catch(e){
     loadLocal();
     renderLib('');renderRB('');renderIngModal();
-    document.getElementById('fbstat').textContent='Local mode — no Firebase';
+    var _fs2=document.getElementById('fbstat');if(_fs2)_fs2.textContent='Local mode — no Firebase';
   }
 }
 
@@ -524,6 +634,12 @@ function saveRecipesToFB(rec){
   else{var ix=RECIPES.findIndex(function(r){return r.id===rec.id;});if(ix>=0)RECIPES[ix]=rec;else RECIPES.push(rec);persist();renderRB('');toast('Saved locally ✓','success');}
 }
 
+function updateInvBadge(){
+  var el=document.getElementById('inv-badge');
+  if(el) el.textContent=INV_ITEMS.length?'📦 '+INV_ITEMS.length+' items linked':'📦 No inventory linked';
+}
+function renderLib(){/* stub — left panel removed */}
+
 // ═══════════════════════════════════════════════════
 //  INGREDIENT ROWS
 // ═══════════════════════════════════════════════════
@@ -532,28 +648,80 @@ function addRow(nm,qty,unit,cpu){
   renderRows();rc();
 }
 function delRow(i){ROWS.splice(i,1);renderRows();rc();}
-function updRow(i,f,val){if(!ROWS[i])return;ROWS[i][f]=(f==='qty'||f==='cpu')?parseFloat(val)||0:val;rc();}
+function updRow(i,f,val){
+  if(!ROWS[i])return;
+  ROWS[i][f]=(f==='qty'||f==='cpu')?parseFloat(val)||0:val;
+  // Auto-cost: when name changes or unit changes, try to resolve from inventory
+  if(f==='name'||f==='unit'){
+    var r=ROWS[i];
+    // Only auto-fill if user hasn't manually set a cost > 0 for name changes
+    // For unit changes, always recalculate from inventory
+    var res=findInvMatch(r.name, r.unit);
+    if(res&&res.cpu>0){
+      if(f==='unit'||(f==='name'&&r.cpu===0)){
+        ROWS[i].cpu=res.cpu;
+        // Update the cpu input visually
+        var cpuEl=document.getElementById('cpu-in-'+i);
+        if(cpuEl){cpuEl.value=res.cpu.toFixed(4);}
+        var badgeEl=document.getElementById('inv-match-'+i);
+        if(badgeEl){
+          badgeEl.title=res.incompatible?'⚠ Unit mismatch ('+res.invUnit+'→'+r.unit+')':'Matched: '+res.item.name+' @ '+res.invPrice+' SAR/'+res.invUnit;
+          badgeEl.textContent=res.incompatible?'⚠':'✓';
+          badgeEl.style.color=res.incompatible?'var(--warn)':'var(--ok)';
+        }
+      }
+    }
+  }
+  rc();
+}
 
 function renderRows(){
   var tb=document.getElementById('itbody');
-  var tbl=document.getElementById('itbl-wrap');
 
   if(!ROWS.length){
-    tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--tx3);padding:14px;font-size:10px;font-family:var(--mono)">No ingredients yet — click + Add Ingredient</td></tr>';
+    tb.innerHTML='<tr><td colspan="8" style="text-align:center;color:var(--tx3);padding:14px;font-size:10px;font-family:var(--mono)">No ingredients yet — click + Add Ingredient</td></tr>';
     return;
   }
 
+  // Build datalist for autocomplete from INV_ITEMS
+  var dlId='inv-datalist';
+  var dl=document.getElementById(dlId);
+  if(!dl){dl=document.createElement('datalist');dl.id=dlId;document.body.appendChild(dl);}
+  dl.innerHTML=INV_ITEMS.map(function(i){return '<option value="'+xe(i.name)+'">'+xe(i.unit)+' @ SAR '+parseFloat(i.price||0).toFixed(2)+'</option>';}).join('');
+
   tb.innerHTML=ROWS.map(function(r,i){
     var cost=(r.cpu||0)*(parseFloat(r.qty)||0);
-    var uOpts=['g','kg','ml','L','pc','pcs','oz','tbsp','tsp','cup','slice','portion'].map(function(u){return '<option'+(u===r.unit?' selected':'')+'>'+u+'</option>';}).join('');
+    var uOpts=['g','kg','ml','L','pc','pcs','oz','tbsp','tsp','cup','slice','portion','bunch','pack','can','bottle','bag','box'].map(function(u){return '<option'+(u===r.unit?' selected':'')+'>'+u+'</option>';}).join('');
+
+    // Check inventory match for this row
+    var res=INV_ITEMS.length?findInvMatch(r.name,r.unit):null;
+    var badgeHtml='';
+    if(r.name){
+      if(res&&res.item){
+        if(res.incompatible){
+          badgeHtml='<span id="inv-match-'+i+'" title="⚠ Unit mismatch: inventory is per '+res.invUnit+', recipe uses '+r.unit+'" style="cursor:help;font-size:11px;color:var(--warn)">⚠</span>';
+        } else {
+          badgeHtml='<span id="inv-match-'+i+'" title="Matched: '+xe(res.item.name)+' @ '+parseFloat(res.invPrice||res.item.price||0).toFixed(2)+' SAR/'+xe(res.invUnit||res.item.unit)+'" style="cursor:help;font-size:11px;color:var(--ok)">✓</span>';
+        }
+      } else if(INV_ITEMS.length){
+        badgeHtml='<span id="inv-match-'+i+'" title="Not found in inventory" style="cursor:help;font-size:11px;color:var(--tx3)">○</span>';
+      }
+    }
+
     return '<tr class="ir" draggable="true" data-i="'+i+'">'
-      +'<td><span class="dh" title="Reorder">&#x283F;</span></td>'
-      +'<td><input class="ti" style="min-width:80px" value="'+xe(r.name)+'" placeholder="Ingredient" oninput="updRow('+i+',\'name\',this.value)"></td>'
+      +'<td><span class="dh" title="Reorder">⠿</span></td>'
+      +'<td style="position:relative">'
+        +'<input class="ti" style="min-width:80px" list="inv-datalist" id="ing-name-'+i+'" value="'+xe(r.name)+'" placeholder="Ingredient" oninput="updRow('+i+',\'name\',this.value)" onchange="updRow('+i+',\'name\',this.value)">'
+        +(badgeHtml?'<span style="position:absolute;right:2px;top:50%;transform:translateY(-50%)">'+badgeHtml+'</span>':'')
+      +'</td>'
       +'<td><input class="ti q" type="number" step="0.001" min="0" value="'+xe(r.qty)+'" placeholder="0" oninput="updRow('+i+',\'qty\',this.value)"></td>'
       +'<td><select class="ti su" onchange="updRow('+i+',\'unit\',this.value)">'+uOpts+'</select></td>'
-      +'<td><input class="ti cpu" type="number" step="0.0001" min="0" value="'+xe(r.cpu||'')+'" placeholder="0.000" oninput="updRow('+i+',\'cpu\',this.value)"></td>'
+      +'<td><input class="ti cpu" id="cpu-in-'+i+'" type="number" step="0.0001" min="0" value="'+xe(r.cpu||'')+'" placeholder="0.000" oninput="updRow('+i+',\'cpu\',this.value)" title="SAR per 1 '+xe(r.unit)+'"></td>'
       +'<td style="text-align:right;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--primary);padding:2px 4px" id="rc'+i+'">'+cost.toFixed(3)+'</td>'
-      +'<td><button class="dr-btn" onclick="delRow('+i+')">&#x2715;</button></td>'
+      +'<td>'
+        +(res&&res.item&&!res.incompatible?'<button class="dr-btn" title="Auto-fill cost from inventory" style="color:var(--primary)" onclick="autoFillCost('+i+')">↻</button>':'')
+      +'</td>'
+      +'<td><button class="dr-btn" onclick="delRow('+i+')">✕</button></td>'
       +'</tr>';
   }).join('');
 
@@ -569,6 +737,36 @@ function renderRows(){
     });
     el.addEventListener('dragend',function(){DSI=null;el.classList.remove('dov');});
   });
+}
+
+/** Force-fill the cost from inventory for row i, with UOM conversion */
+function autoFillCost(i){
+  var r=ROWS[i];
+  if(!r)return;
+  var res=findInvMatch(r.name,r.unit);
+  if(!res||!res.item){toast('No inventory match for "'+r.name+'"','warning');return;}
+  if(res.incompatible){
+    toast('⚠ Unit mismatch: inventory is per '+res.invUnit+', recipe uses '+r.unit+'. Change unit or enter cost manually.','warning');
+    return;
+  }
+  ROWS[i].cpu=res.cpu;
+  renderRows();rc();
+  toast('Cost set: '+res.cpu.toFixed(4)+' SAR/'+r.unit+' (from inventory '+parseFloat(res.invPrice||0).toFixed(2)+' SAR/'+res.invUnit+')','success');
+}
+
+/** Re-run auto-cost for ALL rows that have no manual cost (cpu=0) */
+function autoFillAllCosts(){
+  var filled=0;
+  ROWS.forEach(function(r,i){
+    if(!r.name)return;
+    var res=findInvMatch(r.name,r.unit);
+    if(res&&res.cpu>0&&!res.incompatible){
+      ROWS[i].cpu=res.cpu;
+      filled++;
+    }
+  });
+  renderRows();rc();
+  toast('Auto-costed '+filled+' ingredient'+(filled===1?'':'s')+' from inventory','success');
 }
 
 function rc(){
@@ -726,7 +924,7 @@ function renderView(){
 //  INGREDIENT MANAGER MODAL
 // ═══════════════════════════════════════════════════
 function openIngMgr(){renderIngModal();document.getElementById('ing-modal').classList.add('open');}
-function closeIngMgr(){document.getElementById('ing-modal').classList.remove('open');renderLib(gv('lib-srch'));}
+function closeIngMgr(){document.getElementById('ing-modal').classList.remove('open');}
 document.getElementById('ing-modal').addEventListener('click',function(e){if(e.target===this)closeIngMgr();});
 
 function clearIngForm(){
@@ -1167,19 +1365,29 @@ function applyReview() {
   var sc2=document.getElementById('sig-checked');if(sc2&&REVIEW_DATA.sigChecked)sc2.value=REVIEW_DATA.sigChecked;
   var sa2=document.getElementById('sig-approved');if(sa2&&REVIEW_DATA.sigApproved)sa2.value=REVIEW_DATA.sigApproved;
 
-  // Load ingredients — try to match with library for auto-costing
+  // Load ingredients — try to match with inventory for auto-costing (with UOM conversion)
   ROWS = (REVIEW_DATA.ingredients || []).map(function(ing) {
-    var libMatch = INGS.find(function(li) {
-      return li.name.toLowerCase().replace(/[^a-z0-9]/g,'').includes(
-        ing.name.toLowerCase().replace(/[^a-z0-9]/g,'').slice(0, 6)
-      );
-    });
-    return {
-      name: ing.name || '',
-      qty: parseFloat(ing.qty) || 0,
-      unit: ing.unit || 'g',
-      cpu: parseFloat(ing.costPerUnit) || (libMatch ? libMatch.cost : 0)
-    };
+    var unit = ing.unit || 'g';
+    var cpu = parseFloat(ing.costPerUnit) || 0;
+    // Try inventory match first (with UOM conversion)
+    if(!cpu){
+      var res = findInvMatch(ing.name, unit);
+      if(res && res.cpu > 0 && !res.incompatible) cpu = res.cpu;
+      else if(!cpu){
+        // Fall back to INGS library
+        var libMatch = INGS.find(function(li){
+          return li.name.toLowerCase().replace(/[^a-z0-9]/g,'').includes(
+            ing.name.toLowerCase().replace(/[^a-z0-9]/g,'').slice(0,6)
+          );
+        });
+        if(libMatch){
+          var converted=convertCost(libMatch.cost, libMatch.unit, unit);
+          if(converted!==null) cpu=converted;
+          else cpu=libMatch.cost;
+        }
+      }
+    }
+    return { name: ing.name||'', qty: parseFloat(ing.qty)||0, unit: unit, cpu: cpu };
   });
 
   renderRows();
