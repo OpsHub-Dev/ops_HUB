@@ -393,8 +393,23 @@ html,body{height:100%;background:var(--base);color:var(--tx);font-family:var(--f
       <input class="srch" id="rbsrch" placeholder="Search recipes…" oninput="filterRB(this.value)">
     </div>
 
+    <!-- API KEY for PDF parsing -->
+    <div style="padding:8px 10px 0">
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--tx3);margin-bottom:5px">Anthropic API Key (for PDF read)</div>
+      <div style="display:flex;gap:5px;align-items:center">
+        <input id="api-key-inp" type="password" placeholder="sk-ant-api03-…" autocomplete="off"
+          style="flex:1;background:var(--base);border:none;border-radius:8px;box-shadow:var(--sh-is);padding:6px 9px;font-family:var(--mono);font-size:10px;color:var(--tx);outline:none;min-width:0"
+          oninput="saveApiKey(this.value)">
+        <button class="btn btn-sm" onclick="toggleKeyVis()" id="key-vis-btn" title="Show/Hide">&#x1F441;</button>
+      </div>
+      <div style="font-size:9px;color:var(--tx3);font-family:var(--mono);margin-top:4px;line-height:1.5">
+        Get yours at <a href="https://console.anthropic.com/keys" target="_blank" style="color:var(--primary)">console.anthropic.com/keys</a><br>
+        Saved in localStorage — never sent to our server.
+      </div>
+    </div>
+
     <!-- PDF DROP ZONE -->
-    <div style="padding:0 10px 6px">
+    <div style="padding:6px 10px 6px">
       <div class="pdf-drop" id="pdf-drop" ondragover="pdfDragOver(event)" ondragleave="pdfDragLeave(event)" ondrop="pdfDrop(event)">
         <input type="file" accept="application/pdf,image/*" onchange="pdfFileChange(event)" title="Drop PDF recipe here">
         <div class="pdf-drop-icon">&#x1F4C4;</div>
@@ -934,6 +949,31 @@ function exportJSON(){
 }
 
 // ═══════════════════════════════════════════════════
+//  API KEY MANAGEMENT
+// ═══════════════════════════════════════════════════
+function saveApiKey(val) {
+  try { localStorage.setItem('alfa_anthropic_key', val.trim()); } catch(e) {}
+}
+function loadApiKey() {
+  try {
+    var k = localStorage.getItem('alfa_anthropic_key') || '';
+    var inp = document.getElementById('api-key-inp');
+    if (inp && k) inp.value = k;
+    return k;
+  } catch(e) { return ''; }
+}
+function toggleKeyVis() {
+  var inp = document.getElementById('api-key-inp');
+  if (!inp) return;
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+}
+function getApiKey() {
+  var inp = document.getElementById('api-key-inp');
+  if (inp && inp.value.trim()) return inp.value.trim();
+  return loadApiKey();
+}
+
+// ═══════════════════════════════════════════════════
 //  PDF DROP + AI PARSING
 // ═══════════════════════════════════════════════════
 var REVIEW_DATA = null;
@@ -991,12 +1031,17 @@ function hideParseOverlay() {
 }
 
 async function callClaudeVision(base64Data, mediaType, isPdf) {
-  // The Anthropic API blocks direct browser calls due to CORS.
-  // We use the artifact-embedded API endpoint which is allowed.
+  var apiKey = getApiKey();
+  if (!apiKey) {
+    hideParseOverlay();
+    toast('Enter your Anthropic API key first (right panel)', 'warning');
+    document.getElementById('api-key-inp') && document.getElementById('api-key-inp').focus();
+    return;
+  }
+
   var prompt = 'You are reading an ALFA.CO recipe card image or PDF. Extract ALL information visible and return ONLY a valid JSON object (no markdown, no explanation) with these exact keys:\n{\n  "name": "ITEM NAME",\n  "concept": "CONCEPT (e.g. STEAK HOUSE, PIATTO, HYBRID, SH - SALAD BAR)",\n  "recipeType": "PREP RECIPE type (e.g. SUB-PREP, PREP RECIPE, LINE RECIPE, SERVING RECIPE)",\n  "recipeCode": "RECIPE # code",\n  "yield": "YIELD value as written",\n  "prepTime": "PREP TIME value",\n  "shelfLife": "SHELF LIFE value",\n  "storing": "STORING value",\n  "created": "CREATED date as YYYY-MM-DD if possible, else as written",\n  "revised": "REVISED date as YYYY-MM-DD if possible, else empty",\n  "technique": "Full TECHNIQUE/METHOD text preserving all numbered steps",\n  "ingredients": [\n    { "name": "ingredient name exactly as written", "qty": numeric_value_only, "unit": "unit abbreviation" }\n  ]\n}\nUnit conversions: gm/grams/gm.->g, kilo/kilos->kg, liters/liter->L, pieces/pcs->pcs, ounces->oz.\nIf qty uses mixed text like "1 kilo" split to qty:1 unit:"kg".\nReturn ONLY the JSON object.';
 
   var contentBlocks = [];
-
   if (isPdf) {
     contentBlocks.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64Data } });
   } else {
@@ -1009,6 +1054,7 @@ async function callClaudeVision(base64Data, mediaType, isPdf) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'x-api-key': apiKey,
         'anthropic-version': '2023-06-01',
         'anthropic-dangerous-direct-browser-access': 'true'
       },
@@ -1022,6 +1068,8 @@ async function callClaudeVision(base64Data, mediaType, isPdf) {
     if (!response.ok) {
       var errBody = '';
       try { errBody = await response.text(); } catch(e2) {}
+      // 401 = bad key
+      if (response.status === 401) throw new Error('Invalid API key — check your key at console.anthropic.com/keys');
       throw new Error('HTTP ' + response.status + (errBody ? ': ' + errBody.slice(0,120) : ''));
     }
 
@@ -1033,7 +1081,6 @@ async function callClaudeVision(base64Data, mediaType, isPdf) {
 
     // Strip markdown fences
     text = text.replace(/^```[a-z]*\s*/i, '').replace(/\s*```$/i, '').trim();
-    // Find JSON object boundaries
     var start = text.indexOf('{');
     var end = text.lastIndexOf('}');
     if (start >= 0 && end > start) text = text.slice(start, end + 1);
@@ -1045,13 +1092,11 @@ async function callClaudeVision(base64Data, mediaType, isPdf) {
   } catch (err) {
     hideParseOverlay();
     console.error('Claude API error:', err);
-
-    // Show helpful error with manual fallback
     var msg = err.message || 'Unknown error';
     if (msg.toLowerCase().includes('failed to fetch') || msg.toLowerCase().includes('load failed') || msg.toLowerCase().includes('cors')) {
       showManualFallback();
     } else {
-      toast('AI error: ' + msg.slice(0, 80), 'error');
+      toast('AI error: ' + msg.slice(0, 100), 'error');
     }
   }
 }
@@ -1218,6 +1263,7 @@ function toast(msg,type){
 // ═══════════════════════════════════════════════════
 document.getElementById('fcd').value=new Date().toISOString().slice(0,10);
 renderRows();rc();
+loadApiKey();
 initFB();
 </script>
 </body>
