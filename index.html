@@ -3223,9 +3223,10 @@ var NAV_CONFIG = {
       { id:'alerts-center',icon:'⚠️', label:'Alerts Center', badge:'alerts' }
     ]},
     { section:'SYSTEM', items:[
-      { id:'brand-mgmt',  icon:'🏢', label:'Brand Management' },
-      { id:'access-ctrl', icon:'🔐', label:'Access Control' },
-      { id:'audit-log',   icon:'📋', label:'Audit Log' }
+      { id:'brand-mgmt',    icon:'🏢', label:'Brand Management' },
+      { id:'access-ctrl',   icon:'🔐', label:'Access Control' },
+      { id:'audit-log',     icon:'📋', label:'Audit Log' },
+      { id:'recipe-builder',icon:'🍳', label:'Recipe Builder' }
     ]}
   ],
   brand_dir: [
@@ -3258,6 +3259,7 @@ var NAV_CONFIG = {
       { id:'low-stock',         icon:'🚨', label:'Low Stock', badge:'lowstock' },
       { id:'inv-report',        icon:'📅', label:'Monthly Report' },
       { id:'wastage',           icon:'🗑️', label:'Wastage Log' },
+      { id:'recipe-builder',    icon:'🍳', label:'Recipe Builder' },
       { id:'bm-transfers',      icon:'🔀', label:'Transfer Requests', badge:'bm-transfers-pending' }
     ]},
     { section:'OPERATIONS', items:[
@@ -3302,6 +3304,9 @@ var NAV_CONFIG = {
     { section:'PAYROLL', items:[
       { id:'hrf-payroll',     icon:'💸', label:'Payroll Overview' },
       { id:'hrf-petty-cash',  icon:'🧾', label:'Petty Cash' }
+    ]},
+    { section:'CULINARY', items:[
+      { id:'recipe-builder',  icon:'🍳', label:'Recipe Builder' }
     ]},
     { section:'REPORTS', items:[
       { id:'hrf-hr-report',   icon:'📋', label:'HR Reports' }
@@ -4487,11 +4492,25 @@ function renderPage(pageId) {
       var url='music-player.html'+(s.branchId?'?branch='+encodeURIComponent(s.branchId):'');
       window.open(url,'_blank');
       return '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;text-align:center;padding:40px">' +
-        '<div style="font-size:56px;margin-bottom:20px">🎵</div>' +
+        '<div style="font-size:56px;margin-bottom:20px">&#x1F3B5;</div>' +
         '<div style="font-size:20px;font-weight:800;color:var(--text-primary);margin-bottom:8px">Music Player</div>' +
         '<div style="font-size:13px;color:var(--text-secondary);margin-bottom:24px;max-width:360px;line-height:1.7">The music player has opened in a new tab. Use it to manage your branch playlist and prayer-aware auto-pause.</div>' +
-        '<a href="'+url+'" target="_blank" style="text-decoration:none"><button class="btn btn-primary" style="padding:12px 28px;font-size:13px">🎵 Open Music Player</button></a>' +
+        '<a href="'+url+'" target="_blank" style="text-decoration:none"><button class="btn btn-primary" style="padding:12px 28px;font-size:13px">&#x1F3B5; Open Music Player</button></a>' +
         '</div>';
+    },
+    'recipe-builder': function(){
+      var fbCfg='';
+      try{var st=localStorage.getItem('alfa_fb_config');if(st)fbCfg='?fbcfg='+btoa(st);}catch(e){}
+      var url='recipe-builder.html'+fbCfg;
+      window.open(url,'_blank');
+      return '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;text-align:center;padding:40px">'+
+        '<div style="font-size:56px;margin-bottom:20px">&#x1F373;</div>'+
+        '<div style="font-size:20px;font-weight:800;color:var(--text-primary);margin-bottom:8px">Recipe Builder</div>'+
+        '<div style="font-size:13px;color:var(--text-secondary);margin-bottom:24px;max-width:380px;line-height:1.7">'+
+          'The Recipe Builder has opened in a new tab. Build recipes with ingredients and costs — saved to Firebase and linked to Wastage Log auto-costing.'+
+        '</div>'+
+        '<a href="'+url+'" target="_blank" style="text-decoration:none"><button class="btn btn-primary" style="padding:12px 28px;font-size:13px">&#x1F373; Open Recipe Builder</button></a>'+
+      '</div>';
     },
     // ── HR & Finance Manager pages ──
     'hrf-hr-dash':    pHrfHrDash,
@@ -7270,6 +7289,19 @@ function attachBranchListeners() {
 // Helper to re-render current page without destroying charts (used by listeners)
 function renderPage_(pageId) {
   try {
+    // Recipe Builder opens in a new tab (standalone HTML)
+    if (pageId === 'recipe-builder') {
+      // Pass Firebase config so Recipe Builder can connect to same DB
+      var fbCfg = '';
+      try {
+        var stored = localStorage.getItem('alfa_fb_config');
+        if (stored) fbCfg = '?fbcfg=' + btoa(stored);
+      } catch(e) {}
+      window.open('recipe-builder.html' + fbCfg, '_blank');
+      // Return to previous page after launching
+      if (NX.page !== 'recipe-builder') return renderPage_(NX.page);
+      return pRecipeBuilderLaunch();
+    }
     var fns = {
       'branch-dash':pBranchDash,'inv-items':pInvItems,'inv-moves':pInvMoves,'inv-orders':pInvOrders,
       'low-stock':pLowStock,'inv-report':pInvReport,'wastage':pWastage,'staff':pStaff,
@@ -7277,7 +7309,18 @@ function renderPage_(pageId) {
       'sales':pSales,'petty-cash':pPettyCash,'dsr':pDSR,'checklists':pChecklists,'qr-checkin':pQRCheckin
     };
     return fns[pageId] ? fns[pageId]() : '';
-  } catch(e) { return '<div class="empty-state"><div class="es-icon">⚠️</div><p>' + bxe(e.message) + '</p></div>'; }
+  } catch(e) { return '<div class="empty-state"><div class="es-icon">&#x26A0;&#xFE0F;</div><p>' + bxe(e.message) + '</p></div>'; }
+}
+
+function pRecipeBuilderLaunch() {
+  return '<div class="empty-state" style="padding:60px 20px">'+
+    '<div style="font-size:56px;margin-bottom:16px">&#x1F373;</div>'+
+    '<h3 style="font-size:18px;font-weight:700;margin-bottom:8px">Recipe Builder</h3>'+
+    '<p style="color:var(--text-secondary);margin-bottom:24px;max-width:360px;margin-left:auto;margin-right:auto;line-height:1.7">'+
+      'The Recipe Builder has opened in a new tab. Build and cost recipes there — they are automatically saved to Firebase and linked to the Wastage Log here.'+
+    '</p>'+
+    '<button class="btn btn-primary" onclick="window.open(\'recipe-builder.html\',\'_blank\')">&#x1F373; Open Recipe Builder</button>'+
+  '</div>';
 }
 
 // ── CSS for branch pages (OpsHub style, scoped) ──
@@ -9041,29 +9084,29 @@ function openBranchWastageModal(){
   var recOpts='<option value="">\u2014 Manual entry (no recipe) \u2014</option>';
   var sortedRec=(BS.recipes||[]).slice().sort(function(a,b){return(a.name||'').localeCompare(b.name||'');});
   sortedRec.forEach(function(r){recOpts+='<option value="'+bxe(r.id)+'">'+bxe(r.name)+(r.recipeCode?' ['+bxe(r.recipeCode)+']':'')+'</option>';});
-  var html='<div class="modal-head"><h2>Log Wastage</h2><button class="modal-close" onclick="closeModalForce()">&#x2715;</button></div>'+
-    '<div class="bfg"><label class="form-label">\uD83D\uDCCB Link to Recipe (auto-calculates cost)</label>'+
-    '<select class="form-input form-select" id="bw-recipe" onchange="bwOnRecipePick(this.value)">'+recOpts+'</select></div>'+
-    '<div class="form-row">'+
-      '<div class="bfg"><label class="form-label">Date</label><input class="form-input" type="date" id="bw-date" value="'+TODAY_BS+'"></div>'+
-      '<div class="bfg"><label class="form-label">Reported By</label><select class="form-input form-select" id="bw-by">'+so+'</select></div>'+
-    '</div>'+
-    '<div class="form-row">'+
-      '<div class="bfg"><label class="form-label">Item Name *</label><input class="form-input" id="bw-item" placeholder="Item name / recipe name"></div>'+
-      '<div class="bfg"><label class="form-label">Reason</label><select class="form-input form-select" id="bw-reason"><option value="">\u2014</option>'+WR.map(function(r){return '<option>'+bxe(r)+'</option>';}).join('')+'</select></div>'+
-    '</div>'+
-    '<div class="form-row">'+
-      '<div class="bfg"><label class="form-label">Qty Wasted *</label><input class="form-input" type="number" id="bw-qty" step="0.001" placeholder="0" oninput="bwRecalcCost()"></div>'+
-      '<div class="bfg"><label class="form-label">Unit</label><input class="form-input" id="bw-unit" placeholder="kg, pcs, portion\u2026"></div>'+
-    '</div>'+
-    '<div style="background:var(--surface-2);border-radius:10px;padding:12px 14px;margin-bottom:12px;display:flex;gap:14px;flex-wrap:wrap;align-items:center">'+
-      '<div style="flex:1;min-width:130px"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-tertiary);margin-bottom:3px">Auto-Calculated Cost</div>'+
-      '<div id="bw-cost-display" style="font-size:22px;font-weight:700;font-family:var(--mono);color:var(--danger)">SAR 0.00</div>'+
-      '<div id="bw-cost-note" style="font-size:10px;color:var(--text-tertiary);font-family:var(--mono);margin-top:2px">Select a recipe above</div></div>'+
-      '<div style="flex:1;min-width:130px"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-tertiary);margin-bottom:3px">Override Cost (SAR)</div>'+
-      '<input class="form-input" type="number" id="bw-val" step="0.01" placeholder="Leave blank = use auto" oninput="bwUpdateDisplay()"></div>'+
-    '</div>'+
-    '<button class="btn btn-primary" style="width:100%" onclick="saveBranchWastage()">Log Wastage</button>';
+  var html='<div class="modal-head"><h2>Log Wastage</h2><button class="modal-close" onclick="closeModalForce()">&#x2715;</button></div>';
+  html+='<div class="bfg"><label class="form-label">Link to Recipe (auto-calculates cost)</label>';
+  html+='<select class="form-input form-select" id="bw-recipe" onchange="bwOnRecipePick(this.value)">'+recOpts+'</select></div>';
+  html+='<div class="form-row">';
+  html+='<div class="bfg"><label class="form-label">Date</label><input class="form-input" type="date" id="bw-date" value="'+TODAY_BS+'"></div>';
+  html+='<div class="bfg"><label class="form-label">Reported By</label><select class="form-input form-select" id="bw-by">'+so+'</select></div>';
+  html+='</div>';
+  html+='<div class="form-row">';
+  html+='<div class="bfg"><label class="form-label">Item Name *</label><input class="form-input" id="bw-item" placeholder="Item name / recipe name"></div>';
+  html+='<div class="bfg"><label class="form-label">Reason</label><select class="form-input form-select" id="bw-reason"><option value="">\u2014</option>'+WR.map(function(r){return '<option>'+bxe(r)+'</option>';}).join('')+'</select></div>';
+  html+='</div>';
+  html+='<div class="form-row">';
+  html+='<div class="bfg"><label class="form-label">Qty Wasted *</label><input class="form-input" type="number" id="bw-qty" step="0.001" placeholder="0" oninput="bwRecalcCost()"></div>';
+  html+='<div class="bfg"><label class="form-label">Unit</label><input class="form-input" id="bw-unit" placeholder="kg, pcs, portion\u2026"></div>';
+  html+='</div>';
+  html+='<div style="background:var(--surface-2);border-radius:10px;padding:12px 14px;margin-bottom:12px;display:flex;gap:14px;flex-wrap:wrap;align-items:center">';
+  html+='<div style="flex:1;min-width:130px"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-tertiary);margin-bottom:3px">Auto-Calculated Cost</div>';
+  html+='<div id="bw-cost-display" style="font-size:22px;font-weight:700;font-family:var(--mono);color:var(--danger)">SAR 0.00</div>';
+  html+='<div id="bw-cost-note" style="font-size:10px;color:var(--text-tertiary);font-family:var(--mono);margin-top:2px">Select a recipe above</div></div>';
+  html+='<div style="flex:1;min-width:130px"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-tertiary);margin-bottom:3px">Override Cost (SAR)</div>';
+  html+='<input class="form-input" type="number" id="bw-val" step="0.01" placeholder="Leave blank = use auto" oninput="bwUpdateDisplay()"></div>';
+  html+='</div>';
+  html+='<button class="btn btn-primary" style="width:100%" onclick="saveBranchWastage()">Log Wastage</button>';
   openModal(html);
 }
 function bwOnRecipePick(recipeId){

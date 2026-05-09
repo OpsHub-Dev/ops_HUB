@@ -8,179 +8,249 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <style>
-:root {
+:root{
   --base:#E7E5E4;--base-dk:#D4D2D1;--base-lt:#F4F2F1;
-  --sh-raise:6px 6px 16px rgba(0,0,0,0.18),-6px -6px 16px rgba(255,255,255,0.88);
-  --sh-raise-sm:3px 3px 8px rgba(0,0,0,0.15),-3px -3px 8px rgba(255,255,255,0.85);
-  --sh-raise-lg:10px 10px 28px rgba(0,0,0,0.20),-10px -10px 28px rgba(255,255,255,0.90);
-  --sh-inset:inset 4px 4px 10px rgba(0,0,0,0.13),inset -4px -4px 10px rgba(255,255,255,0.75);
-  --sh-inset-sm:inset 2px 2px 6px rgba(0,0,0,0.10),inset -2px -2px 6px rgba(255,255,255,0.70);
-  --primary:#006666;--primary-h:#008080;--accent:#F1A500;
-  --success:#00A63D;--danger:#FF2157;--warning:#FE9900;
+  --sh-r:6px 6px 16px rgba(0,0,0,.18),-6px -6px 16px rgba(255,255,255,.88);
+  --sh-rs:3px 3px 8px rgba(0,0,0,.15),-3px -3px 8px rgba(255,255,255,.85);
+  --sh-rl:10px 10px 28px rgba(0,0,0,.20),-10px -10px 28px rgba(255,255,255,.90);
+  --sh-i:inset 4px 4px 10px rgba(0,0,0,.13),inset -4px -4px 10px rgba(255,255,255,.75);
+  --sh-is:inset 2px 2px 6px rgba(0,0,0,.10),inset -2px -2px 6px rgba(255,255,255,.70);
+  --primary:#006666;--ph:#008080;--accent:#F1A500;
+  --ok:#00A63D;--err:#FF2157;--warn:#FE9900;
   --font:'Space Mono','Courier New',monospace;
   --mono:'JetBrains Mono','Fira Code',monospace;
-  --text:#1E2938;--text2:rgba(30,41,56,0.58);--text3:rgba(30,41,56,0.35);
+  --tx:#1E2938;--tx2:rgba(30,41,56,.58);--tx3:rgba(30,41,56,.35);
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-html,body{min-height:100vh;background:var(--base);color:var(--text);font-family:var(--font);font-size:13px;-webkit-font-smoothing:antialiased}
-::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:rgba(0,0,0,0.14);border-radius:4px}
+html,body{height:100%;background:var(--base);color:var(--tx);font-family:var(--font);font-size:13px;-webkit-font-smoothing:antialiased;overflow:hidden}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:rgba(0,0,0,.14);border-radius:4px}
 
-.header{background:var(--base);box-shadow:0 4px 16px rgba(0,0,0,0.10),0 -1px 0 rgba(255,255,255,0.8);padding:11px 18px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:50;flex-wrap:wrap}
-.hdr-logo{height:32px;width:auto}
-.hdr-title{font-size:13px;font-weight:700;letter-spacing:-0.5px}
-.hdr-sub{font-size:9px;color:var(--text3);font-family:var(--mono)}
-.hdr-right{margin-left:auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+/* ── HEADER ── */
+.hdr{height:52px;background:var(--base);box-shadow:0 3px 12px rgba(0,0,0,.10);display:flex;align-items:center;gap:10px;padding:0 16px;position:fixed;top:0;left:0;right:0;z-index:100;flex-shrink:0}
+.hdr-logo{height:30px}
+.hdr-name{font-size:13px;font-weight:700;letter-spacing:-.4px}
+.hdr-sub{font-size:9px;color:var(--tx3);font-family:var(--mono)}
+.hdr-r{margin-left:auto;display:flex;gap:5px;align-items:center}
 
-.layout{display:grid;grid-template-columns:270px 1fr;min-height:calc(100vh - 58px)}
-@media(max-width:860px){.layout{grid-template-columns:1fr}}
+/* ── 3-PANEL LAYOUT ── */
+.app{display:grid;grid-template-columns:240px 1fr 240px;height:calc(100vh - 52px);margin-top:52px;overflow:hidden}
 
-.sidebar{background:var(--base-dk);border-right:1px solid rgba(0,0,0,0.06);padding:14px 10px;display:flex;flex-direction:column;gap:9px;overflow-y:auto;max-height:calc(100vh - 58px);position:sticky;top:58px}
-.sb-title{font-size:9px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--text3)}
-.search-inp{width:100%;background:var(--base);border:none;border-radius:9px;box-shadow:var(--sh-inset-sm);padding:7px 10px;font-family:var(--font);font-size:11px;color:var(--text);outline:none}
-.search-inp::placeholder{color:var(--text3)}
-.recipe-card-sm{background:var(--base);border-radius:10px;box-shadow:var(--sh-raise-sm);padding:9px 11px;cursor:pointer;transition:box-shadow .15s,transform .15s;display:flex;align-items:center;gap:7px}
-.recipe-card-sm:hover{box-shadow:var(--sh-raise);transform:translateY(-1px)}
-.recipe-card-sm.active{box-shadow:var(--sh-inset-sm);transform:none}
-.rc-info{flex:1;min-width:0}
-.rc-name{font-weight:700;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.rc-meta{font-size:9px;color:var(--text3);font-family:var(--mono)}
-.rc-cost{font-size:11px;font-weight:700;font-family:var(--mono);color:var(--primary);white-space:nowrap}
+/* ── LEFT PANEL: Ingredient Library ── */
+.lib{background:var(--base-dk);border-right:1px solid rgba(0,0,0,.07);display:flex;flex-direction:column;overflow:hidden}
+.panel-hdr{padding:12px 10px 8px;flex-shrink:0}
+.panel-title{font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--tx3);margin-bottom:8px}
+.srch{width:100%;background:var(--base);border:none;border-radius:8px;box-shadow:var(--sh-is);padding:7px 10px;font-family:var(--font);font-size:11px;color:var(--tx);outline:none}
+.srch::placeholder{color:var(--tx3)}
+.lib-scroll{flex:1;overflow-y:auto;padding:6px 10px 10px;display:flex;flex-direction:column;gap:5px}
 
-.main{padding:14px 18px;display:flex;flex-direction:column;gap:12px}
-.tabs{display:flex;gap:3px;background:var(--base);border-radius:11px;box-shadow:var(--sh-inset-sm);padding:3px}
-.tab-btn{flex:1;padding:7px;border:none;border-radius:9px;font-family:var(--font);font-size:10px;font-weight:700;cursor:pointer;color:var(--text2);background:none;transition:all .15s}
-.tab-btn.active{background:var(--base);box-shadow:var(--sh-raise-sm);color:var(--primary)}
+/* Ingredient card — draggable */
+.ing-card{background:var(--base);border-radius:9px;box-shadow:var(--sh-rs);padding:8px 10px;cursor:grab;display:flex;align-items:center;gap:8px;transition:box-shadow .12s,transform .12s,opacity .12s;user-select:none;border:2px solid transparent}
+.ing-card:hover{box-shadow:var(--sh-r);transform:translateY(-1px)}
+.ing-card:active{cursor:grabbing;box-shadow:var(--sh-is);transform:none}
+.ing-card.dragging{opacity:.45;box-shadow:none;transform:scale(.97)}
+.ic-icon{font-size:18px;flex-shrink:0}
+.ic-body{flex:1;min-width:0}
+.ic-name{font-weight:700;font-size:10px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ic-cost{font-size:9px;color:var(--tx3);font-family:var(--mono)}
+.ic-edit{background:none;border:none;color:var(--tx3);cursor:pointer;font-size:11px;padding:2px 4px;border-radius:4px;opacity:0;transition:opacity .1s}
+.ing-card:hover .ic-edit{opacity:1}
+.ic-edit:hover{color:var(--primary);background:rgba(0,102,102,.1)}
 
-/* ALFA.CO Recipe Form — matches PDF exactly */
-.rform{background:var(--base);border-radius:14px;box-shadow:var(--sh-raise);overflow:hidden}
+/* Lib footer */
+.lib-footer{padding:8px 10px;border-top:1px solid rgba(0,0,0,.06);flex-shrink:0;display:flex;flex-direction:column;gap:5px}
+.fbstat{font-size:9px;color:var(--tx3);font-family:var(--mono)}
+.cbadge{font-size:9px;font-family:var(--mono);padding:2px 7px;border-radius:20px;font-weight:700;display:inline-block}
+.live{background:rgba(0,166,61,.15);color:#00A63D}.off{background:rgba(255,33,87,.12);color:var(--err)}
 
-.rform-hdr{background:var(--primary);padding:12px 16px;display:flex;align-items:center;justify-content:space-between}
-.rform-hdr-name{font-size:13px;font-weight:700;color:#fff;letter-spacing:-0.3px}
-.rform-hdr-sub{font-size:9px;color:rgba(255,255,255,0.75);font-family:var(--mono);margin-top:2px}
+/* ── MIDDLE PANEL: Recipe Editor ── */
+.editor{display:flex;flex-direction:column;overflow:hidden}
+.tabs{display:flex;gap:3px;background:var(--base);box-shadow:var(--sh-is);padding:3px;margin:10px 14px 0;border-radius:10px;flex-shrink:0}
+.tab-btn{flex:1;padding:6px;border:none;border-radius:8px;font-family:var(--font);font-size:10px;font-weight:700;cursor:pointer;color:var(--tx2);background:none;transition:all .15s}
+.tab-btn.on{background:var(--base);box-shadow:var(--sh-rs);color:var(--primary)}
 
-.rform-meta{display:grid;grid-template-columns:1fr 1fr;border-bottom:2px solid rgba(0,0,0,0.07)}
-.meta-side{padding:12px 16px}
-.meta-side:last-child{border-left:1px solid rgba(0,0,0,0.06)}
-.meta-row{display:flex;align-items:center;gap:6px;margin-bottom:6px}
-.meta-row:last-child{margin-bottom:0}
-.ml{font-size:10px;font-weight:700;color:var(--text3);width:76px;flex-shrink:0;text-transform:uppercase;letter-spacing:.06em}
-.fi{width:100%;background:var(--base);border:none;border-radius:7px;box-shadow:var(--sh-inset-sm);padding:5px 8px;font-family:var(--font);font-size:11px;color:var(--text);outline:none}
-.fi:focus{box-shadow:var(--sh-inset),0 0 0 2px rgba(0,102,102,.15)}
-.fi::placeholder{color:var(--text3)}
-select.fi{cursor:pointer}
+.pane{flex:1;overflow-y:auto;padding:10px 14px}
 
-.rform-body{display:grid;grid-template-columns:1fr 1fr;border-bottom:2px solid rgba(0,0,0,0.07)}
-.ic,.tc{padding:12px 16px}
-.tc{border-left:1px solid rgba(0,0,0,0.06)}
-.col-ttl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--text3);margin-bottom:8px;border-bottom:1px solid rgba(0,0,0,0.06);padding-bottom:5px}
+/* Recipe form — ALFA.CO PDF style */
+.rf{background:var(--base);border-radius:14px;box-shadow:var(--sh-r);overflow:hidden;margin-bottom:10px}
+.rf-hdr{background:var(--primary);padding:11px 14px;display:flex;align-items:center;justify-content:space-between}
+.rf-title{font-size:13px;font-weight:700;color:#fff;letter-spacing:-.3px}
+.rf-sub{font-size:9px;color:rgba(255,255,255,.72);font-family:var(--mono);margin-top:2px}
 
+.rf-meta{display:grid;grid-template-columns:1fr 1fr;border-bottom:2px solid rgba(0,0,0,.07)}
+.ms{padding:10px 12px}
+.ms:last-child{border-left:1px solid rgba(0,0,0,.06)}
+.mr{display:flex;align-items:center;gap:5px;margin-bottom:5px}
+.mr:last-child{margin-bottom:0}
+.ml{font-size:9px;font-weight:700;color:var(--tx3);width:70px;flex-shrink:0;text-transform:uppercase;letter-spacing:.06em}
+.fi{width:100%;background:var(--base);border:none;border-radius:7px;box-shadow:var(--sh-is);padding:4px 7px;font-family:var(--font);font-size:10px;color:var(--tx);outline:none}
+.fi:focus{box-shadow:var(--sh-i),0 0 0 2px rgba(0,102,102,.15)}
+.fi::placeholder{color:var(--tx3)}
+
+/* Ingredients section */
+.rf-body{display:grid;grid-template-columns:1fr 1fr;border-bottom:2px solid rgba(0,0,0,.07)}
+.ic-col,.tc-col{padding:10px 12px}
+.tc-col{border-left:1px solid rgba(0,0,0,.06)}
+.col-t{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--tx3);margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid rgba(0,0,0,.06)}
+
+/* DROP ZONE */
+.drop-zone{min-height:80px;border:2px dashed rgba(0,102,102,.3);border-radius:10px;background:rgba(0,102,102,.03);display:flex;align-items:center;justify-content:center;transition:all .2s;margin-bottom:8px;position:relative}
+.drop-zone.dz-active{border-color:var(--primary);background:rgba(0,102,102,.1);box-shadow:0 0 0 3px rgba(0,102,102,.15)}
+.dz-hint{text-align:center;color:var(--tx3);pointer-events:none;padding:12px}
+.dz-hint-icon{font-size:22px;margin-bottom:4px}
+.dz-hint-text{font-size:10px;font-family:var(--mono)}
+
+/* Ingredient rows in recipe */
 .itbl{width:100%;border-collapse:collapse;margin-bottom:6px}
-.itbl th{font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);padding:4px 5px;text-align:left;border-bottom:1px solid rgba(0,0,0,0.06)}
-.itbl td{padding:2px 3px;vertical-align:middle}
-.ir td{border-bottom:1px solid rgba(0,0,0,0.04)}
+.itbl th{font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--tx3);padding:3px 4px;text-align:left;border-bottom:1px solid rgba(0,0,0,.06)}
+.itbl td{padding:2px 2px;vertical-align:middle}
+.ir td{border-bottom:1px solid rgba(0,0,0,.04)}
 .ir:hover td{background:rgba(0,102,102,.03)}
-.ti{width:100%;background:none;border:none;font-family:var(--font);font-size:11px;color:var(--text);outline:none;padding:3px 4px;border-radius:4px}
-.ti:focus{background:var(--base);box-shadow:var(--sh-inset-sm)}
-.ti.n{min-width:90px}
-.ti.q{text-align:right;width:60px}
-.ti.cpu{text-align:right;width:70px}
-.su{width:52px}
-.dh{color:var(--text3);cursor:grab;font-size:12px;padding:2px 3px;user-select:none}
+.ir.dov td{box-shadow:inset 0 -2px 0 var(--primary)}
+.dh{color:var(--tx3);cursor:grab;font-size:12px;padding:1px 3px;user-select:none}
 .dh:active{cursor:grabbing}
-.dr-btn{background:none;border:none;color:var(--text3);cursor:pointer;font-size:12px;padding:2px 5px;border-radius:4px}
-.dr-btn:hover{color:var(--danger);background:rgba(255,33,87,.08)}
-.ir.drag-over td{box-shadow:inset 0 -2px 0 var(--primary)}
+.ti{width:100%;background:none;border:none;font-family:var(--font);font-size:10px;color:var(--tx);outline:none;padding:2px 3px;border-radius:4px}
+.ti:focus{background:var(--base);box-shadow:var(--sh-is)}
+.ti.q{text-align:right;width:52px}.ti.cpu{text-align:right;width:62px}
+.su{width:48px;font-size:10px}
+.dr-btn{background:none;border:none;color:var(--tx3);cursor:pointer;font-size:11px;padding:1px 4px;border-radius:4px}
+.dr-btn:hover{color:var(--err);background:rgba(255,33,87,.08)}
 
-.ta{width:100%;background:none;border:none;font-family:var(--font);font-size:11px;color:var(--text);outline:none;resize:vertical;min-height:160px;line-height:1.8}
-.ta:focus{background:var(--base-lt);border-radius:7px;padding:6px 8px;box-shadow:var(--sh-inset-sm)}
+.ta{width:100%;background:none;border:none;font-family:var(--font);font-size:10px;color:var(--tx);outline:none;resize:vertical;min-height:150px;line-height:1.8}
+.ta:focus{background:var(--base-lt);border-radius:7px;padding:6px 8px;box-shadow:var(--sh-is)}
 
-.cbar{display:flex;flex-wrap:wrap;gap:10px;padding:10px 16px;background:var(--base-lt);border-top:1px solid rgba(0,0,0,0.06);align-items:center}
-.ckpi{text-align:center}
-.ckpi-v{font-size:16px;font-weight:700;font-family:var(--mono);color:var(--primary);letter-spacing:-0.5px}
-.ckpi-l{font-size:8px;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);margin-top:1px}
+/* Cost bar */
+.cbar{display:flex;flex-wrap:wrap;gap:8px;padding:10px 12px;background:var(--base-lt);border-top:1px solid rgba(0,0,0,.06);align-items:center}
+.ck{text-align:center}
+.ckv{font-size:15px;font-weight:700;font-family:var(--mono);color:var(--primary);letter-spacing:-.4px}
+.ckl{font-size:8px;text-transform:uppercase;letter-spacing:.1em;color:var(--tx3)}
+.num-in{width:56px;background:var(--base);border:none;border-radius:7px;box-shadow:var(--sh-is);padding:4px 6px;font-family:var(--mono);font-size:11px;color:var(--tx);outline:none;text-align:center}
 
 .sig{display:grid;grid-template-columns:1fr 1fr;background:var(--base-dk)}
-.sig-c{padding:10px 16px;border-top:1px solid rgba(0,0,0,0.06)}
-.sig-c:last-child{border-left:1px solid rgba(0,0,0,0.06)}
-.sig-line{border-bottom:1px solid rgba(0,0,0,0.18);min-height:28px;margin-bottom:5px}
-.sig-lbl{font-size:9px;color:var(--text3);font-family:var(--mono)}
-.sig-name{font-size:10px;font-weight:700;color:var(--text2)}
+.sc{padding:8px 12px;border-top:1px solid rgba(0,0,0,.06)}
+.sc:last-child{border-left:1px solid rgba(0,0,0,.06)}
+.sl{border-bottom:1px solid rgba(0,0,0,.18);min-height:24px;margin-bottom:4px}
+.slb{font-size:8px;color:var(--tx3);font-family:var(--mono)}
+.sln{font-size:9px;font-weight:700;color:var(--tx2)}
 
-.btn{padding:6px 13px;border:none;border-radius:9px;font-family:var(--font);font-size:10px;font-weight:700;cursor:pointer;transition:box-shadow .15s,transform .15s;background:var(--base);color:var(--text);box-shadow:var(--sh-raise-sm)}
-.btn:hover{box-shadow:var(--sh-raise);transform:translateY(-1px)}
-.btn:active{box-shadow:var(--sh-inset-sm);transform:none}
+/* ── RIGHT PANEL: Saved Recipes ── */
+.recipes{background:var(--base-dk);border-left:1px solid rgba(0,0,0,.07);display:flex;flex-direction:column;overflow:hidden}
+.r-scroll{flex:1;overflow-y:auto;padding:6px 10px 10px;display:flex;flex-direction:column;gap:5px}
+.rc{background:var(--base);border-radius:10px;box-shadow:var(--sh-rs);padding:9px 11px;cursor:pointer;transition:box-shadow .15s,transform .15s;display:flex;align-items:center;gap:7px;border:2px solid transparent}
+.rc:hover{box-shadow:var(--sh-r);transform:translateY(-1px)}
+.rc.active{box-shadow:var(--sh-is);border-color:var(--primary);transform:none}
+.rc-info{flex:1;min-width:0}
+.rc-name{font-weight:700;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rc-meta{font-size:9px;color:var(--tx3);font-family:var(--mono)}
+.rc-cost{font-size:11px;font-weight:700;font-family:var(--mono);color:var(--primary);white-space:nowrap}
+.rc-del{background:none;border:none;color:var(--tx3);cursor:pointer;font-size:11px;padding:2px 4px;border-radius:4px;opacity:0;transition:opacity .1s}
+.rc:hover .rc-del{opacity:1}
+.rc-del:hover{color:var(--err)}
+
+/* Buttons */
+.btn{padding:5px 12px;border:none;border-radius:8px;font-family:var(--font);font-size:10px;font-weight:700;cursor:pointer;transition:box-shadow .15s,transform .12s;background:var(--base);color:var(--tx);box-shadow:var(--sh-rs)}
+.btn:hover{box-shadow:var(--sh-r);transform:translateY(-1px)}
+.btn:active{box-shadow:var(--sh-is);transform:none}
 .btn-p{background:var(--primary);color:#fff;box-shadow:3px 3px 8px rgba(0,102,102,.35)}
-.btn-p:hover{background:var(--primary-h)}
-.btn-d{background:var(--danger);color:#fff}
+.btn-p:hover{background:var(--ph)}
+.btn-d{background:var(--err);color:#fff}
 .btn-sm{padding:3px 8px;font-size:9px;border-radius:7px}
-.cbadge{font-size:9px;font-family:var(--mono);padding:3px 8px;border-radius:20px;font-weight:700}
-.live{background:rgba(0,166,61,.15);color:#00A63D}
-.off{background:rgba(255,33,87,.12);color:var(--danger)}
 
-.toast-wrap{position:fixed;bottom:18px;right:18px;z-index:999;display:flex;flex-direction:column;gap:5px;pointer-events:none}
-.toast{background:var(--base);border-radius:9px;box-shadow:var(--sh-raise);padding:8px 12px;display:flex;align-items:center;gap:7px;font-size:11px;font-weight:600;animation:si .2s ease;min-width:150px}
-.td{width:7px;height:7px;border-radius:50%;flex-shrink:0}
-.td.success{background:var(--success)}.td.error{background:var(--danger)}.td.info{background:var(--primary)}.td.warning{background:var(--warning)}
-@keyframes si{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+/* Ingredient manager modal */
+.modal-ov{position:fixed;inset:0;background:rgba(30,41,56,.45);backdrop-filter:blur(4px);z-index:500;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s}
+.modal-ov.open{opacity:1;pointer-events:all}
+.modal-box{background:var(--base);border-radius:16px;box-shadow:var(--sh-rl);padding:20px;width:min(480px,94vw);max-height:85vh;overflow-y:auto}
+.mhd{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.mhd h2{font-size:14px;font-weight:700}
+.mcl{background:var(--base);border:none;border-radius:7px;box-shadow:var(--sh-rs);width:28px;height:28px;cursor:pointer;font-size:14px;color:var(--tx2);display:flex;align-items:center;justify-content:center}
+.mcl:hover{color:var(--err)}
+.fg{margin-bottom:10px}
+.fg label{display:block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--tx3);margin-bottom:4px}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.form-row-3{grid-template-columns:2fr 1fr 1fr}
+.fi2{width:100%;background:var(--base);border:none;border-radius:8px;box-shadow:var(--sh-is);padding:7px 10px;font-family:var(--font);font-size:11px;color:var(--tx);outline:none}
+.fi2:focus{box-shadow:var(--sh-i),0 0 0 2px rgba(0,102,102,.15)}
+.fi2::placeholder{color:var(--tx3)}
+.ing-list-m{display:flex;flex-direction:column;gap:5px;max-height:260px;overflow-y:auto}
+.ing-item-m{display:flex;align-items:center;gap:7px;padding:7px 9px;background:var(--base);border-radius:8px;box-shadow:var(--sh-rs)}
+
+/* Toast */
+.tw{position:fixed;bottom:16px;right:16px;z-index:999;display:flex;flex-direction:column;gap:5px;pointer-events:none}
+.tt{background:var(--base);border-radius:9px;box-shadow:var(--sh-r);padding:8px 12px;display:flex;align-items:center;gap:7px;font-size:11px;font-weight:600;animation:ttin .2s ease;min-width:150px}
+.tdot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.tdot.success{background:var(--ok)}.tdot.error{background:var(--err)}.tdot.info{background:var(--primary)}.tdot.warning{background:var(--warn)}
+@keyframes ttin{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* Print */
 @media print{
-  .header,.sidebar,.tabs,.hdr-right{display:none!important}
-  .layout{grid-template-columns:1fr!important}
-  body{background:#fff}
-  .rform{box-shadow:none;border:1px solid #ccc;border-radius:0}
-  .pane-view{display:block!important}
-  #pane-edit{display:none!important}
+  .lib,.recipes,.hdr,.tabs,.hdr-r,.cbar>div:last-child{display:none!important}
+  .app{grid-template-columns:0 1fr 0!important}
+  body,html{overflow:visible!important}
+  .rf{box-shadow:none;border:1px solid #ccc;border-radius:0}
 }
 </style>
 </head>
 <body>
 
-<div class="header">
+<!-- HEADER -->
+<div class="hdr">
   <img class="hdr-logo" src="https://i.imgur.com/jeqtcE2.png" alt="ALFA.CO" onerror="this.style.display='none'">
-  <div><div class="hdr-title">Recipe Builder</div><div class="hdr-sub">ALFA.CO · shared/recipes · Firebase Live</div></div>
-  <div class="hdr-right">
+  <div>
+    <div class="hdr-name">Recipe Builder</div>
+    <div class="hdr-sub">ALFA.CO Operations — Drag ingredients to build recipes</div>
+  </div>
+  <div class="hdr-r">
     <span class="cbadge off" id="cbadge">Connecting…</span>
-    <button class="btn btn-sm btn-p" onclick="newRecipe()">+ New Recipe</button>
-    <button class="btn btn-sm" onclick="switchTab('edit')">✏ Edit</button>
-    <button class="btn btn-sm" onclick="switchTab('view')">👁 Preview</button>
-    <button class="btn btn-sm" onclick="window.print()">🖨 Print</button>
-    <button class="btn btn-sm" onclick="exportJSON()">⬇ Export</button>
+    <button class="btn btn-sm" onclick="openIngMgr()">&#x2699; Ingredients</button>
+    <button class="btn btn-sm btn-p" onclick="newRecipe()">+ New</button>
+    <button class="btn btn-sm" onclick="switchTab('view')">&#x1F441; Preview</button>
+    <button class="btn btn-sm" onclick="window.print()">&#x1F5A8; Print</button>
+    <button class="btn btn-sm btn-p" onclick="saveRecipe()">&#x1F4BE; Save</button>
   </div>
 </div>
 
-<div class="layout">
-  <div class="sidebar">
-    <div class="sb-title">Recipes (<span id="rcnt">0</span>)</div>
-    <input class="search-inp" id="sbsrch" placeholder="Search name, code, concept…" oninput="filterSB(this.value)">
-    <div id="sblist" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:5px"></div>
-    <div style="border-top:1px solid rgba(0,0,0,0.06);padding-top:8px">
-      <div class="sb-title" style="margin-bottom:4px">Connection</div>
-      <div id="fbstat" style="font-size:9px;color:var(--text3);font-family:var(--mono)">Initializing…</div>
+<!-- 3-PANEL APP -->
+<div class="app">
+
+  <!-- LEFT: Ingredient Library -->
+  <div class="lib">
+    <div class="panel-hdr">
+      <div class="panel-title">Ingredient Library</div>
+      <input class="srch" id="lib-srch" placeholder="Search ingredients…" oninput="filterLib(this.value)">
+    </div>
+    <div class="lib-scroll" id="lib-list"></div>
+    <div class="lib-footer">
+      <button class="btn btn-sm" onclick="openIngMgr()" style="width:100%">+ Manage Ingredients</button>
+      <div><span class="cbadge off" id="cbadge2">Local</span> <span class="fbstat" id="fbstat">localStorage mode</span></div>
     </div>
   </div>
 
-  <div class="main">
+  <!-- MIDDLE: Recipe Editor -->
+  <div class="editor">
     <div class="tabs">
-      <button class="tab-btn active" id="tabe" onclick="switchTab('edit')">✏ Edit Recipe</button>
-      <button class="tab-btn" id="tabv" onclick="switchTab('view')">👁 Recipe Card</button>
+      <button class="tab-btn on" id="tabe" onclick="switchTab('edit')">&#x270F; Edit Recipe</button>
+      <button class="tab-btn" id="tabv" onclick="switchTab('view')">&#x1F441; Recipe Card</button>
     </div>
 
-    <div id="pane-edit">
-      <div class="rform">
-        <div class="rform-hdr">
+    <!-- EDIT PANE -->
+    <div class="pane" id="pane-edit">
+      <div class="rf">
+        <!-- Recipe header bar -->
+        <div class="rf-hdr">
           <div>
-            <div class="rform-hdr-name" id="hdname">New Recipe</div>
-            <div class="rform-hdr-sub" id="hdsub">Fill in the details below · Ingredients auto-calculate cost</div>
+            <div class="rf-title" id="hdname">New Recipe</div>
+            <div class="rf-sub" id="hdsub">Fill details below &middot; Drag ingredients from left panel</div>
           </div>
-          <img src="https://i.imgur.com/jeqtcE2.png" style="height:34px;filter:brightness(0) invert(1);opacity:.85" onerror="this.style.display='none'">
+          <img src="https://i.imgur.com/jeqtcE2.png" style="height:32px;filter:brightness(0) invert(1);opacity:.85" onerror="this.style.display='none'">
         </div>
 
-        <div class="rform-meta">
-          <div class="meta-side">
-            <div class="meta-row"><span class="ml">Item Name</span><input class="fi" id="fn" placeholder="e.g. MARINATED TERIYAKI CHICKEN" oninput="upd()"></div>
-            <div class="meta-row"><span class="ml">Yield</span><input class="fi" id="fy" placeholder="1.5 Kg / 1 Batch / 1 Order"></div>
-            <div class="meta-row"><span class="ml">Prep Time</span><input class="fi" id="fp" placeholder="4 HOURS"></div>
-            <div class="meta-row"><span class="ml">Shelf Life</span><input class="fi" id="fsl" placeholder="2 DAYS"></div>
-            <div class="meta-row"><span class="ml">Storing</span>
+        <!-- Meta fields -->
+        <div class="rf-meta">
+          <div class="ms">
+            <div class="mr"><span class="ml">Item Name</span><input class="fi" id="fn" placeholder="MARINATED TERIYAKI CHICKEN" oninput="upd()"></div>
+            <div class="mr"><span class="ml">Yield</span><input class="fi" id="fy" placeholder="1.5 Kg / 1 Batch"></div>
+            <div class="mr"><span class="ml">Prep Time</span><input class="fi" id="fp" placeholder="4 HOURS"></div>
+            <div class="mr"><span class="ml">Shelf Life</span><input class="fi" id="fsl" placeholder="2 DAYS"></div>
+            <div class="mr"><span class="ml">Storing</span>
               <select class="fi" id="fst">
                 <option value="">— Select —</option>
                 <option>WALKING CHILLER</option><option>CHILLER</option><option>FREEZER</option>
@@ -188,244 +258,426 @@ select.fi{cursor:pointer}
                 <option>SERVED IMMEDIATELY</option><option>SHIFTLY</option><option>DAILY</option>
               </select></div>
           </div>
-          <div class="meta-side">
-            <div class="meta-row"><span class="ml">Concept</span>
+          <div class="ms">
+            <div class="mr"><span class="ml">Concept</span>
               <select class="fi" id="fc">
                 <option value="">— Select —</option>
                 <option>STEAK HOUSE</option><option>PIATTO</option><option>HYBRID</option>
                 <option>SH - SALAD BAR</option><option>CENTRAL KITCHEN</option><option>CAFE</option><option>OTHER</option>
               </select></div>
-            <div class="meta-row"><span class="ml">Type</span>
+            <div class="mr"><span class="ml">Type</span>
               <select class="fi" id="frt">
                 <option value="">— Select —</option>
                 <option>SUB-PREP</option><option>PREP RECIPE</option><option>LINE RECIPE</option>
                 <option>SERVING RECIPE</option><option>BATCH RECIPE</option>
               </select></div>
-            <div class="meta-row"><span class="ml">Created</span><input class="fi" id="fcd" type="date"></div>
-            <div class="meta-row"><span class="ml">Revised</span><input class="fi" id="frv" type="date"></div>
-            <div class="meta-row"><span class="ml">Recipe #</span><input class="fi" id="fcode" placeholder="ASORRCM386" oninput="upd()"></div>
+            <div class="mr"><span class="ml">Created</span><input class="fi" id="fcd" type="date"></div>
+            <div class="mr"><span class="ml">Revised</span><input class="fi" id="frv" type="date"></div>
+            <div class="mr"><span class="ml">Recipe #</span><input class="fi" id="fcode" placeholder="ASORRCM386" oninput="upd()"></div>
           </div>
         </div>
 
-        <div class="rform-body">
-          <div class="ic">
-            <div class="col-ttl">Fresh Quality, Ingredients</div>
-            <table class="itbl">
+        <!-- Ingredients + Technique -->
+        <div class="rf-body">
+          <div class="ic-col">
+            <div class="col-t">Fresh Quality, Ingredients</div>
+
+            <!-- DROP ZONE -->
+            <div class="drop-zone" id="drop-zone">
+              <div class="dz-hint" id="dz-hint">
+                <div class="dz-hint-icon">&#x1F9EA;</div>
+                <div class="dz-hint-text">Drag ingredients here<br>from the left panel</div>
+              </div>
+            </div>
+
+            <!-- Ingredient rows table -->
+            <table class="itbl" id="itbl-wrap" style="display:none">
               <thead><tr>
-                <th style="width:16px"></th>
+                <th style="width:14px"></th>
                 <th>Ingredient</th>
-                <th style="text-align:right;width:62px">QTY</th>
-                <th style="width:54px">Units</th>
-                <th style="text-align:right;width:72px">SAR/unit</th>
-                <th style="text-align:right;width:60px">Total</th>
-                <th style="width:20px"></th>
+                <th style="text-align:right;width:54px">QTY</th>
+                <th style="width:50px">Unit</th>
+                <th style="text-align:right;width:64px">SAR/unit</th>
+                <th style="text-align:right;width:56px">Total</th>
+                <th style="width:18px"></th>
               </tr></thead>
               <tbody id="itbody"></tbody>
             </table>
-            <button class="btn btn-sm" onclick="addRow()">+ Add Ingredient</button>
+
+            <div style="display:flex;gap:5px;margin-top:6px">
+              <button class="btn btn-sm" onclick="addRow()">+ Add Manually</button>
+            </div>
           </div>
-          <div class="tc">
-            <div class="col-ttl">Technique</div>
-            <textarea class="ta" id="ftech" placeholder="1. Step one&#10;2. Step two&#10;3. Step three&#10;&#10;Use numbered steps for clarity."></textarea>
+          <div class="tc-col">
+            <div class="col-t">Technique</div>
+            <textarea class="ta" id="ftech" placeholder="1. Step one&#10;2. Step two&#10;3. Once done cover, label, date and refrigerate"></textarea>
           </div>
         </div>
 
+        <!-- Cost bar -->
         <div class="cbar">
-          <div class="ckpi"><div class="ckpi-v" id="ctot">SAR 0.00</div><div class="ckpi-l">Total Cost</div></div>
-          <div style="display:flex;align-items:center;gap:5px">
-            <div style="font-size:9px;color:var(--text3)">÷ Portions</div>
-            <input type="number" id="fports" min="1" value="1" step="1" oninput="rc()" style="width:60px;background:var(--base);border:none;border-radius:7px;box-shadow:var(--sh-inset-sm);padding:4px 7px;font-family:var(--mono);font-size:12px;color:var(--text);outline:none;text-align:center">
+          <div class="ck"><div class="ckv" id="ctot">SAR 0.00</div><div class="ckl">Total Cost</div></div>
+          <div style="display:flex;align-items:center;gap:4px">
+            <div style="font-size:8px;color:var(--tx3)">&#247; Portions</div>
+            <input type="number" id="fports" min="1" value="1" class="num-in" oninput="rc()">
           </div>
-          <div class="ckpi"><div class="ckpi-v" id="cpp">SAR 0.000</div><div class="ckpi-l">Cost/Portion</div></div>
-          <div style="display:flex;align-items:center;gap:5px">
-            <div style="font-size:9px;color:var(--text3)">Sell Price</div>
-            <input type="number" id="fprice" step="0.01" placeholder="0.00" oninput="rc()" style="width:75px;background:var(--base);border:none;border-radius:7px;box-shadow:var(--sh-inset-sm);padding:4px 7px;font-family:var(--mono);font-size:12px;color:var(--text);outline:none;text-align:center">
+          <div class="ck"><div class="ckv" id="cpp">SAR 0.000</div><div class="ckl">Cost/Portion</div></div>
+          <div style="display:flex;align-items:center;gap:4px">
+            <div style="font-size:8px;color:var(--tx3)">Sell SAR</div>
+            <input type="number" id="fprice" step="0.01" placeholder="0.00" class="num-in" oninput="rc()">
           </div>
-          <div class="ckpi"><div class="ckpi-v" id="cfc" style="color:var(--warning)">—</div><div class="ckpi-l">Food Cost %</div></div>
-          <div class="ckpi"><div class="ckpi-v" id="cmg" style="color:var(--success)">—</div><div class="ckpi-l">Margin SAR</div></div>
-          <div style="margin-left:auto;display:flex;gap:6px">
-            <button class="btn btn-p" onclick="saveRecipe()">💾 Save to Firebase</button>
-            <button class="btn btn-d btn-sm" id="bdel" style="display:none" onclick="deleteRecipe()">🗑 Delete</button>
+          <div class="ck"><div class="ckv" id="cfc" style="color:var(--warn)">—</div><div class="ckl">Food Cost %</div></div>
+          <div class="ck"><div class="ckv" id="cmg" style="color:var(--ok)">—</div><div class="ckl">Margin SAR</div></div>
+          <div style="margin-left:auto;display:flex;gap:5px">
+            <button class="btn btn-p" onclick="saveRecipe()">&#x1F4BE; Save to Firebase</button>
+            <button class="btn btn-d btn-sm" id="bdel" style="display:none" onclick="deleteRecipe()">&#x1F5D1; Del</button>
           </div>
         </div>
 
+        <!-- Signature block -->
         <div class="sig">
-          <div class="sig-c">
-            <div class="sig-line"></div>
-            <div class="sig-lbl">Checked By: ___________________________</div>
-            <div class="sig-name">CULINARY DIRECTOR : HECTOR ALFONSO GUDIEL</div>
-          </div>
-          <div class="sig-c">
-            <div class="sig-line"></div>
-            <div class="sig-lbl">Approved By: ___________________________</div>
-            <div class="sig-name">CHIEF EXECUTIVE OFFICER (C.E.O) JON NOROTSKY</div>
-          </div>
+          <div class="sc"><div class="sl"></div><div class="slb">Checked By: ___________________________</div><div class="sln">CULINARY DIRECTOR : HECTOR ALFONSO GUDIEL</div></div>
+          <div class="sc"><div class="sl"></div><div class="slb">Approved By: ___________________________</div><div class="sln">CHIEF EXECUTIVE OFFICER (C.E.O) JON NOROTSKY</div></div>
         </div>
-      </div>
-    </div>
+      </div><!-- /rf -->
+    </div><!-- /pane-edit -->
 
-    <div id="pane-view" style="display:none">
+    <!-- VIEW / PRINT PANE -->
+    <div class="pane" id="pane-view" style="display:none">
       <div id="vcard"></div>
       <div style="display:flex;gap:8px;margin-top:10px">
-        <button class="btn btn-p" onclick="window.print()">🖨 Print / Save PDF</button>
-        <button class="btn" onclick="switchTab('edit')">✏ Edit</button>
+        <button class="btn btn-p" onclick="window.print()">&#x1F5A8; Print / PDF</button>
+        <button class="btn" onclick="switchTab('edit')">&#x270F; Back to Edit</button>
       </div>
     </div>
+  </div><!-- /editor -->
+
+  <!-- RIGHT: Saved Recipes -->
+  <div class="recipes">
+    <div class="panel-hdr">
+      <div class="panel-title">Saved Recipes (<span id="rcnt">0</span>)</div>
+      <input class="srch" id="rbsrch" placeholder="Search recipes…" oninput="filterRB(this.value)">
+    </div>
+    <div class="r-scroll" id="rblist"></div>
+    <div class="lib-footer">
+      <button class="btn btn-sm btn-p" onclick="newRecipe()" style="width:100%">+ New Recipe</button>
+      <button class="btn btn-sm" onclick="exportJSON()" style="width:100%">&#x2B07; Export JSON</button>
+    </div>
+  </div>
+
+</div><!-- /app -->
+
+<!-- Ingredient Manager Modal -->
+<div class="modal-ov" id="ing-modal">
+  <div class="modal-box">
+    <div class="mhd"><h2>&#x2699; Ingredient Library</h2><button class="mcl" onclick="closeIngMgr()">&#x2715;</button></div>
+    <div style="background:var(--base-dk);border-radius:11px;padding:13px;margin-bottom:12px">
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--tx3);margin-bottom:10px">Add / Edit Ingredient</div>
+      <div class="form-row" style="margin-bottom:8px">
+        <div class="fg" style="margin:0"><label>Name *</label><input class="fi2" id="mi-name" placeholder="e.g. Beef Patty 180g"></div>
+        <div class="fg" style="margin:0"><label>Category</label>
+          <select class="fi2" id="mi-cat">
+            <option value="meat">&#x1F969; Meat</option><option value="seafood">&#x1F41F; Seafood</option>
+            <option value="veg">&#x1F966; Vegetable</option><option value="dairy">&#x1F9C0; Dairy</option>
+            <option value="bakery">&#x1F35E; Bakery</option><option value="sauce">&#x1FAD9; Sauce</option>
+            <option value="spice">&#x1F9C2; Spice</option><option value="grain">&#x1F33E; Grain/Starch</option>
+            <option value="bev">&#x1F964; Beverage</option><option value="other">&#x1F4E6; Other</option>
+          </select></div>
+      </div>
+      <div class="form-row form-row-3" style="margin-bottom:10px">
+        <div class="fg" style="margin:0"><label>Cost per unit (SAR) *</label><input class="fi2" type="number" id="mi-cost" step="0.0001" placeholder="0.0000"></div>
+        <div class="fg" style="margin:0"><label>Unit</label>
+          <select class="fi2" id="mi-unit">
+            <option>g</option><option>kg</option><option>ml</option><option>L</option>
+            <option>pc</option><option>pcs</option><option>oz</option>
+            <option>tbsp</option><option>tsp</option><option>cup</option><option>slice</option>
+          </select></div>
+        <div class="fg" style="margin:0"><label>Default Qty</label><input class="fi2" type="number" id="mi-qty" placeholder="1" value="1"></div>
+      </div>
+      <input type="hidden" id="mi-id">
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-p" onclick="saveIng()">Save Ingredient</button>
+        <button class="btn btn-sm" id="mi-cancel" style="display:none" onclick="clearIngForm()">Cancel</button>
+      </div>
+    </div>
+    <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--tx3);margin-bottom:7px">Library (<span id="ingcnt">0</span> items)</div>
+    <div class="ing-list-m" id="ing-list-m"></div>
   </div>
 </div>
 
-<div class="toast-wrap" id="twrap"></div>
+<div class="tw" id="twrap"></div>
 
 <script>
-var db=null,RECIPES=[],CID=null,ROWS=[],DSI=null;
+// ═══════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════
+var db=null, RECIPES=[], INGS=[], CID=null, ROWS=[], DSI=null, DRAG_ING=null;
+
+var CAT_ICON={meat:'🥩',seafood:'🐟',veg:'🥦',dairy:'🧀',bakery:'🍞',sauce:'🫙',spice:'🧂',grain:'🌾',bev:'🥤',other:'📦'};
 
 function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2);}
 function xe(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function fsar(v){return 'SAR '+parseFloat(v||0).toFixed(2);}
-function v(id){var e=document.getElementById(id);return e?e.value.trim():'';}
+function gv(id){var e=document.getElementById(id);return e?e.value.trim():'';}
 
-// ── Firebase init ──
+// ═══════════════════════════════════════════════════
+//  PERSIST
+// ═══════════════════════════════════════════════════
+function persist(){
+  try{
+    localStorage.setItem('alfa_rb_ings', JSON.stringify(INGS));
+    localStorage.setItem('alfa_rb_recipes', JSON.stringify(RECIPES));
+  }catch(e){}
+}
+function loadLocal(){
+  try{var i=localStorage.getItem('alfa_rb_ings');if(i)INGS=JSON.parse(i);}catch(e){}
+  try{var r=localStorage.getItem('alfa_rb_recipes');if(r)RECIPES=JSON.parse(r);}catch(e){}
+  if(!INGS.length) seedIngs();
+}
+function seedIngs(){
+  INGS=[
+    {id:uid(),name:'Beef Patty 180g',cat:'meat',unit:'pc',cost:8.50,dqty:1},
+    {id:uid(),name:'Chicken Breast',cat:'meat',unit:'g',cost:0.042,dqty:150},
+    {id:uid(),name:'Cheddar Cheese Slice',cat:'dairy',unit:'pc',cost:0.80,dqty:1},
+    {id:uid(),name:'Brioche Bun',cat:'bakery',unit:'pc',cost:1.20,dqty:1},
+    {id:uid(),name:'Sesame Burger Bun',cat:'bakery',unit:'pc',cost:1.10,dqty:1},
+    {id:uid(),name:'Premium Flour',cat:'grain',unit:'g',cost:0.005,dqty:100},
+    {id:uid(),name:'Lettuce',cat:'veg',unit:'g',cost:0.008,dqty:20},
+    {id:uid(),name:'Tomato',cat:'veg',unit:'g',cost:0.010,dqty:30},
+    {id:uid(),name:'Red Onion',cat:'veg',unit:'g',cost:0.005,dqty:30},
+    {id:uid(),name:'White Onion',cat:'veg',unit:'g',cost:0.004,dqty:50},
+    {id:uid(),name:'Sweet Potato',cat:'veg',unit:'g',cost:0.006,dqty:100},
+    {id:uid(),name:'French Fries',cat:'grain',unit:'g',cost:0.018,dqty:120},
+    {id:uid(),name:'Basmati Rice',cat:'grain',unit:'g',cost:0.008,dqty:150},
+    {id:uid(),name:'Sushi Rice',cat:'grain',unit:'g',cost:0.010,dqty:100},
+    {id:uid(),name:'Quinoa',cat:'grain',unit:'g',cost:0.025,dqty:80},
+    {id:uid(),name:'Spaghetti',cat:'grain',unit:'g',cost:0.012,dqty:120},
+    {id:uid(),name:'Ketchup',cat:'sauce',unit:'g',cost:0.012,dqty:15},
+    {id:uid(),name:'Mayonnaise',cat:'sauce',unit:'g',cost:0.018,dqty:15},
+    {id:uid(),name:'Tar Tar Sauce',cat:'sauce',unit:'g',cost:0.025,dqty:30},
+    {id:uid(),name:'Olive Oil EV',cat:'sauce',unit:'ml',cost:0.022,dqty:20},
+    {id:uid(),name:'Asian Marinade',cat:'sauce',unit:'g',cost:0.020,dqty:50},
+    {id:uid(),name:'Peri-Peri Sauce',cat:'sauce',unit:'g',cost:0.030,dqty:30},
+    {id:uid(),name:'Butter Block',cat:'dairy',unit:'g',cost:0.018,dqty:50},
+    {id:uid(),name:'Heavy Cream',cat:'dairy',unit:'cup',cost:2.50,dqty:1},
+    {id:uid(),name:'Mascarpone Cheese',cat:'dairy',unit:'cup',cost:3.80,dqty:1},
+    {id:uid(),name:'Parmesan',cat:'dairy',unit:'g',cost:0.080,dqty:15},
+    {id:uid(),name:'Mozzarella',cat:'dairy',unit:'g',cost:0.060,dqty:80},
+    {id:uid(),name:'Salt',cat:'spice',unit:'g',cost:0.002,dqty:5},
+    {id:uid(),name:'Black Pepper',cat:'spice',unit:'g',cost:0.030,dqty:2},
+    {id:uid(),name:'Garlic Powder',cat:'spice',unit:'g',cost:0.040,dqty:3},
+    {id:uid(),name:'Fresh Garlic',cat:'veg',unit:'g',cost:0.015,dqty:10},
+    {id:uid(),name:'Lemon Juice',cat:'sauce',unit:'g',cost:0.010,dqty:20},
+    {id:uid(),name:'Shrimp Fresh',cat:'seafood',unit:'g',cost:0.065,dqty:200},
+  ];
+  persist();
+}
+
+// ═══════════════════════════════════════════════════
+//  FIREBASE
+// ═══════════════════════════════════════════════════
 function initFB(){
   try{
     var params=new URLSearchParams(location.search);
     var cp=params.get('fbcfg');
     var cfg=null;
-    if(cp){cfg=JSON.parse(atob(cp));}
+    if(cp)cfg=JSON.parse(atob(cp));
     else{var s=localStorage.getItem('alfa_fb_config');if(s)cfg=JSON.parse(s);}
-    if(cfg){
-      if(!firebase.apps.length)firebase.initializeApp(cfg);
-      db=firebase.database();
-      document.getElementById('cbadge').textContent='Live';document.getElementById('cbadge').className='cbadge live';
-      document.getElementById('fbstat').textContent='Connected · shared/recipes';
-      db.ref('shared/recipes').on('value',function(snap){
-        var raw=snap.val();
-        if(!raw)RECIPES=[];
-        else if(Array.isArray(raw))RECIPES=raw.filter(Boolean);
-        else RECIPES=Object.values(raw).filter(Boolean);
-        renderSB(document.getElementById('sbsrch').value);
-        document.getElementById('rcnt').textContent=RECIPES.length;
-      });
-    }else{throw new Error('no config');}
+    if(!cfg)throw new Error('no config');
+    if(!firebase.apps.length)firebase.initializeApp(cfg);
+    db=firebase.database();
+    ['cbadge','cbadge2'].forEach(function(id){var el=document.getElementById(id);if(el){el.textContent='Live';el.className='cbadge live';}});
+    document.getElementById('fbstat').textContent='Connected to shared/recipes';
+    // Load recipes from Firebase
+    db.ref('shared/recipes').on('value',function(snap){
+      var raw=snap.val();
+      if(!raw)RECIPES=[];
+      else if(Array.isArray(raw))RECIPES=raw.filter(Boolean);
+      else RECIPES=Object.values(raw).filter(Boolean);
+      renderRB(gv('rbsrch'));
+      document.getElementById('rcnt').textContent=RECIPES.length;
+    });
+    // Load ingredient library from Firebase (shared/ingredients)
+    db.ref('shared/ingredients').on('value',function(snap){
+      var raw=snap.val();
+      if(raw){
+        var arr=Array.isArray(raw)?raw.filter(Boolean):Object.values(raw).filter(Boolean);
+        if(arr.length){INGS=arr;renderLib(gv('lib-srch'));renderIngModal();}
+      }
+    });
   }catch(e){
-    document.getElementById('cbadge').textContent='Local';document.getElementById('cbadge').className='cbadge off';
-    document.getElementById('fbstat').textContent='No Firebase config — localStorage mode';
-    try{var s2=localStorage.getItem('alfa_rb_recipes');if(s2)RECIPES=JSON.parse(s2);}catch(ex){}
-    renderSB('');document.getElementById('rcnt').textContent=RECIPES.length;
+    loadLocal();
+    renderLib('');renderRB('');renderIngModal();
+    document.getElementById('fbstat').textContent='Local mode — no Firebase';
   }
 }
 
-// ── Rows ──
+function saveIngToFB(){
+  if(db){var obj={};INGS.forEach(function(i){var k=i.id.replace(/[.#$\[\]\/]/g,'_');obj[k]=i;});db.ref('shared/ingredients').set(obj);}
+  persist();
+}
+function saveRecipesToFB(rec){
+  if(db){var k=rec.id.replace(/[.#$\[\]\/]/g,'_');db.ref('shared/recipes/'+k).set(rec,function(err){if(!err)toast('Saved to Firebase ✓','success');else toast('Save error: '+err.message,'error');});}
+  else{var ix=RECIPES.findIndex(function(r){return r.id===rec.id;});if(ix>=0)RECIPES[ix]=rec;else RECIPES.push(rec);persist();renderRB('');toast('Saved locally ✓','success');}
+}
+
+// ═══════════════════════════════════════════════════
+//  INGREDIENT LIBRARY RENDER
+// ═══════════════════════════════════════════════════
+function filterLib(q){renderLib(q);}
+function renderLib(q){
+  var list=document.getElementById('lib-list');
+  var cats=['meat','seafood','veg','dairy','bakery','sauce','spice','grain','bev','other'];
+  var sorted=INGS.slice().sort(function(a,b){return cats.indexOf(a.cat)-cats.indexOf(b.cat)||a.name.localeCompare(b.name);});
+  var filtered=sorted.filter(function(i){return !q||(i.name||'').toLowerCase().includes(q.toLowerCase());});
+  if(!filtered.length){list.innerHTML='<div style="text-align:center;padding:14px;color:var(--tx3);font-size:10px;font-family:var(--mono)">'+(q?'No results':'Empty — add ingredients below')+'</div>';return;}
+  list.innerHTML=filtered.map(function(ing){
+    return '<div class="ing-card" draggable="true" data-id="'+xe(ing.id)+'" title="Drag to add to recipe">'
+      +'<span class="ic-icon">'+(CAT_ICON[ing.cat]||'📦')+'</span>'
+      +'<div class="ic-body"><div class="ic-name">'+xe(ing.name)+'</div>'
+      +'<div class="ic-cost">'+xe(ing.cost.toFixed(3))+' SAR/'+xe(ing.unit)+' · def '+xe(ing.dqty)+xe(ing.unit)+'</div></div>'
+      +'<button class="ic-edit" onclick="event.stopPropagation();editIng(\''+xe(ing.id)+'\')" title="Edit">&#x270F;</button>'
+      +'</div>';
+  }).join('');
+
+  // Wire drag from library
+  list.querySelectorAll('.ing-card').forEach(function(el){
+    el.addEventListener('dragstart',function(e){
+      DRAG_ING=INGS.find(function(i){return i.id===el.dataset.id;});
+      DSI=null;
+      el.classList.add('dragging');
+      e.dataTransfer.effectAllowed='copy';
+      e.dataTransfer.setData('text/plain',el.dataset.id);
+    });
+    el.addEventListener('dragend',function(){el.classList.remove('dragging');DRAG_ING=null;});
+  });
+}
+
+// ═══════════════════════════════════════════════════
+//  DROP ZONE
+// ═══════════════════════════════════════════════════
+(function(){
+  var dz=document.getElementById('drop-zone');
+  dz.addEventListener('dragover',function(e){e.preventDefault();dz.classList.add('dz-active');e.dataTransfer.dropEffect='copy';});
+  dz.addEventListener('dragleave',function(e){if(!dz.contains(e.relatedTarget))dz.classList.remove('dz-active');});
+  dz.addEventListener('drop',function(e){
+    e.preventDefault();dz.classList.remove('dz-active');
+    if(DRAG_ING){addFromLib(DRAG_ING);DRAG_ING=null;}
+  });
+})();
+
+function addFromLib(ing){
+  ROWS.push({name:ing.name,qty:ing.dqty||1,unit:ing.unit||'g',cpu:ing.cost||0});
+  renderRows();rc();
+  toast(ing.name+' added','success');
+}
+
+// ═══════════════════════════════════════════════════
+//  INGREDIENT ROWS
+// ═══════════════════════════════════════════════════
 function addRow(nm,qty,unit,cpu){
-  ROWS.push({name:nm||'',qty:qty||'',unit:unit||'g',cpu:parseFloat(cpu)||0});
+  ROWS.push({name:nm||'',qty:qty||1,unit:unit||'g',cpu:parseFloat(cpu)||0});
   renderRows();rc();
 }
 function delRow(i){ROWS.splice(i,1);renderRows();rc();}
 function updRow(i,f,val){if(!ROWS[i])return;ROWS[i][f]=(f==='qty'||f==='cpu')?parseFloat(val)||0:val;rc();}
+
 function renderRows(){
   var tb=document.getElementById('itbody');
-  if(!ROWS.length){tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:12px;font-size:10px;font-family:var(--mono)">No ingredients — click + Add below</td></tr>';return;}
+  var tbl=document.getElementById('itbl-wrap');
+  var dz=document.getElementById('drop-zone');
+  var hint=document.getElementById('dz-hint');
+
+  if(!ROWS.length){
+    tbl.style.display='none';
+    dz.style.display='flex';
+    hint.style.display='block';
+    tb.innerHTML='';
+    return;
+  }
+  tbl.style.display='';
+  dz.style.display='flex';
+  dz.style.minHeight='36px';
+  hint.style.display='none';
+
   tb.innerHTML=ROWS.map(function(r,i){
     var cost=(r.cpu||0)*(parseFloat(r.qty)||0);
     var uOpts=['g','kg','ml','L','pc','pcs','oz','tbsp','tsp','cup','slice','portion'].map(function(u){return '<option'+(u===r.unit?' selected':'')+'>'+u+'</option>';}).join('');
     return '<tr class="ir" draggable="true" data-i="'+i+'">'
-      +'<td><span class="dh">⠿</span></td>'
-      +'<td><input class="ti n" value="'+xe(r.name)+'" placeholder="Ingredient name" oninput="updRow('+i+',\'name\',this.value)"></td>'
+      +'<td><span class="dh" title="Reorder">&#x283F;</span></td>'
+      +'<td><input class="ti" style="min-width:80px" value="'+xe(r.name)+'" placeholder="Ingredient" oninput="updRow('+i+',\'name\',this.value)"></td>'
       +'<td><input class="ti q" type="number" step="0.001" min="0" value="'+xe(r.qty)+'" placeholder="0" oninput="updRow('+i+',\'qty\',this.value)"></td>'
       +'<td><select class="ti su" onchange="updRow('+i+',\'unit\',this.value)">'+uOpts+'</select></td>'
-      +'<td><input class="ti cpu" type="number" step="0.0001" min="0" value="'+xe(r.cpu||'')+'" placeholder="0.000" title="Cost per unit SAR" oninput="updRow('+i+',\'cpu\',this.value)"></td>'
-      +'<td style="text-align:right;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--primary);padding:3px 5px">'+cost.toFixed(3)+'</td>'
-      +'<td><button class="dr-btn" onclick="delRow('+i+')">✕</button></td>'
+      +'<td><input class="ti cpu" type="number" step="0.0001" min="0" value="'+xe(r.cpu||'')+'" placeholder="0.000" oninput="updRow('+i+',\'cpu\',this.value)"></td>'
+      +'<td style="text-align:right;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--primary);padding:2px 4px" id="rc'+i+'">'+cost.toFixed(3)+'</td>'
+      +'<td><button class="dr-btn" onclick="delRow('+i+')">&#x2715;</button></td>'
       +'</tr>';
   }).join('');
+
+  // Row drag-to-reorder
   tb.querySelectorAll('.ir').forEach(function(el){
-    el.addEventListener('dragstart',function(e){DSI=parseInt(el.dataset.i);e.dataTransfer.effectAllowed='move';});
-    el.addEventListener('dragover',function(e){e.preventDefault();el.classList.add('drag-over');});
-    el.addEventListener('dragleave',function(){el.classList.remove('drag-over');});
+    el.addEventListener('dragstart',function(e){if(DRAG_ING)return;DSI=parseInt(el.dataset.i);e.dataTransfer.effectAllowed='move';});
+    el.addEventListener('dragover',function(e){e.preventDefault();el.classList.add('dov');});
+    el.addEventListener('dragleave',function(){el.classList.remove('dov');});
     el.addEventListener('drop',function(e){
-      e.preventDefault();el.classList.remove('drag-over');
+      e.preventDefault();el.classList.remove('dov');
       var ti=parseInt(el.dataset.i);
+      if(DRAG_ING){addFromLib(DRAG_ING);DRAG_ING=null;return;}
       if(DSI!==null&&DSI!==ti){var m=ROWS.splice(DSI,1)[0];ROWS.splice(ti,0,m);DSI=null;renderRows();rc();}
     });
-    el.addEventListener('dragend',function(){DSI=null;el.classList.remove('drag-over');});
+    el.addEventListener('dragend',function(){DSI=null;el.classList.remove('dov');});
   });
 }
+
 function rc(){
   var tot=ROWS.reduce(function(s,r){return s+(r.cpu||0)*(parseFloat(r.qty)||0);},0);
   var ports=parseInt(document.getElementById('fports').value)||1;
   var price=parseFloat(document.getElementById('fprice').value)||0;
-  var cpp2=tot/ports;
-  var fc2=price>0?cpp2/price*100:0;
-  var mg=price>0?price-cpp2:0;
+  var cpp2=tot/ports,fc2=price>0?cpp2/price*100:0,mg=price>0?price-cpp2:0;
   document.getElementById('ctot').textContent=fsar(tot);
   document.getElementById('cpp').textContent='SAR '+cpp2.toFixed(3);
   document.getElementById('cfc').textContent=price>0?fc2.toFixed(1)+'%':'—';
-  document.getElementById('cfc').style.color=fc2>35?'var(--danger)':fc2>25?'var(--warning)':'var(--success)';
+  document.getElementById('cfc').style.color=fc2>35?'var(--err)':fc2>25?'var(--warn)':'var(--ok)';
   document.getElementById('cmg').textContent=price>0?fsar(mg):'—';
-  document.getElementById('cmg').style.color=mg>0?'var(--success)':'var(--danger)';
-  // Update row cost cells without full re-render
-  document.querySelectorAll('#itbody .ir').forEach(function(el,i){
-    var r=ROWS[i];if(!r)return;
-    var c=(r.cpu||0)*(parseFloat(r.qty)||0);
-    var cells=el.querySelectorAll('td');if(cells[5])cells[5].textContent=c.toFixed(3);
-  });
-}
-function upd(){
-  var n=v('fn')||'New Recipe';
-  var code=v('fcode');
-  document.getElementById('hdname').textContent=n;
-  document.getElementById('hdsub').textContent=(code?'Recipe # '+code+' · ':'')+'Ingredients auto-calculate cost';
+  document.getElementById('cmg').style.color=mg>0?'var(--ok)':'var(--err)';
+  ROWS.forEach(function(r,i){var el=document.getElementById('rc'+i);if(el)el.textContent=((r.cpu||0)*(parseFloat(r.qty)||0)).toFixed(3);});
 }
 
-// ── Collect + Save ──
+function upd(){
+  var n=gv('fn')||'New Recipe',code=gv('fcode');
+  document.getElementById('hdname').textContent=n;
+  document.getElementById('hdsub').textContent=(code?'Recipe # '+code+' · ':'')+' Drag ingredients from left panel';
+}
+
+// ═══════════════════════════════════════════════════
+//  COLLECT + SAVE
+// ═══════════════════════════════════════════════════
 function collect(){
   var tot=ROWS.reduce(function(s,r){return s+(r.cpu||0)*(parseFloat(r.qty)||0);},0);
   var ports=parseInt(document.getElementById('fports').value)||1;
-  return {
-    id:CID||uid(),name:v('fn'),concept:v('fc'),recipeType:v('frt'),
-    yield:v('fy'),prepTime:v('fp'),shelfLife:v('fsl'),storing:v('fst'),
-    created:v('fcd'),revised:v('frv'),recipeCode:v('fcode'),
-    technique:v('ftech'),
+  return{id:CID||uid(),name:gv('fn'),concept:gv('fc'),recipeType:gv('frt'),
+    yield:gv('fy'),prepTime:gv('fp'),shelfLife:gv('fsl'),storing:gv('fst'),
+    created:gv('fcd'),revised:gv('frv'),recipeCode:gv('fcode'),technique:gv('ftech'),
     ingredients:ROWS.map(function(r){return{name:r.name,qty:r.qty,unit:r.unit,costPerUnit:r.cpu};}),
     totalCost:tot,portions:ports,costPerPortion:tot/ports,
     sellPrice:parseFloat(document.getElementById('fprice').value)||0,
-    yieldUnit:'portion',savedAt:new Date().toISOString()
-  };
+    yieldUnit:'portion',savedAt:new Date().toISOString()};
 }
 
 function saveRecipe(){
   var rec=collect();
-  if(!rec.name){toast('Enter an item name','warning');return;}
+  if(!rec.name){toast('Enter an item name first','warning');return;}
   CID=rec.id;
-  if(db){
-    var key=rec.id.replace(/[.#$\[\]\/]/g,'_');
-    db.ref('shared/recipes/'+key).set(rec,function(err){
-      if(err){toast('Save failed: '+err.message,'error');return;}
-      toast('Saved to Firebase ✓','success');
-      document.getElementById('bdel').style.display='';
-    });
-  }else{
-    var ix=RECIPES.findIndex(function(r){return r.id===rec.id;});
-    if(ix>=0)RECIPES[ix]=rec;else RECIPES.push(rec);
-    try{localStorage.setItem('alfa_rb_recipes',JSON.stringify(RECIPES));}catch(e){}
-    renderSB('');document.getElementById('rcnt').textContent=RECIPES.length;
-    toast('Saved locally ✓','success');document.getElementById('bdel').style.display='';
-  }
+  document.getElementById('bdel').style.display='';
+  saveRecipesToFB(rec);
+  renderRB(gv('rbsrch'));
 }
 
 function deleteRecipe(){
   if(!CID)return;
   if(!confirm('Delete this recipe permanently?'))return;
-  if(db){
-    var key=CID.replace(/[.#$\[\]\/]/g,'_');
-    db.ref('shared/recipes/'+key).remove(function(err){
-      if(err){toast('Delete failed','error');return;}
-      toast('Deleted','info');newRecipe();
-    });
-  }else{
-    RECIPES=RECIPES.filter(function(r){return r.id!==CID;});
-    try{localStorage.setItem('alfa_rb_recipes',JSON.stringify(RECIPES));}catch(e){}
-    renderSB('');toast('Deleted','info');newRecipe();
-  }
+  if(db){db.ref('shared/recipes/'+CID.replace(/[.#$\[\]\/]/g,'_')).remove(function(){toast('Deleted','info');newRecipe();});}
+  else{RECIPES=RECIPES.filter(function(r){return r.id!==CID;});persist();renderRB('');toast('Deleted','info');newRecipe();}
 }
 
 function loadRecipe(id){
@@ -444,10 +696,11 @@ function loadRecipe(id){
   document.getElementById('ftech').value=rec.technique||'';
   document.getElementById('fports').value=rec.portions||1;
   document.getElementById('fprice').value=rec.sellPrice||'';
-  ROWS=(rec.ingredients||[]).map(function(r){return{name:r.name||'',qty:r.qty||'',unit:r.unit||'g',cpu:parseFloat(r.costPerUnit)||0};});
+  ROWS=(rec.ingredients||[]).map(function(r){return{name:r.name||'',qty:r.qty||1,unit:r.unit||'g',cpu:parseFloat(r.costPerUnit)||0};});
   renderRows();rc();upd();
   document.getElementById('bdel').style.display='';
-  renderSB('');switchTab('edit');
+  renderRB(gv('rbsrch'));
+  switchTab('edit');
 }
 
 function newRecipe(){
@@ -459,88 +712,150 @@ function newRecipe(){
   document.getElementById('fports').value=1;
   ROWS=[];renderRows();rc();upd();
   document.getElementById('bdel').style.display='none';
-  renderSB('');switchTab('edit');
+  renderRB(gv('rbsrch'));
+  switchTab('edit');
 }
 
-// ── Sidebar ──
-function filterSB(q){renderSB(q);}
-function renderSB(q){
-  var list=document.getElementById('sblist');
+// ═══════════════════════════════════════════════════
+//  RIGHT PANEL: Saved Recipes
+// ═══════════════════════════════════════════════════
+function filterRB(q){renderRB(q);}
+function renderRB(q){
+  document.getElementById('rcnt').textContent=RECIPES.length;
+  var list=document.getElementById('rblist');
   var filtered=RECIPES.filter(function(r){
     if(!q)return true;
-    return(r.name||'').toLowerCase().includes(q.toLowerCase())||
-           (r.recipeCode||'').toLowerCase().includes(q.toLowerCase())||
-           (r.concept||'').toLowerCase().includes(q.toLowerCase());
+    return(r.name||'').toLowerCase().includes(q.toLowerCase())||(r.recipeCode||'').toLowerCase().includes(q.toLowerCase())||(r.concept||'').toLowerCase().includes(q.toLowerCase());
   }).slice().sort(function(a,b){return(a.name||'').localeCompare(b.name||'');});
-  if(!filtered.length){
-    list.innerHTML='<div style="text-align:center;padding:12px;color:var(--text3);font-size:10px;font-family:var(--mono)">'+(q?'No results':'No recipes yet → create one')+'</div>';
-    return;
-  }
+  if(!filtered.length){list.innerHTML='<div style="text-align:center;padding:14px;color:var(--tx3);font-size:10px;font-family:var(--mono)">'+(q?'No results':'No recipes yet — create one')+'</div>';return;}
   list.innerHTML=filtered.map(function(r){
     var active=r.id===CID;
-    return '<div class="recipe-card-sm'+(active?' active':'')+'" onclick="loadRecipe(\''+xe(r.id)+'\')">'
+    return '<div class="rc'+(active?' active':'')+'" onclick="loadRecipe(\''+xe(r.id)+'\')">'
       +'<div class="rc-info"><div class="rc-name">'+xe(r.name)+'</div>'
       +'<div class="rc-meta">'+(r.recipeCode?xe(r.recipeCode)+' · ':'')+xe(r.concept||r.recipeType||'')+'</div></div>'
-      +'<div class="rc-cost">'+(r.costPerPortion?'SAR '+r.costPerPortion.toFixed(2):'—')+'</div>'
+      +'<div class="rc-cost">'+(r.costPerPortion?'SAR '+parseFloat(r.costPerPortion).toFixed(2):'—')+'</div>'
+      +'<button class="rc-del" onclick="event.stopPropagation();loadRecipe(\''+xe(r.id)+'\');deleteRecipe()" title="Delete">&#x2715;</button>'
       +'</div>';
   }).join('');
 }
 
-// ── View Card ──
-function ml2(lbl,val){return '<div class="meta-row"><span class="ml">'+xe(lbl)+'</span><span style="font-size:11px;font-weight:600">'+xe(val||'—')+'</span></div>';}
+// ═══════════════════════════════════════════════════
+//  TABS
+// ═══════════════════════════════════════════════════
 function switchTab(t){
   var isE=t==='edit';
   document.getElementById('pane-edit').style.display=isE?'':'none';
   document.getElementById('pane-view').style.display=isE?'none':'';
-  document.getElementById('tabe').classList.toggle('active',isE);
-  document.getElementById('tabv').classList.toggle('active',!isE);
+  document.getElementById('tabe').classList.toggle('on',isE);
+  document.getElementById('tabv').classList.toggle('on',!isE);
   if(!isE)renderView();
 }
+
+function ml2(l,v2){return '<div class="mr"><span class="ml">'+xe(l)+'</span><span style="font-size:10px;font-weight:600">'+xe(v2||'—')+'</span></div>';}
 function renderView(){
   var rec=collect();
-  var tot=rec.totalCost;var cpp2=rec.costPerPortion;
+  var tot=rec.totalCost,cpp2=rec.costPerPortion;
   var fc2=rec.sellPrice>0?(cpp2/rec.sellPrice*100).toFixed(1)+'%':'—';
   var vc=document.getElementById('vcard');
-  vc.innerHTML='<div class="rform">'
-    +'<div class="rform-hdr"><div><div class="rform-hdr-name">'+xe(rec.name||'Untitled')+'</div>'
-    +'<div class="rform-hdr-sub">'+(rec.recipeCode?'Recipe # '+xe(rec.recipeCode)+' · ':'')+xe(rec.concept||'')+'</div></div>'
-    +'<img src="https://i.imgur.com/jeqtcE2.png" style="height:34px;filter:brightness(0) invert(1);opacity:.85" onerror="this.style.display=\'none\'"></div>'
-    +'<div class="rform-meta"><div class="meta-side">'
-      +ml2('ITEM NAME',rec.name)+ml2('YIELD',rec.yield)+ml2('PREP TIME',rec.prepTime)+ml2('SHELF LIFE',rec.shelfLife)+ml2('STORING',rec.storing)
-    +'</div><div class="meta-side">'
-      +ml2('CONCEPT',rec.concept)+ml2('PREP RECIPE',rec.recipeType)+ml2('CREATED',rec.created)+ml2('REVISED',rec.revised)+ml2('RECIPE #',rec.recipeCode)
-    +'</div></div>'
-    +'<div class="rform-body"><div class="ic"><div class="col-ttl">Fresh Quality, Ingredients</div>'
-      +'<table class="itbl"><thead><tr><th>Ingredient</th><th style="text-align:right">QTY</th><th>Units</th><th style="text-align:right">SAR/unit</th><th style="text-align:right">Total</th></tr></thead><tbody>'
-      +rec.ingredients.map(function(r){var c=(parseFloat(r.costPerUnit)||0)*(parseFloat(r.qty)||0);return '<tr class="ir"><td style="padding:5px 5px">'+xe(r.name)+'</td><td style="padding:5px;text-align:right;font-family:var(--mono)">'+xe(String(r.qty))+'</td><td style="padding:5px;font-family:var(--mono);color:var(--text3)">'+xe(r.unit)+'</td><td style="padding:5px;text-align:right;font-family:var(--mono)">'+parseFloat(r.costPerUnit||0).toFixed(3)+'</td><td style="padding:5px;text-align:right;font-family:var(--mono);font-weight:700;color:var(--primary)">'+c.toFixed(3)+'</td></tr>';}).join('')
-      +'<tr style="border-top:2px solid rgba(0,0,0,.1);font-weight:700"><td colspan="4" style="padding:6px 5px">TOTAL COST</td><td style="padding:6px 5px;text-align:right;font-family:var(--mono);color:var(--primary)">'+fsar(tot)+'</td></tr>'
-      +'<tr><td colspan="4" style="padding:4px 5px;font-size:11px">COST / PORTION (÷'+rec.portions+')</td><td style="padding:4px 5px;text-align:right;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--danger)">SAR '+cpp2.toFixed(3)+'</td></tr>'
-      +(rec.sellPrice>0?'<tr><td colspan="4" style="padding:3px 5px;font-size:10px;color:var(--text3)">FOOD COST %</td><td style="padding:3px 5px;text-align:right;font-family:var(--mono);font-size:10px">'+fc2+'</td></tr>':'')
-      +'</tbody></table>'
-    +'</div><div class="tc"><div class="col-ttl">Technique</div>'
-      +'<div style="font-size:12px;line-height:1.85;white-space:pre-wrap;font-family:var(--font)">'+xe(rec.technique||'')+'</div>'
-    +'</div></div>'
-    +'<div class="sig"><div class="sig-c"><div class="sig-line"></div><div class="sig-lbl">Checked By: ___________________________</div><div class="sig-name">CULINARY DIRECTOR : HECTOR ALFONSO GUDIEL</div></div>'
-    +'<div class="sig-c"><div class="sig-line"></div><div class="sig-lbl">Approved By: ___________________________</div><div class="sig-name">CHIEF EXECUTIVE OFFICER (C.E.O) JON NOROTSKY</div></div></div>'
-    +'</div>';
+  vc.innerHTML='<div class="rf">'
+    +'<div class="rf-hdr"><div><div class="rf-title">'+xe(rec.name||'Untitled')+'</div>'
+    +'<div class="rf-sub">'+(rec.recipeCode?'Recipe # '+xe(rec.recipeCode)+' &middot; ':'')+xe(rec.concept||'')+'</div></div>'
+    +'<img src="https://i.imgur.com/jeqtcE2.png" style="height:32px;filter:brightness(0) invert(1);opacity:.85" onerror="this.style.display=\'none\'"></div>'
+    +'<div class="rf-meta"><div class="ms">'+ml2('ITEM NAME',rec.name)+ml2('YIELD',rec.yield)+ml2('PREP TIME',rec.prepTime)+ml2('SHELF LIFE',rec.shelfLife)+ml2('STORING',rec.storing)+'</div>'
+    +'<div class="ms">'+ml2('CONCEPT',rec.concept)+ml2('PREP RECIPE',rec.recipeType)+ml2('CREATED',rec.created)+ml2('REVISED',rec.revised)+ml2('RECIPE #',rec.recipeCode)+'</div></div>'
+    +'<div class="rf-body"><div class="ic-col"><div class="col-t">Fresh Quality, Ingredients</div>'
+      +'<table class="itbl"><thead><tr><th>Ingredient</th><th style="text-align:right">QTY</th><th>Unit</th><th style="text-align:right">SAR/unit</th><th style="text-align:right">Total</th></tr></thead><tbody>'
+      +rec.ingredients.map(function(r){var c=(parseFloat(r.costPerUnit)||0)*(parseFloat(r.qty)||0);return '<tr class="ir"><td style="padding:4px 5px">'+xe(r.name)+'</td><td style="padding:4px;text-align:right;font-family:var(--mono)">'+xe(String(r.qty))+'</td><td style="padding:4px;font-family:var(--mono);color:var(--tx3)">'+xe(r.unit)+'</td><td style="padding:4px;text-align:right;font-family:var(--mono)">'+parseFloat(r.costPerUnit||0).toFixed(3)+'</td><td style="padding:4px;text-align:right;font-family:var(--mono);font-weight:700;color:var(--primary)">'+c.toFixed(3)+'</td></tr>';}).join('')
+      +'<tr style="border-top:2px solid rgba(0,0,0,.1);font-weight:700"><td colspan="4" style="padding:5px">TOTAL COST</td><td style="padding:5px;text-align:right;font-family:var(--mono);color:var(--primary)">'+fsar(tot)+'</td></tr>'
+      +'<tr><td colspan="4" style="padding:4px 5px;font-size:10px">COST / PORTION (&divide;'+rec.portions+')</td><td style="padding:4px 5px;text-align:right;font-family:var(--mono);font-weight:700;color:var(--err)">SAR '+cpp2.toFixed(3)+'</td></tr>'
+      +(rec.sellPrice>0?'<tr><td colspan="4" style="padding:3px 5px;font-size:9px;color:var(--tx3)">FOOD COST %</td><td style="padding:3px 5px;text-align:right;font-family:var(--mono);font-size:10px">'+fc2+'</td></tr>':'')
+      +'</tbody></table></div>'
+    +'<div class="tc-col"><div class="col-t">Technique</div><div style="font-size:11px;line-height:1.85;white-space:pre-wrap;font-family:var(--font)">'+xe(rec.technique||'')+'</div></div></div>'
+    +'<div class="sig"><div class="sc"><div class="sl"></div><div class="slb">Checked By: ___________________________</div><div class="sln">CULINARY DIRECTOR : HECTOR ALFONSO GUDIEL</div></div>'
+    +'<div class="sc"><div class="sl"></div><div class="slb">Approved By: ___________________________</div><div class="sln">CHIEF EXECUTIVE OFFICER (C.E.O) JON NOROTSKY</div></div></div></div>';
 }
 
+// ═══════════════════════════════════════════════════
+//  INGREDIENT MANAGER MODAL
+// ═══════════════════════════════════════════════════
+function openIngMgr(){renderIngModal();document.getElementById('ing-modal').classList.add('open');}
+function closeIngMgr(){document.getElementById('ing-modal').classList.remove('open');renderLib(gv('lib-srch'));}
+document.getElementById('ing-modal').addEventListener('click',function(e){if(e.target===this)closeIngMgr();});
+
+function clearIngForm(){
+  document.getElementById('mi-id').value='';
+  document.getElementById('mi-name').value='';
+  document.getElementById('mi-cat').value='meat';
+  document.getElementById('mi-cost').value='';
+  document.getElementById('mi-unit').value='g';
+  document.getElementById('mi-qty').value='1';
+  document.getElementById('mi-cancel').style.display='none';
+}
+function editIng(id){
+  var ing=INGS.find(function(i){return i.id===id;});if(!ing)return;
+  openIngMgr();
+  document.getElementById('mi-id').value=ing.id;
+  document.getElementById('mi-name').value=ing.name;
+  document.getElementById('mi-cat').value=ing.cat||'other';
+  document.getElementById('mi-cost').value=ing.cost;
+  document.getElementById('mi-unit').value=ing.unit||'g';
+  document.getElementById('mi-qty').value=ing.dqty||1;
+  document.getElementById('mi-cancel').style.display='';
+  document.getElementById('mi-name').focus();
+}
+function saveIng(){
+  var name=(document.getElementById('mi-name').value||'').trim();
+  var cost=parseFloat(document.getElementById('mi-cost').value)||0;
+  if(!name){toast('Name required','warning');return;}
+  var id=document.getElementById('mi-id').value;
+  var rec={id:id||uid(),name:name,cat:document.getElementById('mi-cat').value,cost:cost,unit:document.getElementById('mi-unit').value,dqty:parseFloat(document.getElementById('mi-qty').value)||1};
+  if(id){var ix=INGS.findIndex(function(i){return i.id===id;});if(ix>=0)INGS[ix]=rec;else INGS.push(rec);}
+  else INGS.push(rec);
+  saveIngToFB();
+  clearIngForm();renderIngModal();
+  toast(id?'Updated':'Ingredient added','success');
+}
+function deleteIng(id){
+  if(!confirm('Delete this ingredient?'))return;
+  INGS=INGS.filter(function(i){return i.id!==id;});
+  saveIngToFB();renderIngModal();toast('Deleted','info');
+}
+function renderIngModal(){
+  document.getElementById('ingcnt').textContent=INGS.length;
+  var cont=document.getElementById('ing-list-m');
+  if(!INGS.length){cont.innerHTML='<div style="text-align:center;padding:14px;color:var(--tx3);font-size:10px;font-family:var(--mono)">No ingredients yet — add above</div>';return;}
+  cont.innerHTML=INGS.slice().sort(function(a,b){return a.name.localeCompare(b.name);}).map(function(ing){
+    return '<div class="ing-item-m"><span style="font-size:16px">'+(CAT_ICON[ing.cat]||'📦')+'</span>'
+      +'<div style="flex:1;min-width:0"><div style="font-weight:700;font-size:11px">'+xe(ing.name)+'</div>'
+      +'<div style="font-size:10px;color:var(--tx3);font-family:var(--mono)">'+xe(ing.cost.toFixed(4))+' SAR/'+xe(ing.unit)+' · default '+xe(ing.dqty)+xe(ing.unit)+'</div></div>'
+      +'<button class="btn btn-sm" onclick="editIng(\''+xe(ing.id)+'\')">Edit</button>'
+      +'<button class="btn btn-sm" style="color:var(--err)" onclick="deleteIng(\''+xe(ing.id)+'\')">Del</button>'
+      +'</div>';
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════
+//  EXPORT + TOAST
+// ═══════════════════════════════════════════════════
 function exportJSON(){
-  if(!RECIPES.length){toast('No recipes','warning');return;}
-  var b=new Blob([JSON.stringify({recipes:RECIPES,exportedAt:new Date().toISOString()},null,2)],{type:'application/json'});
+  if(!RECIPES.length){toast('No recipes to export','warning');return;}
+  var b=new Blob([JSON.stringify({recipes:RECIPES,ingredients:INGS,exportedAt:new Date().toISOString()},null,2)],{type:'application/json'});
   var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='alfa-recipes-'+new Date().toISOString().slice(0,10)+'.json';a.click();
   toast('Exported '+RECIPES.length+' recipes','success');
 }
 
-var _tt2=null;
+var _tt=null;
 function toast(msg,type){
   var w=document.getElementById('twrap');
-  var d=document.createElement('div');d.className='toast';
-  d.innerHTML='<div class="td '+(type||'info')+'"></div><span>'+xe(msg)+'</span>';
-  w.appendChild(d);clearTimeout(_tt2);
-  _tt2=setTimeout(function(){if(w.firstChild)w.removeChild(w.firstChild);},3000);
+  var d=document.createElement('div');d.className='tt';
+  d.innerHTML='<div class="tdot '+(type||'info')+'"></div><span>'+xe(msg)+'</span>';
+  w.appendChild(d);clearTimeout(_tt);
+  _tt=setTimeout(function(){if(w.firstChild)w.removeChild(w.firstChild);},3000);
 }
 
+// ═══════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════
 document.getElementById('fcd').value=new Date().toISOString().slice(0,10);
 renderRows();rc();
 initFB();
