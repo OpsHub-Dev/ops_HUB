@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <style>
 :root{
   --base:#E7E5E4;--base-dk:#D4D2D1;--base-lt:#F4F2F1;
@@ -33,32 +34,9 @@ html,body{height:100%;background:var(--base);color:var(--tx);font-family:var(--f
 .hdr-r{margin-left:auto;display:flex;gap:5px;align-items:center}
 
 /* ── 3-PANEL LAYOUT ── */
-.app{display:grid;grid-template-columns:240px 1fr 240px;height:calc(100vh - 52px);margin-top:52px;overflow:hidden}
+.app{display:grid;grid-template-columns:1fr 260px;height:calc(100vh - 52px);margin-top:52px;overflow:hidden}
 
-/* ── LEFT PANEL: Ingredient Library ── */
-.lib{background:var(--base-dk);border-right:1px solid rgba(0,0,0,.07);display:flex;flex-direction:column;overflow:hidden}
-.panel-hdr{padding:12px 10px 8px;flex-shrink:0}
-.panel-title{font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--tx3);margin-bottom:8px}
-.srch{width:100%;background:var(--base);border:none;border-radius:8px;box-shadow:var(--sh-is);padding:7px 10px;font-family:var(--font);font-size:11px;color:var(--tx);outline:none}
-.srch::placeholder{color:var(--tx3)}
-.lib-scroll{flex:1;overflow-y:auto;padding:6px 10px 10px;display:flex;flex-direction:column;gap:5px}
-
-/* Ingredient card — draggable */
-.ing-card{background:var(--base);border-radius:9px;box-shadow:var(--sh-rs);padding:8px 10px;cursor:grab;display:flex;align-items:center;gap:8px;transition:box-shadow .12s,transform .12s,opacity .12s;user-select:none;border:2px solid transparent}
-.ing-card:hover{box-shadow:var(--sh-r);transform:translateY(-1px)}
-.ing-card:active{cursor:grabbing;box-shadow:var(--sh-is);transform:none}
-.ing-card.dragging{opacity:.45;box-shadow:none;transform:scale(.97)}
-.ic-icon{font-size:18px;flex-shrink:0}
-.ic-body{flex:1;min-width:0}
-.ic-name{font-weight:700;font-size:10px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ic-cost{font-size:9px;color:var(--tx3);font-family:var(--mono)}
-.ic-edit{background:none;border:none;color:var(--tx3);cursor:pointer;font-size:11px;padding:2px 4px;border-radius:4px;opacity:0;transition:opacity .1s}
-.ing-card:hover .ic-edit{opacity:1}
-.ic-edit:hover{color:var(--primary);background:rgba(0,102,102,.1)}
-
-/* Lib footer */
-.lib-footer{padding:8px 10px;border-top:1px solid rgba(0,0,0,.06);flex-shrink:0;display:flex;flex-direction:column;gap:5px}
-.fbstat{font-size:9px;color:var(--tx3);font-family:var(--mono)}
+/* ── LEFT PANEL: removed ── */
 .cbadge{font-size:9px;font-family:var(--mono);padding:2px 7px;border-radius:20px;font-weight:700;display:inline-block}
 .live{background:rgba(0,166,61,.15);color:#00A63D}.off{background:rgba(255,33,87,.12);color:var(--err)}
 
@@ -92,12 +70,6 @@ html,body{height:100%;background:var(--base);color:var(--tx);font-family:var(--f
 .tc-col{border-left:1px solid rgba(0,0,0,.06)}
 .col-t{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--tx3);margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid rgba(0,0,0,.06)}
 
-/* DROP ZONE */
-.drop-zone{min-height:80px;border:2px dashed rgba(0,102,102,.3);border-radius:10px;background:rgba(0,102,102,.03);display:flex;align-items:center;justify-content:center;transition:all .2s;margin-bottom:8px;position:relative}
-.drop-zone.dz-active{border-color:var(--primary);background:rgba(0,102,102,.1);box-shadow:0 0 0 3px rgba(0,102,102,.15)}
-.dz-hint{text-align:center;color:var(--tx3);pointer-events:none;padding:12px}
-.dz-hint-icon{font-size:22px;margin-bottom:4px}
-.dz-hint-text{font-size:10px;font-family:var(--mono)}
 
 /* Ingredient rows in recipe */
 .itbl{width:100%;border-collapse:collapse;margin-bottom:6px}
@@ -235,19 +207,6 @@ html,body{height:100%;background:var(--base);color:var(--tx);font-family:var(--f
 <!-- 3-PANEL APP -->
 <div class="app">
 
-  <!-- LEFT: Ingredient Library -->
-  <div class="lib">
-    <div class="panel-hdr">
-      <div class="panel-title">Ingredient Library</div>
-      <input class="srch" id="lib-srch" placeholder="Search ingredients…" oninput="filterLib(this.value)">
-    </div>
-    <div class="lib-scroll" id="lib-list"></div>
-    <div class="lib-footer">
-      <button class="btn btn-sm" onclick="openIngMgr()" style="width:100%">+ Manage Ingredients</button>
-      <div><span class="cbadge off" id="cbadge2">Local</span> <span class="fbstat" id="fbstat">localStorage mode</span></div>
-    </div>
-  </div>
-
   <!-- MIDDLE: Recipe Editor -->
   <div class="editor">
     <div class="tabs">
@@ -306,16 +265,8 @@ html,body{height:100%;background:var(--base);color:var(--tx);font-family:var(--f
           <div class="ic-col">
             <div class="col-t">Fresh Quality, Ingredients</div>
 
-            <!-- DROP ZONE -->
-            <div class="drop-zone" id="drop-zone">
-              <div class="dz-hint" id="dz-hint">
-                <div class="dz-hint-icon">&#x1F9EA;</div>
-                <div class="dz-hint-text">Drag ingredients here<br>from the left panel</div>
-              </div>
-            </div>
-
             <!-- Ingredient rows table -->
-            <table class="itbl" id="itbl-wrap" style="display:none">
+            <table class="itbl" id="itbl-wrap">
               <thead><tr>
                 <th style="width:14px"></th>
                 <th>Ingredient</th>
@@ -329,7 +280,7 @@ html,body{height:100%;background:var(--base);color:var(--tx);font-family:var(--f
             </table>
 
             <div style="display:flex;gap:5px;margin-top:6px">
-              <button class="btn btn-sm" onclick="addRow()">+ Add Manually</button>
+              <button class="btn btn-sm btn-p" onclick="addRow()">+ Add Ingredient</button>
             </div>
           </div>
           <div class="tc-col">
@@ -393,28 +344,14 @@ html,body{height:100%;background:var(--base);color:var(--tx);font-family:var(--f
       <input class="srch" id="rbsrch" placeholder="Search recipes…" oninput="filterRB(this.value)">
     </div>
 
-    <!-- API KEY for PDF parsing -->
-    <div style="padding:8px 10px 0">
-      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--tx3);margin-bottom:5px">Anthropic API Key (for PDF read)</div>
-      <div style="display:flex;gap:5px;align-items:center">
-        <input id="api-key-inp" type="password" placeholder="sk-ant-api03-…" autocomplete="off"
-          style="flex:1;background:var(--base);border:none;border-radius:8px;box-shadow:var(--sh-is);padding:6px 9px;font-family:var(--mono);font-size:10px;color:var(--tx);outline:none;min-width:0"
-          oninput="saveApiKey(this.value)">
-        <button class="btn btn-sm" onclick="toggleKeyVis()" id="key-vis-btn" title="Show/Hide">&#x1F441;</button>
-      </div>
-      <div style="font-size:9px;color:var(--tx3);font-family:var(--mono);margin-top:4px;line-height:1.5">
-        Get yours at <a href="https://console.anthropic.com/keys" target="_blank" style="color:var(--primary)">console.anthropic.com/keys</a><br>
-        Saved in localStorage — never sent to our server.
-      </div>
-    </div>
-
     <!-- PDF DROP ZONE -->
-    <div style="padding:6px 10px 6px">
+    <div style="padding:8px 10px 6px">
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--tx3);margin-bottom:5px">&#x1F4C4; Import from PDF — Free, No AI needed</div>
       <div class="pdf-drop" id="pdf-drop" ondragover="pdfDragOver(event)" ondragleave="pdfDragLeave(event)" ondrop="pdfDrop(event)">
-        <input type="file" accept="application/pdf,image/*" onchange="pdfFileChange(event)" title="Drop PDF recipe here">
+        <input type="file" accept="application/pdf" onchange="pdfFileChange(event)" title="Drop ALFA.CO recipe PDF here">
         <div class="pdf-drop-icon">&#x1F4C4;</div>
-        <div class="pdf-drop-title">Drop PDF Recipe Here</div>
-        <div class="pdf-drop-sub">AI reads it &rarr; fills the form automatically</div>
+        <div class="pdf-drop-title">Drop ALFA.CO Recipe PDF</div>
+        <div class="pdf-drop-sub">Reads text layer &rarr; fills form free &amp; instant</div>
       </div>
     </div>
 
@@ -510,7 +447,7 @@ html,body{height:100%;background:var(--base);color:var(--tx);font-family:var(--f
 // ═══════════════════════════════════════════════════
 //  STATE
 // ═══════════════════════════════════════════════════
-var db=null, RECIPES=[], INGS=[], CID=null, ROWS=[], DSI=null, DRAG_ING=null;
+var db=null, RECIPES=[], INGS=[], CID=null, ROWS=[], DSI=null;
 
 var CAT_ICON={meat:'🥩',seafood:'🐟',veg:'🥦',dairy:'🧀',bakery:'🍞',sauce:'🫙',spice:'🧂',grain:'🌾',bev:'🥤',other:'📦'};
 
@@ -531,45 +468,12 @@ function persist(){
 function loadLocal(){
   try{var i=localStorage.getItem('alfa_rb_ings');if(i)INGS=JSON.parse(i);}catch(e){}
   try{var r=localStorage.getItem('alfa_rb_recipes');if(r)RECIPES=JSON.parse(r);}catch(e){}
-  if(!INGS.length) seedIngs();
-}
-function seedIngs(){
-  INGS=[
-    {id:uid(),name:'Beef Patty 180g',cat:'meat',unit:'pc',cost:8.50,dqty:1},
-    {id:uid(),name:'Chicken Breast',cat:'meat',unit:'g',cost:0.042,dqty:150},
-    {id:uid(),name:'Cheddar Cheese Slice',cat:'dairy',unit:'pc',cost:0.80,dqty:1},
-    {id:uid(),name:'Brioche Bun',cat:'bakery',unit:'pc',cost:1.20,dqty:1},
-    {id:uid(),name:'Sesame Burger Bun',cat:'bakery',unit:'pc',cost:1.10,dqty:1},
-    {id:uid(),name:'Premium Flour',cat:'grain',unit:'g',cost:0.005,dqty:100},
-    {id:uid(),name:'Lettuce',cat:'veg',unit:'g',cost:0.008,dqty:20},
-    {id:uid(),name:'Tomato',cat:'veg',unit:'g',cost:0.010,dqty:30},
-    {id:uid(),name:'Red Onion',cat:'veg',unit:'g',cost:0.005,dqty:30},
-    {id:uid(),name:'White Onion',cat:'veg',unit:'g',cost:0.004,dqty:50},
-    {id:uid(),name:'Sweet Potato',cat:'veg',unit:'g',cost:0.006,dqty:100},
-    {id:uid(),name:'French Fries',cat:'grain',unit:'g',cost:0.018,dqty:120},
-    {id:uid(),name:'Basmati Rice',cat:'grain',unit:'g',cost:0.008,dqty:150},
-    {id:uid(),name:'Sushi Rice',cat:'grain',unit:'g',cost:0.010,dqty:100},
-    {id:uid(),name:'Quinoa',cat:'grain',unit:'g',cost:0.025,dqty:80},
-    {id:uid(),name:'Spaghetti',cat:'grain',unit:'g',cost:0.012,dqty:120},
-    {id:uid(),name:'Ketchup',cat:'sauce',unit:'g',cost:0.012,dqty:15},
-    {id:uid(),name:'Mayonnaise',cat:'sauce',unit:'g',cost:0.018,dqty:15},
-    {id:uid(),name:'Tar Tar Sauce',cat:'sauce',unit:'g',cost:0.025,dqty:30},
-    {id:uid(),name:'Olive Oil EV',cat:'sauce',unit:'ml',cost:0.022,dqty:20},
-    {id:uid(),name:'Asian Marinade',cat:'sauce',unit:'g',cost:0.020,dqty:50},
-    {id:uid(),name:'Peri-Peri Sauce',cat:'sauce',unit:'g',cost:0.030,dqty:30},
-    {id:uid(),name:'Butter Block',cat:'dairy',unit:'g',cost:0.018,dqty:50},
-    {id:uid(),name:'Heavy Cream',cat:'dairy',unit:'cup',cost:2.50,dqty:1},
-    {id:uid(),name:'Mascarpone Cheese',cat:'dairy',unit:'cup',cost:3.80,dqty:1},
-    {id:uid(),name:'Parmesan',cat:'dairy',unit:'g',cost:0.080,dqty:15},
-    {id:uid(),name:'Mozzarella',cat:'dairy',unit:'g',cost:0.060,dqty:80},
-    {id:uid(),name:'Salt',cat:'spice',unit:'g',cost:0.002,dqty:5},
-    {id:uid(),name:'Black Pepper',cat:'spice',unit:'g',cost:0.030,dqty:2},
-    {id:uid(),name:'Garlic Powder',cat:'spice',unit:'g',cost:0.040,dqty:3},
-    {id:uid(),name:'Fresh Garlic',cat:'veg',unit:'g',cost:0.015,dqty:10},
-    {id:uid(),name:'Lemon Juice',cat:'sauce',unit:'g',cost:0.010,dqty:20},
-    {id:uid(),name:'Shrimp Fresh',cat:'seafood',unit:'g',cost:0.065,dqty:200},
-  ];
-  persist();
+  // Remove any auto-seeded ingredients that were added by the system (not by the user)
+  // We clear them so only user-added ingredients remain
+  if(INGS.length && !localStorage.getItem('alfa_rb_user_added_ings')){
+    INGS=[];
+    try{localStorage.removeItem('alfa_rb_ings');}catch(e){}
+  }
 }
 
 // ═══════════════════════════════════════════════════
@@ -585,7 +489,7 @@ function initFB(){
     if(!cfg)throw new Error('no config');
     if(!firebase.apps.length)firebase.initializeApp(cfg);
     db=firebase.database();
-    ['cbadge','cbadge2'].forEach(function(id){var el=document.getElementById(id);if(el){el.textContent='Live';el.className='cbadge live';}});
+    ['cbadge'].forEach(function(id){var el=document.getElementById(id);if(el){el.textContent='Live';el.className='cbadge live';}});
     document.getElementById('fbstat').textContent='Connected to shared/recipes';
     // Load recipes from Firebase
     db.ref('shared/recipes').on('value',function(snap){
@@ -621,57 +525,6 @@ function saveRecipesToFB(rec){
 }
 
 // ═══════════════════════════════════════════════════
-//  INGREDIENT LIBRARY RENDER
-// ═══════════════════════════════════════════════════
-function filterLib(q){renderLib(q);}
-function renderLib(q){
-  var list=document.getElementById('lib-list');
-  var cats=['meat','seafood','veg','dairy','bakery','sauce','spice','grain','bev','other'];
-  var sorted=INGS.slice().sort(function(a,b){return cats.indexOf(a.cat)-cats.indexOf(b.cat)||a.name.localeCompare(b.name);});
-  var filtered=sorted.filter(function(i){return !q||(i.name||'').toLowerCase().includes(q.toLowerCase());});
-  if(!filtered.length){list.innerHTML='<div style="text-align:center;padding:14px;color:var(--tx3);font-size:10px;font-family:var(--mono)">'+(q?'No results':'Empty — add ingredients below')+'</div>';return;}
-  list.innerHTML=filtered.map(function(ing){
-    return '<div class="ing-card" draggable="true" data-id="'+xe(ing.id)+'" title="Drag to add to recipe">'
-      +'<span class="ic-icon">'+(CAT_ICON[ing.cat]||'📦')+'</span>'
-      +'<div class="ic-body"><div class="ic-name">'+xe(ing.name)+'</div>'
-      +'<div class="ic-cost">'+xe(ing.cost.toFixed(3))+' SAR/'+xe(ing.unit)+' · def '+xe(ing.dqty)+xe(ing.unit)+'</div></div>'
-      +'<button class="ic-edit" onclick="event.stopPropagation();editIng(\''+xe(ing.id)+'\')" title="Edit">&#x270F;</button>'
-      +'</div>';
-  }).join('');
-
-  // Wire drag from library
-  list.querySelectorAll('.ing-card').forEach(function(el){
-    el.addEventListener('dragstart',function(e){
-      DRAG_ING=INGS.find(function(i){return i.id===el.dataset.id;});
-      DSI=null;
-      el.classList.add('dragging');
-      e.dataTransfer.effectAllowed='copy';
-      e.dataTransfer.setData('text/plain',el.dataset.id);
-    });
-    el.addEventListener('dragend',function(){el.classList.remove('dragging');DRAG_ING=null;});
-  });
-}
-
-// ═══════════════════════════════════════════════════
-//  DROP ZONE
-// ═══════════════════════════════════════════════════
-(function(){
-  var dz=document.getElementById('drop-zone');
-  dz.addEventListener('dragover',function(e){e.preventDefault();dz.classList.add('dz-active');e.dataTransfer.dropEffect='copy';});
-  dz.addEventListener('dragleave',function(e){if(!dz.contains(e.relatedTarget))dz.classList.remove('dz-active');});
-  dz.addEventListener('drop',function(e){
-    e.preventDefault();dz.classList.remove('dz-active');
-    if(DRAG_ING){addFromLib(DRAG_ING);DRAG_ING=null;}
-  });
-})();
-
-function addFromLib(ing){
-  ROWS.push({name:ing.name,qty:ing.dqty||1,unit:ing.unit||'g',cpu:ing.cost||0});
-  renderRows();rc();
-  toast(ing.name+' added','success');
-}
-
-// ═══════════════════════════════════════════════════
 //  INGREDIENT ROWS
 // ═══════════════════════════════════════════════════
 function addRow(nm,qty,unit,cpu){
@@ -684,20 +537,11 @@ function updRow(i,f,val){if(!ROWS[i])return;ROWS[i][f]=(f==='qty'||f==='cpu')?pa
 function renderRows(){
   var tb=document.getElementById('itbody');
   var tbl=document.getElementById('itbl-wrap');
-  var dz=document.getElementById('drop-zone');
-  var hint=document.getElementById('dz-hint');
 
   if(!ROWS.length){
-    tbl.style.display='none';
-    dz.style.display='flex';
-    hint.style.display='block';
-    tb.innerHTML='';
+    tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--tx3);padding:14px;font-size:10px;font-family:var(--mono)">No ingredients yet — click + Add Ingredient</td></tr>';
     return;
   }
-  tbl.style.display='';
-  dz.style.display='flex';
-  dz.style.minHeight='36px';
-  hint.style.display='none';
 
   tb.innerHTML=ROWS.map(function(r,i){
     var cost=(r.cpu||0)*(parseFloat(r.qty)||0);
@@ -715,13 +559,12 @@ function renderRows(){
 
   // Row drag-to-reorder
   tb.querySelectorAll('.ir').forEach(function(el){
-    el.addEventListener('dragstart',function(e){if(DRAG_ING)return;DSI=parseInt(el.dataset.i);e.dataTransfer.effectAllowed='move';});
+    el.addEventListener('dragstart',function(e){DSI=parseInt(el.dataset.i);e.dataTransfer.effectAllowed='move';});
     el.addEventListener('dragover',function(e){e.preventDefault();el.classList.add('dov');});
     el.addEventListener('dragleave',function(){el.classList.remove('dov');});
     el.addEventListener('drop',function(e){
       e.preventDefault();el.classList.remove('dov');
       var ti=parseInt(el.dataset.i);
-      if(DRAG_ING){addFromLib(DRAG_ING);DRAG_ING=null;return;}
       if(DSI!==null&&DSI!==ti){var m=ROWS.splice(DSI,1)[0];ROWS.splice(ti,0,m);DSI=null;renderRows();rc();}
     });
     el.addEventListener('dragend',function(){DSI=null;el.classList.remove('dov');});
@@ -915,6 +758,7 @@ function saveIng(){
   var rec={id:id||uid(),name:name,cat:document.getElementById('mi-cat').value,cost:cost,unit:document.getElementById('mi-unit').value,dqty:parseFloat(document.getElementById('mi-qty').value)||1};
   if(id){var ix=INGS.findIndex(function(i){return i.id===id;});if(ix>=0)INGS[ix]=rec;else INGS.push(rec);}
   else INGS.push(rec);
+  try{localStorage.setItem('alfa_rb_user_added_ings','1');}catch(e){}
   saveIngToFB();
   clearIngForm();renderIngModal();
   toast(id?'Updated':'Ingredient added','success');
@@ -949,39 +793,17 @@ function exportJSON(){
 }
 
 // ═══════════════════════════════════════════════════
-//  API KEY MANAGEMENT
-// ═══════════════════════════════════════════════════
-function saveApiKey(val) {
-  try { localStorage.setItem('alfa_anthropic_key', val.trim()); } catch(e) {}
-}
-function loadApiKey() {
-  try {
-    var k = localStorage.getItem('alfa_anthropic_key') || '';
-    var inp = document.getElementById('api-key-inp');
-    if (inp && k) inp.value = k;
-    return k;
-  } catch(e) { return ''; }
-}
-function toggleKeyVis() {
-  var inp = document.getElementById('api-key-inp');
-  if (!inp) return;
-  inp.type = inp.type === 'password' ? 'text' : 'password';
-}
-function getApiKey() {
-  var inp = document.getElementById('api-key-inp');
-  if (inp && inp.value.trim()) return inp.value.trim();
-  return loadApiKey();
-}
-
-// ═══════════════════════════════════════════════════
-//  PDF DROP + AI PARSING
+//  PDF DROP + FREE TEXT EXTRACTION (PDF.js — no AI, no cost)
 // ═══════════════════════════════════════════════════
 var REVIEW_DATA = null;
 
-// Drag events on PDF drop zone
+// Configure PDF.js worker
+if (typeof pdfjsLib !== 'undefined') {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
+
 function pdfDragOver(e) {
-  e.preventDefault();
-  e.stopPropagation();
+  e.preventDefault(); e.stopPropagation();
   document.getElementById('pdf-drop').classList.add('drag-over');
   e.dataTransfer.dropEffect = 'copy';
 }
@@ -990,8 +812,7 @@ function pdfDragLeave(e) {
   document.getElementById('pdf-drop').classList.remove('drag-over');
 }
 function pdfDrop(e) {
-  e.preventDefault();
-  e.stopPropagation();
+  e.preventDefault(); e.stopPropagation();
   document.getElementById('pdf-drop').classList.remove('drag-over');
   var files = e.dataTransfer.files;
   if (files && files.length) processPdfFile(files[0]);
@@ -999,134 +820,263 @@ function pdfDrop(e) {
 function pdfFileChange(e) {
   var files = e.target.files;
   if (files && files.length) processPdfFile(files[0]);
-  e.target.value = ''; // reset so same file can be dropped again
+  e.target.value = '';
 }
 
 function processPdfFile(file) {
-  var isImage = file.type.startsWith('image/');
-  var isPdf = file.type === 'application/pdf';
-  if (!isImage && !isPdf) { toast('Please drop a PDF or image file', 'warning'); return; }
-
-  // Show parsing overlay
-  showParseOverlay('Reading ' + (isPdf ? 'PDF' : 'image') + '…', 'Claude AI is extracting the recipe. This takes a few seconds.');
+  if (file.type !== 'application/pdf') { toast('Please drop a PDF file', 'warning'); return; }
+  showParseOverlay('Reading PDF…', 'Extracting text from your ALFA.CO recipe card. Instant & free.');
 
   var reader = new FileReader();
   reader.onload = function(ev) {
-    var base64 = ev.target.result.split(',')[1];
-    var mediaType = file.type;
-    callClaudeVision(base64, mediaType, isPdf);
+    var arrayBuffer = ev.target.result;
+    extractPdfText(arrayBuffer);
   };
   reader.onerror = function() { hideParseOverlay(); toast('Could not read file', 'error'); };
-  reader.readAsDataURL(file);
+  reader.readAsArrayBuffer(file);
 }
 
 function showParseOverlay(title, sub) {
   document.getElementById('parse-title').textContent = title;
   document.getElementById('parse-sub').textContent = sub;
-  document.getElementById('parse-spinner').style.display = '';
   document.getElementById('parse-overlay').classList.add('open');
 }
 function hideParseOverlay() {
   document.getElementById('parse-overlay').classList.remove('open');
 }
 
-async function callClaudeVision(base64Data, mediaType, isPdf) {
-  var apiKey = getApiKey();
-  if (!apiKey) {
-    hideParseOverlay();
-    toast('Enter your Anthropic API key first (right panel)', 'warning');
-    document.getElementById('api-key-inp') && document.getElementById('api-key-inp').focus();
-    return;
-  }
-
-  var prompt = 'You are reading an ALFA.CO recipe card image or PDF. Extract ALL information visible and return ONLY a valid JSON object (no markdown, no explanation) with these exact keys:\n{\n  "name": "ITEM NAME",\n  "concept": "CONCEPT (e.g. STEAK HOUSE, PIATTO, HYBRID, SH - SALAD BAR)",\n  "recipeType": "PREP RECIPE type (e.g. SUB-PREP, PREP RECIPE, LINE RECIPE, SERVING RECIPE)",\n  "recipeCode": "RECIPE # code",\n  "yield": "YIELD value as written",\n  "prepTime": "PREP TIME value",\n  "shelfLife": "SHELF LIFE value",\n  "storing": "STORING value",\n  "created": "CREATED date as YYYY-MM-DD if possible, else as written",\n  "revised": "REVISED date as YYYY-MM-DD if possible, else empty",\n  "technique": "Full TECHNIQUE/METHOD text preserving all numbered steps",\n  "ingredients": [\n    { "name": "ingredient name exactly as written", "qty": numeric_value_only, "unit": "unit abbreviation" }\n  ]\n}\nUnit conversions: gm/grams/gm.->g, kilo/kilos->kg, liters/liter->L, pieces/pcs->pcs, ounces->oz.\nIf qty uses mixed text like "1 kilo" split to qty:1 unit:"kg".\nReturn ONLY the JSON object.';
-
-  var contentBlocks = [];
-  if (isPdf) {
-    contentBlocks.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64Data } });
-  } else {
-    contentBlocks.push({ type: 'image', source: { type: 'base64', media_type: mediaType, data: base64Data } });
-  }
-  contentBlocks.push({ type: 'text', text: prompt });
-
+// ── Step 1: Extract raw text from every PDF page via PDF.js ──
+async function extractPdfText(arrayBuffer) {
   try {
-    var response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 2000,
-        messages: [{ role: 'user', content: contentBlocks }]
-      })
-    });
-
-    if (!response.ok) {
-      var errBody = '';
-      try { errBody = await response.text(); } catch(e2) {}
-      // 401 = bad key
-      if (response.status === 401) throw new Error('Invalid API key — check your key at console.anthropic.com/keys');
-      throw new Error('HTTP ' + response.status + (errBody ? ': ' + errBody.slice(0,120) : ''));
+    if (typeof pdfjsLib === 'undefined') {
+      hideParseOverlay();
+      toast('PDF.js not loaded — check internet connection', 'error');
+      return;
     }
-
-    var data = await response.json();
-    var text = (data.content || [])
-      .filter(function(b) { return b.type === 'text'; })
-      .map(function(b) { return b.text; })
-      .join('');
-
-    // Strip markdown fences
-    text = text.replace(/^```[a-z]*\s*/i, '').replace(/\s*```$/i, '').trim();
-    var start = text.indexOf('{');
-    var end = text.lastIndexOf('}');
-    if (start >= 0 && end > start) text = text.slice(start, end + 1);
-
-    var parsed = JSON.parse(text);
+    var pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    var allLines = [];
+    for (var p = 1; p <= pdf.numPages; p++) {
+      var page = await pdf.getPage(p);
+      var content = await page.getTextContent();
+      // Group items by Y position (same Y = same line)
+      var byY = {};
+      content.items.forEach(function(item) {
+        var y = Math.round(item.transform[5]);
+        if (!byY[y]) byY[y] = [];
+        byY[y].push({ x: item.transform[4], text: item.str });
+      });
+      // Sort lines top-to-bottom, items left-to-right
+      Object.keys(byY).sort(function(a, b) { return b - a; }).forEach(function(y) {
+        var line = byY[y].sort(function(a, b) { return a.x - b.x; }).map(function(i) { return i.text; }).join(' ').trim();
+        if (line) allLines.push(line);
+      });
+    }
     hideParseOverlay();
+    var parsed = parseAlfaRecipe(allLines);
     openReview(parsed);
-
   } catch (err) {
     hideParseOverlay();
-    console.error('Claude API error:', err);
-    var msg = err.message || 'Unknown error';
-    if (msg.toLowerCase().includes('failed to fetch') || msg.toLowerCase().includes('load failed') || msg.toLowerCase().includes('cors')) {
-      showManualFallback();
-    } else {
-      toast('AI error: ' + msg.slice(0, 100), 'error');
-    }
+    console.error('PDF extract error:', err);
+    toast('PDF read error: ' + (err.message || err).toString().slice(0, 80), 'error');
   }
 }
 
-function showManualFallback() {
-  // CORS blocked — open review modal with empty fields for manual fill
-  hideParseOverlay();
-  document.getElementById('parse-overlay').classList.remove('open');
+// ── Step 2: Parse ALFA.CO recipe layout from raw text lines ──
+function parseAlfaRecipe(lines) {
+  var txt = lines.join('\n');
 
-  var empty = {
-    name:'', concept:'', recipeType:'', recipeCode:'',
-    yield:'', prepTime:'', shelfLife:'', storing:'',
-    created: new Date().toISOString().slice(0,10), revised:'',
-    technique:'', ingredients:[
+  // Helper: grab value after a label on same or next non-empty line
+  function after(label, src) {
+    var re = new RegExp(label + '[\\s:]*([^\\n]+)', 'i');
+    var m = src.match(re);
+    return m ? m[1].replace(/^\s*:\s*/, '').trim() : '';
+  }
+
+  // Helper: clean a qty string → number
+  function parseQty(s) {
+    if (!s) return 0;
+    s = s.toString().replace(/,/g, '.').trim();
+    var m = s.match(/[\d]+\.?[\d]*/);
+    return m ? parseFloat(m[0]) : 0;
+  }
+
+  // Helper: normalize unit string
+  function normUnit(u) {
+    if (!u) return 'g';
+    u = u.toString().toLowerCase().trim().replace(/\.$/,'');
+    var map = {
+      'gm':'g','gms':'g','gram':'g','grams':'g','g':'g',
+      'kg':'kg','kilo':'kg','kilos':'kg','kilogram':'kg','kilograms':'kg',
+      'ml':'ml','milliliter':'ml','milliliters':'ml',
+      'l':'L','liter':'L','liters':'L','litre':'L','litres':'L',
+      'pc':'pcs','pcs':'pcs','piece':'pcs','pieces':'pcs',
+      'oz':'oz','ounce':'oz','ounces':'oz',
+      'cup':'cup','cups':'cup',
+      'tbsp':'tbsp','tablespoon':'tbsp','tablespoons':'tbsp',
+      'tsp':'tsp','teaspoon':'tsp','teaspoons':'tsp',
+      'slice':'slice','slices':'slice',
+      'portion':'portion','portions':'portion',
+      'batch':'batch'
+    };
+    return map[u] || u;
+  }
+
+  // ── Extract header meta fields ──
+  // These appear at the top of ALFA.CO cards in the format:  ITEM NAME  : VALUE
+  var name       = after('ITEM\\s+NAME', txt) || after('item\\s+name', txt);
+  var yieldVal   = after('YIELD', txt);
+  var prepTime   = after('PREP\\s*[\\.\\/]?\\s*TIME', txt) || after('PREP TIME', txt);
+  var shelfLife  = after('SHELF\\s*LIFE', txt);
+  var storing    = after('STORING', txt);
+  var concept    = after('CONCEPT', txt);
+  var recipeType = after('(?:LINE\\s+RECIPE|PREP\\s+RECIPE|SERVING\\s+RECIPE)', txt) ||
+                   after('PREP\\s+RECIPE', txt) || after('LINE\\s+RECIPE', txt);
+  var created    = after('CREATED', txt);
+  var revised    = after('REVISED', txt);
+  var recipeCode = after('RECIPE\\s*[#\\.]', txt) || after('RECIPE\\s*:', txt);
+
+  // Clean up name (remove leading colon/space)
+  name = name.replace(/^[:.\s]+/, '').trim();
+
+  // Normalize PREP RECIPE type
+  var typeMap = {
+    'sub-prep':'SUB-PREP','sub prep':'SUB-PREP',
+    'prep recipe':'PREP RECIPE','prep':'PREP RECIPE',
+    'line recipe':'LINE RECIPE','line':'LINE RECIPE',
+    'serving recipe':'SERVING RECIPE','serving':'SERVING RECIPE',
+    'batch':'BATCH RECIPE'
+  };
+  var rtLow = (recipeType||'').toLowerCase();
+  recipeType = typeMap[rtLow] || recipeType.toUpperCase() || '';
+
+  // Normalize concept
+  var conceptMap = {
+    'steak house':'STEAK HOUSE','steakhouse':'STEAK HOUSE',
+    'piatto':'PIATTO',
+    'hybrid':'HYBRID',
+    'sh - salad bar':'SH - SALAD BAR','salad bar':'SH - SALAD BAR','sh':'SH - SALAD BAR',
+    'central kitchen':'CENTRAL KITCHEN',
+    'cafe':'CAFE'
+  };
+  concept = conceptMap[(concept||'').toLowerCase()] || (concept||'').toUpperCase();
+
+  // Normalize dates → YYYY-MM-DD where possible
+  function parseDate(s) {
+    if (!s) return '';
+    s = s.replace(/^[:.\s]+/,'').trim();
+    // dd-Mon-yy or d-Mon-yy
+    var m = s.match(/(\d{1,2})[.\-\/\s]([A-Za-z]+)[.\-\/\s](\d{2,4})/);
+    if (m) {
+      var months = {jan:'01',feb:'02',mar:'03',apr:'04',may:'05',jun:'06',jul:'07',aug:'08',sep:'09',oct:'10',nov:'11',dec:'12'};
+      var mo = months[(m[2]||'').toLowerCase().slice(0,3)] || '01';
+      var yr = m[3].length === 2 ? '20' + m[3] : m[3];
+      return yr + '-' + mo + '-' + m[1].padStart(2,'0');
+    }
+    // dd.mm.yyyy
+    var m2 = s.match(/(\d{1,2})[.\-\/](\d{1,2})[.\-\/](\d{2,4})/);
+    if (m2) {
+      var yr2 = m2[3].length === 2 ? '20' + m2[3] : m2[3];
+      return yr2 + '-' + m2[2].padStart(2,'0') + '-' + m2[1].padStart(2,'0');
+    }
+    return s;
+  }
+  created = parseDate(created);
+  revised = parseDate(revised);
+
+  // ── Extract ingredients section ──
+  // Find the block between "FRESH QUALITY, INGREDIENTS" and "TECHNIQUE" / "METHOD"
+  var ingSection = '';
+  var techSection = '';
+
+  var ingStart = txt.search(/FRESH\s+QUALITY[,\s]+INGREDIENTS?/i);
+  var techStart = txt.search(/\bTECHNIQUE\b|\bMETHOD\b/i);
+
+  if (ingStart >= 0 && techStart > ingStart) {
+    ingSection = txt.slice(ingStart, techStart);
+    techSection = txt.slice(techStart);
+  } else if (ingStart >= 0) {
+    ingSection = txt.slice(ingStart);
+  } else {
+    // Fallback: search for QTY/UNITS header
+    var qtyIdx = txt.search(/QTY\s*\/?\s*UNITS?/i);
+    if (qtyIdx >= 0) { ingSection = txt.slice(qtyIdx); techSection = ''; }
+  }
+
+  // Clean technique — remove the TECHNIQUE header word itself, keep steps
+  techSection = techSection.replace(/^[^\n]*TECHNIQUE[^\n]*/i, '').replace(/^[^\n]*METHOD[^\n]*/i, '').trim();
+  // Remove signature block lines
+  techSection = techSection.split('\n').filter(function(l) {
+    var lo = l.toLowerCase();
+    return !lo.includes('checked by') && !lo.includes('approved by') &&
+           !lo.includes('culinary director') && !lo.includes('chief executive') &&
+           !lo.includes('director of kitchen') && l.trim().length > 0;
+  }).join('\n').trim();
+
+  // ── Parse individual ingredients ──
+  var ingredients = [];
+
+  // Strategy: look for lines that have a quantity pattern: number + optional unit
+  // QTY column is typically right-aligned numbers; ingredient name is left column
+  // Pattern: "Ingredient name   500 gm"  OR  "Ingredient name : 500 gm"
+  var ingLines = ingSection.split('\n').map(function(l) { return l.trim(); }).filter(Boolean);
+
+  // Remove header lines
+  ingLines = ingLines.filter(function(l) {
+    var lo = l.toLowerCase();
+    return !lo.match(/^fresh\s+quality/i) && !lo.match(/^ingredients?$/i) &&
+           !lo.match(/^qty\s*\//i) && !lo.match(/^technique/i) &&
+           !lo.match(/^method/i) && !lo.match(/^concept/i) &&
+           !lo.match(/^item\s+name/i) && l.trim().length > 1;
+  });
+
+  // Regex: optional letter prefix (a. b. c.), ingredient name, quantity, unit
+  var ingRe = /^(?:[a-z][\.\)]\s*)?(.+?)\s{2,}([\d,]+\.?[\d]*)\s*([a-zA-Z\/\.]+)?$/;
+  // Also simpler: ends with number + unit
+  var ingRe2 = /^(?:[a-z][\.\)]\s*)?(.+?)\s+([\d,]+\.?[\d]*)\s*(g|gm|gms|kg|ml|L|pcs?|pc|oz|tbsp|tsp|cups?|kilo|kilos?|liters?|litres?|slice|slices?|portion|batch)\s*\.?$/i;
+
+  ingLines.forEach(function(line) {
+    // Try strict pattern first (ingredient  qty  unit — separated by 2+ spaces)
+    var m = line.match(ingRe);
+    if (!m) m = line.match(ingRe2);
+    if (m) {
+      var ingName = m[1].replace(/^\s*[:.\-]\s*/, '').trim();
+      var qty = parseQty(m[2]);
+      var unit = normUnit(m[3] || 'g');
+      if (ingName && qty > 0) {
+        ingredients.push({ name: ingName, qty: qty, unit: unit });
+        return;
+      }
+    }
+
+    // Fallback: line has a standalone number anywhere
+    var numM = line.match(/^(.*?)\s+([\d,]+\.?[\d]*)\s*([a-zA-Z]+)?\s*$/);
+    if (numM) {
+      var n2 = numM[1].replace(/^[a-z][\.\)]\s*/,'').replace(/[:.\-]\s*$/,'').trim();
+      var q2 = parseQty(numM[2]);
+      var u2 = normUnit(numM[3] || 'g');
+      if (n2 && n2.length > 1 && q2 > 0 && !n2.match(/^[\d\s]+$/) &&
+          !n2.match(/^(concept|recipe|yield|prep|shelf|stor|created|revised|ALFACO)/i)) {
+        ingredients.push({ name: n2, qty: q2, unit: u2 });
+      }
+    }
+  });
+
+  return {
+    name:       name,
+    concept:    concept,
+    recipeType: recipeType,
+    recipeCode: recipeCode.replace(/^[:.\s]+/,'').trim(),
+    yield:      yieldVal.replace(/^[:.\s]+/,'').trim(),
+    prepTime:   prepTime.replace(/^[:.\s]+/,'').trim(),
+    shelfLife:  shelfLife.replace(/^[:.\s]+/,'').trim(),
+    storing:    storing.replace(/^[:.\s]+/,'').trim(),
+    created:    created,
+    revised:    revised,
+    technique:  techSection,
+    ingredients: ingredients.length ? ingredients : [
       {name:'',qty:0,unit:'g'},{name:'',qty:0,unit:'g'},{name:'',qty:0,unit:'g'}
     ]
   };
-
-  openReview(empty);
-
-  // Show a notice inside the review modal
-  setTimeout(function() {
-    var grid = document.getElementById('review-grid');
-    if (grid) {
-      var notice = document.createElement('div');
-      notice.style.cssText = 'grid-column:1/-1;background:rgba(254,153,0,.12);border:1px solid rgba(254,153,0,.3);border-radius:8px;padding:9px 12px;font-size:10px;color:#b45309;font-family:var(--mono);margin-bottom:4px;line-height:1.6';
-      notice.innerHTML = '&#x26A0; Auto-read blocked by browser security (CORS). The form is open — fill it manually from your PDF, then click Apply.';
-      grid.insertBefore(notice, grid.firstChild);
-    }
-  }, 100);
 }
 
 // ── Review Modal ──
@@ -1263,7 +1213,6 @@ function toast(msg,type){
 // ═══════════════════════════════════════════════════
 document.getElementById('fcd').value=new Date().toISOString().slice(0,10);
 renderRows();rc();
-loadApiKey();
 initFB();
 </script>
 </body>
