@@ -360,8 +360,18 @@ html,body{height:100%;background:var(--base);color:var(--tx);font-family:var(--f
 
         <!-- Signature block -->
         <div class="sig">
-          <div class="sc"><div class="sl"></div><div class="slb">Checked By: ___________________________</div><div class="sln">CULINARY DIRECTOR : HECTOR ALFONSO GUDIEL</div></div>
-          <div class="sc"><div class="sl"></div><div class="slb">Approved By: ___________________________</div><div class="sln">CHIEF EXECUTIVE OFFICER (C.E.O) JON NOROTSKY</div></div>
+          <div class="sc"><div class="sl"></div><div class="slb">Checked By: ___________________________</div>
+            <div class="sln" style="display:flex;align-items:center;gap:6px">
+              <span style="white-space:nowrap">CULINARY DIRECTOR :</span>
+              <input id="sig-checked" value="HECTOR ALFONSO GUDIEL" style="background:none;border:none;border-bottom:1px solid rgba(0,0,0,.2);font-family:var(--font);font-size:9px;font-weight:700;color:var(--tx2);outline:none;width:100%;padding:1px 3px">
+            </div>
+          </div>
+          <div class="sc"><div class="sl"></div><div class="slb">Approved By: ___________________________</div>
+            <div class="sln" style="display:flex;align-items:center;gap:6px">
+              <span style="white-space:nowrap">CHIEF EXECUTIVE OFFICER (C.E.O) :</span>
+              <input id="sig-approved" value="JON NOROTSKY" style="background:none;border:none;border-bottom:1px solid rgba(0,0,0,.2);font-family:var(--font);font-size:9px;font-weight:700;color:var(--tx2);outline:none;width:100%;padding:1px 3px">
+            </div>
+          </div>
         </div>
       </div><!-- /rf -->
     </div><!-- /pane-edit -->
@@ -732,6 +742,8 @@ function collect(){
   return{id:CID||uid(),name:gv('fn'),concept:gv('fc'),recipeType:gv('frt'),
     yield:gv('fy'),prepTime:gv('fp'),shelfLife:gv('fsl'),storing:gv('fst'),
     created:gv('fcd'),revised:gv('frv'),recipeCode:gv('fcode'),technique:gv('ftech'),
+    sigChecked:gv('sig-checked')||'HECTOR ALFONSO GUDIEL',
+    sigApproved:gv('sig-approved')||'JON NOROTSKY',
     ingredients:ROWS.map(function(r){return{name:r.name,qty:r.qty,unit:r.unit,costPerUnit:r.cpu};}),
     totalCost:tot,portions:ports,costPerPortion:tot/ports,
     sellPrice:parseFloat(document.getElementById('fprice').value)||0,
@@ -771,6 +783,8 @@ function loadRecipe(id){
   document.getElementById('fports').value=rec.portions||1;
   document.getElementById('fprice').value=rec.sellPrice||'';
   ROWS=(rec.ingredients||[]).map(function(r){return{name:r.name||'',qty:r.qty||1,unit:r.unit||'g',cpu:parseFloat(r.costPerUnit)||0};});
+  var sc=document.getElementById('sig-checked');if(sc)sc.value=rec.sigChecked||'HECTOR ALFONSO GUDIEL';
+  var sa=document.getElementById('sig-approved');if(sa)sa.value=rec.sigApproved||'JON NOROTSKY';
   renderRows();rc();upd();
   document.getElementById('bdel').style.display='';
   renderRB(gv('rbsrch'));
@@ -784,6 +798,7 @@ function newRecipe(){
   document.getElementById('fcd').value=new Date().toISOString().slice(0,10);
   document.getElementById('frv').value='';
   document.getElementById('fports').value=1;
+  // Keep signature names — user only changes these occasionally
   ROWS=[];renderRows();rc();upd();
   document.getElementById('bdel').style.display='none';
   renderRB(gv('rbsrch'));
@@ -845,8 +860,8 @@ function renderView(){
       +(rec.sellPrice>0?'<tr><td colspan="4" style="padding:3px 5px;font-size:9px;color:var(--tx3)">FOOD COST %</td><td style="padding:3px 5px;text-align:right;font-family:var(--mono);font-size:10px">'+fc2+'</td></tr>':'')
       +'</tbody></table></div>'
     +'<div class="tc-col"><div class="col-t">Technique</div><div style="font-size:11px;line-height:1.85;white-space:pre-wrap;font-family:var(--font)">'+xe(rec.technique||'')+'</div></div></div>'
-    +'<div class="sig"><div class="sc"><div class="sl"></div><div class="slb">Checked By: ___________________________</div><div class="sln">CULINARY DIRECTOR : HECTOR ALFONSO GUDIEL</div></div>'
-    +'<div class="sc"><div class="sl"></div><div class="slb">Approved By: ___________________________</div><div class="sln">CHIEF EXECUTIVE OFFICER (C.E.O) JON NOROTSKY</div></div></div></div>';
+    +'<div class="sig"><div class="sc"><div class="sl"></div><div class="slb">Checked By: ___________________________</div><div class="sln">CULINARY DIRECTOR : '+xe(rec.sigChecked||'HECTOR ALFONSO GUDIEL')+'</div></div>'
+    +'<div class="sc"><div class="sl"></div><div class="slb">Approved By: ___________________________</div><div class="sln">CHIEF EXECUTIVE OFFICER (C.E.O) : '+xe(rec.sigApproved||'JON NOROTSKY')+'</div></div></div></div>';
 }
 
 // ═══════════════════════════════════════════════════
@@ -1121,6 +1136,8 @@ function applyReview() {
   setv('fcd',   REVIEW_DATA.created || new Date().toISOString().slice(0, 10));
   setv('frv',   REVIEW_DATA.revised);
   setv('ftech', REVIEW_DATA.technique);
+  var sc2=document.getElementById('sig-checked');if(sc2&&REVIEW_DATA.sigChecked)sc2.value=REVIEW_DATA.sigChecked;
+  var sa2=document.getElementById('sig-approved');if(sa2&&REVIEW_DATA.sigApproved)sa2.value=REVIEW_DATA.sigApproved;
 
   // Load ingredients — try to match with library for auto-costing
   ROWS = (REVIEW_DATA.ingredients || []).map(function(ing) {
