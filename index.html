@@ -6933,13 +6933,24 @@ var BS = {
   tsEmps:[], tsAtt:{}, tsLeaves:[],
   tsTab:'att', tsLTab:'all', tsSt:'present', tsViewDate:'', attFilt:'all', fd:'All', _roleFilter:'All',
   inv_loc:'', inv_sts:'', inv_uom:'', inv_page:0, waresFilter:'all', q:'',
-  _branchConfig:{}
+  _branchConfig:{}, recipes:[]
 };
 var bItems = [], bLogs = [], bOrders = [];
 var _bListenersAttached = false;
 
 // ── Data constants (same as OpsHub) ──
-var DEPTS = ['Manager','Kitchen','FOH'];
+var DEPTS = ['Management','Kitchen','FOH','Bar','Maintenance','Other'];
+var _deptAliases = {
+  'manager':'Management','managers':'Management','management':'Management',
+  'kitchen':'Kitchen','foh':'FOH','front of house':'FOH',
+  'bar':'Bar','maintenance':'Maintenance','other':'Other'
+};
+// ── Dept alias normalizer — dynamically updated when DEPTS changes ──
+function normalizeDept(d) {
+  if (!d) return '';
+  var dStr = String(d).trim();
+  return _deptAliases[dStr.toLowerCase()] || dStr;
+}
 var ROLES = ['Restaurant Manager','Assistant Manager','Senior Supervisor','Supervisor','Kitchen Manager','Assistant Kitchen Manager','Captain','Server','Host','Barista','Busser','Line Cook','Prep Cook','Dishwasher'];
 var STATS = ['Active','Off Today','On Leave','Training'];
 var ACC_LEVELS = ['Admin','Manager','Staff'];
@@ -6977,7 +6988,7 @@ function bremBadge(days) {
   if(days<=60) return bpl(days+'d left','#d97706');
   return bpl(days+'d left','#059669');
 }
-function bdc(d) { return d==='Manager'?'#b45309':d==='Kitchen'?'#0057ff':'#00875a'; }
+function bdc(d) { var dn=normalizeDept(d||''); return dn==='Management'?'#b45309':dn==='Kitchen'?'#0057ff':dn==='Bar'?'#5b21b6':dn==='Maintenance'?'#c0392b':'#00875a'; }
 function btsHrs(a,b) { if(!a||!b)return '—';var x=a.split(':').map(Number),y=b.split(':').map(Number),d=(y[0]*60+y[1])-(x[0]*60+x[1]);if(d<0)d+=24*60;return d<=0?'—':Math.floor(d/60)+'h '+d%60+'m'; }
 function btsBadge(s) { var c=TS_ST_BRANCH[s]||TS_ST_BRANCH.absent;return bpl(c.l,c.c); }
 function bweekKey() {
@@ -7139,9 +7150,15 @@ function attachBranchListeners() {
   collections.forEach(function(key){
     db.ref(bPath(key)).on('value', function(snap){
       var raw=snap.val();
-      if(raw===null) BS[key]=[];
-      else if(Array.isArray(raw)) BS[key]=raw.filter(Boolean);
-      else BS[key]=Object.values(raw).filter(Boolean);
+      var arr;
+      if(raw===null) arr=[];
+      else if(Array.isArray(raw)) arr=raw.filter(Boolean);
+      else arr=Object.values(raw).filter(Boolean);
+      // Normalize dept names so HR data always matches Branch Manager schedule
+      if(key==='staff'||key==='tsEmps'){
+        arr.forEach(function(m){ if(m&&m.dept) m.dept=normalizeDept(m.dept); });
+      }
+      BS[key]=arr;
       bsyncTSFromStaff();
       NX.lastSync=Date.now();
       if(['branch-dash','staff','timesheet','health-cards','sales','petty-cash','wastage','schedule'].indexOf(NX.page)>=0) {
@@ -7159,6 +7176,13 @@ function attachBranchListeners() {
   db.ref(bPath('pcGLs')).on('value', function(snap){ var v=snap.val(); if(v&&v.length)BS.pcGLs=v; });
   db.ref(bPath('pcCycleNo')).on('value', function(snap){ var v=snap.val(); if(v!==null&&v!==undefined)BS.pcCycleNo=v; });
   db.ref(bPath('pcArchive')).on('value', function(snap){ BS.pcArchive=snap.val()||[]; });
+  // Load shared recipe catalog for wastage cost auto-calculation
+  db.ref('shared/recipes').on('value', function(snap){
+    var raw=snap.val();
+    if(!raw) BS.recipes=[];
+    else if(Array.isArray(raw)) BS.recipes=raw.filter(Boolean);
+    else BS.recipes=Object.values(raw).filter(Boolean);
+  });
 
   // Load new BM data (transfers + announcements) once on attach, then update badges
   if(NX.session&&(NX.session.role==='branch_mgr'||NX.session.role==='staff')){
@@ -8983,9 +9007,102 @@ function invSaveEndingCount(id,month,val){
 }
 
 // ── Wastage ──────────────────────────────────────────
-function pWastage(){attachBranchListeners();var data=BS.waste.filter(function(w){return bmatch(w,['item','by','reason']);}).slice().sort(function(a,b){return(b.date||'').localeCompare(a.date||'');});var tot=0;data.forEach(function(w){tot+=(+w.value||0);});var tc=BS.waste.filter(function(w){return w.date===TODAY_BS;}).length;var rows=data.map(function(w){return '<tr><td class="bmono" style="color:var(--text-tertiary);font-size:11px">'+bfdate(w.date)+'</td><td style="font-weight:600;color:var(--text-primary)">'+bxe(w.item)+'</td><td class="bmono">'+bxe(w.qty)+' '+bxe(w.unit||'')+'</td><td>'+bpl(w.reason||'\u2014','#c0392b')+'</td><td class="bmono" style="color:var(--danger);font-weight:600">'+bfsar(w.value)+'</td><td style="color:var(--text-secondary)">'+bxe(w.by||'\u2014')+'</td><td><button class="btn btn-sm" style="color:var(--danger)" onclick="delBranchWaste(\''+bxe(w.id)+'\')">Del</button></td></tr>';}).join('');var h='<div class="page-header"><h1>Wastage Log</h1></div><div class="bgrid-3" style="margin-bottom:16px"><div class="bsc"><div class="bsc-lbl">Total Entries</div><div class="bsc-val bca">'+BS.waste.length+'</div></div><div class="bsc"><div class="bsc-lbl">Today</div><div class="bsc-val" style="color:#b45309">'+tc+'</div></div><div class="bsc"><div class="bsc-lbl">Cumulative Loss</div><div class="bsc-val bcr">'+bfsar(tot)+'</div></div></div>';h+='<div class="header-actions"><div></div><button class="btn btn-primary" onclick="openBranchWastageModal()">+ Log Wastage</button></div>';return h+'<div class="btw"><div class="btw-s"><table class="btbl"><thead><tr><th>Date</th><th>Item</th><th>Qty</th><th>Reason</th><th>Est. Value</th><th>By</th><th></th></tr></thead><tbody>'+(rows||'<tr><td colspan="7" style="text-align:center;color:var(--text-tertiary);padding:28px">No wastage entries</td></tr>')+'</tbody></table></div></div>';}
-function openBranchWastageModal(){var so='<option value="">\u2014</option>'+BS.staff.map(function(s2){return '<option>'+bxe(s2.name)+'</option>';}).join('');var html='<div class="modal-head"><h2>Log Wastage</h2><button class="modal-close" onclick="closeModalForce()">&#x2715;</button></div><div class="bfg"><label class="form-label">Date</label><input class="form-input" type="date" id="bw-date" value="'+TODAY_BS+'"></div><div class="form-row"><div class="bfg"><label class="form-label">Item *</label><input class="form-input" id="bw-item" placeholder="Item name"></div><div class="bfg"><label class="form-label">Quantity *</label><input class="form-input" type="number" id="bw-qty" step="0.01" placeholder="0"></div></div><div class="form-row"><div class="bfg"><label class="form-label">Unit</label><input class="form-input" id="bw-unit" placeholder="kg, pcs\u2026"></div><div class="bfg"><label class="form-label">Reason</label><select class="form-input form-select" id="bw-reason"><option value="">\u2014</option>'+WR.map(function(r){return '<option>'+bxe(r)+'</option>';}).join('')+'</select></div></div><div class="form-row"><div class="bfg"><label class="form-label">Est. Value (SAR)</label><input class="form-input" type="number" id="bw-val" step="0.01" placeholder="0"></div><div class="bfg"><label class="form-label">Reported By</label><select class="form-input form-select" id="bw-by">'+so+'</select></div></div><button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="saveBranchWastage()">Log Wastage</button>';openModal(html);}
-function saveBranchWastage(){var item=bgv('bw-item'),qty=parseFloat(bgv('bw-qty'))||0;if(!item||qty<=0){showToast('Item and quantity required','error');return;}BS.waste.push({id:buid(),date:bgv('bw-date')||TODAY_BS,item:item,qty:qty,unit:bgv('bw-unit'),reason:bgv('bw-reason'),value:parseFloat(bgv('bw-val'))||0,by:bgv('bw-by')});bSaveColl('waste',BS.waste);closeModalForce();showToast('Wastage logged','success');navTo('wastage');}
+function pWastage(){
+  attachBranchListeners();
+  var data=BS.waste.filter(function(w){return bmatch(w,['item','by','reason']);}).slice().sort(function(a,b){return(b.date||'').localeCompare(a.date||'');});
+  var tot=0;data.forEach(function(w){tot+=(+w.value||0);});
+  var tc=BS.waste.filter(function(w){return w.date===TODAY_BS;}).length;
+  var rows=data.map(function(w){
+    var hasRecipe=!!(w.recipeId);
+    var costBadge=hasRecipe
+      ?'<span style="font-size:9px;background:rgba(0,102,102,.12);color:#006666;padding:1px 6px;border-radius:10px;font-weight:700">AUTO</span>'
+      :'<span style="font-size:9px;background:rgba(180,83,9,.1);color:#b45309;padding:1px 6px;border-radius:10px">EST</span>';
+    return '<tr>'+
+      '<td class="bmono" style="color:var(--text-tertiary);font-size:11px">'+bfdate(w.date)+'</td>'+
+      '<td style="font-weight:600;color:var(--text-primary)">'+bxe(w.item)+(w.recipeCode?'<div style="font-size:9px;color:var(--text-tertiary);font-family:monospace">'+bxe(w.recipeCode)+'</div>':'')+'</td>'+
+      '<td class="bmono">'+bxe(w.qty)+' '+bxe(w.unit||'')+'</td>'+
+      '<td>'+bpl(w.reason||'\u2014','#c0392b')+'</td>'+
+      '<td class="bmono" style="color:var(--danger);font-weight:600">'+bfsar(w.value)+' '+costBadge+'</td>'+
+      '<td style="color:var(--text-secondary)">'+bxe(w.by||'\u2014')+'</td>'+
+      '<td><button class="btn btn-sm" style="color:var(--danger)" onclick="delBranchWaste(''+bxe(w.id)+'')">Del</button></td>'+
+    '</tr>';
+  }).join('');
+  var h='<div class="page-header"><h1>Wastage Log</h1></div>';
+  h+='<div class="bgrid-3" style="margin-bottom:16px">';
+  h+='<div class="bsc"><div class="bsc-lbl">Total Entries</div><div class="bsc-val bca">'+BS.waste.length+'</div></div>';
+  h+='<div class="bsc"><div class="bsc-lbl">Today</div><div class="bsc-val" style="color:#b45309">'+tc+'</div></div>';
+  h+='<div class="bsc"><div class="bsc-lbl">Cumulative Loss</div><div class="bsc-val bcr">'+bfsar(tot)+'</div></div>';
+  h+='</div>';
+  h+='<div class="header-actions"><div></div><button class="btn btn-primary" onclick="openBranchWastageModal()">+ Log Wastage</button></div>';
+  return h+'<div class="btw"><div class="btw-s"><table class="btbl"><thead><tr><th>Date</th><th>Item</th><th>Qty</th><th>Reason</th><th>Cost</th><th>By</th><th></th></tr></thead><tbody>'+(rows||'<tr><td colspan="7" style="text-align:center;color:var(--text-tertiary);padding:28px">No wastage entries</td></tr>')+'</tbody></table></div></div>';
+}
+function openBranchWastageModal(){
+  var so='<option value="">\u2014</option>'+BS.staff.map(function(s2){return '<option>'+bxe(s2.name)+'</option>';}).join('');
+  var recOpts='<option value="">\u2014 Manual entry (no recipe) \u2014</option>';
+  var sortedRec=(BS.recipes||[]).slice().sort(function(a,b){return(a.name||'').localeCompare(b.name||'');});
+  sortedRec.forEach(function(r){recOpts+='<option value="'+bxe(r.id)+'">'+bxe(r.name)+(r.recipeCode?' ['+bxe(r.recipeCode)+']':'')+'</option>';});
+  var html='<div class="modal-head"><h2>Log Wastage</h2><button class="modal-close" onclick="closeModalForce()">&#x2715;</button></div>'+
+    '<div class="bfg"><label class="form-label">\uD83D\uDCCB Link to Recipe (auto-calculates cost)</label>'+
+    '<select class="form-input form-select" id="bw-recipe" onchange="bwOnRecipePick(this.value)">'+recOpts+'</select></div>'+
+    '<div class="form-row">'+
+      '<div class="bfg"><label class="form-label">Date</label><input class="form-input" type="date" id="bw-date" value="'+TODAY_BS+'"></div>'+
+      '<div class="bfg"><label class="form-label">Reported By</label><select class="form-input form-select" id="bw-by">'+so+'</select></div>'+
+    '</div>'+
+    '<div class="form-row">'+
+      '<div class="bfg"><label class="form-label">Item Name *</label><input class="form-input" id="bw-item" placeholder="Item name / recipe name"></div>'+
+      '<div class="bfg"><label class="form-label">Reason</label><select class="form-input form-select" id="bw-reason"><option value="">\u2014</option>'+WR.map(function(r){return '<option>'+bxe(r)+'</option>';}).join('')+'</select></div>'+
+    '</div>'+
+    '<div class="form-row">'+
+      '<div class="bfg"><label class="form-label">Qty Wasted *</label><input class="form-input" type="number" id="bw-qty" step="0.001" placeholder="0" oninput="bwRecalcCost()"></div>'+
+      '<div class="bfg"><label class="form-label">Unit</label><input class="form-input" id="bw-unit" placeholder="kg, pcs, portion\u2026"></div>'+
+    '</div>'+
+    '<div style="background:var(--surface-2);border-radius:10px;padding:12px 14px;margin-bottom:12px;display:flex;gap:14px;flex-wrap:wrap;align-items:center">'+
+      '<div style="flex:1;min-width:130px"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-tertiary);margin-bottom:3px">Auto-Calculated Cost</div>'+
+      '<div id="bw-cost-display" style="font-size:22px;font-weight:700;font-family:var(--mono);color:var(--danger)">SAR 0.00</div>'+
+      '<div id="bw-cost-note" style="font-size:10px;color:var(--text-tertiary);font-family:var(--mono);margin-top:2px">Select a recipe above</div></div>'+
+      '<div style="flex:1;min-width:130px"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-tertiary);margin-bottom:3px">Override Cost (SAR)</div>'+
+      '<input class="form-input" type="number" id="bw-val" step="0.01" placeholder="Leave blank = use auto" oninput="bwUpdateDisplay()"></div>'+
+    '</div>'+
+    '<button class="btn btn-primary" style="width:100%" onclick="saveBranchWastage()">Log Wastage</button>';
+  openModal(html);
+}
+function bwOnRecipePick(recipeId){
+  var nameEl=document.getElementById('bw-item'),unitEl=document.getElementById('bw-unit'),noteEl=document.getElementById('bw-cost-note');
+  if(!recipeId){if(noteEl)noteEl.textContent='Select a recipe above';bwRecalcCost();return;}
+  var rec=(BS.recipes||[]).find(function(r){return r.id===recipeId;});
+  if(!rec)return;
+  if(nameEl&&!nameEl.value)nameEl.value=rec.name||'';
+  if(unitEl)unitEl.value=rec.yieldUnit||'portion';
+  if(noteEl)noteEl.textContent='Cost/portion: SAR '+(rec.costPerPortion||0).toFixed(3);
+  bwRecalcCost();
+}
+function bwRecalcCost(){
+  var recipeId=(document.getElementById('bw-recipe')||{}).value||'';
+  var qty=parseFloat((document.getElementById('bw-qty')||{}).value)||0;
+  var disp=document.getElementById('bw-cost-display'),noteEl=document.getElementById('bw-cost-note');
+  var rec=recipeId?(BS.recipes||[]).find(function(r){return r.id===recipeId;}):null;
+  if(rec&&qty>0){
+    var cost=rec.costPerPortion*qty;
+    if(disp)disp.textContent='SAR '+cost.toFixed(2);
+    if(noteEl)noteEl.textContent='AUTO: '+qty+' \u00d7 SAR '+(rec.costPerPortion||0).toFixed(3)+'/portion';
+    var ov=document.getElementById('bw-val');if(ov&&!ov.value)ov.value=cost.toFixed(2);
+  } else {
+    if(disp)disp.textContent='SAR '+(parseFloat((document.getElementById('bw-val')||{}).value)||0).toFixed(2);
+  }
+}
+function bwUpdateDisplay(){var v=parseFloat((document.getElementById('bw-val')||{}).value)||0;var disp=document.getElementById('bw-cost-display');if(disp)disp.textContent='SAR '+v.toFixed(2);}
+function saveBranchWastage(){
+  var item=bgv('bw-item'),qty=parseFloat(bgv('bw-qty'))||0;
+  if(!item||qty<=0){showToast('Item and quantity required','error');return;}
+  var recipeId=bgv('bw-recipe');
+  var rec=recipeId?(BS.recipes||[]).find(function(r){return r.id===recipeId;}):null;
+  var overrideVal=parseFloat(bgv('bw-val'))||0;
+  var autoCost=rec?rec.costPerPortion*qty:0;
+  var finalCost=overrideVal>0?overrideVal:autoCost;
+  BS.waste.push({id:buid(),date:bgv('bw-date')||TODAY_BS,item:item,qty:qty,unit:bgv('bw-unit'),reason:bgv('bw-reason'),value:finalCost,by:bgv('bw-by'),recipeId:recipeId||'',recipeCode:rec?rec.recipeCode||'':''});
+  bSaveColl('waste',BS.waste);closeModalForce();showToast('Wastage logged \u2014 Cost: '+bfsar(finalCost),'success');navTo('wastage');
+}
+
 function delBranchWaste(id){if(!confirm('Delete this wastage entry?'))return;BS.waste=BS.waste.filter(function(w){return w.id!==id;});bSaveColl('waste',BS.waste);showToast('Deleted');navTo('wastage');}
 
 // ── Staff ─────────────────────────────────────────────
@@ -9006,7 +9123,7 @@ function pStaff() {
   var dbt='';['All'].concat(DEPTS).forEach(function(d){dbt+='<button class="bfbt'+(BS.fd===d?' on':'')+'" onclick="BS.fd=\''+d+'\';navTo(\'staff\')">'+bxe(d)+'</button>';});
   var rows='';
   BS.staff.forEach(function(m){
-    if(BS.fd!=='All'&&m.dept!==BS.fd)return;
+    if(BS.fd!=='All'&&normalizeDept(m.dept)!==BS.fd)return;
     if(BS._roleFilter&&BS._roleFilter!=='All'&&m.role!==BS._roleFilter)return;
     if(!bmatch(m,['name','role','phone','sap']))return;
     var sc=m.status==='Active'?'#00875a':m.status==='On Leave'?'#c0392b':'#94a3b8';
@@ -9063,7 +9180,7 @@ function saveBranchStaff(id){
   if(allowedRoles.indexOf(sess.role)<0){
     showToast('You do not have permission to save staff changes','error');closeModalForce();return;
   }
-  var name=bgv('bst-name'),dept=bgv('bst-dept');
+  var name=bgv('bst-name'),dept=normalizeDept(bgv('bst-dept'));
   if(!name||!dept){showToast('Name and department required','error');return;}
   var now=new Date(); var mkey=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
   var kpiVal=bgv('bst-kpi');
@@ -9310,9 +9427,9 @@ function pSchedule() {
   dates.forEach(function(dt,i){var it=dt===TODAY_BS;th+='<th style="'+(it?'color:var(--ceo)':'')+';text-align:center">'+DAYS_WEEK[i]+'<br><span style="font-weight:400;font-size:9px;opacity:.7">'+new Date(dt+'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short'})+'</span></th>';});
   th+='</tr>';
   var tb='';
-  DEPTS.forEach(function(dep){var mem=BS.staff.filter(function(m){return m.dept===dep;});if(!mem.length)return;tb+='<tr class="bdr"><td colspan="8">'+bxe(dep)+'</td></tr>';mem.forEach(function(m){var ms=(sc[m.id]||{});tb+='<tr><td><div style="display:flex;align-items:center;gap:8px"><div class="bav" style="width:24px;height:24px;font-size:9px">'+bini(m.name)+'</div><span style="font-size:12px;font-weight:500">'+bxe(m.name)+'</span>'+(m.sap?'<div style="font-size:9px;color:#94a3b8;font-family:monospace">'+bxe(m.sap)+'</div>':'')+' </div></div></td>';DAYS_WEEK.forEach(function(day){tb+='<td style="padding:4px"><input class="bsinp bsc-inp" data-id="'+bxe(m.id)+'" data-day="'+bxe(day)+'" value="'+bxe(ms[day]||'')+'" placeholder="\u2014"></td>';});tb+='</tr>';});});
+  DEPTS.forEach(function(dep){var mem=BS.staff.filter(function(m){return normalizeDept(m.dept)===dep;});if(!mem.length)return;tb+='<tr class="bdr"><td colspan="8">'+bxe(dep)+'</td></tr>';mem.forEach(function(m){var ms=(sc[m.id]||{});tb+='<tr><td><div style="display:flex;align-items:center;gap:8px"><div class="bav" style="width:24px;height:24px;font-size:9px">'+bini(m.name)+'</div><span style="font-size:12px;font-weight:500">'+bxe(m.name)+'</span>'+(m.sap?'<div style="font-size:9px;color:#94a3b8;font-family:monospace">'+bxe(m.sap)+'</div>':'')+' </div></div></td>';DAYS_WEEK.forEach(function(day){tb+='<td style="padding:4px"><input class="bsinp bsc-inp" data-id="'+bxe(m.id)+'" data-day="'+bxe(day)+'" value="'+bxe(ms[day]||'')+'" placeholder="\u2014"></td>';});tb+='</tr>';});});
   var h='<div class="page-header"><h1>Weekly Schedule</h1></div>';
-  h+='<div class="bwnav"><button class="btn btn-sm" onclick="BS.wo=(BS.wo||0)-1;navTo(\'schedule\')">\u2190 Prev</button><span class="bmono" style="font-size:12px;color:var(--text-secondary)">'+bxe(wk)+' \u00b7 '+d0+' \u2014 '+d6+'</span><button class="btn btn-sm" onclick="BS.wo=(BS.wo||0)+1;navTo(\'schedule\')">Next \u2192</button><span style="margin-left:auto;font-size:11px;color:var(--success);opacity:.8">● Auto-saves</span><button class="btn btn-sm" onclick="printBranchSched(\'All\')">Print All</button><button class="btn btn-sm" onclick="printBranchSched(\'Manager\')">Print Mgr</button><button class="btn btn-sm" onclick="printBranchSched(\'Kitchen\')">Print Kitchen</button><button class="btn btn-sm" onclick="printBranchSched(\'FOH\')">Print FOH</button></div>';
+  h+='<div class="bwnav"><button class="btn btn-sm" onclick="BS.wo=(BS.wo||0)-1;navTo(\'schedule\')">\u2190 Prev</button><span class="bmono" style="font-size:12px;color:var(--text-secondary)">'+bxe(wk)+' \u00b7 '+d0+' \u2014 '+d6+'</span><button class="btn btn-sm" onclick="BS.wo=(BS.wo||0)+1;navTo(\'schedule\')">Next \u2192</button><span style="margin-left:auto;font-size:11px;color:var(--success);opacity:.8">\u25cf Auto-saves</span><button class="btn btn-sm" onclick="printBranchSched(\'All\')">Print All</button><button class="btn btn-sm" onclick="printBranchSched(\'Management\')">Print Mgmt</button><button class="btn btn-sm" onclick="printBranchSched(\'Kitchen\')">Print Kitchen</button><button class="btn btn-sm" onclick="printBranchSched(\'FOH\')">Print FOH</button></div>';
   h+='<div class="bswrap"><table class="bstbl"><thead>'+th+'</thead><tbody>'+tb+'</tbody></table></div>';
   setTimeout(function(){
     document.querySelectorAll('.bsc-inp').forEach(function(inp){
@@ -9329,7 +9446,7 @@ function pSchedule() {
   },0);
   return h;
 }
-function printBranchSched(dept){var wk=bweekKey(),dates=bweekDates(),sc=BS.sch[wk]||{};var d0=new Date(dates[0]+'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short'});var d6=new Date(dates[6]+'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short'});var s=NX.session||{};var th='<tr style="background:#1a2340;color:#fff"><th style="padding:10px 14px;text-align:left;min-width:180px">Staff Member</th>';dates.forEach(function(dt,i){var it=dt===TODAY_BS;th+='<th style="padding:10px 8px;text-align:center;min-width:80px'+(it?';color:#b45309':'')+' ">'+DAYS_WEEK[i]+'<br><span style="font-size:9px;font-weight:400;opacity:.8">'+new Date(dt+'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short'})+'</span></th>';});th+='</tr>';var tb='';var deptsR=dept==='All'?DEPTS:[dept];deptsR.forEach(function(dep){var mem=BS.staff.filter(function(m){return m.dept===dep;});if(!mem.length)return;tb+='<tr><td colspan="8" style="background:#f1f5f9;font-size:9px;text-transform:uppercase;letter-spacing:2px;color:#64748b;font-weight:700;padding:6px 14px">'+dep+'</td></tr>';mem.forEach(function(m){var ms=(sc[m.id]||{});var ini2='';String(m.name||'').split(' ').forEach(function(p){if(p&&ini2.length<2)ini2+=p[0].toUpperCase();});tb+='<tr><td style="padding:8px 14px;font-size:12px;font-weight:600;border-bottom:1px solid #f1f5f9"><div style="display:flex;align-items:center;gap:8px"><div style="width:24px;height:24px;border-radius:50%;background:#e2e8f0;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700">'+ini2+'</div>'+bxe(m.name)+'</div></td>';dates.forEach(function(dt,di){var val=(ms[DAYS_WEEK[di]]||'');var isOff=val.toUpperCase()==='OFF'||val.toUpperCase()==='DAY OFF';var it=dt===TODAY_BS;tb+='<td style="padding:8px 6px;text-align:center;font-size:11px;font-weight:600;color:'+(val?isOff?'#b45309':'#1a2340':'#cbd5e1')+';background:'+(it?'#fffbeb':isOff?'#f8fafc':'#fff')+';border-bottom:1px solid #f1f5f9;border-left:1px solid #f1f5f9">'+bxe(val||'\u2014')+'</td>';});tb+='</tr>';});});var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Schedule</title><style>@page{size:A4 landscape;margin:8mm}*{box-sizing:border-box;margin:0;padding:0;font-family:Arial,Helvetica,sans-serif}body{background:#fff;color:#111;font-size:12px}table{width:100%;border-collapse:collapse}.hdr{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:10px;margin-bottom:14px;border-bottom:3px solid #1a2340}.foot{margin-top:20px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:30px}.foot-cell{border-top:1px solid #333;padding-top:5px;text-align:center;font-size:9px;color:#64748b}@media print{.np{display:none!important}}</style></head><body><div class="hdr"><div><img src="https://i.imgur.com/jeqtcE2.png" alt="ALFA.CO" style="height:44px;width:auto;display:block"><div style="font-size:10px;color:#888">'+bxe(s.branchName||s.entityName||'')+'</div></div><div style="text-align:center"><h1 style="font-size:16px;font-weight:800;color:#1a2340">Weekly Schedule</h1><p style="font-size:10px;color:#64748b">'+bxe(dept)+' \u00b7 '+bxe(wk)+' \u00b7 '+d0+' \u2013 '+d6+'</p></div><div style="text-align:right;font-size:10px;color:#64748b"><div>Printed: '+new Date().toLocaleDateString('en-GB')+'</div></div></div><table><thead>'+th+'</thead><tbody>'+tb+'</tbody></table><div class="foot"><div class="foot-cell">Prepared by</div><div class="foot-cell">Approved by Manager</div><div class="foot-cell">Date &amp; Signature</div></div><div class="np" style="text-align:center;margin-top:20px"><button onclick="window.print()" style="background:#1a2340;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:13px;font-weight:700;cursor:pointer">Print / Save PDF</button></div></body></html>';var w=window.open('','_blank','width=1100,height=700');if(w){w.document.write(html);w.document.close();}else showToast('Allow pop-ups to print','error');}
+function printBranchSched(dept){var wk=bweekKey(),dates=bweekDates(),sc=BS.sch[wk]||{};var d0=new Date(dates[0]+'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short'});var d6=new Date(dates[6]+'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short'});var s=NX.session||{};var th='<tr style="background:#1a2340;color:#fff"><th style="padding:10px 14px;text-align:left;min-width:180px">Staff Member</th>';dates.forEach(function(dt,i){var it=dt===TODAY_BS;th+='<th style="padding:10px 8px;text-align:center;min-width:80px'+(it?';color:#b45309':'')+' ">'+DAYS_WEEK[i]+'<br><span style="font-size:9px;font-weight:400;opacity:.8">'+new Date(dt+'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short'})+'</span></th>';});th+='</tr>';var tb='';var deptsR=dept==='All'?DEPTS:[dept];deptsR.forEach(function(dep){var mem=BS.staff.filter(function(m){return normalizeDept(m.dept)===dep;});if(!mem.length)return;tb+='<tr><td colspan="8" style="background:#f1f5f9;font-size:9px;text-transform:uppercase;letter-spacing:2px;color:#64748b;font-weight:700;padding:6px 14px">'+dep+'</td></tr>';mem.forEach(function(m){var ms=(sc[m.id]||{});var ini2='';String(m.name||'').split(' ').forEach(function(p){if(p&&ini2.length<2)ini2+=p[0].toUpperCase();});tb+='<tr><td style="padding:8px 14px;font-size:12px;font-weight:600;border-bottom:1px solid #f1f5f9"><div style="display:flex;align-items:center;gap:8px"><div style="width:24px;height:24px;border-radius:50%;background:#e2e8f0;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700">'+ini2+'</div>'+bxe(m.name)+'</div></td>';dates.forEach(function(dt,di){var val=(ms[DAYS_WEEK[di]]||'');var isOff=val.toUpperCase()==='OFF'||val.toUpperCase()==='DAY OFF';var it=dt===TODAY_BS;tb+='<td style="padding:8px 6px;text-align:center;font-size:11px;font-weight:600;color:'+(val?isOff?'#b45309':'#1a2340':'#cbd5e1')+';background:'+(it?'#fffbeb':isOff?'#f8fafc':'#fff')+';border-bottom:1px solid #f1f5f9;border-left:1px solid #f1f5f9">'+bxe(val||'\u2014')+'</td>';});tb+='</tr>';});});var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Schedule</title><style>@page{size:A4 landscape;margin:8mm}*{box-sizing:border-box;margin:0;padding:0;font-family:Arial,Helvetica,sans-serif}body{background:#fff;color:#111;font-size:12px}table{width:100%;border-collapse:collapse}.hdr{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:10px;margin-bottom:14px;border-bottom:3px solid #1a2340}.foot{margin-top:20px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:30px}.foot-cell{border-top:1px solid #333;padding-top:5px;text-align:center;font-size:9px;color:#64748b}@media print{.np{display:none!important}}</style></head><body><div class="hdr"><div><img src="https://i.imgur.com/jeqtcE2.png" alt="ALFA.CO" style="height:44px;width:auto;display:block"><div style="font-size:10px;color:#888">'+bxe(s.branchName||s.entityName||'')+'</div></div><div style="text-align:center"><h1 style="font-size:16px;font-weight:800;color:#1a2340">Weekly Schedule</h1><p style="font-size:10px;color:#64748b">'+bxe(dept)+' \u00b7 '+bxe(wk)+' \u00b7 '+d0+' \u2013 '+d6+'</p></div><div style="text-align:right;font-size:10px;color:#64748b"><div>Printed: '+new Date().toLocaleDateString('en-GB')+'</div></div></div><table><thead>'+th+'</thead><tbody>'+tb+'</tbody></table><div class="foot"><div class="foot-cell">Prepared by</div><div class="foot-cell">Approved by Manager</div><div class="foot-cell">Date &amp; Signature</div></div><div class="np" style="text-align:center;margin-top:20px"><button onclick="window.print()" style="background:#1a2340;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:13px;font-weight:700;cursor:pointer">Print / Save PDF</button></div></body></html>';var w=window.open('','_blank','width=1100,height=700');if(w){w.document.write(html);w.document.close();}else showToast('Allow pop-ups to print','error');}
 
 // ── Timesheet ─────────────────────────────────────────
 function pTimesheet() {
@@ -12630,10 +12747,10 @@ function hrfLoading(msg) {
   return '<div class="empty-state"><div style="font-size:36px;margin-bottom:12px">\u23f3</div><h3>' + hxe(msg||'Loading\u2026') + '</h3><p style="color:var(--text-secondary)">Reading live data from Firebase</p></div>';
 }
 
-function hrfTable(headers, rows) {
+function hrfTable(headers, rows, tableId) {
   var ths = headers.map(function(h){ return '<th style="padding:9px 14px;text-align:left;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-tertiary);border-bottom:1px solid var(--border);background:var(--surface-2)">' + hxe(h) + '</th>'; }).join('');
   return '<div style="border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--surface-1)">' +
-    '<table style="width:100%;border-collapse:collapse;font-size:12.5px">' +
+    '<table'+(tableId?' id="'+tableId+'"':'')+' style="width:100%;border-collapse:collapse;font-size:12.5px">' +
     '<thead><tr>' + ths + '</tr></thead>' +
     '<tbody>' + rows + '</tbody></table></div>';
 }
@@ -12816,11 +12933,11 @@ function pHrfEmployees(){
     });
     var filtered=allStaff.filter(function(m){
       if(filterBranch&&m._branchId!==filterBranch)return false;
-      if(filterDept&&(m.dept||'')!==filterDept)return false;
+      if(filterDept&&normalizeDept(m.dept||'')!==normalizeDept(filterDept))return false;
       if(filterQ){var q=filterQ.toLowerCase();if((m.name||'').toLowerCase().indexOf(q)<0&&(m.sap||'').toLowerCase().indexOf(q)<0)return false;}
       return true;
     });
-    var depts=[''].concat([...new Set(allStaff.map(function(m){return m.dept||'';}).filter(Boolean))].sort());
+    var depts=[''].concat(DEPTS);
     var brOpts='<option value="">All Branches</option>'+branches.map(function(b){return '<option value="'+hxe(b.id)+'"'+(filterBranch===b.id?' selected':'')+'>'+hxe(b.name)+'</option>';}).join('');
     var depOpts=depts.map(function(d){return '<option value="'+hxe(d)+'"'+(filterDept===d?' selected':'')+'>'+(d||'All Departments')+'</option>';}).join('');
     var INP='padding:7px 10px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;color:var(--text-primary);font-family:var(--font);font-size:13px;outline:none';
@@ -12829,14 +12946,15 @@ function pHrfEmployees(){
       '<button class="btn" onclick="hrfExportEmployees()">&#x2B07; Export CSV</button>'+
       '<button class="btn btn-primary" onclick="openHrfEmpModal(null,null)">+ Add Employee</button>'+
       '<button class="btn" style="background:rgba(0,102,102,.1);color:#006666;border:1px solid rgba(0,102,102,.2)" onclick="hrfSyncAllSapIndex()" title="Sync SAP numbers to branch schedule index">🔗 Sync SAP to Schedule</button>');
+    // ── Search: uses id="hrf-emp-search" and filters in-place (no navTo on every keystroke) ──
     h+='<div style="display:flex;gap:8px;padding:12px 0;flex-wrap:wrap;border-bottom:1px solid var(--border);margin-bottom:16px">'+
-      '<input style="flex:1;min-width:200px;'+INP+'" placeholder="Search name or SAP\u2026" value="'+hxe(filterQ)+'" oninput="NX._hrfQ=this.value;navTo(\'hrf-employees\')">'+
-      '<select style="'+INP+'" onchange="NX._hrfBranch=this.value;navTo(\'hrf-employees\')">'+brOpts+'</select>'+
-      '<select style="'+INP+'" onchange="NX._hrfDept=this.value;navTo(\'hrf-employees\')">'+depOpts+'</select></div>';
+      '<input id="hrf-emp-search" style="flex:1;min-width:200px;'+INP+'" placeholder="Search name or SAP\u2026" value="'+hxe(filterQ)+'">'+
+      '<select id="hrf-emp-branch" style="'+INP+'">'+brOpts+'</select>'+
+      '<select id="hrf-emp-dept" style="'+INP+'">'+depOpts+'</select></div>';
     var rows='';
     filtered.forEach(function(m){
       var stCol=(m.status||'Active')==='Active'?'#00875a':m.status==='On Leave'?'#b45309':'#c0392b';
-      // Resolve 3rd party company name from HRF_COMPANIES (use name not ID)
+      // Resolve 3rd party company name (use name not raw id)
       var sponsorCompanyName = '';
       if (m.workerType === '3rdparty' && m.companyId) {
         var matchedCo = HRF_COMPANIES.find(function(c){ return c.id === m.companyId || c.name === m.companyId; });
@@ -12845,7 +12963,7 @@ function pHrfEmployees(){
       var sponsorLabel=m.workerType==='3rdparty'?
         ('<span style="font-size:10px;color:#5b21b6;background:rgba(167,139,250,.12);padding:2px 7px;border-radius:10px;font-weight:600">3rd Party' + (sponsorCompanyName ? ' · ' + hxe(sponsorCompanyName) : '') + '</span>'):
         '<span style="font-size:10px;color:#00875a;background:rgba(0,102,102,.1);padding:2px 7px;border-radius:10px;font-weight:600">ALFA</span>';
-      rows+='<tr><td><div style="display:flex;align-items:center;gap:10px"><div class="hrf-emp-avatar" style="width:32px;height:32px;font-size:11px">'+hini(m.name)+'</div>'+
+      rows+='<tr data-name="'+hxe((m.name||'').toLowerCase())+'" data-sap="'+hxe((m.sap||'').toLowerCase())+'" data-branch="'+hxe(m._branchId||'')+'" data-dept="'+hxe(m.dept||'')+'"><td><div style="display:flex;align-items:center;gap:10px"><div class="hrf-emp-avatar" style="width:32px;height:32px;font-size:11px">'+hini(m.name)+'</div>'+
         '<div><div style="font-weight:600;color:var(--text-primary)">'+hxe(m.name)+'</div>'+
         '<div style="font-size:11px;color:var(--text-tertiary)">'+hxe(m.sap||m.id||'\u2014')+'</div></div></div></td>'+
         '<td>'+hxe(m.dept||'\u2014')+'</td><td>'+hxe(m.role||'\u2014')+'</td>'+
@@ -12860,7 +12978,36 @@ function pHrfEmployees(){
         '</div></td></tr>';
     });
     if(!filtered.length)h+='<div class="empty-state"><div class="es-icon">&#x1F465;</div><h3>No staff found</h3><p>Try adjusting filters</p></div>';
-    else h+=hrfTable(['Name','Dept','Role','Branch','Status','Sponsor','Phone','Actions'],rows);
+    else h+=hrfTable(['Name','Dept','Role','Branch','Status','Sponsor','Phone','Actions'],rows,'hrf-emp-table');
+    // Wire up in-place filtering AFTER render (no re-render on keystroke = no focus loss)
+    setTimeout(function(){
+      var si=document.getElementById('hrf-emp-search');
+      var sb=document.getElementById('hrf-emp-branch');
+      var sd=document.getElementById('hrf-emp-dept');
+      function applyFilter(){
+        NX._hrfQ=si?si.value:'';
+        NX._hrfBranch=sb?sb.value:'';
+        NX._hrfDept=sd?sd.value:'';
+        // Filter table rows in-place without full page re-render
+        var q=(NX._hrfQ||'').toLowerCase();
+        var bd=NX._hrfBranch||'';
+        var dd=NX._hrfDept||'';
+        document.querySelectorAll('#hrf-emp-table tbody tr').forEach(function(row){
+          var name=(row.dataset.name||'').toLowerCase();
+          var sap=(row.dataset.sap||'').toLowerCase();
+          var branch=row.dataset.branch||'';
+          var dept=row.dataset.dept||'';
+          var show=true;
+          if(q&&name.indexOf(q)<0&&sap.indexOf(q)<0)show=false;
+          if(bd&&branch!==bd)show=false;
+          if(dd&&normalizeDept(dept)!==normalizeDept(dd))show=false;
+          row.style.display=show?'':'none';
+        });
+      }
+      if(si)si.addEventListener('input',applyFilter);
+      if(sb)sb.addEventListener('change',applyFilter);
+      if(sd)sd.addEventListener('change',applyFilter);
+    },0);
     return h;
   }
   var cached=branches.filter(function(b){return HRF.staff[b.id];});
@@ -12931,10 +13078,25 @@ var HRF_COMPANIES = []; // 3rd-party staffing companies
 function hrfLoadRolesAndCompanies(cb){
   if(!db){if(cb)cb();return;}
   var done=0;
-  function check(){done++;if(done>=2&&cb)cb();}
+  function check(){done++;if(done>=3&&cb)cb();}
   db.ref('shared/hr_roles').once('value',function(snap){var v=snap.val();if(v&&v.length)HRF_ROLES=v;check();});
   db.ref('shared/hr_companies').once('value',function(snap){var v=snap.val();if(v)HRF_COMPANIES=Array.isArray(v)?v:Object.values(v);else HRF_COMPANIES=[];check();});
+  // Also load managed departments so DEPTS stays in sync with Firebase
+  db.ref('shared/departments').once('value',function(snap){
+    var v=snap.val();
+    if(v&&Array.isArray(v)&&v.length){
+      DEPTS=v;
+      // Rebuild normalizeDept aliases dynamically
+      DEPTS.forEach(function(d){ if(d) _deptAliases[d.toLowerCase()]=d; });
+    } else if(!v) {
+      // Seed defaults on first run
+      db.ref('shared/departments').set(DEPTS);
+    }
+    check();
+  });
 }
+
+// ── Dept Aliases cache (updated when DEPTS changes) ──
 
 function openHrfEmpModal(empId,branchId){
   hrfLoadRolesAndCompanies(function(){
@@ -12942,7 +13104,7 @@ function openHrfEmpModal(empId,branchId){
     if(empId&&branchId){var arr=HRF.staff[branchId]||[];m=arr.find(function(x){return x.id===empId;});}
     var branches=hrfBranches();
     var brOpts=branches.map(function(b){return '<option value="'+hxe(b.id)+'"'+(m&&m._branchId===b.id?' selected':(branchId===b.id?' selected':''))+'>'+hxe(b.name)+'</option>';}).join('');
-    var deps=['FOH','Kitchen','Bar','Management','Maintenance','Other'];
+    var deps=DEPTS; // ← use canonical DEPTS (shared with Branch Manager schedule)
     var depOpts=deps.map(function(d){return '<option'+(m&&m.dept===d?' selected':'')+'>'+d+'</option>';}).join('');
     var statuses=['Active','On Leave','Resigned','Terminated'];
     var stOpts=statuses.map(function(s){return '<option'+(m&&m.status===s?' selected':(!m&&s==='Active'?' selected':''))+'>'+s+'</option>';}).join('');
@@ -12954,6 +13116,7 @@ function openHrfEmpModal(empId,branchId){
       '<div class="modal-head"><h2>'+(m?'Edit Employee':'Add Employee')+'</h2>'+
       '<div style="display:flex;gap:8px">'+
         '<button class="btn btn-sm" onclick="openHrfRolesMgr()" title="Manage Roles">\u2699\uFE0F Roles</button>'+
+        '<button class="btn btn-sm" onclick="openHrfDeptsMgr()" title="Manage Departments">\u2699\uFE0F Depts</button>'+
         '<button class="btn btn-sm" onclick="openHrfCompaniesMgr()" title="Manage Companies">\u2699\uFE0F Companies</button>'+
         '<button class="modal-close" onclick="closeModalForce()">\u2715</button>'+
       '</div></div>'+
@@ -13017,12 +13180,14 @@ function saveHrfEmp(empId,oldBranchId){
   var name=bgv('hrfemp-name'),branchId=bgv('hrfemp-branch');
   if(!name||!branchId){showToast('Name and Branch are required','error');return;}
   var wType=bgv('hrfemp-workertype')||'company';
+  // Ensure stable id — same id used as schedule key
+  var newId = empId || buid();
   var rec={
-    id:empId||buid(),
+    id:newId,
     name:name,
     sap:bgv('hrfemp-sap'),
     email:bgv('hrfemp-email'),
-    dept:bgv('hrfemp-dept'),
+    dept:normalizeDept(bgv('hrfemp-dept')),
     role:bgv('hrfemp-role'),
     status:bgv('hrfemp-status')||'Active',
     phone:bgv('hrfemp-phone'),
@@ -13033,13 +13198,23 @@ function saveHrfEmp(empId,oldBranchId){
     companyId:wType==='3rdparty'?(bgv('hrfemp-company')||''):'',
     branchId:branchId
   };
+  // ── Convert array to keyed-object (same format as bSaveColl) ──
+  function toObj(arr) {
+    var obj={};
+    arr.forEach(function(item){
+      if(!item)return;
+      var k=String(item.id||'').replace(/[.#$\[\]\/]/g,'_')||'item_'+Math.random().toString(36).slice(2);
+      obj[k]=item;
+    });
+    return obj;
+  }
   if(!db){showToast('Firebase not connected','error');return;}
   if(empId&&oldBranchId&&oldBranchId!==branchId){
     var oldArr=(HRF.staff[oldBranchId]||[]).filter(function(x){return x.id!==empId;});
-    db.ref('branches/'+oldBranchId+'/staff').set(oldArr,function(err){
+    db.ref('branches/'+oldBranchId+'/staff').set(toObj(oldArr),function(err){
       if(err){showToast('Move failed: '+err.message,'error');return;}
       var newArr=(HRF.staff[branchId]||[]).slice();newArr.push(rec);
-      db.ref('branches/'+branchId+'/staff').set(newArr,function(e2){
+      db.ref('branches/'+branchId+'/staff').set(toObj(newArr),function(e2){
         if(e2){showToast('Save failed: '+e2.message,'error');return;}
         HRF.staff[oldBranchId]=oldArr;HRF.staff[branchId]=newArr;
         _hrfWriteSapIndex(oldBranchId, oldArr);
@@ -13051,12 +13226,9 @@ function saveHrfEmp(empId,oldBranchId){
     var arr=(HRF.staff[branchId]||[]).slice();
     if(empId){var i=arr.findIndex(function(x){return x.id===empId;});if(i>=0)arr[i]=rec;else arr.push(rec);}
     else arr.push(rec);
-    db.ref('branches/'+branchId+'/staff').set(arr,function(err){
+    db.ref('branches/'+branchId+'/staff').set(toObj(arr),function(err){
       if(err){showToast('Save failed: '+err.message,'error');return;}
       HRF.staff[branchId]=arr;
-      // Write SAP→staffId index so Staff Portal can find schedule by SAP
-      // Uses the branch schedule's internal ID (m.id from the BS.staff list)
-      // We build the index from ALL staff in this branch
       _hrfWriteSapIndex(branchId, arr);
       closeModalForce();showToast(empId?'Employee updated':'Employee added','success');navTo('hrf-employees');
     });
@@ -13116,6 +13288,71 @@ function addHrfRole(){var v=bgv('hrf-role-new');if(!v){showToast('Enter a role n
 function renameHrfRole(i){var v=prompt('Rename "'+HRF_ROLES[i]+'" to:',HRF_ROLES[i]);if(!v||v===HRF_ROLES[i])return;HRF_ROLES[i]=v;db.ref('shared/hr_roles').set(HRF_ROLES);showToast('Renamed','success');openHrfRolesMgr();}
 function deleteHrfRole(i){if(!confirm('Delete role "'+HRF_ROLES[i]+'"?'))return;HRF_ROLES.splice(i,1);db.ref('shared/hr_roles').set(HRF_ROLES);showToast('Deleted','success');openHrfRolesMgr();}
 
+// ── Managed Departments CRUD ──
+// Stored at shared/departments — same array feeds DEPTS used by HR + Branch Manager schedule
+function openHrfDeptsMgr(){
+  var rows=DEPTS.map(function(d,i){
+    var isCore=(i<3); // Management/Kitchen/FOH are core — warn before delete
+    return '<tr>'+
+      '<td style="font-weight:600;color:var(--text-primary)">'+hxe(d)+'</td>'+
+      '<td style="text-align:right;white-space:nowrap">'+
+        '<button class="btn btn-sm" data-di="'+i+'" onclick="renameHrfDept(parseInt(this.dataset.di))">Rename</button> '+
+        '<button class="btn btn-sm" style="color:var(--danger)" data-di="'+i+'" data-core="'+(isCore?'1':'0')+'" onclick="deleteHrfDept(parseInt(this.dataset.di),this.dataset.core===\'1\')">Del</button>'+
+      '</td></tr>';
+  }).join('');
+  openModal(
+    '<div class="modal-head"><h2>\u2699\uFE0F Manage Departments</h2><button class="modal-close" onclick="closeModalForce()">\u2715</button></div>'+
+    '<div style="font-size:11px;color:var(--text-tertiary);background:var(--surface-2);padding:9px 12px;border-radius:8px;margin-bottom:12px">'+
+      'Departments are shared across HR and Branch Manager schedule. Changes apply everywhere instantly.'+
+    '</div>'+
+    '<div class="bfg"><label class="form-label">Add new department</label>'+
+    '<div style="display:flex;gap:8px">'+
+      '<input class="form-input" id="hrf-dept-new" placeholder="e.g. Bar, Delivery, Events\u2026">'+
+      '<button class="btn btn-primary" onclick="addHrfDept()">+ Add</button>'+
+    '</div></div>'+
+    '<div class="btw" style="max-height:320px;overflow-y:auto;margin-top:12px">'+
+    '<table class="btbl"><thead><tr><th>Department</th><th style="text-align:right">Actions</th></tr></thead>'+
+    '<tbody>'+(rows||'<tr><td colspan="2" style="text-align:center;color:var(--text-tertiary);padding:14px">No departments</td></tr>')+'</tbody></table></div>'
+  );
+}
+function _saveDepts(cb){
+  if(!db)return;
+  db.ref('shared/departments').set(DEPTS,function(){
+    // Rebuild alias map
+    DEPTS.forEach(function(d){ if(d) _deptAliases[d.toLowerCase()]=d; });
+    if(cb)cb();
+  });
+}
+function addHrfDept(){
+  var v=bgv('hrf-dept-new').trim();
+  if(!v){showToast('Enter a department name','error');return;}
+  if(DEPTS.indexOf(v)>=0){showToast('Already exists','error');return;}
+  DEPTS.push(v);
+  _saveDepts(function(){showToast('Department added','success');openHrfDeptsMgr();_refreshDeptDropdown();});
+}
+function renameHrfDept(i){
+  var v=prompt('Rename "'+DEPTS[i]+'" to:',DEPTS[i]);
+  if(!v||v===DEPTS[i])return;
+  var old=DEPTS[i];
+  DEPTS[i]=v;
+  _deptAliases[old.toLowerCase()]=v; // alias old → new for existing data
+  _deptAliases[v.toLowerCase()]=v;
+  _saveDepts(function(){showToast('Renamed','success');openHrfDeptsMgr();_refreshDeptDropdown();});
+}
+function deleteHrfDept(i,isCore){
+  if(isCore&&!confirm('"'+DEPTS[i]+'" is a core department used by the schedule. Deleting it may affect existing staff grouping.\n\nContinue?'))return;
+  if(!isCore&&!confirm('Delete "'+DEPTS[i]+'"?'))return;
+  DEPTS.splice(i,1);
+  _saveDepts(function(){showToast('Deleted','success');openHrfDeptsMgr();_refreshDeptDropdown();});
+}
+// Refresh the dept dropdown in the open employee modal (if visible)
+function _refreshDeptDropdown(){
+  var sel=document.getElementById('hrfemp-dept');
+  if(!sel)return;
+  var cur=sel.value;
+  sel.innerHTML=DEPTS.map(function(d){return '<option value="'+hxe(d)+'"'+(d===cur?' selected':'')+'>'+hxe(d)+'</option>';}).join('');
+}
+
 // ── Managed Companies CRUD ──
 function openHrfCompaniesMgr(){
   var rows=HRF_COMPANIES.map(function(c,i){return '<tr>'+
@@ -13143,7 +13380,20 @@ function addHrfCompany(){
   if(HRF_COMPANIES.find(function(c){return c.name===name;})){showToast('Already exists','error');return;}
   var co={id:buid(),name:name,contact:bgv('hrf-co-contact'),phone:bgv('hrf-co-phone'),email:bgv('hrf-co-email')};
   HRF_COMPANIES.push(co);
-  db.ref('shared/hr_companies').set(HRF_COMPANIES);showToast('Company added','success');openHrfCompaniesMgr();
+  db.ref('shared/hr_companies').set(HRF_COMPANIES,function(){
+    showToast('Company added','success');
+    openHrfCompaniesMgr();
+    // If the employee modal's company dropdown is present in the DOM, refresh it
+    // (it lives behind the companies manager modal)
+    var sel=document.getElementById('hrfemp-company');
+    if(sel){
+      var currentVal=sel.value;
+      sel.innerHTML='<option value="">— None —</option>'+HRF_COMPANIES.map(function(c){
+        var id=c.id||c.name;
+        return '<option value="'+hxe(id)+'"'+(currentVal===id?' selected':'')+'>'+hxe(c.name)+'</option>';
+      }).join('');
+    }
+  });
 }
 function editHrfCompany(i){
   var c=HRF_COMPANIES[i];
@@ -13218,9 +13468,10 @@ function hrfDoReassign(empId,fromBranchId){
   emp.branchId=toBranchId;
   var newToArr=(HRF.staff[toBranchId]||[]).slice();
   newToArr.push(emp);
-  db.ref('branches/'+fromBranchId+'/staff').set(newOldArr,function(e1){
+  function toObj(arr){var obj={};arr.forEach(function(item){if(!item)return;var k=String(item.id||'').replace(/[.#$\[\]\/]/g,'_')||'item_'+Math.random().toString(36).slice(2);obj[k]=item;});return obj;}
+  db.ref('branches/'+fromBranchId+'/staff').set(toObj(newOldArr),function(e1){
     if(e1){showToast('Remove failed: '+e1.message,'error');return;}
-    db.ref('branches/'+toBranchId+'/staff').set(newToArr,function(e2){
+    db.ref('branches/'+toBranchId+'/staff').set(toObj(newToArr),function(e2){
       if(e2){showToast('Add failed: '+e2.message,'error');return;}
       HRF.staff[fromBranchId]=newOldArr;HRF.staff[toBranchId]=newToArr;
       closeModalForce();showToast('Employee moved \u2713','success');navTo('hrf-employees');
@@ -13231,7 +13482,8 @@ function hrfDeleteEmp(empId,branchId){
   if(!confirm('Delete this employee permanently?\n\nThis removes them from the branch staff list.'))return;
   if(!db)return;
   var arr=(HRF.staff[branchId]||[]).filter(function(x){return x.id!==empId;});
-  db.ref('branches/'+branchId+'/staff').set(arr,function(err){
+  function toObj(a){var o={};a.forEach(function(item){if(!item)return;var k=String(item.id||'').replace(/[.#$\[\]\/]/g,'_')||'x';o[k]=item;});return o;}
+  db.ref('branches/'+branchId+'/staff').set(toObj(arr),function(err){
     if(err){showToast('Delete failed: '+err.message,'error');return;}
     HRF.staff[branchId]=arr;
     showToast('Employee deleted','success');navTo('hrf-employees');

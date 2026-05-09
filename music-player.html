@@ -538,10 +538,6 @@ html, body {
       </div>
     </div>
 
-    <!-- Google Drive embed player (shown instead of native audio for GDrive links) -->
-    <div id="gdrive-wrap" style="display:none;margin:10px 0;"></div>
-    <div id="audio-error" style="font-size:11px;color:#e74c3c;text-align:center;min-height:14px;margin:-4px 0 6px"></div>
-
     <div class="controls">
       <button class="ctrl-btn" id="btn-shuffle" onclick="toggleShuffle()" title="Shuffle">🔀</button>
       <button class="ctrl-btn" onclick="prevTrack()" title="Previous">⏮</button>
@@ -594,28 +590,53 @@ html, body {
 <div class="modal-ov" id="add-modal">
   <div class="modal-box">
     <div class="modal-title">Add Track to Playlist</div>
-    <div class="modal-sub">Paste a cloud link or any public audio URL. Google Drive, OneDrive, Dropbox, or direct MP3/audio links all work.</div>
-    <div class="modal-info">
-      <strong>Google Drive:</strong> Share → "Anyone with link" → paste URL<br>
-      <strong>OneDrive:</strong> Share → copy link (auto-converted)<br>
-      <strong>Dropbox:</strong> Share link (dl=0→dl=1 auto-fixed)<br>
-      <strong>Direct URL:</strong> Any public .mp3 / .ogg / .wav / .aac
+
+    <!-- Tab switcher: URL vs Local File -->
+    <div style="display:flex;gap:0;margin-bottom:14px;border-radius:10px;overflow:hidden;box-shadow:var(--sh-inset-sm)">
+      <button id="tab-url" onclick="switchAddTab('url')" style="flex:1;padding:8px;border:none;background:var(--primary);color:#fff;font-family:var(--font);font-size:11px;font-weight:700;cursor:pointer;transition:all .15s">🔗 Cloud / URL</button>
+      <button id="tab-file" onclick="switchAddTab('file')" style="flex:1;padding:8px;border:none;background:var(--base);color:var(--text2);font-family:var(--font);font-size:11px;font-weight:700;cursor:pointer;transition:all .15s">📁 Local File</button>
     </div>
-    <div class="field">
-      <label>Track Name *</label>
-      <input type="text" id="inp-name" placeholder="e.g. Morning Lofi Vibes">
+
+    <!-- URL tab -->
+    <div id="add-tab-url">
+      <div class="modal-sub">Paste a cloud link or any public audio URL.</div>
+      <div class="modal-info">
+        <strong>Google Drive:</strong> Share → "Anyone with link" → paste URL<br>
+        <strong>OneDrive:</strong> Share → copy link (auto-converted)<br>
+        <strong>Dropbox:</strong> Share link (auto-fixed)<br>
+        <strong>Direct URL:</strong> Any public .mp3 / .ogg / .wav / .aac
+      </div>
+      <div class="field">
+        <label>Track Name *</label>
+        <input type="text" id="inp-name" placeholder="e.g. Morning Lofi Vibes">
+      </div>
+      <div class="field">
+        <label>Artist / Source</label>
+        <input type="text" id="inp-artist" placeholder="e.g. Lofi Radio">
+      </div>
+      <div class="field">
+        <label>Audio URL or Cloud Link *</label>
+        <input type="text" id="inp-url" placeholder="Paste Google Drive / OneDrive / Dropbox / direct link">
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel" onclick="closeAddModal()">Cancel</button>
+        <button class="btn-ok" onclick="addTrack()">Add to Playlist</button>
+      </div>
     </div>
-    <div class="field">
-      <label>Artist / Source</label>
-      <input type="text" id="inp-artist" placeholder="e.g. Lofi Radio">
-    </div>
-    <div class="field">
-      <label>Audio URL or Cloud Link *</label>
-      <input type="text" id="inp-url" placeholder="https://drive.google.com/file/d/.../view">
-    </div>
-    <div class="modal-footer">
-      <button class="btn-cancel" onclick="closeAddModal()">Cancel</button>
-      <button class="btn-ok" onclick="addTrack()">Add to Playlist</button>
+
+    <!-- Local File tab -->
+    <div id="add-tab-file" style="display:none">
+      <div class="modal-sub" style="margin-bottom:10px">Pick audio files from your device. They play directly — no upload needed. Files stay available while this tab is open.</div>
+      <div style="background:var(--base);border-radius:12px;box-shadow:var(--sh-inset-sm);padding:16px;text-align:center;margin-bottom:14px;cursor:pointer" onclick="document.getElementById('local-file-inp').click()">
+        <div style="font-size:28px;margin-bottom:6px">📂</div>
+        <div style="font-size:12px;font-weight:700;color:var(--primary);font-family:var(--font)">Click to choose audio files</div>
+        <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:4px">MP3, WAV, OGG, AAC, FLAC, M4A</div>
+      </div>
+      <input type="file" id="local-file-inp" accept="audio/*" multiple style="display:none" onchange="addLocalFiles(this.files)">
+      <div id="local-file-status" style="font-size:11px;color:var(--text2);font-family:var(--mono);text-align:center;min-height:18px"></div>
+      <div class="modal-footer" style="margin-top:10px">
+        <button class="btn-cancel" onclick="closeAddModal()">Done</button>
+      </div>
     </div>
   </div>
 </div>
@@ -700,24 +721,25 @@ function load() {
     var idx = localStorage.getItem(SK+'_idx');
     var pt  = localStorage.getItem(SK+'_pt');
     var vol = localStorage.getItem(SK+'_vol');
-    if (pl) {
+    if (pl)  {
       playlist = JSON.parse(pl);
-      // Migrate old Google Drive URLs (export=download or export=view) → gdrive://
       var migrated = false;
+      // Remove local blob: tracks (they expire on page reload)
+      playlist = playlist.filter(function(t) {
+        if (t.isLocal || (t.url && t.url.startsWith('blob:'))) return false;
+        return true;
+      });
+      // Migrate old export=view → export=download for Google Drive
       playlist.forEach(function(t) {
-        if (t.url && t.url.includes('drive.google.com') && !t.url.startsWith('gdrive://')) {
-          var id = extractGDriveId(t.url);
-          if (!id) {
-            // Try matching uc?export= format
-            var m = t.url.match(/[?&]id=([^&]+)/);
-            if (m) id = m[1];
-          }
-          if (id) { t.url = 'gdrive://' + id; migrated = true; }
+        if (t.url && t.url.includes('drive.google.com') && t.url.includes('export=view')) {
+          t.url = t.url.replace('export=view', 'export=download');
+          migrated = true;
         }
       });
       if (migrated) save();
     }
     if (idx !== null) currentIndex = parseInt(idx) || 0;
+    if (currentIndex >= playlist.length) currentIndex = playlist.length - 1;
     if (pt)  prayerTimes = Object.assign({}, prayerTimes, JSON.parse(pt));
     if (vol) { document.getElementById('vol-slider').value = vol; setVolume(vol); }
   } catch(e) {}
@@ -726,25 +748,75 @@ function load() {
 // ═══════════════════════════════════════
 //  URL CONVERSION
 // ═══════════════════════════════════════
-function extractGDriveId(u) {
-  var m = u.match(/drive\.google\.com\/file\/d\/([^\/\?&]+)/);
-  if (m) return m[1];
-  var m2 = u.match(/drive\.google\.com\/open\?id=([^&]+)/);
-  if (m2) return m2[1];
-  var m3 = u.match(/[?&]id=([^&]+)/);
-  if (m3 && u.includes('drive.google.com')) return m3[1];
-  return null;
-}
 function convertUrl(raw) {
   var u = (raw || '').trim();
-  // Google Drive — we store the special gdrive:// prefix so loadTrack can use iframe
-  var gdId = extractGDriveId(u);
-  if (gdId) return 'gdrive://' + gdId;
+
+  // Google Drive: extract file ID from any share/view/open URL
+  var gdId = null;
+  var gd1 = u.match(/drive\.google\.com\/file\/d\/([^\/\?&]+)/);
+  if (gd1) gdId = gd1[1];
+  if (!gdId) { var gd2 = u.match(/drive\.google\.com\/open\?id=([^&]+)/); if (gd2) gdId = gd2[1]; }
+  if (!gdId) { var gd3 = u.match(/[?&]id=([^&]+)/); if (u.includes('drive.google.com') && gd3) gdId = gd3[1]; }
+
+  if (gdId) {
+    // Use uc?export=download&confirm=t — this bypasses the scan page and
+    // returns raw audio bytes that HTMLAudioElement can stream.
+    // export=view returns HTML (the viewer page), not audio bytes.
+    return 'https://drive.google.com/uc?export=download&confirm=t&id=' + gdId;
+  }
+
   if (u.includes('1drv.ms') || u.includes('onedrive.live.com')) {
     try { var e = btoa(u).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,''); return 'https://api.onedrive.com/v1.0/shares/u!'+e+'/root/content'; } catch(ex) { return u; }
   }
   if (u.includes('dropbox.com')) return u.replace('dl=0','dl=1').replace('www.dropbox.com','dl.dropboxusercontent.com');
   return u;
+}
+
+// ── Tab switcher: URL vs Local File ──
+function switchAddTab(tab) {
+  var urlTab  = document.getElementById('add-tab-url');
+  var fileTab = document.getElementById('add-tab-file');
+  var btnUrl  = document.getElementById('tab-url');
+  var btnFile = document.getElementById('tab-file');
+  if (tab === 'url') {
+    urlTab.style.display  = '';
+    fileTab.style.display = 'none';
+    btnUrl.style.background  = 'var(--primary)'; btnUrl.style.color  = '#fff';
+    btnFile.style.background = 'var(--base)';    btnFile.style.color = 'var(--text2)';
+    setTimeout(function(){ var n=document.getElementById('inp-name'); if(n)n.focus(); },80);
+  } else {
+    urlTab.style.display  = 'none';
+    fileTab.style.display = '';
+    btnFile.style.background = 'var(--primary)'; btnFile.style.color = '#fff';
+    btnUrl.style.background  = 'var(--base)';    btnUrl.style.color  = 'var(--text2)';
+  }
+}
+
+// ── Local File Handler ──
+// Creates blob: URLs — they work while the tab is open (no upload needed)
+function addLocalFiles(files) {
+  if (!files || !files.length) return;
+  var st = document.getElementById('local-file-status');
+  var added = 0;
+  Array.from(files).forEach(function(file) {
+    if (!file.type.startsWith('audio/')) return;
+    var blobUrl = URL.createObjectURL(file);
+    // Extract clean name (strip extension)
+    var name = file.name.replace(/\.[^.]+$/, '').replace(/[-_]/g,' ');
+    playlist.push({ id: Date.now() + Math.random(), name: name, artist: 'Local File', url: blobUrl, isLocal: true, duration: null });
+    added++;
+  });
+  if (added) {
+    save(); renderList();
+    if (currentIndex === -1) loadTrack(playlist.length - 1, false);
+    toast('Added ' + added + ' local track' + (added>1?'s':''), 'success');
+    if (st) st.textContent = '✓ ' + added + ' file' + (added>1?'s':'') + ' added to playlist';
+  } else {
+    if (st) st.textContent = 'No supported audio files found';
+  }
+  // Reset input so same file can be re-picked
+  var inp = document.getElementById('local-file-inp');
+  if (inp) inp.value = '';
 }
 
 // ═══════════════════════════════════════
@@ -852,70 +924,23 @@ function filterTracks(q) { renderList(q); }
 // ═══════════════════════════════════════
 //  PLAYBACK
 // ═══════════════════════════════════════
-function isGDrive(url) { return url && url.indexOf('gdrive://') === 0; }
-function gdId(url) { return url.replace('gdrive://',''); }
-
 function loadTrack(idx, autoplay) {
   if (idx < 0 || idx >= playlist.length) return;
   currentIndex = idx;
   var t = playlist[idx];
+  audio.src = t.url;
   document.getElementById('now-title').textContent  = t.name;
   document.getElementById('now-artist').textContent = t.artist;
   document.getElementById('hdr-sub').textContent    = 'Now: ' + t.name;
   document.title = t.name + ' — ALFA.CO';
-
-  if (isGDrive(t.url)) {
-    // Google Drive: use iframe embed — avoids CORS restriction entirely
-    var id = gdId(t.url);
-    audio.pause(); audio.src = '';
-    showGDrivePlayer(id, autoplay);
-  } else {
-    hideGDrivePlayer();
-    audio.src = t.url;
-    if (autoplay && !isPrayerPaused) audio.play().catch(function(){});
-  }
   save(); renderList();
-}
-
-function showGDrivePlayer(fileId, autoplay) {
-  var wrap = document.getElementById('gdrive-wrap');
-  if (!wrap) return;
-  var src = 'https://drive.google.com/file/d/' + fileId + '/preview';
-  wrap.innerHTML = '<iframe id="gdrive-iframe" src="' + src + '" width="100%" height="80" frameborder="0" allow="autoplay" allowfullscreen style="border:none;border-radius:10px;background:#000"></iframe>';
-  wrap.style.display = 'block';
-  // Show a message so user knows it loaded
-  document.getElementById('audio-error') && (document.getElementById('audio-error').textContent = '');
-  isPlaying = autoplay;
-  document.getElementById('btn-play').textContent = autoplay ? '⏸' : '▶';
-  setWavePaused(!autoplay);
-}
-
-function hideGDrivePlayer() {
-  var wrap = document.getElementById('gdrive-wrap');
-  if (wrap) { wrap.innerHTML = ''; wrap.style.display = 'none'; }
+  if (autoplay && !isPrayerPaused) audio.play().catch(function(){});
 }
 
 function togglePlay() {
   if (isPrayerPaused) { toast('🕌 Paused for prayer time', 'warning'); return; }
   if (!playlist.length) { toast('Add tracks first', 'warning'); return; }
   if (currentIndex < 0) { loadTrack(0, true); return; }
-  var t = playlist[currentIndex];
-  if (isGDrive(t.url)) {
-    // GDrive iframe controls itself — just toggle the visual state
-    if (isPlaying) {
-      isPlaying = false;
-      document.getElementById('btn-play').textContent = '▶';
-      setWavePaused(true);
-      hideGDrivePlayer();
-      toast('Paused — click play to resume', 'info');
-    } else {
-      isPlaying = true;
-      document.getElementById('btn-play').textContent = '⏸';
-      setWavePaused(false);
-      showGDrivePlayer(gdId(t.url), true);
-    }
-    return;
-  }
   isPlaying ? audio.pause() : audio.play().catch(function(){});
 }
 function prevTrack() {
@@ -1196,9 +1221,11 @@ function _ptFetchByCoords(lat, lng) {
 //  ADD MODAL
 // ═══════════════════════════════════════
 function openAddModal() {
-  ['inp-name','inp-artist','inp-url'].forEach(function(id) { document.getElementById(id).value = ''; });
+  ['inp-name','inp-artist','inp-url'].forEach(function(id) { var el=document.getElementById(id); if(el)el.value = ''; });
+  var st=document.getElementById('local-file-status'); if(st)st.textContent='';
+  switchAddTab('url'); // always start on URL tab
   document.getElementById('add-modal').classList.add('show');
-  setTimeout(function(){ document.getElementById('inp-name').focus(); }, 80);
+  setTimeout(function(){ var n=document.getElementById('inp-name'); if(n)n.focus(); }, 80);
 }
 function closeAddModal() { document.getElementById('add-modal').classList.remove('show'); }
 

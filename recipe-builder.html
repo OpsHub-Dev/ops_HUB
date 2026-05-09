@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Recipe Builder — ALFA.CO</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<style>
+:root {
+  --base:#E7E5E4;--base-dk:#D4D2D1;--base-lt:#F4F2F1;
+  --sh-raise:6px 6px 16px rgba(0,0,0,0.18),-6px -6px 16px rgba(255,255,255,0.88);
+  --sh-raise-sm:3px 3px 8px rgba(0,0,0,0.15),-3px -3px 8px rgba(255,255,255,0.85);
+  --sh-raise-lg:10px 10px 28px rgba(0,0,0,0.20),-10px -10px 28px rgba(255,255,255,0.90);
+  --sh-inset:inset 4px 4px 10px rgba(0,0,0,0.13),inset -4px -4px 10px rgba(255,255,255,0.75);
+  --sh-inset-sm:inset 2px 2px 6px rgba(0,0,0,0.10),inset -2px -2px 6px rgba(255,255,255,0.70);
+  --primary:#006666;--primary-h:#008080;--accent:#F1A500;
+  --success:#00A63D;--danger:#FF2157;--warning:#FE9900;
+  --font:'Space Mono','Courier New',monospace;
+  --mono:'JetBrains Mono','Fira Code',monospace;
+  --text:#1E2938;--text2:rgba(30,41,56,0.58);--text3:rgba(30,41,56,0.35);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{min-height:100vh;background:var(--base);color:var(--text);font-family:var(--font);font-size:13px;-webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:rgba(0,0,0,0.14);border-radius:4px}
+
+.header{background:var(--base);box-shadow:0 4px 16px rgba(0,0,0,0.10),0 -1px 0 rgba(255,255,255,0.8);padding:11px 18px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:50;flex-wrap:wrap}
+.hdr-logo{height:32px;width:auto}
+.hdr-title{font-size:13px;font-weight:700;letter-spacing:-0.5px}
+.hdr-sub{font-size:9px;color:var(--text3);font-family:var(--mono)}
+.hdr-right{margin-left:auto;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+
+.layout{display:grid;grid-template-columns:270px 1fr;min-height:calc(100vh - 58px)}
+@media(max-width:860px){.layout{grid-template-columns:1fr}}
+
+.sidebar{background:var(--base-dk);border-right:1px solid rgba(0,0,0,0.06);padding:14px 10px;display:flex;flex-direction:column;gap:9px;overflow-y:auto;max-height:calc(100vh - 58px);position:sticky;top:58px}
+.sb-title{font-size:9px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--text3)}
+.search-inp{width:100%;background:var(--base);border:none;border-radius:9px;box-shadow:var(--sh-inset-sm);padding:7px 10px;font-family:var(--font);font-size:11px;color:var(--text);outline:none}
+.search-inp::placeholder{color:var(--text3)}
+.recipe-card-sm{background:var(--base);border-radius:10px;box-shadow:var(--sh-raise-sm);padding:9px 11px;cursor:pointer;transition:box-shadow .15s,transform .15s;display:flex;align-items:center;gap:7px}
+.recipe-card-sm:hover{box-shadow:var(--sh-raise);transform:translateY(-1px)}
+.recipe-card-sm.active{box-shadow:var(--sh-inset-sm);transform:none}
+.rc-info{flex:1;min-width:0}
+.rc-name{font-weight:700;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rc-meta{font-size:9px;color:var(--text3);font-family:var(--mono)}
+.rc-cost{font-size:11px;font-weight:700;font-family:var(--mono);color:var(--primary);white-space:nowrap}
+
+.main{padding:14px 18px;display:flex;flex-direction:column;gap:12px}
+.tabs{display:flex;gap:3px;background:var(--base);border-radius:11px;box-shadow:var(--sh-inset-sm);padding:3px}
+.tab-btn{flex:1;padding:7px;border:none;border-radius:9px;font-family:var(--font);font-size:10px;font-weight:700;cursor:pointer;color:var(--text2);background:none;transition:all .15s}
+.tab-btn.active{background:var(--base);box-shadow:var(--sh-raise-sm);color:var(--primary)}
+
+/* ALFA.CO Recipe Form — matches PDF exactly */
+.rform{background:var(--base);border-radius:14px;box-shadow:var(--sh-raise);overflow:hidden}
+
+.rform-hdr{background:var(--primary);padding:12px 16px;display:flex;align-items:center;justify-content:space-between}
+.rform-hdr-name{font-size:13px;font-weight:700;color:#fff;letter-spacing:-0.3px}
+.rform-hdr-sub{font-size:9px;color:rgba(255,255,255,0.75);font-family:var(--mono);margin-top:2px}
+
+.rform-meta{display:grid;grid-template-columns:1fr 1fr;border-bottom:2px solid rgba(0,0,0,0.07)}
+.meta-side{padding:12px 16px}
+.meta-side:last-child{border-left:1px solid rgba(0,0,0,0.06)}
+.meta-row{display:flex;align-items:center;gap:6px;margin-bottom:6px}
+.meta-row:last-child{margin-bottom:0}
+.ml{font-size:10px;font-weight:700;color:var(--text3);width:76px;flex-shrink:0;text-transform:uppercase;letter-spacing:.06em}
+.fi{width:100%;background:var(--base);border:none;border-radius:7px;box-shadow:var(--sh-inset-sm);padding:5px 8px;font-family:var(--font);font-size:11px;color:var(--text);outline:none}
+.fi:focus{box-shadow:var(--sh-inset),0 0 0 2px rgba(0,102,102,.15)}
+.fi::placeholder{color:var(--text3)}
+select.fi{cursor:pointer}
+
+.rform-body{display:grid;grid-template-columns:1fr 1fr;border-bottom:2px solid rgba(0,0,0,0.07)}
+.ic,.tc{padding:12px 16px}
+.tc{border-left:1px solid rgba(0,0,0,0.06)}
+.col-ttl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--text3);margin-bottom:8px;border-bottom:1px solid rgba(0,0,0,0.06);padding-bottom:5px}
+
+.itbl{width:100%;border-collapse:collapse;margin-bottom:6px}
+.itbl th{font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);padding:4px 5px;text-align:left;border-bottom:1px solid rgba(0,0,0,0.06)}
+.itbl td{padding:2px 3px;vertical-align:middle}
+.ir td{border-bottom:1px solid rgba(0,0,0,0.04)}
+.ir:hover td{background:rgba(0,102,102,.03)}
+.ti{width:100%;background:none;border:none;font-family:var(--font);font-size:11px;color:var(--text);outline:none;padding:3px 4px;border-radius:4px}
+.ti:focus{background:var(--base);box-shadow:var(--sh-inset-sm)}
+.ti.n{min-width:90px}
+.ti.q{text-align:right;width:60px}
+.ti.cpu{text-align:right;width:70px}
+.su{width:52px}
+.dh{color:var(--text3);cursor:grab;font-size:12px;padding:2px 3px;user-select:none}
+.dh:active{cursor:grabbing}
+.dr-btn{background:none;border:none;color:var(--text3);cursor:pointer;font-size:12px;padding:2px 5px;border-radius:4px}
+.dr-btn:hover{color:var(--danger);background:rgba(255,33,87,.08)}
+.ir.drag-over td{box-shadow:inset 0 -2px 0 var(--primary)}
+
+.ta{width:100%;background:none;border:none;font-family:var(--font);font-size:11px;color:var(--text);outline:none;resize:vertical;min-height:160px;line-height:1.8}
+.ta:focus{background:var(--base-lt);border-radius:7px;padding:6px 8px;box-shadow:var(--sh-inset-sm)}
+
+.cbar{display:flex;flex-wrap:wrap;gap:10px;padding:10px 16px;background:var(--base-lt);border-top:1px solid rgba(0,0,0,0.06);align-items:center}
+.ckpi{text-align:center}
+.ckpi-v{font-size:16px;font-weight:700;font-family:var(--mono);color:var(--primary);letter-spacing:-0.5px}
+.ckpi-l{font-size:8px;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);margin-top:1px}
+
+.sig{display:grid;grid-template-columns:1fr 1fr;background:var(--base-dk)}
+.sig-c{padding:10px 16px;border-top:1px solid rgba(0,0,0,0.06)}
+.sig-c:last-child{border-left:1px solid rgba(0,0,0,0.06)}
+.sig-line{border-bottom:1px solid rgba(0,0,0,0.18);min-height:28px;margin-bottom:5px}
+.sig-lbl{font-size:9px;color:var(--text3);font-family:var(--mono)}
+.sig-name{font-size:10px;font-weight:700;color:var(--text2)}
+
+.btn{padding:6px 13px;border:none;border-radius:9px;font-family:var(--font);font-size:10px;font-weight:700;cursor:pointer;transition:box-shadow .15s,transform .15s;background:var(--base);color:var(--text);box-shadow:var(--sh-raise-sm)}
+.btn:hover{box-shadow:var(--sh-raise);transform:translateY(-1px)}
+.btn:active{box-shadow:var(--sh-inset-sm);transform:none}
+.btn-p{background:var(--primary);color:#fff;box-shadow:3px 3px 8px rgba(0,102,102,.35)}
+.btn-p:hover{background:var(--primary-h)}
+.btn-d{background:var(--danger);color:#fff}
+.btn-sm{padding:3px 8px;font-size:9px;border-radius:7px}
+.cbadge{font-size:9px;font-family:var(--mono);padding:3px 8px;border-radius:20px;font-weight:700}
+.live{background:rgba(0,166,61,.15);color:#00A63D}
+.off{background:rgba(255,33,87,.12);color:var(--danger)}
+
+.toast-wrap{position:fixed;bottom:18px;right:18px;z-index:999;display:flex;flex-direction:column;gap:5px;pointer-events:none}
+.toast{background:var(--base);border-radius:9px;box-shadow:var(--sh-raise);padding:8px 12px;display:flex;align-items:center;gap:7px;font-size:11px;font-weight:600;animation:si .2s ease;min-width:150px}
+.td{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.td.success{background:var(--success)}.td.error{background:var(--danger)}.td.info{background:var(--primary)}.td.warning{background:var(--warning)}
+@keyframes si{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@media print{
+  .header,.sidebar,.tabs,.hdr-right{display:none!important}
+  .layout{grid-template-columns:1fr!important}
+  body{background:#fff}
+  .rform{box-shadow:none;border:1px solid #ccc;border-radius:0}
+  .pane-view{display:block!important}
+  #pane-edit{display:none!important}
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <img class="hdr-logo" src="https://i.imgur.com/jeqtcE2.png" alt="ALFA.CO" onerror="this.style.display='none'">
+  <div><div class="hdr-title">Recipe Builder</div><div class="hdr-sub">ALFA.CO · shared/recipes · Firebase Live</div></div>
+  <div class="hdr-right">
+    <span class="cbadge off" id="cbadge">Connecting…</span>
+    <button class="btn btn-sm btn-p" onclick="newRecipe()">+ New Recipe</button>
+    <button class="btn btn-sm" onclick="switchTab('edit')">✏ Edit</button>
+    <button class="btn btn-sm" onclick="switchTab('view')">👁 Preview</button>
+    <button class="btn btn-sm" onclick="window.print()">🖨 Print</button>
+    <button class="btn btn-sm" onclick="exportJSON()">⬇ Export</button>
+  </div>
+</div>
+
+<div class="layout">
+  <div class="sidebar">
+    <div class="sb-title">Recipes (<span id="rcnt">0</span>)</div>
+    <input class="search-inp" id="sbsrch" placeholder="Search name, code, concept…" oninput="filterSB(this.value)">
+    <div id="sblist" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:5px"></div>
+    <div style="border-top:1px solid rgba(0,0,0,0.06);padding-top:8px">
+      <div class="sb-title" style="margin-bottom:4px">Connection</div>
+      <div id="fbstat" style="font-size:9px;color:var(--text3);font-family:var(--mono)">Initializing…</div>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="tabs">
+      <button class="tab-btn active" id="tabe" onclick="switchTab('edit')">✏ Edit Recipe</button>
+      <button class="tab-btn" id="tabv" onclick="switchTab('view')">👁 Recipe Card</button>
+    </div>
+
+    <div id="pane-edit">
+      <div class="rform">
+        <div class="rform-hdr">
+          <div>
+            <div class="rform-hdr-name" id="hdname">New Recipe</div>
+            <div class="rform-hdr-sub" id="hdsub">Fill in the details below · Ingredients auto-calculate cost</div>
+          </div>
+          <img src="https://i.imgur.com/jeqtcE2.png" style="height:34px;filter:brightness(0) invert(1);opacity:.85" onerror="this.style.display='none'">
+        </div>
+
+        <div class="rform-meta">
+          <div class="meta-side">
+            <div class="meta-row"><span class="ml">Item Name</span><input class="fi" id="fn" placeholder="e.g. MARINATED TERIYAKI CHICKEN" oninput="upd()"></div>
+            <div class="meta-row"><span class="ml">Yield</span><input class="fi" id="fy" placeholder="1.5 Kg / 1 Batch / 1 Order"></div>
+            <div class="meta-row"><span class="ml">Prep Time</span><input class="fi" id="fp" placeholder="4 HOURS"></div>
+            <div class="meta-row"><span class="ml">Shelf Life</span><input class="fi" id="fsl" placeholder="2 DAYS"></div>
+            <div class="meta-row"><span class="ml">Storing</span>
+              <select class="fi" id="fst">
+                <option value="">— Select —</option>
+                <option>WALKING CHILLER</option><option>CHILLER</option><option>FREEZER</option>
+                <option>ROOM TEMPERATURE</option><option>BAIN MARIE</option><option>DRY STORE</option>
+                <option>SERVED IMMEDIATELY</option><option>SHIFTLY</option><option>DAILY</option>
+              </select></div>
+          </div>
+          <div class="meta-side">
+            <div class="meta-row"><span class="ml">Concept</span>
+              <select class="fi" id="fc">
+                <option value="">— Select —</option>
+                <option>STEAK HOUSE</option><option>PIATTO</option><option>HYBRID</option>
+                <option>SH - SALAD BAR</option><option>CENTRAL KITCHEN</option><option>CAFE</option><option>OTHER</option>
+              </select></div>
+            <div class="meta-row"><span class="ml">Type</span>
+              <select class="fi" id="frt">
+                <option value="">— Select —</option>
+                <option>SUB-PREP</option><option>PREP RECIPE</option><option>LINE RECIPE</option>
+                <option>SERVING RECIPE</option><option>BATCH RECIPE</option>
+              </select></div>
+            <div class="meta-row"><span class="ml">Created</span><input class="fi" id="fcd" type="date"></div>
+            <div class="meta-row"><span class="ml">Revised</span><input class="fi" id="frv" type="date"></div>
+            <div class="meta-row"><span class="ml">Recipe #</span><input class="fi" id="fcode" placeholder="ASORRCM386" oninput="upd()"></div>
+          </div>
+        </div>
+
+        <div class="rform-body">
+          <div class="ic">
+            <div class="col-ttl">Fresh Quality, Ingredients</div>
+            <table class="itbl">
+              <thead><tr>
+                <th style="width:16px"></th>
+                <th>Ingredient</th>
+                <th style="text-align:right;width:62px">QTY</th>
+                <th style="width:54px">Units</th>
+                <th style="text-align:right;width:72px">SAR/unit</th>
+                <th style="text-align:right;width:60px">Total</th>
+                <th style="width:20px"></th>
+              </tr></thead>
+              <tbody id="itbody"></tbody>
+            </table>
+            <button class="btn btn-sm" onclick="addRow()">+ Add Ingredient</button>
+          </div>
+          <div class="tc">
+            <div class="col-ttl">Technique</div>
+            <textarea class="ta" id="ftech" placeholder="1. Step one&#10;2. Step two&#10;3. Step three&#10;&#10;Use numbered steps for clarity."></textarea>
+          </div>
+        </div>
+
+        <div class="cbar">
+          <div class="ckpi"><div class="ckpi-v" id="ctot">SAR 0.00</div><div class="ckpi-l">Total Cost</div></div>
+          <div style="display:flex;align-items:center;gap:5px">
+            <div style="font-size:9px;color:var(--text3)">÷ Portions</div>
+            <input type="number" id="fports" min="1" value="1" step="1" oninput="rc()" style="width:60px;background:var(--base);border:none;border-radius:7px;box-shadow:var(--sh-inset-sm);padding:4px 7px;font-family:var(--mono);font-size:12px;color:var(--text);outline:none;text-align:center">
+          </div>
+          <div class="ckpi"><div class="ckpi-v" id="cpp">SAR 0.000</div><div class="ckpi-l">Cost/Portion</div></div>
+          <div style="display:flex;align-items:center;gap:5px">
+            <div style="font-size:9px;color:var(--text3)">Sell Price</div>
+            <input type="number" id="fprice" step="0.01" placeholder="0.00" oninput="rc()" style="width:75px;background:var(--base);border:none;border-radius:7px;box-shadow:var(--sh-inset-sm);padding:4px 7px;font-family:var(--mono);font-size:12px;color:var(--text);outline:none;text-align:center">
+          </div>
+          <div class="ckpi"><div class="ckpi-v" id="cfc" style="color:var(--warning)">—</div><div class="ckpi-l">Food Cost %</div></div>
+          <div class="ckpi"><div class="ckpi-v" id="cmg" style="color:var(--success)">—</div><div class="ckpi-l">Margin SAR</div></div>
+          <div style="margin-left:auto;display:flex;gap:6px">
+            <button class="btn btn-p" onclick="saveRecipe()">💾 Save to Firebase</button>
+            <button class="btn btn-d btn-sm" id="bdel" style="display:none" onclick="deleteRecipe()">🗑 Delete</button>
+          </div>
+        </div>
+
+        <div class="sig">
+          <div class="sig-c">
+            <div class="sig-line"></div>
+            <div class="sig-lbl">Checked By: ___________________________</div>
+            <div class="sig-name">CULINARY DIRECTOR : HECTOR ALFONSO GUDIEL</div>
+          </div>
+          <div class="sig-c">
+            <div class="sig-line"></div>
+            <div class="sig-lbl">Approved By: ___________________________</div>
+            <div class="sig-name">CHIEF EXECUTIVE OFFICER (C.E.O) JON NOROTSKY</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="pane-view" style="display:none">
+      <div id="vcard"></div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="btn btn-p" onclick="window.print()">🖨 Print / Save PDF</button>
+        <button class="btn" onclick="switchTab('edit')">✏ Edit</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast-wrap" id="twrap"></div>
+
+<script>
+var db=null,RECIPES=[],CID=null,ROWS=[],DSI=null;
+
+function uid(){return Date.now().toString(36)+Math.random().toString(36).slice(2);}
+function xe(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function fsar(v){return 'SAR '+parseFloat(v||0).toFixed(2);}
+function v(id){var e=document.getElementById(id);return e?e.value.trim():'';}
+
+// ── Firebase init ──
+function initFB(){
+  try{
+    var params=new URLSearchParams(location.search);
+    var cp=params.get('fbcfg');
+    var cfg=null;
+    if(cp){cfg=JSON.parse(atob(cp));}
+    else{var s=localStorage.getItem('alfa_fb_config');if(s)cfg=JSON.parse(s);}
+    if(cfg){
+      if(!firebase.apps.length)firebase.initializeApp(cfg);
+      db=firebase.database();
+      document.getElementById('cbadge').textContent='Live';document.getElementById('cbadge').className='cbadge live';
+      document.getElementById('fbstat').textContent='Connected · shared/recipes';
+      db.ref('shared/recipes').on('value',function(snap){
+        var raw=snap.val();
+        if(!raw)RECIPES=[];
+        else if(Array.isArray(raw))RECIPES=raw.filter(Boolean);
+        else RECIPES=Object.values(raw).filter(Boolean);
+        renderSB(document.getElementById('sbsrch').value);
+        document.getElementById('rcnt').textContent=RECIPES.length;
+      });
+    }else{throw new Error('no config');}
+  }catch(e){
+    document.getElementById('cbadge').textContent='Local';document.getElementById('cbadge').className='cbadge off';
+    document.getElementById('fbstat').textContent='No Firebase config — localStorage mode';
+    try{var s2=localStorage.getItem('alfa_rb_recipes');if(s2)RECIPES=JSON.parse(s2);}catch(ex){}
+    renderSB('');document.getElementById('rcnt').textContent=RECIPES.length;
+  }
+}
+
+// ── Rows ──
+function addRow(nm,qty,unit,cpu){
+  ROWS.push({name:nm||'',qty:qty||'',unit:unit||'g',cpu:parseFloat(cpu)||0});
+  renderRows();rc();
+}
+function delRow(i){ROWS.splice(i,1);renderRows();rc();}
+function updRow(i,f,val){if(!ROWS[i])return;ROWS[i][f]=(f==='qty'||f==='cpu')?parseFloat(val)||0:val;rc();}
+function renderRows(){
+  var tb=document.getElementById('itbody');
+  if(!ROWS.length){tb.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:12px;font-size:10px;font-family:var(--mono)">No ingredients — click + Add below</td></tr>';return;}
+  tb.innerHTML=ROWS.map(function(r,i){
+    var cost=(r.cpu||0)*(parseFloat(r.qty)||0);
+    var uOpts=['g','kg','ml','L','pc','pcs','oz','tbsp','tsp','cup','slice','portion'].map(function(u){return '<option'+(u===r.unit?' selected':'')+'>'+u+'</option>';}).join('');
+    return '<tr class="ir" draggable="true" data-i="'+i+'">'
+      +'<td><span class="dh">⠿</span></td>'
+      +'<td><input class="ti n" value="'+xe(r.name)+'" placeholder="Ingredient name" oninput="updRow('+i+',\'name\',this.value)"></td>'
+      +'<td><input class="ti q" type="number" step="0.001" min="0" value="'+xe(r.qty)+'" placeholder="0" oninput="updRow('+i+',\'qty\',this.value)"></td>'
+      +'<td><select class="ti su" onchange="updRow('+i+',\'unit\',this.value)">'+uOpts+'</select></td>'
+      +'<td><input class="ti cpu" type="number" step="0.0001" min="0" value="'+xe(r.cpu||'')+'" placeholder="0.000" title="Cost per unit SAR" oninput="updRow('+i+',\'cpu\',this.value)"></td>'
+      +'<td style="text-align:right;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--primary);padding:3px 5px">'+cost.toFixed(3)+'</td>'
+      +'<td><button class="dr-btn" onclick="delRow('+i+')">✕</button></td>'
+      +'</tr>';
+  }).join('');
+  tb.querySelectorAll('.ir').forEach(function(el){
+    el.addEventListener('dragstart',function(e){DSI=parseInt(el.dataset.i);e.dataTransfer.effectAllowed='move';});
+    el.addEventListener('dragover',function(e){e.preventDefault();el.classList.add('drag-over');});
+    el.addEventListener('dragleave',function(){el.classList.remove('drag-over');});
+    el.addEventListener('drop',function(e){
+      e.preventDefault();el.classList.remove('drag-over');
+      var ti=parseInt(el.dataset.i);
+      if(DSI!==null&&DSI!==ti){var m=ROWS.splice(DSI,1)[0];ROWS.splice(ti,0,m);DSI=null;renderRows();rc();}
+    });
+    el.addEventListener('dragend',function(){DSI=null;el.classList.remove('drag-over');});
+  });
+}
+function rc(){
+  var tot=ROWS.reduce(function(s,r){return s+(r.cpu||0)*(parseFloat(r.qty)||0);},0);
+  var ports=parseInt(document.getElementById('fports').value)||1;
+  var price=parseFloat(document.getElementById('fprice').value)||0;
+  var cpp2=tot/ports;
+  var fc2=price>0?cpp2/price*100:0;
+  var mg=price>0?price-cpp2:0;
+  document.getElementById('ctot').textContent=fsar(tot);
+  document.getElementById('cpp').textContent='SAR '+cpp2.toFixed(3);
+  document.getElementById('cfc').textContent=price>0?fc2.toFixed(1)+'%':'—';
+  document.getElementById('cfc').style.color=fc2>35?'var(--danger)':fc2>25?'var(--warning)':'var(--success)';
+  document.getElementById('cmg').textContent=price>0?fsar(mg):'—';
+  document.getElementById('cmg').style.color=mg>0?'var(--success)':'var(--danger)';
+  // Update row cost cells without full re-render
+  document.querySelectorAll('#itbody .ir').forEach(function(el,i){
+    var r=ROWS[i];if(!r)return;
+    var c=(r.cpu||0)*(parseFloat(r.qty)||0);
+    var cells=el.querySelectorAll('td');if(cells[5])cells[5].textContent=c.toFixed(3);
+  });
+}
+function upd(){
+  var n=v('fn')||'New Recipe';
+  var code=v('fcode');
+  document.getElementById('hdname').textContent=n;
+  document.getElementById('hdsub').textContent=(code?'Recipe # '+code+' · ':'')+'Ingredients auto-calculate cost';
+}
+
+// ── Collect + Save ──
+function collect(){
+  var tot=ROWS.reduce(function(s,r){return s+(r.cpu||0)*(parseFloat(r.qty)||0);},0);
+  var ports=parseInt(document.getElementById('fports').value)||1;
+  return {
+    id:CID||uid(),name:v('fn'),concept:v('fc'),recipeType:v('frt'),
+    yield:v('fy'),prepTime:v('fp'),shelfLife:v('fsl'),storing:v('fst'),
+    created:v('fcd'),revised:v('frv'),recipeCode:v('fcode'),
+    technique:v('ftech'),
+    ingredients:ROWS.map(function(r){return{name:r.name,qty:r.qty,unit:r.unit,costPerUnit:r.cpu};}),
+    totalCost:tot,portions:ports,costPerPortion:tot/ports,
+    sellPrice:parseFloat(document.getElementById('fprice').value)||0,
+    yieldUnit:'portion',savedAt:new Date().toISOString()
+  };
+}
+
+function saveRecipe(){
+  var rec=collect();
+  if(!rec.name){toast('Enter an item name','warning');return;}
+  CID=rec.id;
+  if(db){
+    var key=rec.id.replace(/[.#$\[\]\/]/g,'_');
+    db.ref('shared/recipes/'+key).set(rec,function(err){
+      if(err){toast('Save failed: '+err.message,'error');return;}
+      toast('Saved to Firebase ✓','success');
+      document.getElementById('bdel').style.display='';
+    });
+  }else{
+    var ix=RECIPES.findIndex(function(r){return r.id===rec.id;});
+    if(ix>=0)RECIPES[ix]=rec;else RECIPES.push(rec);
+    try{localStorage.setItem('alfa_rb_recipes',JSON.stringify(RECIPES));}catch(e){}
+    renderSB('');document.getElementById('rcnt').textContent=RECIPES.length;
+    toast('Saved locally ✓','success');document.getElementById('bdel').style.display='';
+  }
+}
+
+function deleteRecipe(){
+  if(!CID)return;
+  if(!confirm('Delete this recipe permanently?'))return;
+  if(db){
+    var key=CID.replace(/[.#$\[\]\/]/g,'_');
+    db.ref('shared/recipes/'+key).remove(function(err){
+      if(err){toast('Delete failed','error');return;}
+      toast('Deleted','info');newRecipe();
+    });
+  }else{
+    RECIPES=RECIPES.filter(function(r){return r.id!==CID;});
+    try{localStorage.setItem('alfa_rb_recipes',JSON.stringify(RECIPES));}catch(e){}
+    renderSB('');toast('Deleted','info');newRecipe();
+  }
+}
+
+function loadRecipe(id){
+  var rec=RECIPES.find(function(r){return r.id===id;});if(!rec)return;
+  CID=rec.id;
+  document.getElementById('fn').value=rec.name||'';
+  document.getElementById('fc').value=rec.concept||'';
+  document.getElementById('frt').value=rec.recipeType||'';
+  document.getElementById('fy').value=rec.yield||'';
+  document.getElementById('fp').value=rec.prepTime||'';
+  document.getElementById('fsl').value=rec.shelfLife||'';
+  document.getElementById('fst').value=rec.storing||'';
+  document.getElementById('fcd').value=rec.created||'';
+  document.getElementById('frv').value=rec.revised||'';
+  document.getElementById('fcode').value=rec.recipeCode||'';
+  document.getElementById('ftech').value=rec.technique||'';
+  document.getElementById('fports').value=rec.portions||1;
+  document.getElementById('fprice').value=rec.sellPrice||'';
+  ROWS=(rec.ingredients||[]).map(function(r){return{name:r.name||'',qty:r.qty||'',unit:r.unit||'g',cpu:parseFloat(r.costPerUnit)||0};});
+  renderRows();rc();upd();
+  document.getElementById('bdel').style.display='';
+  renderSB('');switchTab('edit');
+}
+
+function newRecipe(){
+  CID=null;
+  ['fn','fy','fp','fsl','fcode','ftech','fprice'].forEach(function(id){document.getElementById(id).value='';});
+  ['fc','frt','fst'].forEach(function(id){document.getElementById(id).value='';});
+  document.getElementById('fcd').value=new Date().toISOString().slice(0,10);
+  document.getElementById('frv').value='';
+  document.getElementById('fports').value=1;
+  ROWS=[];renderRows();rc();upd();
+  document.getElementById('bdel').style.display='none';
+  renderSB('');switchTab('edit');
+}
+
+// ── Sidebar ──
+function filterSB(q){renderSB(q);}
+function renderSB(q){
+  var list=document.getElementById('sblist');
+  var filtered=RECIPES.filter(function(r){
+    if(!q)return true;
+    return(r.name||'').toLowerCase().includes(q.toLowerCase())||
+           (r.recipeCode||'').toLowerCase().includes(q.toLowerCase())||
+           (r.concept||'').toLowerCase().includes(q.toLowerCase());
+  }).slice().sort(function(a,b){return(a.name||'').localeCompare(b.name||'');});
+  if(!filtered.length){
+    list.innerHTML='<div style="text-align:center;padding:12px;color:var(--text3);font-size:10px;font-family:var(--mono)">'+(q?'No results':'No recipes yet → create one')+'</div>';
+    return;
+  }
+  list.innerHTML=filtered.map(function(r){
+    var active=r.id===CID;
+    return '<div class="recipe-card-sm'+(active?' active':'')+'" onclick="loadRecipe(\''+xe(r.id)+'\')">'
+      +'<div class="rc-info"><div class="rc-name">'+xe(r.name)+'</div>'
+      +'<div class="rc-meta">'+(r.recipeCode?xe(r.recipeCode)+' · ':'')+xe(r.concept||r.recipeType||'')+'</div></div>'
+      +'<div class="rc-cost">'+(r.costPerPortion?'SAR '+r.costPerPortion.toFixed(2):'—')+'</div>'
+      +'</div>';
+  }).join('');
+}
+
+// ── View Card ──
+function ml2(lbl,val){return '<div class="meta-row"><span class="ml">'+xe(lbl)+'</span><span style="font-size:11px;font-weight:600">'+xe(val||'—')+'</span></div>';}
+function switchTab(t){
+  var isE=t==='edit';
+  document.getElementById('pane-edit').style.display=isE?'':'none';
+  document.getElementById('pane-view').style.display=isE?'none':'';
+  document.getElementById('tabe').classList.toggle('active',isE);
+  document.getElementById('tabv').classList.toggle('active',!isE);
+  if(!isE)renderView();
+}
+function renderView(){
+  var rec=collect();
+  var tot=rec.totalCost;var cpp2=rec.costPerPortion;
+  var fc2=rec.sellPrice>0?(cpp2/rec.sellPrice*100).toFixed(1)+'%':'—';
+  var vc=document.getElementById('vcard');
+  vc.innerHTML='<div class="rform">'
+    +'<div class="rform-hdr"><div><div class="rform-hdr-name">'+xe(rec.name||'Untitled')+'</div>'
+    +'<div class="rform-hdr-sub">'+(rec.recipeCode?'Recipe # '+xe(rec.recipeCode)+' · ':'')+xe(rec.concept||'')+'</div></div>'
+    +'<img src="https://i.imgur.com/jeqtcE2.png" style="height:34px;filter:brightness(0) invert(1);opacity:.85" onerror="this.style.display=\'none\'"></div>'
+    +'<div class="rform-meta"><div class="meta-side">'
+      +ml2('ITEM NAME',rec.name)+ml2('YIELD',rec.yield)+ml2('PREP TIME',rec.prepTime)+ml2('SHELF LIFE',rec.shelfLife)+ml2('STORING',rec.storing)
+    +'</div><div class="meta-side">'
+      +ml2('CONCEPT',rec.concept)+ml2('PREP RECIPE',rec.recipeType)+ml2('CREATED',rec.created)+ml2('REVISED',rec.revised)+ml2('RECIPE #',rec.recipeCode)
+    +'</div></div>'
+    +'<div class="rform-body"><div class="ic"><div class="col-ttl">Fresh Quality, Ingredients</div>'
+      +'<table class="itbl"><thead><tr><th>Ingredient</th><th style="text-align:right">QTY</th><th>Units</th><th style="text-align:right">SAR/unit</th><th style="text-align:right">Total</th></tr></thead><tbody>'
+      +rec.ingredients.map(function(r){var c=(parseFloat(r.costPerUnit)||0)*(parseFloat(r.qty)||0);return '<tr class="ir"><td style="padding:5px 5px">'+xe(r.name)+'</td><td style="padding:5px;text-align:right;font-family:var(--mono)">'+xe(String(r.qty))+'</td><td style="padding:5px;font-family:var(--mono);color:var(--text3)">'+xe(r.unit)+'</td><td style="padding:5px;text-align:right;font-family:var(--mono)">'+parseFloat(r.costPerUnit||0).toFixed(3)+'</td><td style="padding:5px;text-align:right;font-family:var(--mono);font-weight:700;color:var(--primary)">'+c.toFixed(3)+'</td></tr>';}).join('')
+      +'<tr style="border-top:2px solid rgba(0,0,0,.1);font-weight:700"><td colspan="4" style="padding:6px 5px">TOTAL COST</td><td style="padding:6px 5px;text-align:right;font-family:var(--mono);color:var(--primary)">'+fsar(tot)+'</td></tr>'
+      +'<tr><td colspan="4" style="padding:4px 5px;font-size:11px">COST / PORTION (÷'+rec.portions+')</td><td style="padding:4px 5px;text-align:right;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--danger)">SAR '+cpp2.toFixed(3)+'</td></tr>'
+      +(rec.sellPrice>0?'<tr><td colspan="4" style="padding:3px 5px;font-size:10px;color:var(--text3)">FOOD COST %</td><td style="padding:3px 5px;text-align:right;font-family:var(--mono);font-size:10px">'+fc2+'</td></tr>':'')
+      +'</tbody></table>'
+    +'</div><div class="tc"><div class="col-ttl">Technique</div>'
+      +'<div style="font-size:12px;line-height:1.85;white-space:pre-wrap;font-family:var(--font)">'+xe(rec.technique||'')+'</div>'
+    +'</div></div>'
+    +'<div class="sig"><div class="sig-c"><div class="sig-line"></div><div class="sig-lbl">Checked By: ___________________________</div><div class="sig-name">CULINARY DIRECTOR : HECTOR ALFONSO GUDIEL</div></div>'
+    +'<div class="sig-c"><div class="sig-line"></div><div class="sig-lbl">Approved By: ___________________________</div><div class="sig-name">CHIEF EXECUTIVE OFFICER (C.E.O) JON NOROTSKY</div></div></div>'
+    +'</div>';
+}
+
+function exportJSON(){
+  if(!RECIPES.length){toast('No recipes','warning');return;}
+  var b=new Blob([JSON.stringify({recipes:RECIPES,exportedAt:new Date().toISOString()},null,2)],{type:'application/json'});
+  var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='alfa-recipes-'+new Date().toISOString().slice(0,10)+'.json';a.click();
+  toast('Exported '+RECIPES.length+' recipes','success');
+}
+
+var _tt2=null;
+function toast(msg,type){
+  var w=document.getElementById('twrap');
+  var d=document.createElement('div');d.className='toast';
+  d.innerHTML='<div class="td '+(type||'info')+'"></div><span>'+xe(msg)+'</span>';
+  w.appendChild(d);clearTimeout(_tt2);
+  _tt2=setTimeout(function(){if(w.firstChild)w.removeChild(w.firstChild);},3000);
+}
+
+document.getElementById('fcd').value=new Date().toISOString().slice(0,10);
+renderRows();rc();
+initFB();
+</script>
+</body>
+</html>
