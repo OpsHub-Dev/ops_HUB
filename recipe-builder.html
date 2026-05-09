@@ -173,7 +173,31 @@ html,body{height:100%;background:var(--base);color:var(--tx);font-family:var(--f
 .ing-list-m{display:flex;flex-direction:column;gap:5px;max-height:260px;overflow-y:auto}
 .ing-item-m{display:flex;align-items:center;gap:7px;padding:7px 9px;background:var(--base);border-radius:8px;box-shadow:var(--sh-rs)}
 
-/* Toast */
+/* PDF Drop Zone */
+.pdf-drop{border:2px dashed rgba(0,102,102,.35);border-radius:12px;padding:18px 14px;text-align:center;cursor:pointer;transition:all .2s;background:rgba(0,102,102,.03);margin-bottom:10px;position:relative}
+.pdf-drop:hover,.pdf-drop.drag-over{border-color:var(--primary);background:rgba(0,102,102,.09);box-shadow:0 0 0 3px rgba(0,102,102,.12)}
+.pdf-drop input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.pdf-drop-icon{font-size:28px;margin-bottom:6px}
+.pdf-drop-title{font-size:11px;font-weight:700;color:var(--primary)}
+.pdf-drop-sub{font-size:9px;color:var(--tx3);font-family:var(--mono);margin-top:3px}
+
+/* PDF parsing overlay */
+.parse-overlay{position:fixed;inset:0;background:rgba(30,41,56,.55);backdrop-filter:blur(6px);z-index:600;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s}
+.parse-overlay.open{opacity:1;pointer-events:all}
+.parse-box{background:var(--base);border-radius:18px;box-shadow:var(--sh-rl);padding:28px 32px;text-align:center;max-width:340px;width:94vw}
+.parse-spinner{width:40px;height:40px;border:3px solid rgba(0,102,102,.2);border-top-color:var(--primary);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 16px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.parse-title{font-size:14px;font-weight:700;margin-bottom:6px}
+.parse-sub{font-size:11px;color:var(--tx2);font-family:var(--mono);line-height:1.6}
+
+/* Review modal */
+.review-box{background:var(--base);border-radius:18px;box-shadow:var(--sh-rl);padding:22px;width:min(580px,96vw);max-height:90vh;overflow-y:auto}
+.review-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.review-field{display:flex;flex-direction:column;gap:3px}
+.review-field label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--tx3)}
+.review-ing-row{display:grid;grid-template-columns:1fr 60px 50px 70px;gap:5px;margin-bottom:4px;align-items:center}
+.review-ing-row input{background:var(--base);border:none;border-radius:7px;box-shadow:var(--sh-is);padding:5px 7px;font-family:var(--font);font-size:10px;color:var(--tx);outline:none;width:100%}
+.review-ing-row input:focus{box-shadow:var(--sh-i)}
 .tw{position:fixed;bottom:16px;right:16px;z-index:999;display:flex;flex-direction:column;gap:5px;pointer-events:none}
 .tt{background:var(--base);border-radius:9px;box-shadow:var(--sh-r);padding:8px 12px;display:flex;align-items:center;gap:7px;font-size:11px;font-weight:600;animation:ttin .2s ease;min-width:150px}
 .tdot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
@@ -358,6 +382,17 @@ html,body{height:100%;background:var(--base);color:var(--tx);font-family:var(--f
       <div class="panel-title">Saved Recipes (<span id="rcnt">0</span>)</div>
       <input class="srch" id="rbsrch" placeholder="Search recipes…" oninput="filterRB(this.value)">
     </div>
+
+    <!-- PDF DROP ZONE -->
+    <div style="padding:0 10px 6px">
+      <div class="pdf-drop" id="pdf-drop" ondragover="pdfDragOver(event)" ondragleave="pdfDragLeave(event)" ondrop="pdfDrop(event)">
+        <input type="file" accept="application/pdf,image/*" onchange="pdfFileChange(event)" title="Drop PDF recipe here">
+        <div class="pdf-drop-icon">&#x1F4C4;</div>
+        <div class="pdf-drop-title">Drop PDF Recipe Here</div>
+        <div class="pdf-drop-sub">AI reads it &rarr; fills the form automatically</div>
+      </div>
+    </div>
+
     <div class="r-scroll" id="rblist"></div>
     <div class="lib-footer">
       <button class="btn btn-sm btn-p" onclick="newRecipe()" style="width:100%">+ New Recipe</button>
@@ -366,6 +401,45 @@ html,body{height:100%;background:var(--base);color:var(--tx);font-family:var(--f
   </div>
 
 </div><!-- /app -->
+
+<!-- PDF Parsing Overlay -->
+<div class="parse-overlay" id="parse-overlay">
+  <div class="parse-box">
+    <div class="parse-spinner" id="parse-spinner"></div>
+    <div class="parse-title" id="parse-title">Reading PDF…</div>
+    <div class="parse-sub" id="parse-sub">Claude AI is extracting the recipe details.<br>This takes a few seconds.</div>
+  </div>
+</div>
+
+<!-- Review Modal: shows extracted data before applying -->
+<div class="modal-ov" id="review-modal">
+  <div class="review-box">
+    <div class="mhd">
+      <h2>&#x1F50D; Review Extracted Recipe</h2>
+      <button class="mcl" onclick="closeReview()">&#x2715;</button>
+    </div>
+    <div style="font-size:10px;color:var(--tx3);font-family:var(--mono);margin-bottom:14px;padding:8px 10px;background:var(--base-dk);border-radius:8px">
+      AI extracted the fields below from your PDF. Review and edit before applying.
+    </div>
+    <div class="review-grid" id="review-grid"></div>
+    <div style="margin-bottom:12px">
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--tx3);margin-bottom:8px">Ingredients</div>
+      <div style="font-size:9px;color:var(--tx3);font-family:var(--mono);margin-bottom:5px;display:grid;grid-template-columns:1fr 60px 50px 70px;gap:5px;padding:0 2px">
+        <span>Name</span><span>QTY</span><span>Unit</span><span>SAR/unit</span>
+      </div>
+      <div id="review-ings"></div>
+      <button class="btn btn-sm" onclick="reviewAddIng()" style="margin-top:6px">+ Add Row</button>
+    </div>
+    <div style="margin-bottom:14px">
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--tx3);margin-bottom:6px">Technique</div>
+      <textarea id="review-technique" style="width:100%;background:var(--base);border:none;border-radius:9px;box-shadow:var(--sh-is);padding:8px 10px;font-family:var(--font);font-size:10px;color:var(--tx);outline:none;resize:vertical;min-height:100px;line-height:1.7"></textarea>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-p" style="flex:1" onclick="applyReview()">&#x2713; Apply to Recipe Form</button>
+      <button class="btn" onclick="closeReview()">Cancel</button>
+    </div>
+  </div>
+</div>
 
 <!-- Ingredient Manager Modal -->
 <div class="modal-ov" id="ing-modal">
@@ -843,6 +917,242 @@ function exportJSON(){
   var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='alfa-recipes-'+new Date().toISOString().slice(0,10)+'.json';a.click();
   toast('Exported '+RECIPES.length+' recipes','success');
 }
+
+// ═══════════════════════════════════════════════════
+//  PDF DROP + AI PARSING
+// ═══════════════════════════════════════════════════
+var REVIEW_DATA = null;
+
+// Drag events on PDF drop zone
+function pdfDragOver(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  document.getElementById('pdf-drop').classList.add('drag-over');
+  e.dataTransfer.dropEffect = 'copy';
+}
+function pdfDragLeave(e) {
+  e.stopPropagation();
+  document.getElementById('pdf-drop').classList.remove('drag-over');
+}
+function pdfDrop(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  document.getElementById('pdf-drop').classList.remove('drag-over');
+  var files = e.dataTransfer.files;
+  if (files && files.length) processPdfFile(files[0]);
+}
+function pdfFileChange(e) {
+  var files = e.target.files;
+  if (files && files.length) processPdfFile(files[0]);
+  e.target.value = ''; // reset so same file can be dropped again
+}
+
+function processPdfFile(file) {
+  var isImage = file.type.startsWith('image/');
+  var isPdf = file.type === 'application/pdf';
+  if (!isImage && !isPdf) { toast('Please drop a PDF or image file', 'warning'); return; }
+
+  // Show parsing overlay
+  showParseOverlay('Reading ' + (isPdf ? 'PDF' : 'image') + '…', 'Claude AI is extracting the recipe. This takes a few seconds.');
+
+  var reader = new FileReader();
+  reader.onload = function(ev) {
+    var base64 = ev.target.result.split(',')[1];
+    var mediaType = file.type;
+    callClaudeVision(base64, mediaType, isPdf);
+  };
+  reader.onerror = function() { hideParseOverlay(); toast('Could not read file', 'error'); };
+  reader.readAsDataURL(file);
+}
+
+function showParseOverlay(title, sub) {
+  document.getElementById('parse-title').textContent = title;
+  document.getElementById('parse-sub').textContent = sub;
+  document.getElementById('parse-spinner').style.display = '';
+  document.getElementById('parse-overlay').classList.add('open');
+}
+function hideParseOverlay() {
+  document.getElementById('parse-overlay').classList.remove('open');
+}
+
+async function callClaudeVision(base64Data, mediaType, isPdf) {
+  var prompt = 'You are reading an ALFA.CO recipe card. Extract ALL information and return ONLY a JSON object with these exact keys:\n' +
+    '{\n' +
+    '  "name": "ITEM NAME from the card",\n' +
+    '  "concept": "CONCEPT value (e.g. STEAK HOUSE, PIATTO)",\n' +
+    '  "recipeType": "PREP RECIPE type (e.g. SUB-PREP, PREP RECIPE, LINE RECIPE)",\n' +
+    '  "recipeCode": "RECIPE # or RECIPE code",\n' +
+    '  "yield": "YIELD value",\n' +
+    '  "prepTime": "PREP TIME value",\n' +
+    '  "shelfLife": "SHELF LIFE value",\n' +
+    '  "storing": "STORING value",\n' +
+    '  "created": "CREATED date in YYYY-MM-DD format if possible",\n' +
+    '  "revised": "REVISED date in YYYY-MM-DD format if possible",\n' +
+    '  "technique": "Full TECHNIQUE text, preserve numbered steps",\n' +
+    '  "ingredients": [\n' +
+    '    { "name": "ingredient name", "qty": numeric_quantity, "unit": "unit string" }\n' +
+    '  ]\n' +
+    '}\n' +
+    'For ingredients: extract exact names and quantities. Convert units: gm/grams->g, kilo/kg->kg, ml->ml, liters->L, pcs->pcs, oz->oz, tbsp->tbsp, tsp->tsp, cup->cup.\n' +
+    'If a field is not visible, use empty string. Return ONLY the JSON object, no markdown, no explanation.';
+
+  var contentBlock = isPdf
+    ? { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64Data } }
+    : { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64Data } };
+
+  try {
+    var response = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1500,
+        messages: [{
+          role: 'user',
+          content: [contentBlock, { type: 'text', text: prompt }]
+        }]
+      })
+    });
+
+    if (!response.ok) {
+      var errText = await response.text();
+      throw new Error('API error ' + response.status + ': ' + errText.slice(0, 200));
+    }
+
+    var data = await response.json();
+    var text = (data.content || []).filter(function(b) { return b.type === 'text'; }).map(function(b) { return b.text; }).join('');
+
+    // Strip any markdown fences if present
+    text = text.replace(/```json\s*/gi, '').replace(/```\s*/g, '').trim();
+
+    var parsed = JSON.parse(text);
+    hideParseOverlay();
+    openReview(parsed);
+
+  } catch (err) {
+    hideParseOverlay();
+    console.error('Claude API error:', err);
+    toast('AI parse error: ' + err.message.slice(0, 80), 'error');
+  }
+}
+
+// ── Review Modal ──
+function openReview(data) {
+  REVIEW_DATA = data;
+
+  // Build meta fields grid
+  var fields = [
+    { key: 'name',       label: 'Item Name' },
+    { key: 'concept',    label: 'Concept' },
+    { key: 'recipeType', label: 'Type' },
+    { key: 'recipeCode', label: 'Recipe #' },
+    { key: 'yield',      label: 'Yield' },
+    { key: 'prepTime',   label: 'Prep Time' },
+    { key: 'shelfLife',  label: 'Shelf Life' },
+    { key: 'storing',    label: 'Storing' },
+    { key: 'created',    label: 'Created' },
+    { key: 'revised',    label: 'Revised' }
+  ];
+
+  document.getElementById('review-grid').innerHTML = fields.map(function(f) {
+    return '<div class="review-field"><label>' + xe(f.label) + '</label>'
+      + '<input class="fi2" style="font-size:10px;padding:5px 8px" id="rv-' + xe(f.key) + '" value="' + xe(data[f.key] || '') + '"></div>';
+  }).join('');
+
+  // Technique
+  document.getElementById('review-technique').value = data.technique || '';
+
+  // Ingredients
+  renderReviewIngs(data.ingredients || []);
+
+  document.getElementById('review-modal').classList.add('open');
+}
+
+function renderReviewIngs(ings) {
+  document.getElementById('review-ings').innerHTML = ings.map(function(ing, i) {
+    return '<div class="review-ing-row" id="rvi-' + i + '">'
+      + '<input value="' + xe(ing.name || '') + '" placeholder="Name" oninput="updReviewIng(' + i + ',\'name\',this.value)">'
+      + '<input type="number" step="0.001" value="' + xe(ing.qty || '') + '" placeholder="0" oninput="updReviewIng(' + i + ',\'qty\',this.value)">'
+      + '<input value="' + xe(ing.unit || 'g') + '" placeholder="g" oninput="updReviewIng(' + i + ',\'unit\',this.value)">'
+      + '<input type="number" step="0.0001" value="' + xe(ing.costPerUnit || '') + '" placeholder="SAR/unit" oninput="updReviewIng(' + i + ',\'costPerUnit\',this.value)">'
+      + '</div>';
+  }).join('');
+}
+
+function updReviewIng(i, field, val) {
+  if (!REVIEW_DATA || !REVIEW_DATA.ingredients[i]) return;
+  REVIEW_DATA.ingredients[i][field] = field === 'qty' || field === 'costPerUnit' ? parseFloat(val) || 0 : val;
+}
+
+function reviewAddIng() {
+  if (!REVIEW_DATA) return;
+  REVIEW_DATA.ingredients.push({ name: '', qty: 0, unit: 'g', costPerUnit: 0 });
+  renderReviewIngs(REVIEW_DATA.ingredients);
+}
+
+function closeReview() {
+  document.getElementById('review-modal').classList.remove('open');
+  REVIEW_DATA = null;
+}
+
+function applyReview() {
+  if (!REVIEW_DATA) return;
+
+  // Read any edits the user made in the review form
+  var keys = ['name','concept','recipeType','recipeCode','yield','prepTime','shelfLife','storing','created','revised'];
+  keys.forEach(function(k) {
+    var el = document.getElementById('rv-' + k);
+    if (el) REVIEW_DATA[k] = el.value;
+  });
+  REVIEW_DATA.technique = document.getElementById('review-technique').value;
+
+  // Apply to the main form
+  newRecipe(); // clear first
+
+  var setv = function(id, val) { var e = document.getElementById(id); if (e) e.value = val || ''; };
+  setv('fn',    REVIEW_DATA.name);
+  setv('fc',    REVIEW_DATA.concept);
+  setv('frt',   REVIEW_DATA.recipeType);
+  setv('fcode', REVIEW_DATA.recipeCode);
+  setv('fy',    REVIEW_DATA.yield);
+  setv('fp',    REVIEW_DATA.prepTime);
+  setv('fsl',   REVIEW_DATA.shelfLife);
+  setv('fst',   REVIEW_DATA.storing);
+  setv('fcd',   REVIEW_DATA.created || new Date().toISOString().slice(0, 10));
+  setv('frv',   REVIEW_DATA.revised);
+  setv('ftech', REVIEW_DATA.technique);
+
+  // Load ingredients — try to match with library for auto-costing
+  ROWS = (REVIEW_DATA.ingredients || []).map(function(ing) {
+    var libMatch = INGS.find(function(li) {
+      return li.name.toLowerCase().replace(/[^a-z0-9]/g,'').includes(
+        ing.name.toLowerCase().replace(/[^a-z0-9]/g,'').slice(0, 6)
+      );
+    });
+    return {
+      name: ing.name || '',
+      qty: parseFloat(ing.qty) || 0,
+      unit: ing.unit || 'g',
+      cpu: parseFloat(ing.costPerUnit) || (libMatch ? libMatch.cost : 0)
+    };
+  });
+
+  renderRows();
+  rc();
+  upd();
+  closeReview();
+  switchTab('edit');
+
+  var matched = ROWS.filter(function(r) { return r.cpu > 0; }).length;
+  toast('Recipe loaded! ' + ROWS.length + ' ingredients (' + matched + ' costs matched)', 'success');
+}
+
+// ── Also wire document-level drag-over to prevent browser from opening PDF ──
+document.addEventListener('dragover', function(e) { e.preventDefault(); });
+document.addEventListener('drop', function(e) {
+  // Only handle drops on pdf-drop zone, ignore others at document level
+  if (!e.target.closest('#pdf-drop')) e.preventDefault();
+});
 
 var _tt=null;
 function toast(msg,type){
