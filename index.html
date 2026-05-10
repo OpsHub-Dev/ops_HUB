@@ -3014,9 +3014,12 @@ function xe(str) {
     .replace(/'/g, '&#39;');
 }
 
+// ── Saudi Riyal Symbol (matches official design) ──
+var SAR_SYM = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 580" width="1em" height="1.1em" style="display:inline-block;vertical-align:-0.1em;margin-right:1px" fill="currentColor"><path d="M140,0 L195,0 L195,370 Q195,440 125,440 L60,440 L60,390 L120,390 Q145,390 145,365 L145,0 Z"/><rect x="270" y="0" width="55" height="290" rx="8"/><polygon points="140,145 430,120 430,165 140,190"/><polygon points="140,230 390,205 390,248 140,273"/><polygon points="140,315 350,290 350,333 140,358"/><polygon points="295,165 430,145 425,188 290,208"/><polygon points="295,248 390,230 385,272 290,290"/><polygon points="295,333 350,315 345,358 290,375"/></svg>';
+
 function formatSAR(val) {
-  if (isNaN(val) || val === null || val === undefined) return 'SAR 0.00';
-  return 'SAR ' + Number(val).toLocaleString('en-SA', {minimumFractionDigits:2, maximumFractionDigits:2});
+  if (isNaN(val) || val === null || val === undefined) return SAR_SYM + '0.00';
+  return SAR_SYM + Number(val).toLocaleString('en-SA', {minimumFractionDigits:2, maximumFractionDigits:2});
 }
 
 function formatNum(val) {
@@ -4764,7 +4767,7 @@ function openBrandTargetModal() {
   branches.forEach(function(b){ var bn=b.brand||b.name; if(!brandMap[bn])brandMap[bn]={name:bn,id:bn.toLowerCase().replace(/\s+/g,'_')}; });
   var fields = Object.values(brandMap).map(function(bm){
     var stored = (NX.brandTargets||{})[bm.id] || 0;
-    return '<div class="form-group"><label class="form-label">'+xe(bm.name)+' Monthly Target (SAR)</label>'+
+    return '<div class="form-group"><label class="form-label">'+xe(bm.name)+' Monthly Target (‫﷼‬)</label>'+
       '<input class="form-input" id="bt-'+xe(bm.id)+'" type="number" value="'+stored+'" placeholder="e.g. 250000"></div>';
   }).join('');
   openModal('<div class="modal-head"><h2>🎯 Set Brand Targets</h2><button class="modal-close" onclick="closeModalForce()">&#x2715;</button></div>'+
@@ -5385,7 +5388,7 @@ function revPieType(type, btn) {
 function revExportCSV() {
   var range = revDateRange();
   var entities = revGetEntities();
-  var rows = [['Entity','Period Revenue SAR','Prev Period SAR','Change %','Daily Avg SAR']];
+  var rows = [['Entity','Period Revenue ﷼','Prev Period ﷼','Change %','Daily Avg ﷼']];
   entities.forEach(function(ent) {
     var v  = revGetEntityRevenue(ent, range.start, range.end);
     var pv = revGetEntityRevenue(ent, range.prevStart, range.prevEnd);
@@ -5581,7 +5584,7 @@ function pHeadcount() {
                 '<div style="font-size:20px">💰</div>' +
                 '<div style="flex:1">' +
                   '<div style="font-weight:700;font-size:13px">' + xe(cy.branchName||cy.branchId) + ' — Cycle #' + cy.cycleNo + '</div>' +
-                  '<div style="font-size:12px;color:var(--text-secondary)">Total: <strong>' + (cy.total||0).toLocaleString('en',{minimumFractionDigits:2}) + ' SAR</strong> · ' + (cy.entries||[]).length + ' entries · ' + (invCount?'📎 '+invCount+' invoice(s)':'no invoices') + '</div>' +
+                  '<div style="font-size:12px;color:var(--text-secondary)">Total: <strong>' + (cy.total||0).toLocaleString('en',{minimumFractionDigits:2}) + ' ﷼</strong> · ' + (cy.entries||[]).length + ' entries · ' + (invCount?'📎 '+invCount+' invoice(s)':'no invoices') + '</div>' +
                   '<div style="font-size:11px;color:var(--text-tertiary)">Closed by: ' + xe(cy.closedBy||'—') + ' · ' + (cy.closedAt?new Date(cy.closedAt).toLocaleDateString():'') + '</div>' +
                 '</div>' +
               '</div>' +
@@ -6803,7 +6806,7 @@ function openDirectorBranchEdit(branchId) {
         '<input class="form-input" type="number" id="dbe-fc" value="' + (b.fcTarget||30) + '" min="0" max="100"></div></div>' +
       '<div class="form-row"><div class="form-group"><label class="form-label">Seating Capacity</label>' +
         '<input class="form-input" type="number" id="dbe-seats" value="' + (b.seats||0) + '"></div>' +
-        '<div class="form-group"><label class="form-label">Monthly Sales Target (SAR)</label>' +
+        '<div class="form-group"><label class="form-label">Monthly Sales Target (‫﷼‬)</label>' +
         '<input class="form-input" type="number" id="dbe-tgt" value="' + (b.monthlyTarget||0) + '" placeholder="0"></div></div>' +
       '<div style="display:flex;gap:8px;margin-top:8px">' +
         '<button class="btn" style="flex:1" onclick="closeModalForce()">Cancel</button>' +
@@ -6994,7 +6997,7 @@ function buid() { return Date.now().toString(36) + Math.random().toString(36).sl
 function bxe(s) { return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function bini(n) { var p=String(n||'').split(' '),r='';for(var i=0;i<p.length&&r.length<2;i++)if(p[i])r+=p[i][0].toUpperCase();return r; }
 function bfdate(d) { return d?new Date(d+'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}):'—'; }
-function bfsar(v) { return 'SAR '+parseFloat(v||0).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function bfsar(v) { return SAR_SYM+parseFloat(v||0).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function bpl(l,c) { return '<span style="background:'+c+'18;color:'+c+';border:1px solid '+c+'30;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:500">'+bxe(l)+'</span>'; }
 function bmthKey(off) { var d=new Date();if(off)d.setMonth(d.getMonth()+off);return d.getFullYear()+'-'+(d.getMonth()<9?'0':'')+(d.getMonth()+1); }
 function bselOpts(arr,sel) { var h='';for(var i=0;i<arr.length;i++)h+='<option value="'+bxe(arr[i])+'"'+(arr[i]===sel?' selected':'')+'>'+bxe(arr[i])+'</option>';return h; }
@@ -7378,7 +7381,7 @@ function pBranchDash() {
   var now2 = new Date();
   var cy = now2.getFullYear(), ly = cy - 1;
 
-  function fsar(v) { return formatSAR(v||0); }
+  function fsar(v) { return SAR_SYM + parseFloat(v||0).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2}); }
   function mthKeyD(off) { var d=new Date(now2.getFullYear(),now2.getMonth()+off,1); return d.getFullYear()+'-'+(d.getMonth()<9?'0':'')+(d.getMonth()+1); }
   function dsLocal(d) { return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
   function chgArrow(v) {
@@ -7927,7 +7930,7 @@ function openBranchItemModal(code){
   html+='<div class="bfg"><label class="form-label">Code *</label><input class="form-input" id="bi-code" value="'+bxe(it?it.code:'')+'" '+(it?'readonly':'')+'></div>';
   html+='<div class="bfg"><label class="form-label">Name *</label><input class="form-input" id="bi-name" value="'+bxe(it?it.name:'')+'"></div>';
   html+='<div class="form-row"><div class="bfg"><label class="form-label">Unit</label><input class="form-input" id="bi-unit" value="'+bxe(it?it.unit:'EA')+'"></div><div class="bfg"><label class="form-label">Min Stock</label><input class="form-input" type="number" id="bi-min" value="'+(it?it.min:0)+'"></div></div>';
-  html+='<div class="form-row"><div class="bfg"><label class="form-label">Price (SAR)</label><input class="form-input" type="number" id="bi-price" value="'+(it?it.price:0)+'"></div></div>';
+  html+='<div class="form-row"><div class="bfg"><label class="form-label">Price (‫﷼‬)</label><input class="form-input" type="number" id="bi-price" value="'+(it?it.price:0)+'"></div></div>';
   // Location row with + New and 🗑 buttons
   html+='<div class="bfg"><label class="form-label" style="display:flex;align-items:center;gap:8px">Location <button type="button" class="btn btn-sm" style="padding:2px 8px;font-size:10px" onclick="nxAddLocationModal()">+ New</button><button type="button" class="btn btn-sm" style="padding:2px 8px;font-size:10px;color:var(--danger);border-color:rgba(248,113,113,.3)" onclick="nxDelLocationModal()">🗑 Delete</button></label>';
   html+='<select class="form-input form-select" id="bi-loc">'+locOpts+'</select></div>';
@@ -8252,7 +8255,7 @@ function previewInvImport(){
   var html='<div style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:10px">';
   html+='<div style="color:var(--ceo);font-weight:700;font-size:12px;margin-bottom:6px">Preview: '+res.items.length+' items ready, '+dups+' duplicates (will overwrite), '+res.errors.length+' errors</div>';
   if(res.errors.length){html+='<div style="color:var(--danger);font-size:11px;max-height:80px;overflow:auto">'+res.errors.slice(0,5).join('<br>')+'</div>';}
-  if(res.items.length){html+='<div style="color:var(--text-tertiary);font-size:11px;font-family:var(--mono);max-height:80px;overflow:auto;margin-top:6px">First 3: '+res.items.slice(0,3).map(function(i){return i.code+' — '+i.name+' | SAR '+i.price+' | Qty:'+i.qty;}).join('<br>')+'</div>';}
+  if(res.items.length){html+='<div style="color:var(--text-tertiary);font-size:11px;font-family:var(--mono);max-height:80px;overflow:auto;margin-top:6px">First 3: '+res.items.slice(0,3).map(function(i){return i.code+' — '+i.name+' | ﷼ '+i.price+' | Qty:'+i.qty;}).join('<br>')+'</div>';}
   html+='</div>';
   box.innerHTML=html;
 }
@@ -8799,7 +8802,7 @@ function printPurchaseOrder(ordId) {
       '<th style="text-align:center;width:60px">Unit</th><th style="text-align:center;width:120px">Status</th>' +
       '<th style="width:140px">Supplier Signature</th>' +
     '</tr></thead><tbody>' + rows + '</tbody></table>' +
-    (total > 0 ? '<div style="text-align:right;margin-top:12px;font-size:13px;font-weight:700;color:#1a2340">Total Estimated: SAR ' + total.toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2}) + '</div>' : '') +
+    (total > 0 ? '<div style="text-align:right;margin-top:12px;font-size:13px;font-weight:700;color:#1a2340">Total Estimated: ﷼ ' + total.toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2}) + '</div>' : '') +
     '<div class="foot">' +
       '<div class="foot-cell">Prepared by</div>' +
       '<div class="foot-cell">Approved by Manager</div>' +
@@ -9026,7 +9029,7 @@ function pInvReport(){
   h+='</div>';
   h+='<div style="'+card+'">';
   h+='<div style="'+secHdr+'">\ud83d\udce6 Current Stock Levels</div>';
-  h+='<div class="btw"><div class="btw-s"><table class="btbl"><thead><tr><th>Code</th><th>Name</th><th>Location</th><th>Qty</th><th>Unit</th><th>Min</th><th>Value SAR</th><th>Status</th></tr></thead><tbody>';
+  h+='<div class="btw"><div class="btw-s"><table class="btbl"><thead><tr><th>Code</th><th>Name</th><th>Location</th><th>Qty</th><th>Unit</th><th>Min</th><th>Value ﷼</th><th>Status</th></tr></thead><tbody>';
   bItems.forEach(function(it){
     var isLow=it.min>0&&it.qty<=it.min;
     h+='<tr><td class="bmono" style="font-size:10px;color:var(--ceo)">'+bxe(it.code)+'</td><td style="color:var(--text-primary)">'+bxe(it.name)+'</td><td>'+bxe(it.location||'\u2014')+'</td><td class="bmono" style="font-weight:700;color:'+(isLow?'var(--danger)':'var(--text-primary)')+'">'+it.qty+'</td><td class="bmono">'+bxe(it.unit)+'</td><td class="bmono" style="color:var(--text-tertiary)">'+it.min+'</td><td class="bmono">'+bfsar(it.qty*parseFloat(it.price||0))+'</td><td>'+bpl(isLow?'Low':'OK',isLow?'#c0392b':'#00875a')+'</td></tr>';
@@ -9098,9 +9101,9 @@ function openBranchWastageModal(){
   html+='</div>';
   html+='<div style="background:var(--surface-2);border-radius:10px;padding:12px 14px;margin-bottom:12px;display:flex;gap:14px;flex-wrap:wrap;align-items:center">';
   html+='<div style="flex:1;min-width:130px"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-tertiary);margin-bottom:3px">Auto-Calculated Cost</div>';
-  html+='<div id="bw-cost-display" style="font-size:22px;font-weight:700;font-family:var(--mono);color:var(--danger)">SAR 0.00</div>';
+  html+='<div id="bw-cost-display" style="font-size:22px;font-weight:700;font-family:var(--mono);color:var(--danger)">﷼ 0.00</div>';
   html+='<div id="bw-cost-note" style="font-size:10px;color:var(--text-tertiary);font-family:var(--mono);margin-top:2px">Select a recipe above</div></div>';
-  html+='<div style="flex:1;min-width:130px"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-tertiary);margin-bottom:3px">Override Cost (SAR)</div>';
+  html+='<div style="flex:1;min-width:130px"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-tertiary);margin-bottom:3px">Override Cost (‫﷼‬)</div>';
   html+='<input class="form-input" type="number" id="bw-val" step="0.01" placeholder="Leave blank = use auto" oninput="bwUpdateDisplay()"></div>';
   html+='</div>';
   html+='<button class="btn btn-primary" style="width:100%" onclick="saveBranchWastage()">Log Wastage</button>';
@@ -9113,7 +9116,7 @@ function bwOnRecipePick(recipeId){
   if(!rec)return;
   if(nameEl&&!nameEl.value)nameEl.value=rec.name||'';
   if(unitEl)unitEl.value=rec.yieldUnit||'portion';
-  if(noteEl)noteEl.textContent='Cost/portion: SAR '+(rec.costPerPortion||0).toFixed(3);
+  if(noteEl)noteEl.textContent='﷼ '+(rec.costPerPortion||0).toFixed(3);
   bwRecalcCost();
 }
 function bwRecalcCost(){
@@ -9123,14 +9126,14 @@ function bwRecalcCost(){
   var rec=recipeId?(BS.recipes||[]).find(function(r){return r.id===recipeId;}):null;
   if(rec&&qty>0){
     var cost=rec.costPerPortion*qty;
-    if(disp)disp.textContent='SAR '+cost.toFixed(2);
-    if(noteEl)noteEl.textContent='AUTO: '+qty+' \u00d7 SAR '+(rec.costPerPortion||0).toFixed(3)+'/portion';
+    if(disp)disp.textContent='﷼ '+cost.toFixed(2);
+    if(noteEl)noteEl.textContent='﷼ AUTO: '+qty+' × ﷼ '+(rec.costPerPortion||0).toFixed(3)+'/portion';
     var ov=document.getElementById('bw-val');if(ov&&!ov.value)ov.value=cost.toFixed(2);
   } else {
-    if(disp)disp.textContent='SAR '+(parseFloat((document.getElementById('bw-val')||{}).value)||0).toFixed(2);
+    if(disp)disp.textContent='﷼ '+(parseFloat((document.getElementById('bw-val')||{}).value)||0).toFixed(2);
   }
 }
-function bwUpdateDisplay(){var v=parseFloat((document.getElementById('bw-val')||{}).value)||0;var disp=document.getElementById('bw-cost-display');if(disp)disp.textContent='SAR '+v.toFixed(2);}
+function bwUpdateDisplay(){var v=parseFloat((document.getElementById('bw-val')||{}).value)||0;var disp=document.getElementById('bw-cost-display');if(disp)disp.textContent='﷼ '+v.toFixed(2);}
 function saveBranchWastage(){
   var item=bgv('bw-item'),qty=parseFloat(bgv('bw-qty'))||0;
   if(!item||qty<=0){showToast('Item and quantity required','error');return;}
@@ -10122,7 +10125,7 @@ function pSales() {
   return h;
 }
 
-function openBranchSalesModal(id){var e=id?BS.sales.find(function(x){return x.id===id;}):null;var html='<div class="modal-head"><h2>'+(e?'Edit Sales Entry':'Add Sales Entry')+'</h2><button class="modal-close" onclick="closeModalForce()">&#x2715;</button></div><div class="bfg"><label class="form-label">Date *</label><input class="form-input" type="date" id="bsl-date" value="'+(e?e.date:TODAY_BS)+'"></div><div class="form-row"><div class="bfg"><label class="form-label">Actual Sales (SAR) *</label><input class="form-input" type="number" step="0.01" id="bsl-actual" value="'+(e?e.actual:'')+'" placeholder="0.00"></div><div class="bfg"><label class="form-label">Sales Target (SAR) *</label><input class="form-input" type="number" step="0.01" id="bsl-target" value="'+(e?e.target:'')+'" placeholder="0.00"></div></div><button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="saveBranchSales(\''+bxe(id||'')+'\')">Save Entry</button>';openModal(html);}
+function openBranchSalesModal(id){var e=id?BS.sales.find(function(x){return x.id===id;}):null;var html='<div class="modal-head"><h2>'+(e?'Edit Sales Entry':'Add Sales Entry')+'</h2><button class="modal-close" onclick="closeModalForce()">&#x2715;</button></div><div class="bfg"><label class="form-label">Date *</label><input class="form-input" type="date" id="bsl-date" value="'+(e?e.date:TODAY_BS)+'"></div><div class="form-row"><div class="bfg"><label class="form-label">Actual Sales (‫﷼‬) *</label><input class="form-input" type="number" step="0.01" id="bsl-actual" value="'+(e?e.actual:'')+'" placeholder="0.00"></div><div class="bfg"><label class="form-label">Sales Target (‫﷼‬) *</label><input class="form-input" type="number" step="0.01" id="bsl-target" value="'+(e?e.target:'')+'" placeholder="0.00"></div></div><button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="saveBranchSales(\''+bxe(id||'')+'\')">Save Entry</button>';openModal(html);}
 function saveBranchSales(id){var dt=bgv('bsl-date'),a=bgv('bsl-actual'),t=bgv('bsl-target');if(!dt||!a||!t){showToast('All fields required','error');return;}if(id){var i=BS.sales.findIndex(function(x){return x.id===id;});if(i>=0){BS.sales[i].date=dt;BS.sales[i].actual=parseFloat(a);BS.sales[i].target=parseFloat(t);}}else{BS.sales=BS.sales.filter(function(s2){return s2.date!==dt;});BS.sales.push({id:buid(),date:dt,actual:parseFloat(a),target:parseFloat(t)});}bSaveColl('sales',BS.sales);closeModalForce();showToast('Sales saved','success');navTo('sales');}
 function delBranchSales(id){if(!confirm('Delete this sales entry?'))return;BS.sales=BS.sales.filter(function(x){return x.id!==id;});bSaveColl('sales',BS.sales);showToast('Deleted');navTo('sales');}
 
@@ -10220,7 +10223,7 @@ function pPettyCash(){
 function openPCBudgetModal(){
   var cur=BS.pcBudget||0;
   openModal('<div class="modal-head"><h2>\uD83D\uDCB0 Monthly Budget Cap</h2><button class="modal-close" onclick="closeModalForce()">\u2715</button></div>'+
-    '<div class="bfg"><label class="form-label">Monthly Petty Cash Budget (SAR)</label>'+
+    '<div class="bfg"><label class="form-label">Monthly Petty Cash Budget (‫﷼‬)</label>'+
       '<input class="form-input" type="number" id="pcb-val" value="'+cur+'" placeholder="e.g. 5000" step="100"></div>'+
     '<div style="font-size:11px;color:var(--text-tertiary);margin-bottom:14px">A warning banner appears at 70% and 90% of this limit.</div>'+
     '<button class="btn btn-primary" style="width:100%" onclick="savePCBudget()">\uD83D\uDCBE Save Budget</button>');
@@ -10241,7 +10244,7 @@ function openBranchPCModal(id){
   html+='<div class="form-row"><div class="bfg"><label class="form-label">For Who / Dept *</label><input class="form-input" id="bpc-for" value="'+bxe(p?p.forwhat||'':'')+'"></div>'+
     '<div class="bfg"><label class="form-label">Cost Center</label><select class="form-input form-select" id="bpc-cat"><option value="">\u2014</option>'+ccList.map(function(c){return '<option'+(p&&p.category===c?' selected':'')+'>'+bxe(c)+'</option>';}).join('')+'</select></div></div>';
   html+='<div class="form-row"><div class="bfg"><label class="form-label">Choose the Proper GL</label><select class="form-input form-select" id="bpc-gl"><option value="">\u2014</option>'+glList.map(function(g){return '<option'+(p&&p.gl===g?' selected':'')+'>'+bxe(g)+'</option>';}).join('')+'</select></div>'+
-    '<div class="bfg"><label class="form-label">Amount (SAR) *</label><input class="form-input" type="number" step="0.01" id="bpc-amt" value="'+(p?p.amount:'')+'" placeholder="0.00"></div></div>';
+    '<div class="bfg"><label class="form-label">Amount (‫﷼‬) *</label><input class="form-input" type="number" step="0.01" id="bpc-amt" value="'+(p?p.amount:'')+'" placeholder="0.00"></div></div>';
   html+='<div class="bfg"><label class="form-label">Remarks</label><input class="form-input" id="bpc-rem" value="'+bxe(p?p.remarks||'':'')+'"></div>';
   html+='<button class="btn btn-primary" style="width:100%;margin-top:8px" data-pcid="'+bxe(id||'')+'" onclick="saveBranchPC(this.dataset.pcid)">'+(p?'Save Changes':'Save Entry')+'</button>';
   // Invoice attachment UI
@@ -10402,7 +10405,7 @@ function pcPrintCycle(){
     '<img src="https://i.imgur.com/jeqtcE2.png" alt="ALFA.CO" style="height:44px;width:auto;display:block;margin-bottom:8px">'+
     '<h1>Petty Cash Report \u2014 Cycle #'+curNo+'</h1>'+
     '<div class="h">Branch: '+bxe(s.branchName||'')+' \u00b7 Generated: '+new Date().toLocaleString()+' \u00b7 Entries: '+entries.length+'</div>'+
-    '<table><thead><tr><th>#</th><th>Date</th><th>Item</th><th>For / Dept</th><th>Cost Center</th><th>GL</th><th>Remarks</th><th>Amount (SAR)</th></tr></thead>'+
+    '<table><thead><tr><th>#</th><th>Date</th><th>Item</th><th>For / Dept</th><th>Cost Center</th><th>GL</th><th>Remarks</th><th>Amount (‫﷼‬)</th></tr></thead>'+
     '<tbody>'+rowsHtml+'</tbody>'+
     '<tfoot><tr><td colspan="7" style="text-align:right">Total</td><td class="tot">'+total.toFixed(2)+'</td></tr></tfoot></table>'+
     '<div class="sig"><div>Prepared by</div><div>Approved by</div><div>Received by</div></div>'+
@@ -10515,7 +10518,7 @@ function pcExportCyclePDF(cycleId){
     '<img src="https://i.imgur.com/jeqtcE2.png" alt="Logo" style="height:44px;margin-bottom:12px;display:block">'+
     '<h1>Petty Cash Report — Cycle #'+cy.cycleNo+'</h1>'+
     '<div class="meta">Branch: <strong>'+cy.branchName+'</strong> &nbsp;·&nbsp; Closed: '+new Date(cy.closedAt||Date.now()).toLocaleString()+' &nbsp;·&nbsp; Closed by: '+(cy.closedBy||'—')+' &nbsp;·&nbsp; Status: <span class="status-badge">'+statLabel+'</span></div>'+
-    '<table><thead><tr><th>#</th><th>Date</th><th>Item / Invoices</th><th>For / Dept</th><th>Cost Center</th><th>GL</th><th>Remarks</th><th>Amount (SAR)</th></tr></thead>'+
+    '<table><thead><tr><th>#</th><th>Date</th><th>Item / Invoices</th><th>For / Dept</th><th>Cost Center</th><th>GL</th><th>Remarks</th><th>Amount (‫﷼‬)</th></tr></thead>'+
     '<tbody>'+rowsHtml+'</tbody>'+
     '<tfoot><tr><td colspan="7" style="text-align:right">TOTAL</td><td style="text-align:right;font-family:monospace">'+total.toFixed(2)+'</td></tr></tfoot></table>'+
     // Embedded invoice gallery
@@ -10794,18 +10797,18 @@ function pDSR(){
   } else if(D.tab==='income'){
     body+='<div style="'+card+'"><div style="'+secHdr+'">Income Categories</div>';
     body+='<div style="'+grid3+'">';
-    body+=grp('Food Sales (SAR)',fi_n('food',D.food,'0.00','dsrRecalc()'));
-    body+=grp('Beverage Sales (SAR)',fi_n('bev',D.bev,'0.00','dsrRecalc()'));
-    body+=grp('MISC / Other (SAR)',fi_n('misc',D.misc,'0.00','dsrRecalc()'));
+    body+=grp('Food Sales (‫﷼‬)',fi_n('food',D.food,'0.00','dsrRecalc()'));
+    body+=grp('Beverage Sales (‫﷼‬)',fi_n('bev',D.bev,'0.00','dsrRecalc()'));
+    body+=grp('MISC / Other (‫﷼‬)',fi_n('misc',D.misc,'0.00','dsrRecalc()'));
     body+=grp('Guest Count',fi_n('guests',D.guests,'0','dsrRecalc()'));
-    body+=grp('System VAT (SAR)',fi_n('vat',D.vat,'0.00','dsrRecalc()'));
+    body+=grp('System VAT (‫﷼‬)',fi_n('vat',D.vat,'0.00','dsrRecalc()'));
     body+=grp('VAT on ALFA (info)',fi_n('vatAlfa',D.vatAlfa,'0.00','dsrRecalc()'));
     body+='</div></div>';
     body+='<div style="'+card+'"><div style="'+secHdr+'">Discounts</div>';
     (D.discounts||[]).forEach(function(d,i){
       body+='<div style="display:flex;gap:8px;margin-bottom:8px;align-items:center">';
       body+='<input type="text" placeholder="Discount type" value="'+bxe(d.type||'')+'" oninput="dsrUpdArr(\'discounts\','+i+',\'type\',this.value)" style="'+fi+'flex:2">';
-      body+='<input type="number" step="0.01" placeholder="SAR" value="'+(d.amount||'')+'" oninput="dsrUpdArr(\'discounts\','+i+',\'amount\',this.value);dsrRecalc()" style="'+fi+'flex:1">';
+      body+='<input type="number" step="0.01" placeholder="﷼" value="'+(d.amount||'')+'" oninput="dsrUpdArr(\'discounts\','+i+',\'amount\',this.value);dsrRecalc()" style="'+fi+'flex:1">';
       body+='<button onclick="dsrRmArr(\'discounts\','+i+')" style="color:var(--danger);background:transparent;border:none;cursor:pointer;font-size:18px;line-height:1">×</button>';
       body+='</div>';
     });
@@ -10820,7 +10823,7 @@ function pDSR(){
       body+='<select oninput="dsrUpdArr(\'payments\','+i+',\'method\',this.value)" style="'+fi+'flex:1.5">';
       payMethods.forEach(function(m){body+='<option'+(p.method===m?' selected':'')+'>'+m+'</option>';});
       body+='</select>';
-      body+='<input type="number" step="0.01" placeholder="SAR" value="'+(p.amount||'')+'" oninput="dsrUpdArr(\'payments\','+i+',\'amount\',this.value);dsrRecalc()" style="'+fi+'flex:1">';
+      body+='<input type="number" step="0.01" placeholder="﷼" value="'+(p.amount||'')+'" oninput="dsrUpdArr(\'payments\','+i+',\'amount\',this.value);dsrRecalc()" style="'+fi+'flex:1">';
       body+='<button onclick="dsrRmArr(\'payments\','+i+')" style="color:var(--danger);background:transparent;border:none;cursor:pointer;font-size:18px;line-height:1">×</button>';
       body+='</div>';
     });
@@ -10850,7 +10853,7 @@ function pDSR(){
     (D.delivery||[]).forEach(function(d,i){
       body+='<div style="display:flex;gap:8px;margin-bottom:8px;align-items:center">';
       body+='<input type="text" placeholder="Platform (HungerStation, Jahez...)" value="'+bxe(d.platform||'')+'" oninput="dsrUpdArr(\'delivery\','+i+',\'platform\',this.value)" style="'+fi+'flex:2">';
-      body+='<input type="number" step="0.01" placeholder="SAR" value="'+(d.amount||'')+'" oninput="dsrUpdArr(\'delivery\','+i+',\'amount\',this.value);dsrRecalc()" style="'+fi+'flex:1">';
+      body+='<input type="number" step="0.01" placeholder="﷼" value="'+(d.amount||'')+'" oninput="dsrUpdArr(\'delivery\','+i+',\'amount\',this.value);dsrRecalc()" style="'+fi+'flex:1">';
       body+='<input type="number" placeholder="Orders" value="'+(d.orders||'')+'" oninput="dsrUpdArr(\'delivery\','+i+',\'orders\',this.value)" style="'+fi+'width:80px;flex:none">';
       body+='<button onclick="dsrRmArr(\'delivery\','+i+')" style="color:var(--danger);background:transparent;border:none;cursor:pointer;font-size:18px;line-height:1">×</button>';
       body+='</div>';
@@ -10882,16 +10885,16 @@ function pDSR(){
       body+='<div style="'+grid3+'margin-bottom:12px">';
       body+=grp('Server Name',fi_t('srv_name_'+si,s.name,'Full name','dsrUpdSrv('+si+',\'name\',this.value)'));
       body+=grp('SAP Number',fi_t('srv_sap_'+si,s.sap,'SAP-XXXX','dsrUpdSrv('+si+',\'sap\',this.value)'));
-      body+=grp('Total Sales (SAR)',fi_n('srv_tot_'+si,s.totalSales,'0.00','dsrUpdSrv('+si+',\'totalSales\',this.value);dsrRecalc('+si+')'));
-      body+=grp('Cash Sales (SAR)',fi_n('srv_cash_'+si,s.cashSales,'0.00','dsrUpdSrv('+si+',\'cashSales\',this.value);dsrRecalc('+si+')'));
-      body+=grp('MADA (SAR)',fi_n('srv_mada_'+si,s.madaSales,'0.00','dsrUpdSrv('+si+',\'madaSales\',this.value);dsrRecalc('+si+')'));
-      body+=grp('VISA (SAR)',fi_n('srv_visa_'+si,s.visaSales,'0.00','dsrUpdSrv('+si+',\'visaSales\',this.value);dsrRecalc('+si+')'));
-      body+=grp('Master Card (SAR)',fi_n('srv_mc_'+si,s.mcSales,'0.00','dsrUpdSrv('+si+',\'mcSales\',this.value);dsrRecalc('+si+')'));
-      body+=grp('AMEX (SAR)',fi_n('srv_amex_'+si,s.amexSales,'0.00','dsrUpdSrv('+si+',\'amexSales\',this.value);dsrRecalc('+si+')'));
-      body+=grp('Qlub (SAR)',fi_n('srv_qlub_'+si,s.qlubSales,'0.00','dsrUpdSrv('+si+',\'qlubSales\',this.value);dsrRecalc('+si+')'));
-      body+=grp('Loyalty Point (SAR)',fi_n('srv_loy_'+si,s.loyaltySales,'0.00','dsrUpdSrv('+si+',\'loyaltySales\',this.value);dsrRecalc('+si+')'));
-      body+=grp('Delivery (SAR)',fi_n('srv_del_'+si,s.deliverySales,'0.00','dsrUpdSrv('+si+',\'deliverySales\',this.value);dsrRecalc('+si+')'));
-      body+=grp('VAT on ALFA (SAR)',fi_n('srv_vatalfa_'+si,s.vatAlfaSales,'0.00','dsrUpdSrv('+si+',\'vatAlfaSales\',this.value);dsrRecalc('+si+')'));
+      body+=grp('Total Sales (‫﷼‬)',fi_n('srv_tot_'+si,s.totalSales,'0.00','dsrUpdSrv('+si+',\'totalSales\',this.value);dsrRecalc('+si+')'));
+      body+=grp('Cash Sales (‫﷼‬)',fi_n('srv_cash_'+si,s.cashSales,'0.00','dsrUpdSrv('+si+',\'cashSales\',this.value);dsrRecalc('+si+')'));
+      body+=grp('MADA (‫﷼‬)',fi_n('srv_mada_'+si,s.madaSales,'0.00','dsrUpdSrv('+si+',\'madaSales\',this.value);dsrRecalc('+si+')'));
+      body+=grp('VISA (‫﷼‬)',fi_n('srv_visa_'+si,s.visaSales,'0.00','dsrUpdSrv('+si+',\'visaSales\',this.value);dsrRecalc('+si+')'));
+      body+=grp('Master Card (‫﷼‬)',fi_n('srv_mc_'+si,s.mcSales,'0.00','dsrUpdSrv('+si+',\'mcSales\',this.value);dsrRecalc('+si+')'));
+      body+=grp('AMEX (‫﷼‬)',fi_n('srv_amex_'+si,s.amexSales,'0.00','dsrUpdSrv('+si+',\'amexSales\',this.value);dsrRecalc('+si+')'));
+      body+=grp('Qlub (‫﷼‬)',fi_n('srv_qlub_'+si,s.qlubSales,'0.00','dsrUpdSrv('+si+',\'qlubSales\',this.value);dsrRecalc('+si+')'));
+      body+=grp('Loyalty Point (‫﷼‬)',fi_n('srv_loy_'+si,s.loyaltySales,'0.00','dsrUpdSrv('+si+',\'loyaltySales\',this.value);dsrRecalc('+si+')'));
+      body+=grp('Delivery (‫﷼‬)',fi_n('srv_del_'+si,s.deliverySales,'0.00','dsrUpdSrv('+si+',\'deliverySales\',this.value);dsrRecalc('+si+')'));
+      body+=grp('VAT on ALFA (‫﷼‬)',fi_n('srv_vatalfa_'+si,s.vatAlfaSales,'0.00','dsrUpdSrv('+si+',\'vatAlfaSales\',this.value);dsrRecalc('+si+')'));
       body+='</div>';
       // Tips
       body+='<div style="margin-bottom:12px;padding-top:10px;border-top:1px solid var(--border)">';
@@ -10903,7 +10906,7 @@ function pDSR(){
         body+='<select oninput="dsrUpdTip('+si+',\''+t.id+'\',\'method\',this.value)" style="'+fi+'flex:1;font-size:11px">';
         CARDM.forEach(function(m){body+='<option'+(t.method===m?' selected':'')+'>'+m+'</option>';});
         body+='</select>';
-        body+='<input type="number" step="0.01" placeholder="SAR" value="'+(t.amount||'')+'" oninput="dsrUpdTip('+si+',\''+t.id+'\',\'amount\',this.value)" style="'+fi+'width:90px;flex:none;font-size:11px">';
+        body+='<input type="number" step="0.01" placeholder="﷼" value="'+(t.amount||'')+'" oninput="dsrUpdTip('+si+',\''+t.id+'\',\'amount\',this.value)" style="'+fi+'width:90px;flex:none;font-size:11px">';
         body+='<input type="text" placeholder="Approval Code" value="'+bxe(t.approval||'')+'" oninput="dsrUpdTip('+si+',\''+t.id+'\',\'approval\',this.value)" style="'+fi+'width:100px;flex:none;font-size:11px">';
         body+='<span style="background:'+tc+'18;color:'+tc+';border:1px solid '+tc+'40;border-radius:20px;padding:2px 10px;font-size:10px;font-weight:700;flex:none;white-space:nowrap">'+t.status.toUpperCase()+'</span>';
         if(t.status==='pending'){
@@ -10928,7 +10931,7 @@ function pDSR(){
         VRR.forEach(function(r){body+='<option'+(v.reason===r?' selected':'')+'>'+r+'</option>';});
         body+='</select>';
         body+='<input type="text" placeholder="Check#" value="'+bxe(v.check||'')+'" oninput="dsrUpdVR('+si+',\'voids\',\''+v.id+'\',\'check\',this.value)" style="'+fi+'width:70px;flex:none;font-size:11px">';
-        body+='<input type="number" step="0.01" placeholder="SAR" value="'+(v.amount||'')+'" oninput="dsrUpdVR('+si+',\'voids\',\''+v.id+'\',\'amount\',this.value);dsrRecalc('+si+')" style="'+fi+'width:80px;flex:none;font-size:11px">';
+        body+='<input type="number" step="0.01" placeholder="﷼" value="'+(v.amount||'')+'" oninput="dsrUpdVR('+si+',\'voids\',\''+v.id+'\',\'amount\',this.value);dsrRecalc('+si+')" style="'+fi+'width:80px;flex:none;font-size:11px">';
         body+='<span style="background:'+vc+'18;color:'+vc+';border:1px solid '+vc+'40;border-radius:20px;padding:2px 10px;font-size:10px;font-weight:700;flex:none;white-space:nowrap">'+v.status.toUpperCase()+'</span>';
         if(v.status==='pending'){
           body+='<button onclick="dsrApprVR('+si+',\'voids\',\''+v.id+'\')" style="padding:5px 12px;border-radius:7px;background:rgba(52,211,153,.15);border:1px solid rgba(52,211,153,.35);color:#b45309;font-size:12px;font-weight:700;cursor:pointer;flex:none;white-space:nowrap">✓ OK</button>';
@@ -10952,7 +10955,7 @@ function pDSR(){
         VRR.forEach(function(r){body+='<option'+(v.reason===r?' selected':'')+'>'+r+'</option>';});
         body+='</select>';
         body+='<input type="text" placeholder="Check#" value="'+bxe(v.check||'')+'" oninput="dsrUpdVR('+si+',\'returns\',\''+v.id+'\',\'check\',this.value)" style="'+fi+'width:70px;flex:none;font-size:11px">';
-        body+='<input type="number" step="0.01" placeholder="SAR" value="'+(v.amount||'')+'" oninput="dsrUpdVR('+si+',\'returns\',\''+v.id+'\',\'amount\',this.value);dsrRecalc('+si+')" style="'+fi+'width:80px;flex:none;font-size:11px">';
+        body+='<input type="number" step="0.01" placeholder="﷼" value="'+(v.amount||'')+'" oninput="dsrUpdVR('+si+',\'returns\',\''+v.id+'\',\'amount\',this.value);dsrRecalc('+si+')" style="'+fi+'width:80px;flex:none;font-size:11px">';
         body+='<span style="background:'+vc+'18;color:'+vc+';border:1px solid '+vc+'40;border-radius:20px;padding:2px 10px;font-size:10px;font-weight:700;flex:none;white-space:nowrap">'+v.status.toUpperCase()+'</span>';
         if(v.status==='pending'){
           body+='<button onclick="dsrApprVR('+si+',\'returns\',\''+v.id+'\')" style="padding:5px 12px;border-radius:7px;background:rgba(52,211,153,.15);border:1px solid rgba(52,211,153,.35);color:#b45309;font-size:12px;font-weight:700;cursor:pointer;flex:none;white-space:nowrap">✓ OK</button>';
@@ -10996,14 +10999,14 @@ function pDSR(){
       var qty=parseFloat((D.denoms||{})[dk])||0;
       var sub=qty*parseFloat(d.v);
       body+='<div style="background:var(--surface-2);border:1px solid var(--border);border-radius:9px;padding:10px;text-align:center">';
-      body+='<div style="font-size:12px;color:var(--text-primary);margin-bottom:6px;font-weight:700">SAR '+d.l+'</div>';
+      body+='<div style="font-size:12px;color:var(--text-primary);margin-bottom:6px;font-weight:700">﷼ '+d.l+'</div>';
       body+='<input type="number" min="0" value="'+(qty||'')+'" placeholder="0" oninput="dsrUpdDenom(\''+dk+'\',this.value)" style="'+fi+'text-align:center;font-size:15px;font-weight:700;margin-bottom:5px">';
       body+='<div id="denom-sub-'+dk+'" style="font-size:12px;color:var(--ceo);font-family:var(--mono);font-weight:700">='+sub.toFixed(2)+'</div>';
       body+='</div>';
     });
     body+='</div>';
     var physRunning=Object.keys(D.denoms||{}).filter(function(k){return k.indexOf('dep_')===0;}).reduce(function(a,k){var v=parseFloat(k.replace('dep_','').replace('_','.'));return a+(parseFloat((D.denoms||{})[k])||0)*v;},0);
-    body+='<div id="denom-total" style="margin-top:12px;font-size:16px;font-weight:700;color:var(--ceo);font-family:var(--mono);text-align:right">SAR '+physRunning.toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2})+'</div>';
+    body+='<div id="denom-total" style="margin-top:12px;font-size:16px;font-weight:700;color:var(--ceo);font-family:var(--mono);text-align:right">﷼ '+physRunning.toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2})+'</div>';
     body+='</div>';
     body+='<button onclick="dsrPrintDeposit()" style="padding:10px 28px;border-radius:9px;background:var(--surface-2);border:1px solid var(--border);color:var(--text-primary);font-size:13px;font-weight:600;cursor:pointer">⎙ Print Deposit Sheet</button>';
 
@@ -11073,7 +11076,7 @@ function pDSR(){
     var DENOMS_MF={have:[{v:'500',l:'500'},{v:'200',l:'200'},{v:'100',l:'100'},{v:'50',l:'50'},{v:'20',l:'20'},{v:'10',l:'10'},{v:'5',l:'5'},{v:'1',l:'1.00'},{v:'0.5',l:'0.50'},{v:'0.25',l:'0.25'}],change:[{v:'100',l:'100'},{v:'50',l:'50'},{v:'20',l:'20'},{v:'10',l:'10'},{v:'5',l:'5'},{v:'1',l:'1.00'}]};
     function denomGrid(type,denoms){
       var ht='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px">';
-      denoms.forEach(function(d){var dk=type+'_'+d.v.replace('.','_');var qty=parseFloat((D.denoms||{})[dk])||0;var sub=qty*parseFloat(d.v);ht+='<div style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center"><div style="font-size:12px;color:var(--text-primary);margin-bottom:6px;font-weight:700">SAR '+d.l+'</div><input type="number" min="0" value="'+(qty||'')+'" placeholder="0" oninput="dsrUpdDenom(\''+dk+'\',this.value)" style="'+fi+'text-align:center;font-size:15px;font-weight:700;margin-bottom:5px"><div style="font-size:12px;color:var(--ceo);font-family:var(--mono);font-weight:700">='+sub.toFixed(2)+'</div></div>';});
+      denoms.forEach(function(d){var dk=type+'_'+d.v.replace('.','_');var qty=parseFloat((D.denoms||{})[dk])||0;var sub=qty*parseFloat(d.v);ht+='<div style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center"><div style="font-size:12px;color:var(--text-primary);margin-bottom:6px;font-weight:700">﷼ '+d.l+'</div><input type="number" min="0" value="'+(qty||'')+'" placeholder="0" oninput="dsrUpdDenom(\''+dk+'\',this.value)" style="'+fi+'text-align:center;font-size:15px;font-weight:700;margin-bottom:5px"><div style="font-size:12px;color:var(--ceo);font-family:var(--mono);font-weight:700">='+sub.toFixed(2)+'</div></div>';});
       return ht+'</div>';
     }
     var haveTotal=DENOMS_MF.have.reduce(function(a,d){return a+(parseFloat((D.denoms||{})['mfh_'+d.v.replace('.','_')])||0)*parseFloat(d.v);},0);
@@ -11091,7 +11094,7 @@ function pDSR(){
     var mfDiff=mfTotal-mfCompany;
     body+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">';
     body+='<div style="'+card+'"><div style="'+secHdr+'">Company Float</div>';
-    body+=grp('Company Provides (SAR)','<input type="number" step="0.01" placeholder="e.g. 10000" value="'+(D.mfCompany||'')+'" oninput="dsrUp(\'mfCompany\',this.value)" style="'+fi+'font-size:18px;padding:9px 12px;color:var(--ceo)">');
+    body+=grp('Company Provides (‫﷼‬)','<input type="number" step="0.01" placeholder="e.g. 10000" value="'+(D.mfCompany||'')+'" oninput="dsrUp(\'mfCompany\',this.value)" style="'+fi+'font-size:18px;padding:9px 12px;color:var(--ceo)">');
     body+='<div style="background:var(--surface-2);border-radius:9px;padding:12px;margin-top:8px">';
     function msl(l,v,c,bold){return '<div style="'+sline+(bold?'font-weight:700':'')+'"><span style="color:var(--text-secondary)">'+l+'</span><span style="font-family:var(--mono);color:'+(c||'var(--text-primary)')+'">'+v.toFixed(2)+'</span></div>';}
     body+=msl('Cash I Have',haveTotal);body+=msl('Change in Safe',changeTotal);body+=msl('Closed Petty Cash',closedPC);body+=msl('Ongoing Petty Cash',ongoingPC);
@@ -11105,11 +11108,11 @@ function pDSR(){
     body+='</div>';
     body+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">';
     body+='<div style="'+card+'"><div style="'+secHdr+'">Closed Petty Cash</div>';
-    (D.closedPetty||[]).forEach(function(p,i){body+='<div style="display:flex;gap:8px;margin-bottom:8px;align-items:center"><input type="text" placeholder="Description" value="'+bxe(p.desc||'')+'" oninput="dsrUpdArr(\'closedPetty\','+i+',\'desc\',this.value)" style="'+fi+'flex:2"><input type="number" step="0.01" placeholder="SAR" value="'+(p.amount||'')+'" oninput="dsrUpdArr(\'closedPetty\','+i+',\'amount\',this.value)" style="'+fi+'flex:1"><button onclick="dsrRmArr(\'closedPetty\','+i+')" style="color:var(--danger);background:transparent;border:none;cursor:pointer;font-size:18px">×</button></div>';});
+    (D.closedPetty||[]).forEach(function(p,i){body+='<div style="display:flex;gap:8px;margin-bottom:8px;align-items:center"><input type="text" placeholder="Description" value="'+bxe(p.desc||'')+'" oninput="dsrUpdArr(\'closedPetty\','+i+',\'desc\',this.value)" style="'+fi+'flex:2"><input type="number" step="0.01" placeholder="﷼" value="'+(p.amount||'')+'" oninput="dsrUpdArr(\'closedPetty\','+i+',\'amount\',this.value)" style="'+fi+'flex:1"><button onclick="dsrRmArr(\'closedPetty\','+i+')" style="color:var(--danger);background:transparent;border:none;cursor:pointer;font-size:18px">×</button></div>';});
     body+='<button onclick="dsrAddArr(\'closedPetty\')" style="padding:6px 14px;border-radius:7px;border:1px solid var(--border);background:var(--surface-2);color:var(--text-primary);font-size:11px;cursor:pointer;margin-top:4px">+ Add</button>';
     body+='<div style="font-size:11px;color:#c0392b;font-family:var(--mono);margin-top:10px;font-weight:700">Total: '+bfsar(closedPC)+'</div></div>';
     body+='<div style="'+card+'"><div style="'+secHdr+'">Ongoing Petty Cash</div>';
-    (D.ongoingPetty||[]).forEach(function(p,i){body+='<div style="display:flex;gap:8px;margin-bottom:8px;align-items:center"><input type="text" placeholder="Description" value="'+bxe(p.desc||'')+'" oninput="dsrUpdArr(\'ongoingPetty\','+i+',\'desc\',this.value)" style="'+fi+'flex:2"><input type="number" step="0.01" placeholder="SAR" value="'+(p.amount||'')+'" oninput="dsrUpdArr(\'ongoingPetty\','+i+',\'amount\',this.value)" style="'+fi+'flex:1"><button onclick="dsrRmArr(\'ongoingPetty\','+i+')" style="color:var(--danger);background:transparent;border:none;cursor:pointer;font-size:18px">×</button></div>';});
+    (D.ongoingPetty||[]).forEach(function(p,i){body+='<div style="display:flex;gap:8px;margin-bottom:8px;align-items:center"><input type="text" placeholder="Description" value="'+bxe(p.desc||'')+'" oninput="dsrUpdArr(\'ongoingPetty\','+i+',\'desc\',this.value)" style="'+fi+'flex:2"><input type="number" step="0.01" placeholder="﷼" value="'+(p.amount||'')+'" oninput="dsrUpdArr(\'ongoingPetty\','+i+',\'amount\',this.value)" style="'+fi+'flex:1"><button onclick="dsrRmArr(\'ongoingPetty\','+i+')" style="color:var(--danger);background:transparent;border:none;cursor:pointer;font-size:18px">×</button></div>';});
     body+='<button onclick="dsrAddArr(\'ongoingPetty\')" style="padding:6px 14px;border-radius:7px;border:1px solid var(--border);background:var(--surface-2);color:var(--text-primary);font-size:11px;cursor:pointer;margin-top:4px">+ Add</button>';
     body+='<div style="font-size:11px;color:#c0392b;font-family:var(--mono);margin-top:10px;font-weight:700">Total: '+bfsar(ongoingPC)+'</div></div>';
     body+='</div>';
@@ -11205,7 +11208,7 @@ function dsrUpdDenom(k,v){
     return s+(D.denoms[dk]*dv);
   },0);
   var el=document.getElementById('denom-total');
-  if(el)el.textContent='SAR '+total.toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
+  if(el)el.textContent='﷼ '+total.toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
 }
 function dsrSave(){var D=_dsrD();var activeDate=_dsrActiveDate();if(db&&NX.session&&NX.session.branchId){db.ref(dsrFbPath(activeDate)).set(D,function(err){if(err)showToast('Save failed','error');else showToast('DSR saved to Firebase ✓','success');});}else{try{localStorage.setItem('dsr_nexus_'+activeDate,JSON.stringify(D));showToast('DSR saved locally ✓','success');}catch(e){showToast('Save failed','error');}}}
 function dsrClear(){
@@ -11261,9 +11264,9 @@ function dsrEndShift(){
   }
 }
 function dsrPrintFull(){var D=_dsrD();var food=parseFloat(D.food)||0,bev=parseFloat(D.bev)||0,misc=parseFloat(D.misc)||0,vat=parseFloat(D.vat)||0;var totalDisc=(D.discounts||[]).reduce(function(a,d){return a+(parseFloat(d.amount)||0);},0);var netSales=(food+bev+misc)-totalDisc;var totalSales=netSales+vat;var serverCash=(D.servers||[]).reduce(function(a,s){return a+(parseFloat(s.cashSales)||0);},0);var approvedTips=(D.servers||[]).reduce(function(a,s){return a+(s.tips||[]).filter(function(t){return t.status==='approved';}).reduce(function(b,t){return b+(parseFloat(t.amount)||0);},0);},0);var toDeposit=serverCash-approvedTips;var guests=parseInt(D.guests)||0;var checkAvg=guests>0?netSales/guests:0;var dateStr=new Date(D.date+'T00:00:00').toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'});var payRows=(D.payments||[]).map(function(p){return '<tr><td>'+bxe(p.method)+'</td><td style="text-align:right">'+(parseFloat(p.amount||0)).toFixed(2)+'</td></tr>';}).join('');var delivRows=(D.delivery||[]).map(function(d){return '<tr><td>'+bxe(d.platform||'—')+'</td><td>'+(d.orders||0)+' orders</td><td style="text-align:right">'+(parseFloat(d.amount||0)).toFixed(2)+'</td></tr>';}).join('');var discRows=(D.discounts||[]).map(function(d){return '<tr><td>'+bxe(d.type||'—')+'</td><td style="text-align:right">'+(parseFloat(d.amount||0)).toFixed(2)+'</td></tr>';}).join('');var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>DSR - '+(D.restName||'')+'</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;padding:20px;color:#111;font-size:11px}@page{size:A4;margin:8mm}@media print{button{display:none!important}}h2{font-size:18px;font-weight:800;color:#1a2340}table{width:100%;border-collapse:collapse;margin-bottom:10px}th{background:#1a2340;color:#fff;padding:6px 8px;text-align:left;font-size:9px;text-transform:uppercase}td{padding:6px 8px;border-bottom:1px solid #eee}.amt{text-align:right;font-family:monospace;font-weight:600}.sig-row{display:grid;grid-template-columns:repeat(3,1fr);gap:30px;margin-top:24px}.sig-box{border-top:1px solid #333;padding-top:4px;text-align:center;font-size:9px;color:#666}</style></head><body>';html+='<div style="display:flex;justify-content:space-between;border-bottom:3px solid #1a2340;padding-bottom:10px;margin-bottom:16px"><div><img src="https://i.imgur.com/jeqtcE2.png" alt="ALFA.CO" style="height:44px;width:auto;display:block"><div style="font-size:11px;color:#888">'+bxe(D.restName||'')+'</div></div><div style="text-align:right"><div style="font-size:16px;font-weight:800;color:#1a2340">DAILY SALES REPORT</div><div style="font-size:10px;color:#666">'+dateStr+'</div></div></div>';html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:14px"><table><thead><tr><th colspan="2">Sales Summary</th></tr></thead><tbody><tr><td>Food + Bev + MISC</td><td class="amt">'+(food+bev+misc).toFixed(2)+'</td></tr><tr><td>(-) Discounts</td><td class="amt">('+totalDisc.toFixed(2)+')</td></tr><tr style="font-weight:700;background:#f5f5f5"><td>= Net Sales</td><td class="amt">'+netSales.toFixed(2)+'</td></tr><tr><td>+ System VAT</td><td class="amt">'+vat.toFixed(2)+'</td></tr><tr style="font-weight:700;background:#e8f0fe"><td>= Total Sales</td><td class="amt">'+totalSales.toFixed(2)+'</td></tr></tbody></table>';html+='<table><thead><tr><th colspan="2">Cash Reconciliation</th></tr></thead><tbody><tr><td>Guest Count</td><td class="amt">'+guests+'</td></tr><tr><td>Check Average</td><td class="amt">'+checkAvg.toFixed(2)+'</td></tr><tr><td>Server Cash Total</td><td class="amt">'+serverCash.toFixed(2)+'</td></tr><tr><td>(-) Credit Tips Paid</td><td class="amt">('+approvedTips.toFixed(2)+')</td></tr><tr style="font-weight:700;background:#e8f5e9"><td>Amount to Deposit</td><td class="amt">'+toDeposit.toFixed(2)+'</td></tr></tbody></table></div>';html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:14px"><table><thead><tr><th colspan="2">Payment Methods</th></tr></thead><tbody>'+(payRows||'<tr><td colspan="2">None</td></tr>')+'</tbody></table><table><thead><tr><th colspan="3">Delivery</th></tr></thead><tbody>'+(delivRows||'<tr><td colspan="3">None</td></tr>')+'</tbody></table><table><thead><tr><th colspan="2">Discounts</th></tr></thead><tbody>'+(discRows||'<tr><td colspan="2">None</td></tr>')+'</tbody></table></div>';html+='<div class="sig-row"><div class="sig-box">Manager</div><div class="sig-box">Cashier / Supervisor</div><div class="sig-box">Date & Stamp</div></div>';html+='<div style="text-align:center;margin-top:16px"><button onclick="window.print()" style="background:#1a2340;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:13px;font-weight:700;cursor:pointer">Print / Save PDF</button></div></body></html>';var w=window.open('','_blank','width=900,height=700');if(w){w.document.write(html);w.document.close();}else showToast('Allow pop-ups to print','error');}
-function dsrPrintVR(){var D=_dsrD();var rows=[];(D.servers||[]).forEach(function(s){(s.voids||[]).filter(function(v){return v.status==='approved';}).forEach(function(v){rows.push({server:s.name,sap:s.sap,type:'Void',item:v.item,check:v.check,reason:v.reason,manager:v.manager,amount:v.amount});});(s.returns||[]).filter(function(v){return v.status==='approved';}).forEach(function(v){rows.push({server:s.name,sap:s.sap,type:'Return',item:v.item,check:v.check,reason:v.reason,manager:v.manager,amount:v.amount});});});var tot=rows.reduce(function(a,v){return a+(parseFloat(v.amount)||0);},0);var dateStr=new Date(D.date+'T00:00:00').toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'});var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Voids & Returns</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;padding:20px;color:#111;font-size:11px}@media print{button{display:none!important}@page{size:A4;margin:8mm}}table{width:100%;border-collapse:collapse}th{background:#1a2340;color:#fff;padding:6px 8px;text-align:left;font-size:9px;text-transform:uppercase}td{padding:7px 8px;border-bottom:1px solid #eee}.amt{text-align:right;font-family:monospace;font-weight:600}</style></head><body><div style="display:flex;justify-content:space-between;border-bottom:3px solid #1a2340;padding-bottom:10px;margin-bottom:16px"><div><img src="https://i.imgur.com/jeqtcE2.png" alt="ALFA.CO" style="height:44px;width:auto;display:block"><div>'+bxe(D.restName||'')+'</div></div><div style="text-align:right"><div style="font-size:16px;font-weight:700">VOIDS & RETURNS REPORT</div><div style="font-size:10px;color:#666">'+dateStr+'</div></div></div><table><thead><tr><th>Server</th><th>SAP</th><th>Type</th><th>Item</th><th>Check #</th><th>Reason</th><th>Manager</th><th class="amt">Amount SAR</th></tr></thead><tbody>'+(rows.length?rows.map(function(v){return '<tr><td>'+bxe(v.server||'—')+'</td><td>'+bxe(v.sap||'—')+'</td><td>'+v.type+'</td><td>'+bxe(v.item||'—')+'</td><td>'+bxe(v.check||'—')+'</td><td>'+bxe(v.reason||'—')+'</td><td>'+bxe(v.manager||'—')+'</td><td class="amt">'+(parseFloat(v.amount||0)).toFixed(2)+'</td></tr>';}).join(''):'<tr><td colspan="8" style="text-align:center;padding:16px;color:#999">No approved voids or returns</td></tr>')+'<tr style="font-weight:700;background:#f5f5f5"><td colspan="7">TOTAL</td><td class="amt">'+tot.toFixed(2)+'</td></tr></tbody></table><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:30px;margin-top:24px"><div style="border-top:1px solid #333;padding-top:4px;text-align:center;font-size:9px;color:#666">Manager</div><div style="border-top:1px solid #333;padding-top:4px;text-align:center;font-size:9px;color:#666">Date</div><div style="border-top:1px solid #333;padding-top:4px;text-align:center;font-size:9px;color:#666">Verified By</div></div><div style="text-align:center;margin-top:14px"><button onclick="window.print()" style="background:#1a2340;color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:13px;font-weight:700;cursor:pointer">Print</button></div></body></html>';var w=window.open('','_blank','width=900,height=600');if(w){w.document.write(html);w.document.close();}else showToast('Allow pop-ups','error');}
-function dsrPrintTips(){var D=_dsrD();var rows=[];(D.servers||[]).forEach(function(s){(s.tips||[]).filter(function(t){return t.status==='approved';}).forEach(function(t){rows.push({server:s.name,sap:s.sap,method:t.method,amount:t.amount,approval:t.approval,guest:t.guest});});});var tot=rows.reduce(function(a,t){return a+(parseFloat(t.amount)||0);},0);var dateStr=new Date(D.date+'T00:00:00').toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'});var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Tips Report</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;padding:20px;color:#111;font-size:11px}@media print{button{display:none!important}@page{size:A4;margin:8mm}}table{width:100%;border-collapse:collapse}th{background:#1a2340;color:#fff;padding:6px 8px;text-align:left;font-size:9px;text-transform:uppercase}td{padding:7px 8px;border-bottom:1px solid #eee}.amt{text-align:right;font-family:monospace;font-weight:600}</style></head><body><div style="display:flex;justify-content:space-between;border-bottom:3px solid #1a2340;padding-bottom:10px;margin-bottom:16px"><div><img src="https://i.imgur.com/jeqtcE2.png" alt="ALFA.CO" style="height:44px;width:auto;display:block"><div>'+bxe(D.restName||'')+'</div></div><div style="text-align:right"><div style="font-size:16px;font-weight:700">TIPS REPORT</div><div style="font-size:10px;color:#666">'+dateStr+'</div></div></div><table><thead><tr><th>Server</th><th>SAP</th><th>Card Method</th><th class="amt">Amount SAR</th><th>Approval Code</th><th>Guest #</th></tr></thead><tbody>'+(rows.length?rows.map(function(t){return '<tr><td>'+bxe(t.server||'—')+'</td><td>'+bxe(t.sap||'—')+'</td><td>'+bxe(t.method)+'</td><td class="amt">'+(parseFloat(t.amount||0)).toFixed(2)+'</td><td>'+bxe(t.approval||'—')+'</td><td>'+bxe(t.guest||'—')+'</td></tr>';}).join(''):'<tr><td colspan="6" style="text-align:center;padding:16px;color:#999">No approved tips</td></tr>')+'<tr style="font-weight:700;background:#f5f5f5"><td colspan="3">TOTAL TIPS</td><td class="amt">'+tot.toFixed(2)+'</td><td colspan="2"></td></tr></tbody></table><div style="text-align:center;margin-top:14px"><button onclick="window.print()" style="background:#1a2340;color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:13px;font-weight:700;cursor:pointer">Print</button></div></body></html>';var w=window.open('','_blank','width=900,height=600');if(w){w.document.write(html);w.document.close();}else showToast('Allow pop-ups','error');}
-function dsrPrintDeposit(){var D=_dsrD();var DENOMS_DEP2=[{v:'500',l:'500'},{v:'200',l:'200'},{v:'100',l:'100'},{v:'50',l:'50'},{v:'20',l:'20'},{v:'10',l:'10'},{v:'5',l:'5'},{v:'1',l:'1.00'},{v:'0.5',l:'0.50'},{v:'0.25',l:'0.25'}];var serverCash4=(D.servers||[]).reduce(function(a,s){return a+(parseFloat(s.cashSales)||0);},0);var approvedTips4=(D.servers||[]).reduce(function(a,s){return a+(s.tips||[]).filter(function(t){return t.status==='approved';}).reduce(function(b,t){return b+(parseFloat(t.amount)||0);},0);},0);var toDeposit4=serverCash4-approvedTips4;var notes=0,coins=0;var denomRows='';DENOMS_DEP2.forEach(function(d){var qty=parseFloat((D.denoms||{})['dep_'+d.v.replace('.','_')])||0;var sub=qty*parseFloat(d.v);if(qty>0){denomRows+='<tr><td>SAR '+d.l+'</td><td style="text-align:center">'+qty+'</td><td style="text-align:right">'+sub.toFixed(2)+'</td></tr>';}if(parseFloat(d.v)>=5)notes+=sub;else coins+=sub;});var physical=notes+coins;var diff=physical-toDeposit4;var dateStr=new Date(D.date+'T00:00:00').toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'});var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Deposit Sheet</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;padding:20px;color:#111;font-size:11px}@media print{button{display:none!important}@page{size:A4;margin:8mm}}table{width:100%;border-collapse:collapse}th{background:#1a2340;color:#fff;padding:6px 8px;text-align:left;font-size:9px;text-transform:uppercase}td{padding:7px 8px;border-bottom:1px solid #eee}.amt{text-align:right;font-family:monospace;font-weight:600}</style></head><body><div style="display:flex;justify-content:space-between;border-bottom:3px solid #1a2340;padding-bottom:10px;margin-bottom:16px"><div><img src="https://i.imgur.com/jeqtcE2.png" alt="ALFA.CO" style="height:44px;width:auto;display:block"><div>'+bxe(D.restName||'')+'</div></div><div style="text-align:right"><div style="font-size:16px;font-weight:700">DAILY DEPOSIT SHEET</div><div style="font-size:10px;color:#666">'+dateStr+'</div></div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:20px"><table><thead><tr><th>Denomination</th><th style="text-align:center">Qty</th><th style="text-align:right">Amount SAR</th></tr></thead><tbody>'+(denomRows||'<tr><td colspan="3" style="text-align:center;color:#999">No denominations entered</td></tr>')+'<tr style="background:#f0f0f0"><td>Notes</td><td></td><td style="text-align:right">'+notes.toFixed(2)+'</td></tr><tr style="background:#f0f0f0"><td>Coins</td><td></td><td style="text-align:right">'+coins.toFixed(2)+'</td></tr><tr style="font-weight:700;background:#e8e8e8"><td>TOTAL PHYSICAL</td><td></td><td style="text-align:right">'+physical.toFixed(2)+'</td></tr></tbody></table><table><thead><tr><th colspan="2">Deposit Calculation</th></tr></thead><tbody><tr><td>Server Cash Total</td><td class="amt">'+serverCash4.toFixed(2)+'</td></tr><tr><td>(-) Credit Tips Paid</td><td class="amt">('+approvedTips4.toFixed(2)+')</td></tr><tr style="font-weight:700;background:#e8f5e9"><td>Amount to Deposit</td><td class="amt">'+toDeposit4.toFixed(2)+'</td></tr><tr><td>Physical Cash Counted</td><td class="amt">'+physical.toFixed(2)+'</td></tr><tr style="font-weight:700;background:'+(Math.abs(diff)<0.01?'#e8f5e9':'#ffebee')+'"><td>Variance</td><td class="amt">'+(diff>=0?'+':'')+diff.toFixed(2)+'</td></tr></tbody></table></div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:30px;margin-top:28px"><div style="border-top:1px solid #333;padding-top:4px;text-align:center;font-size:9px;color:#666">Cashier / Supervisor</div><div style="border-top:1px solid #333;padding-top:4px;text-align:center;font-size:9px;color:#666">Manager</div><div style="border-top:1px solid #333;padding-top:4px;text-align:center;font-size:9px;color:#666">Date & Stamp</div></div><div style="text-align:center;margin-top:14px"><button onclick="window.print()" style="background:#1a2340;color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:13px;font-weight:700;cursor:pointer">Print</button></div></body></html>';var w=window.open('','_blank','width=900,height=600');if(w){w.document.write(html);w.document.close();}else showToast('Allow pop-ups','error');}
+function dsrPrintVR(){var D=_dsrD();var rows=[];(D.servers||[]).forEach(function(s){(s.voids||[]).filter(function(v){return v.status==='approved';}).forEach(function(v){rows.push({server:s.name,sap:s.sap,type:'Void',item:v.item,check:v.check,reason:v.reason,manager:v.manager,amount:v.amount});});(s.returns||[]).filter(function(v){return v.status==='approved';}).forEach(function(v){rows.push({server:s.name,sap:s.sap,type:'Return',item:v.item,check:v.check,reason:v.reason,manager:v.manager,amount:v.amount});});});var tot=rows.reduce(function(a,v){return a+(parseFloat(v.amount)||0);},0);var dateStr=new Date(D.date+'T00:00:00').toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'});var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Voids & Returns</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;padding:20px;color:#111;font-size:11px}@media print{button{display:none!important}@page{size:A4;margin:8mm}}table{width:100%;border-collapse:collapse}th{background:#1a2340;color:#fff;padding:6px 8px;text-align:left;font-size:9px;text-transform:uppercase}td{padding:7px 8px;border-bottom:1px solid #eee}.amt{text-align:right;font-family:monospace;font-weight:600}</style></head><body><div style="display:flex;justify-content:space-between;border-bottom:3px solid #1a2340;padding-bottom:10px;margin-bottom:16px"><div><img src="https://i.imgur.com/jeqtcE2.png" alt="ALFA.CO" style="height:44px;width:auto;display:block"><div>'+bxe(D.restName||'')+'</div></div><div style="text-align:right"><div style="font-size:16px;font-weight:700">VOIDS & RETURNS REPORT</div><div style="font-size:10px;color:#666">'+dateStr+'</div></div></div><table><thead><tr><th>Server</th><th>SAP</th><th>Type</th><th>Item</th><th>Check #</th><th>Reason</th><th>Manager</th><th class="amt">Amount ﷼</th></tr></thead><tbody>'+(rows.length?rows.map(function(v){return '<tr><td>'+bxe(v.server||'—')+'</td><td>'+bxe(v.sap||'—')+'</td><td>'+v.type+'</td><td>'+bxe(v.item||'—')+'</td><td>'+bxe(v.check||'—')+'</td><td>'+bxe(v.reason||'—')+'</td><td>'+bxe(v.manager||'—')+'</td><td class="amt">'+(parseFloat(v.amount||0)).toFixed(2)+'</td></tr>';}).join(''):'<tr><td colspan="8" style="text-align:center;padding:16px;color:#999">No approved voids or returns</td></tr>')+'<tr style="font-weight:700;background:#f5f5f5"><td colspan="7">TOTAL</td><td class="amt">'+tot.toFixed(2)+'</td></tr></tbody></table><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:30px;margin-top:24px"><div style="border-top:1px solid #333;padding-top:4px;text-align:center;font-size:9px;color:#666">Manager</div><div style="border-top:1px solid #333;padding-top:4px;text-align:center;font-size:9px;color:#666">Date</div><div style="border-top:1px solid #333;padding-top:4px;text-align:center;font-size:9px;color:#666">Verified By</div></div><div style="text-align:center;margin-top:14px"><button onclick="window.print()" style="background:#1a2340;color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:13px;font-weight:700;cursor:pointer">Print</button></div></body></html>';var w=window.open('','_blank','width=900,height=600');if(w){w.document.write(html);w.document.close();}else showToast('Allow pop-ups','error');}
+function dsrPrintTips(){var D=_dsrD();var rows=[];(D.servers||[]).forEach(function(s){(s.tips||[]).filter(function(t){return t.status==='approved';}).forEach(function(t){rows.push({server:s.name,sap:s.sap,method:t.method,amount:t.amount,approval:t.approval,guest:t.guest});});});var tot=rows.reduce(function(a,t){return a+(parseFloat(t.amount)||0);},0);var dateStr=new Date(D.date+'T00:00:00').toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'});var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Tips Report</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;padding:20px;color:#111;font-size:11px}@media print{button{display:none!important}@page{size:A4;margin:8mm}}table{width:100%;border-collapse:collapse}th{background:#1a2340;color:#fff;padding:6px 8px;text-align:left;font-size:9px;text-transform:uppercase}td{padding:7px 8px;border-bottom:1px solid #eee}.amt{text-align:right;font-family:monospace;font-weight:600}</style></head><body><div style="display:flex;justify-content:space-between;border-bottom:3px solid #1a2340;padding-bottom:10px;margin-bottom:16px"><div><img src="https://i.imgur.com/jeqtcE2.png" alt="ALFA.CO" style="height:44px;width:auto;display:block"><div>'+bxe(D.restName||'')+'</div></div><div style="text-align:right"><div style="font-size:16px;font-weight:700">TIPS REPORT</div><div style="font-size:10px;color:#666">'+dateStr+'</div></div></div><table><thead><tr><th>Server</th><th>SAP</th><th>Card Method</th><th class="amt">Amount ﷼</th><th>Approval Code</th><th>Guest #</th></tr></thead><tbody>'+(rows.length?rows.map(function(t){return '<tr><td>'+bxe(t.server||'—')+'</td><td>'+bxe(t.sap||'—')+'</td><td>'+bxe(t.method)+'</td><td class="amt">'+(parseFloat(t.amount||0)).toFixed(2)+'</td><td>'+bxe(t.approval||'—')+'</td><td>'+bxe(t.guest||'—')+'</td></tr>';}).join(''):'<tr><td colspan="6" style="text-align:center;padding:16px;color:#999">No approved tips</td></tr>')+'<tr style="font-weight:700;background:#f5f5f5"><td colspan="3">TOTAL TIPS</td><td class="amt">'+tot.toFixed(2)+'</td><td colspan="2"></td></tr></tbody></table><div style="text-align:center;margin-top:14px"><button onclick="window.print()" style="background:#1a2340;color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:13px;font-weight:700;cursor:pointer">Print</button></div></body></html>';var w=window.open('','_blank','width=900,height=600');if(w){w.document.write(html);w.document.close();}else showToast('Allow pop-ups','error');}
+function dsrPrintDeposit(){var D=_dsrD();var DENOMS_DEP2=[{v:'500',l:'500'},{v:'200',l:'200'},{v:'100',l:'100'},{v:'50',l:'50'},{v:'20',l:'20'},{v:'10',l:'10'},{v:'5',l:'5'},{v:'1',l:'1.00'},{v:'0.5',l:'0.50'},{v:'0.25',l:'0.25'}];var serverCash4=(D.servers||[]).reduce(function(a,s){return a+(parseFloat(s.cashSales)||0);},0);var approvedTips4=(D.servers||[]).reduce(function(a,s){return a+(s.tips||[]).filter(function(t){return t.status==='approved';}).reduce(function(b,t){return b+(parseFloat(t.amount)||0);},0);},0);var toDeposit4=serverCash4-approvedTips4;var notes=0,coins=0;var denomRows='';DENOMS_DEP2.forEach(function(d){var qty=parseFloat((D.denoms||{})['dep_'+d.v.replace('.','_')])||0;var sub=qty*parseFloat(d.v);if(qty>0){denomRows+='<tr><td>﷼ '+d.l+'</td><td style="text-align:center">'+qty+'</td><td style="text-align:right">'+sub.toFixed(2)+'</td></tr>';}if(parseFloat(d.v)>=5)notes+=sub;else coins+=sub;});var physical=notes+coins;var diff=physical-toDeposit4;var dateStr=new Date(D.date+'T00:00:00').toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'});var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Deposit Sheet</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;padding:20px;color:#111;font-size:11px}@media print{button{display:none!important}@page{size:A4;margin:8mm}}table{width:100%;border-collapse:collapse}th{background:#1a2340;color:#fff;padding:6px 8px;text-align:left;font-size:9px;text-transform:uppercase}td{padding:7px 8px;border-bottom:1px solid #eee}.amt{text-align:right;font-family:monospace;font-weight:600}</style></head><body><div style="display:flex;justify-content:space-between;border-bottom:3px solid #1a2340;padding-bottom:10px;margin-bottom:16px"><div><img src="https://i.imgur.com/jeqtcE2.png" alt="ALFA.CO" style="height:44px;width:auto;display:block"><div>'+bxe(D.restName||'')+'</div></div><div style="text-align:right"><div style="font-size:16px;font-weight:700">DAILY DEPOSIT SHEET</div><div style="font-size:10px;color:#666">'+dateStr+'</div></div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:20px"><table><thead><tr><th>Denomination</th><th style="text-align:center">Qty</th><th style="text-align:right">Amount ﷼</th></tr></thead><tbody>'+(denomRows||'<tr><td colspan="3" style="text-align:center;color:#999">No denominations entered</td></tr>')+'<tr style="background:#f0f0f0"><td>Notes</td><td></td><td style="text-align:right">'+notes.toFixed(2)+'</td></tr><tr style="background:#f0f0f0"><td>Coins</td><td></td><td style="text-align:right">'+coins.toFixed(2)+'</td></tr><tr style="font-weight:700;background:#e8e8e8"><td>TOTAL PHYSICAL</td><td></td><td style="text-align:right">'+physical.toFixed(2)+'</td></tr></tbody></table><table><thead><tr><th colspan="2">Deposit Calculation</th></tr></thead><tbody><tr><td>Server Cash Total</td><td class="amt">'+serverCash4.toFixed(2)+'</td></tr><tr><td>(-) Credit Tips Paid</td><td class="amt">('+approvedTips4.toFixed(2)+')</td></tr><tr style="font-weight:700;background:#e8f5e9"><td>Amount to Deposit</td><td class="amt">'+toDeposit4.toFixed(2)+'</td></tr><tr><td>Physical Cash Counted</td><td class="amt">'+physical.toFixed(2)+'</td></tr><tr style="font-weight:700;background:'+(Math.abs(diff)<0.01?'#e8f5e9':'#ffebee')+'"><td>Variance</td><td class="amt">'+(diff>=0?'+':'')+diff.toFixed(2)+'</td></tr></tbody></table></div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:30px;margin-top:28px"><div style="border-top:1px solid #333;padding-top:4px;text-align:center;font-size:9px;color:#666">Cashier / Supervisor</div><div style="border-top:1px solid #333;padding-top:4px;text-align:center;font-size:9px;color:#666">Manager</div><div style="border-top:1px solid #333;padding-top:4px;text-align:center;font-size:9px;color:#666">Date & Stamp</div></div><div style="text-align:center;margin-top:14px"><button onclick="window.print()" style="background:#1a2340;color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:13px;font-weight:700;cursor:pointer">Print</button></div></body></html>';var w=window.open('','_blank','width=900,height=600');if(w){w.document.write(html);w.document.close();}else showToast('Allow pop-ups','error');}
 // Load DSR from Firebase when entering DSR page — also picks up server drops from standalone page
 function dsrLoadFromFirebase(cb){
   var activeDate=_dsrActiveDate();
@@ -11460,7 +11463,7 @@ function initRevChart(filter) {
 
   var opts = chartDefaults();
   opts.plugins.legend.display = datasets.length > 1;
-  opts.scales.y.ticks.callback = function(v){ return v>=1000?'SAR '+(v/1000).toFixed(0)+'K':'SAR '+v; };
+  opts.scales.y.ticks.callback = function(v){ return v>=1000?'﷼ '+(v/1000).toFixed(0)+'K':'﷼ '+v; };
   NX.charts.revenue30 = new Chart(ctx, { type:'line', data:{ labels:labels, datasets:datasets }, options:opts });
 }
 
@@ -11577,9 +11580,9 @@ function initRevTrendChart() {
   opts.scales.x.ticks.autoSkip = true;
   opts.scales.x.ticks.maxTicksLimit = range.days <= 14 ? range.days : (range.days <= 60 ? 10 : 8);
   opts.scales.y.ticks.callback = function(val) {
-    if (val >= 1000000) return 'SAR ' + (val/1000000).toFixed(1) + 'M';
-    if (val >= 1000) return 'SAR ' + (val/1000).toFixed(0) + 'K';
-    return 'SAR ' + val;
+    if (val >= 1000000) return '﷼ ' + (val/1000000).toFixed(1) + 'M';
+    if (val >= 1000) return '﷼ ' + (val/1000).toFixed(0) + 'K';
+    return '﷼ ' + val;
   };
   opts.interaction = { mode: 'index', intersect: false };
 
@@ -11800,7 +11803,7 @@ function initFCTrendChart() {
   }
   var opts = chartDefaults();
   opts.plugins.legend.display = false;
-  opts.scales.y.ticks.callback = function(v){ return 'SAR '+(v>=1000?(v/1000).toFixed(1)+'K':v); };
+  opts.scales.y.ticks.callback = function(v){ return '﷼ '+(v>=1000?(v/1000).toFixed(1)+'K':v); };
   NX.charts.fcTrend = new Chart(ctx, { type:'bar', data:{ labels:labels, datasets:[{ data:data, backgroundColor:'rgba(248,113,113,.4)', borderColor:'#c0392b', borderWidth:1, borderRadius:3 }] }, options:opts });
 }
 
@@ -11851,7 +11854,7 @@ function initBranchRevChart() {
   var data = s.branchId ? getSalesData30(s.branchId) : Array(30).fill(0);
   var opts = chartDefaults();
   opts.plugins.legend.display = false;
-  opts.scales.y.ticks.callback = function(v){ return v>=1000?'SAR '+(v/1000).toFixed(0)+'K':'SAR '+v; };
+  opts.scales.y.ticks.callback = function(v){ return v>=1000?'﷼ '+(v/1000).toFixed(0)+'K':'﷼ '+v; };
   NX.charts.branchRev = new Chart(ctx, { type:'line', data:{ labels:labels, datasets:[{ data:data, borderColor:'var(--ceo)', backgroundColor:'rgba(240,165,0,.08)', tension:.4, pointRadius:0, borderWidth:2, fill:true }] }, options:opts });
 }
 
@@ -11868,7 +11871,7 @@ function initBrandTrendChart() {
   });
   var opts = chartDefaults();
   opts.plugins.legend.display = false;
-  opts.scales.y.ticks.callback = function(v){ return v>=1000?'SAR '+(v/1000).toFixed(0)+'K':'SAR '+v; };
+  opts.scales.y.ticks.callback = function(v){ return v>=1000?'﷼ '+(v/1000).toFixed(0)+'K':'﷼ '+v; };
   NX.charts.brandTrend = new Chart(ctx, { type:'line', data:{ labels:labels, datasets:[{ data:totals, borderColor:'var(--brand-dir)', backgroundColor:'rgba(124,111,247,.08)', tension:.4, pointRadius:0, borderWidth:2, fill:true }] }, options:opts });
 }
 
@@ -11883,7 +11886,7 @@ function initRegionCompChart() {
   var colors = branches.map(function(b){return b.color||'#f0a500';});
   var opts = chartDefaults();
   opts.plugins.legend.display = false;
-  opts.scales.y.ticks.callback = function(v){ return v>=1000?'SAR '+(v/1000).toFixed(0)+'K':'SAR '+v; };
+  opts.scales.y.ticks.callback = function(v){ return v>=1000?'﷼ '+(v/1000).toFixed(0)+'K':'﷼ '+v; };
   NX.charts.regionComp = new Chart(ctx, { type:'bar', data:{ labels:labels, datasets:[{ data:values, backgroundColor:colors.map(function(c){return c+'60';}), borderColor:colors, borderWidth:2, borderRadius:4 }] }, options:opts });
 }
 
@@ -11897,7 +11900,7 @@ function initBranchSalesChart() {
   var data = s.branchId ? getSalesData30(s.branchId) : Array(30).fill(0);
   var opts = chartDefaults();
   opts.plugins.legend.display = false;
-  opts.scales.y.ticks.callback = function(v){ return v>=1000?'SAR '+(v/1000).toFixed(0)+'K':'SAR '+v; };
+  opts.scales.y.ticks.callback = function(v){ return v>=1000?'﷼ '+(v/1000).toFixed(0)+'K':'﷼ '+v; };
   opts.plugins.tooltip.callbacks = { label: function(ctx2){ return ' ' + formatSAR(ctx2.parsed.y); } };
   NX.charts.branchSales = new Chart(ctx, {
     type:'line',
@@ -12762,7 +12765,7 @@ function hrfLoadAll(coll, cacheKey, cb) {
 }
 
 function hxe(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-function hfsar(n) { return 'SAR\u00a0' + parseFloat(n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function hfsar(n) { return SAR_SYM + parseFloat(n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function hfnum(n) { return parseFloat(n||0).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0}); }
 function hini(name) { return String(name||'').split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase(); }
 
@@ -13203,7 +13206,7 @@ function openHrfEmpModal(empId,branchId){
       '<input class="form-input" type="date" id="hrfemp-hire" value="'+bxe(m?m.hireDate||'':'')+'"></div></div>'+
 
       // Row 8: Salary
-      '<div class="bfg"><label class="form-label">Basic Salary (SAR)</label>'+
+      '<div class="bfg"><label class="form-label">Basic Salary (‫﷼‬)</label>'+
       '<input class="form-input" type="number" step="0.01" id="hrfemp-salary" value="'+(m?m.basicSalary||m.salary||'':'')+'"></div>'+
 
       '<button class="btn btn-primary" style="width:100%;margin-top:14px" data-eid="'+bxe(empId||'')+'" data-bid="'+bxe(branchId||'')+'" onclick="saveHrfEmp(this.dataset.eid,this.dataset.bid)">'+(m?'Save Changes':'Add Employee')+'</button>'
@@ -13810,7 +13813,7 @@ function hrfPrintPayrollReport(month,moLabel){
       if(totA>0||totL>0){var sal=m.salary||m.basicSalary||0;var perDay=sal?Math.round(sal/30):0;deductions.push({name:m.name,dept:m.dept||'',branch:bname,absent:totA,late:totL,salary:sal,est:perDay?(totA+totL)*perDay:0});}
     });
   });
-  var rows=deductions.map(function(r,i){return '<tr style="background:'+(i%2===0?'#fff':'#f8fafc')+'"><td style="padding:8px 10px">'+i+1+'</td><td style="padding:8px 10px;font-weight:600">'+r.name+'</td><td style="padding:8px 10px">'+r.dept+'</td><td style="padding:8px 10px">'+r.branch+'</td><td style="padding:8px 10px;text-align:center;color:#c0392b;font-weight:700">'+r.absent+'</td><td style="padding:8px 10px;text-align:center;color:#b45309;font-weight:700">'+r.late+'</td><td style="padding:8px 10px;text-align:center;font-weight:700;color:#5b21b6">'+(r.absent+r.late)+'</td><td style="padding:8px 10px;font-family:monospace">'+( r.salary?'SAR '+r.salary.toLocaleString():'\u2014')+'</td><td style="padding:8px 10px;color:#c0392b;font-weight:700;font-family:monospace">'+(r.est?'-SAR '+r.est.toLocaleString():'Review')+'</td></tr>';}).join('');
+  var rows=deductions.map(function(r,i){return '<tr style="background:'+(i%2===0?'#fff':'#f8fafc')+'"><td style="padding:8px 10px">'+i+1+'</td><td style="padding:8px 10px;font-weight:600">'+r.name+'</td><td style="padding:8px 10px">'+r.dept+'</td><td style="padding:8px 10px">'+r.branch+'</td><td style="padding:8px 10px;text-align:center;color:#c0392b;font-weight:700">'+r.absent+'</td><td style="padding:8px 10px;text-align:center;color:#b45309;font-weight:700">'+r.late+'</td><td style="padding:8px 10px;text-align:center;font-weight:700;color:#5b21b6">'+(r.absent+r.late)+'</td><td style="padding:8px 10px;font-family:monospace">'+( r.salary?'﷼ '+r.salary.toLocaleString():'\u2014')+'</td><td style="padding:8px 10px;color:#c0392b;font-weight:700;font-family:monospace">'+(r.est?'-﷼ '+r.est.toLocaleString():'Review')+'</td></tr>';}).join('');
   var sess=NX.session||{};
   var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Payroll Deduction Report \u2014 '+moLabel+'</title><style>@page{size:A4 landscape;margin:10mm}*{box-sizing:border-box;margin:0;padding:0;font-family:Arial,Helvetica,sans-serif}body{background:#fff;color:#111;font-size:12px}table{width:100%;border-collapse:collapse}th{background:#1a2340;color:#fff;padding:8px 10px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:1px}.c{text-align:center}.foot{margin-top:24px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:40px}.foot-cell{border-top:1px solid #333;padding-top:6px;text-align:center;font-size:9px;color:#64748b}</style></head><body>';
   html+='<div style="display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:10px;margin-bottom:18px;border-bottom:3px solid #1a2340"><div><img src="https://i.imgur.com/jeqtcE2.png" alt="ALFA.CO" style="height:44px;width:auto;display:block"><div style="font-size:11px;color:#64748b">Human Resources</div></div><div style="text-align:center"><h1 style="font-size:18px;font-weight:900;color:#c0392b">PAYROLL DEDUCTION REPORT</h1><p style="font-size:12px;color:#64748b;margin-top:3px">'+moLabel+' \u00b7 Submitted by '+sess.userName+'</p></div><div style="text-align:right;font-size:10px;color:#64748b"><div>Printed: '+new Date().toLocaleDateString('en-GB')+'</div><div style="margin-top:3px;color:#c0392b;font-weight:700">CONFIDENTIAL</div></div></div>';
@@ -13936,7 +13939,7 @@ function pHrfSchedule(){
                 '<div style="width:40px;height:40px;border-radius:10px;background:rgba(180,83,9,.12);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">💰</div>'+
                 '<div style="flex:1">'+
                   '<div style="font-weight:700;font-size:13px">'+hxe(cy.branchName||cy.branchId)+' — Cycle #'+cy.cycleNo+'</div>'+
-                  '<div style="font-size:12px;color:var(--text-secondary)">Total: <strong>SAR '+(cy.total||0).toLocaleString('en',{minimumFractionDigits:2})+'</strong> · '+(cy.entries||[]).length+' entries · '+(invCount?'📎 '+invCount+' inv.':'no invoices')+'</div>'+
+                  '<div style="font-size:12px;color:var(--text-secondary)">Total: <strong>﷼ '+(cy.total||0).toLocaleString('en',{minimumFractionDigits:2})+'</strong> · '+(cy.entries||[]).length+' entries · '+(invCount?'📎 '+invCount+' inv.':'no invoices')+'</div>'+
                   '<div style="font-size:11px;color:var(--text-tertiary)">AM Approved by '+hxe(cy.amApprovedBy||'—')+' · '+( cy.amApprovedAt?new Date(cy.amApprovedAt).toLocaleDateString():'' )+'</div>'+
                 '</div>'+
                 '<span style="background:'+(isPending?'rgba(0,87,255,.1)':'rgba(91,33,182,.1)')+';color:'+(isPending?'#0057ff':'#5b21b6')+';border:1px solid '+(isPending?'rgba(0,87,255,.2)':'rgba(91,33,182,.2)')+';border-radius:12px;padding:2px 10px;font-size:11px;font-weight:600">'+(isPending?'Pending Finance':'🔄 Processing')+'</span>'+
@@ -14136,11 +14139,11 @@ function hrfEditPayRow(branchId,empId,month){
     var staff=(HRF.staff[branchId]||[]).find(function(m){return m.id===empId;})||{};
     openModal('<div class="modal-head"><h2>Edit Payroll \u2014 '+hxe(staff.name||empId)+'</h2><button class="modal-close" onclick="closeModalForce()">\u2715</button></div>'+
       '<div class="form-row">'+
-        '<div class="form-group"><label class="form-label">Basic Salary (SAR)</label><input class="form-input" type="number" id="hpe-basic" value="'+(pay.basicSalary||staff.salary||0)+'"></div>'+
-        '<div class="form-group"><label class="form-label">Allowances (SAR)</label><input class="form-input" type="number" id="hpe-allow" value="'+(pay.allowances||0)+'"></div>'+
+        '<div class="form-group"><label class="form-label">Basic Salary (‫﷼‬)</label><input class="form-input" type="number" id="hpe-basic" value="'+(pay.basicSalary||staff.salary||0)+'"></div>'+
+        '<div class="form-group"><label class="form-label">Allowances (‫﷼‬)</label><input class="form-input" type="number" id="hpe-allow" value="'+(pay.allowances||0)+'"></div>'+
       '</div>'+
       '<div class="form-row">'+
-        '<div class="form-group"><label class="form-label">Deductions (SAR)</label><input class="form-input" type="number" id="hpe-ded" value="'+(pay.deductions||0)+'"></div>'+
+        '<div class="form-group"><label class="form-label">Deductions (‫﷼‬)</label><input class="form-input" type="number" id="hpe-ded" value="'+(pay.deductions||0)+'"></div>'+
         '<div class="form-group"><label class="form-label">Status</label><select class="form-input form-select" id="hpe-status">'+
           ['draft','pending_hr','pending_finance','released'].map(function(s2){return '<option value="'+s2+'"'+(pay.status===s2?' selected':'')+'>'+s2.replace(/_/g,' ')+'</option>';}).join('')+
         '</select></div>'+
@@ -15087,10 +15090,10 @@ function openBmInvoiceModal() {
   var html = '<div class="modal-head"><h2>&#x1F4C4; Add Supplier Invoice</h2><button class="modal-close" onclick="closeModalForce()">&#x2715;</button></div>';
   html += '<div class="form-row"><div class="bfg"><label class="form-label">Supplier *</label><select class="form-input form-select" id="bmi-sup"><option value="">Select...</option>'+supOpts+'</select></div>'+
     '<div class="bfg"><label class="form-label">Invoice Date *</label><input class="form-input" type="date" id="bmi-date" value="'+TODAY_BS+'"></div></div>';
-  html += '<div class="form-row"><div class="bfg"><label class="form-label">Amount (SAR) *</label><input class="form-input" type="number" id="bmi-amount" placeholder="0.00" step="0.01"></div>'+
+  html += '<div class="form-row"><div class="bfg"><label class="form-label">Amount (‫﷼‬) *</label><input class="form-input" type="number" id="bmi-amount" placeholder="0.00" step="0.01"></div>'+
     '<div class="bfg"><label class="form-label">Category</label><select class="form-input form-select" id="bmi-cat">'+catOpts+'</select></div></div>';
   html += '<div class="form-row"><div class="bfg"><label class="form-label">Invoice #</label><input class="form-input" id="bmi-ref" placeholder="INV-2025-001"></div>'+
-    '<div class="bfg"><label class="form-label">VAT Amount (SAR)</label><input class="form-input" type="number" id="bmi-vat" placeholder="0.00" step="0.01"></div></div>';
+    '<div class="bfg"><label class="form-label">VAT Amount (‫﷼‬)</label><input class="form-input" type="number" id="bmi-vat" placeholder="0.00" step="0.01"></div></div>';
   html += '<div class="bfg"><label class="form-label">Note</label><textarea class="form-input" id="bmi-note" rows="2" placeholder="Description or items..."></textarea></div>';
   html += '<div class="modal-actions"><button class="btn" onclick="closeModalForce()">Cancel</button><button class="btn btn-primary" onclick="saveBmInvoice()">Save Invoice</button></div>';
   openModal(html);
@@ -15297,7 +15300,7 @@ function pBmPayroll() {
       }).join('');
 
       area.innerHTML = '<div style="margin-bottom:12px;font-size:12px;color:var(--text-secondary)">&#x1F4A1; Enter base salary and adjust allowances / deductions. Overtime auto-calculated from timesheet if available.</div>'+
-        '<div class="btw"><div class="btw-s"><table class="btbl"><thead><tr><th>Employee</th><th>Base (SAR)</th><th>Allowances</th><th>Deductions</th><th>Overtime</th><th>Net Pay</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>'+
+        '<div class="btw"><div class="btw-s"><table class="btbl"><thead><tr><th>Employee</th><th>Base (‫﷼‬)</th><th>Allowances</th><th>Deductions</th><th>Overtime</th><th>Net Pay</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>'+
         '<div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px">'+
         '<button class="btn" onclick="bmCalcPayrollNetPay()">&#x1F5A9;&#xFE0F; Recalculate</button>'+
         '<button class="btn btn-primary" onclick="bmSubmitPayroll(\''+bxe(s.branchId)+'\',\''+bxe(monthKey)+'\')">Submit to HR &#x2192;</button>'+
@@ -15651,675 +15654,6 @@ var _origKpiCard = (typeof kpiCard === 'function') ? kpiCard : null;
   setTimeout(patchIcons, 2500);
 })();
 
-</script>
-
-<!-- ═══════════════════════════════════════════════════════
-     CLAUDE AI ASSISTANT — ALFA.CO
-     • Floating button on every page
-     • Reads live branch data as context
-     • PDF invoice upload & extraction
-     • Saves items directly to Firebase inventory
-════════════════════════════════════════════════════════ -->
-<style>
-/* ── Floating Button ── */
-#ai-fab {
-  position: fixed; bottom: 28px; right: 28px; z-index: 9000;
-  width: 54px; height: 54px; border-radius: 50%;
-  background: linear-gradient(135deg, #f0a500, #e07b00);
-  box-shadow: 0 4px 20px rgba(240,165,0,0.45);
-  border: none; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 22px; transition: transform .2s, box-shadow .2s;
-  color: #fff;
-}
-#ai-fab:hover { transform: scale(1.1); box-shadow: 0 6px 28px rgba(240,165,0,0.6); }
-#ai-fab.open { background: linear-gradient(135deg,#374151,#1f2937); box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
-
-/* ── Panel ── */
-#ai-panel {
-  position: fixed; bottom: 94px; right: 28px; z-index: 8999;
-  width: 400px; max-width: calc(100vw - 40px);
-  height: 560px; max-height: calc(100vh - 120px);
-  background: var(--body-bg, #0d1117);
-  border: 1px solid rgba(240,165,0,0.25);
-  border-radius: 18px;
-  box-shadow: 0 16px 60px rgba(0,0,0,0.7);
-  display: none; flex-direction: column;
-  overflow: hidden;
-  animation: aiSlide .22s ease;
-}
-#ai-panel.show { display: flex; }
-@keyframes aiSlide { from{transform:translateY(16px);opacity:0} to{transform:translateY(0);opacity:1} }
-
-/* Header */
-#ai-panel-head {
-  padding: 14px 16px;
-  background: rgba(240,165,0,0.07);
-  border-bottom: 1px solid rgba(240,165,0,0.15);
-  display: flex; align-items: center; gap: 10px; flex-shrink: 0;
-}
-.ai-head-icon { font-size: 20px; }
-.ai-head-title { flex:1; font-size: 13px; font-weight: 700; color: var(--text-primary); }
-.ai-head-sub { font-size: 10px; color: var(--text-tertiary); font-family: var(--mono); }
-#ai-clear-btn {
-  background: none; border: none; color: var(--text-tertiary);
-  cursor: pointer; font-size: 11px; padding: 4px 8px; border-radius: 6px;
-  transition: all .15s;
-}
-#ai-clear-btn:hover { background: rgba(255,255,255,.07); color: var(--text-primary); }
-
-/* Messages */
-#ai-messages {
-  flex: 1; overflow-y: auto; padding: 14px;
-  display: flex; flex-direction: column; gap: 10px;
-}
-#ai-messages::-webkit-scrollbar { width: 3px; }
-#ai-messages::-webkit-scrollbar-thumb { background: rgba(255,255,255,.1); border-radius: 3px; }
-
-.ai-msg {
-  max-width: 88%; padding: 10px 13px; border-radius: 12px;
-  font-size: 12px; line-height: 1.65; word-break: break-word;
-}
-.ai-msg.user {
-  align-self: flex-end;
-  background: rgba(240,165,0,0.15);
-  border: 1px solid rgba(240,165,0,0.2);
-  color: var(--text-primary);
-  border-bottom-right-radius: 4px;
-}
-.ai-msg.assistant {
-  align-self: flex-start;
-  background: rgba(255,255,255,.05);
-  border: 1px solid rgba(255,255,255,.08);
-  color: var(--text-primary);
-  border-bottom-left-radius: 4px;
-}
-.ai-msg.system-msg {
-  align-self: center;
-  background: rgba(5,150,105,0.1);
-  border: 1px solid rgba(5,150,105,0.2);
-  color: #34d399; font-size: 11px; text-align: center;
-  max-width: 95%;
-}
-.ai-msg.error-msg {
-  align-self: center;
-  background: rgba(192,57,43,0.1);
-  border: 1px solid rgba(192,57,43,0.2);
-  color: #f87171; font-size: 11px; text-align: center;
-  max-width: 95%;
-}
-.ai-typing {
-  align-self: flex-start;
-  background: rgba(255,255,255,.05);
-  border: 1px solid rgba(255,255,255,.08);
-  border-radius: 12px; border-bottom-left-radius: 4px;
-  padding: 10px 14px; display: flex; gap: 5px; align-items: center;
-}
-.ai-dot {
-  width: 6px; height: 6px; border-radius: 50%;
-  background: rgba(240,165,0,0.7);
-  animation: aiDot 1.2s ease-in-out infinite;
-}
-.ai-dot:nth-child(2){animation-delay:.2s}
-.ai-dot:nth-child(3){animation-delay:.4s}
-@keyframes aiDot{0%,80%,100%{transform:scale(.6);opacity:.4}40%{transform:scale(1);opacity:1}}
-
-/* PDF Preview Table */
-.ai-inv-table {
-  width: 100%; border-collapse: collapse;
-  font-size: 11px; margin-top: 8px;
-}
-.ai-inv-table th {
-  background: rgba(240,165,0,0.12);
-  color: var(--text-secondary); font-weight: 700;
-  padding: 5px 7px; text-align: left; font-size: 10px;
-  text-transform: uppercase; letter-spacing: .05em;
-}
-.ai-inv-table td {
-  padding: 5px 7px; border-bottom: 1px solid rgba(255,255,255,.05);
-  color: var(--text-primary);
-}
-.ai-inv-table td input {
-  background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.12);
-  border-radius: 5px; padding: 3px 6px; color: var(--text-primary);
-  font-size: 11px; font-family: var(--mono); width: 100%;
-  outline: none;
-}
-.ai-inv-table td input:focus { border-color: rgba(240,165,0,.5); }
-.ai-save-inv-btn {
-  margin-top: 10px; width: 100%;
-  background: linear-gradient(135deg,#059669,#047857);
-  color: #fff; border: none; border-radius: 8px;
-  padding: 9px; font-size: 12px; font-weight: 700;
-  cursor: pointer; transition: opacity .15s;
-}
-.ai-save-inv-btn:hover { opacity: .88; }
-
-/* Quick prompts */
-#ai-quick-wrap {
-  padding: 8px 14px 0; display: flex; gap: 6px; flex-wrap: wrap; flex-shrink: 0;
-}
-.ai-qbtn {
-  font-size: 10px; padding: 4px 10px; border-radius: 20px; border: none;
-  background: rgba(255,255,255,.07); color: var(--text-secondary);
-  cursor: pointer; transition: all .15s; white-space: nowrap;
-  font-family: var(--font);
-}
-.ai-qbtn:hover { background: rgba(240,165,0,.15); color: var(--accent); }
-
-/* Footer input */
-#ai-footer {
-  padding: 10px 12px; border-top: 1px solid rgba(255,255,255,.07);
-  display: flex; flex-direction: column; gap: 8px; flex-shrink: 0;
-}
-#ai-pdf-row {
-  display: flex; align-items: center; gap: 8px;
-}
-#ai-pdf-label {
-  display: flex; align-items: center; gap: 5px;
-  font-size: 10px; color: var(--text-tertiary);
-  cursor: pointer; padding: 5px 10px; border-radius: 8px;
-  border: 1px dashed rgba(255,255,255,.15); transition: all .15s;
-  white-space: nowrap;
-}
-#ai-pdf-label:hover { border-color: rgba(240,165,0,.4); color: var(--accent); }
-#ai-pdf-input { display: none; }
-#ai-pdf-name {
-  flex: 1; font-size: 10px; color: var(--accent);
-  font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-#ai-input-row { display: flex; gap: 8px; }
-#ai-input {
-  flex: 1; background: rgba(255,255,255,.07);
-  border: 1px solid rgba(255,255,255,.12);
-  border-radius: 10px; padding: 9px 12px;
-  color: var(--text-primary); font-size: 12px;
-  font-family: var(--font); outline: none; resize: none;
-  max-height: 80px; min-height: 36px;
-  transition: border-color .2s;
-}
-#ai-input:focus { border-color: rgba(240,165,0,.45); }
-#ai-input::placeholder { color: var(--text-tertiary); }
-#ai-send-btn {
-  width: 38px; height: 38px; border-radius: 10px; border: none;
-  background: linear-gradient(135deg,#f0a500,#e07b00);
-  color: #fff; font-size: 16px; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  transition: opacity .15s; flex-shrink: 0;
-}
-#ai-send-btn:hover { opacity: .85; }
-#ai-send-btn:disabled { opacity: .4; cursor: not-allowed; }
-</style>
-
-<!-- Floating Button -->
-<button id="ai-fab" onclick="toggleAIPanel()" title="AI Assistant">✦</button>
-
-<!-- AI Panel -->
-<div id="ai-panel">
-  <div id="ai-panel-head">
-    <span class="ai-head-icon">✦</span>
-    <div>
-      <div class="ai-head-title">AI Assistant</div>
-      <div class="ai-head-sub" id="ai-head-sub">ALFA.CO · Branch Intelligence</div>
-    </div>
-    <button id="ai-clear-btn" onclick="clearAIChat()">Clear</button>
-    <button id="ai-clear-btn" onclick="toggleAIPanel()" style="font-size:15px;padding:4px 8px">✕</button>
-  </div>
-
-  <div id="ai-messages">
-    <div class="ai-msg assistant">
-      👋 Hi! I'm your AI assistant powered by Google Gemini. I have access to your live branch data — sales, staff, inventory, wastage and more.<br><br>
-      You can also <strong>📄 upload a PDF invoice</strong> and I'll extract all items and add them to your inventory automatically.
-    </div>
-  </div>
-
-  <div id="ai-quick-wrap">
-    <button class="ai-qbtn" onclick="aiQuick('Summarize today\'s dashboard for me')">📊 Today summary</button>
-    <button class="ai-qbtn" onclick="aiQuick('Which items are low stock?')">📦 Low stock</button>
-    <button class="ai-qbtn" onclick="aiQuick('How is sales this week vs last week?')">💰 Sales trend</button>
-    <button class="ai-qbtn" onclick="aiQuick('Who is on leave today?')">👥 Staff leave</button>
-    <button class="ai-qbtn" onclick="aiQuick('Is food cost on track this month?')">🍽️ Food cost</button>
-  </div>
-
-  <div id="ai-footer">
-    <div id="ai-pdf-row">
-      <label id="ai-pdf-label" for="ai-pdf-input">📄 Upload Invoice PDF</label>
-      <input type="file" id="ai-pdf-input" accept=".pdf,image/*" onchange="aiHandleFile(this)">
-      <span id="ai-pdf-name"></span>
-      <button id="ai-clear-pdf" onclick="aiClearFile()" style="display:none;background:none;border:none;color:var(--danger);cursor:pointer;font-size:13px;flex-shrink:0">✕</button>
-    </div>
-    <!-- Gemini API Key — one time entry, saved to localStorage -->
-    <div style="display:flex;align-items:center;gap:5px;padding:5px 10px;border-top:1px solid rgba(255,255,255,0.08)">
-      <span style="font-size:9px;color:rgba(255,255,255,0.45);font-family:var(--mono);white-space:nowrap">Gemini Key:</span>
-      <input id="ai-gemini-key" type="password" placeholder="Paste from aistudio.google.com/apikey" autocomplete="off"
-        style="flex:1;min-width:0;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:4px 7px;font-family:var(--mono);font-size:10px;color:#fff;outline:none"
-        oninput="aiSaveGeminiKey(this.value)">
-      <button onclick="var i=document.getElementById('ai-gemini-key');i.type=i.type==='password'?'text':'password'"
-        style="background:none;border:none;color:rgba(255,255,255,0.4);cursor:pointer;font-size:11px;flex-shrink:0" title="Show/Hide">👁</button>
-    </div>
-    <div id="ai-input-row">
-      <textarea id="ai-input" placeholder="Ask anything about your branch…" rows="1"
-        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();aiSend()}"
-        oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,80)+'px'"></textarea>
-      <button id="ai-send-btn" onclick="aiSend()">➤</button>
-    </div>
-  </div>
-</div>
-
-<script>
-// ═══════════════════════════════════════════════════════
-//  CLAUDE AI ASSISTANT — ALFA.CO
-// ═══════════════════════════════════════════════════════
-var _aiOpen = false;
-var _aiHistory = [];
-var _aiPdfData = null;   // base64 pdf/image
-var _aiPdfType = null;   // mime type
-var _aiPdfName = null;
-var _aiLoading = false;
-var _aiLastExtracted = null; // items extracted from invoice
-
-function toggleAIPanel() {
-  _aiOpen = !_aiOpen;
-  var panel = document.getElementById('ai-panel');
-  var fab   = document.getElementById('ai-fab');
-  if (_aiOpen) {
-    panel.classList.add('show');
-    fab.classList.add('open');
-    fab.textContent = '✕';
-    var s = (typeof NX !== 'undefined' && NX.session) || {};
-    var sub = document.getElementById('ai-head-sub');
-    if (sub && s.branchName) sub.textContent = s.branchName + ' · Branch Intelligence';
-    aiLoadGeminiKey();
-    setTimeout(function(){ document.getElementById('ai-input').focus(); }, 100);
-  } else {
-    panel.classList.remove('show');
-    fab.classList.remove('open');
-    fab.textContent = '✦';
-  }
-}
-
-function clearAIChat() {
-  _aiHistory = [];
-  _aiLastExtracted = null;
-  aiClearFile();
-  document.getElementById('ai-messages').innerHTML =
-    '<div class="ai-msg assistant">Chat cleared. How can I help you?</div>';
-}
-
-// ── File Handling ──────────────────────────────────────
-function aiHandleFile(input) {
-  var file = input.files[0];
-  if (!file) return;
-  _aiPdfName = file.name;
-  _aiPdfType = file.type || 'application/pdf';
-  document.getElementById('ai-pdf-name').textContent = file.name;
-  document.getElementById('ai-clear-pdf').style.display = 'block';
-
-  var reader = new FileReader();
-  reader.onload = function(e) {
-    // strip data URL prefix, keep raw base64
-    _aiPdfData = e.target.result.split(',')[1];
-    aiAddMsg('system-msg', '📄 "' + file.name + '" loaded — ask me to scan it or I\'ll extract items automatically.');
-    // Auto-trigger extraction if it looks like an invoice
-    if (file.name.toLowerCase().indexOf('invoice') >= 0 ||
-        file.name.toLowerCase().indexOf('receipt') >= 0 ||
-        file.name.toLowerCase().indexOf('po') >= 0) {
-      aiSend('Extract all inventory items from this invoice');
-    }
-  };
-  reader.readAsDataURL(file);
-}
-
-function aiClearFile() {
-  _aiPdfData = null; _aiPdfType = null; _aiPdfName = null;
-  var inp = document.getElementById('ai-pdf-input');
-  if (inp) inp.value = '';
-  document.getElementById('ai-pdf-name').textContent = '';
-  document.getElementById('ai-clear-pdf').style.display = 'none';
-}
-
-// ── Build Live Data Context ───────────────────────────
-function aiGetContext() {
-  var s = (typeof NX !== 'undefined' && NX.session) || {};
-  var items = (typeof bItems !== 'undefined') ? bItems : [];
-  var logs  = (typeof bLogs  !== 'undefined') ? bLogs  : [];
-  var staff = (typeof BS !== 'undefined' && BS.staff) ? BS.staff : [];
-  var sales = (typeof BS !== 'undefined' && BS.sales) ? BS.sales : [];
-  var waste = (typeof BS !== 'undefined' && BS.waste) ? BS.waste : [];
-  var today = (typeof TODAY_BS !== 'undefined') ? TODAY_BS : new Date().toISOString().slice(0,10);
-
-  // Sales summary
-  var todaySales = 0, monthSales = 0;
-  var thisMonth = today.slice(0,7);
-  sales.forEach(function(e) {
-    var amt = parseFloat(e.amount || e.total || 0);
-    if (e.date === today) todaySales += amt;
-    if ((e.date||'').indexOf(thisMonth) === 0) monthSales += amt;
-  });
-
-  // Staff summary
-  var onLeave = staff.filter(function(m){ return m.status === 'on-leave' || m.status === 'Leave'; }).length;
-  var active  = staff.filter(function(m){ return m.status === 'Active' || !m.status; }).length;
-
-  // Inventory summary
-  var lowStock = items.filter(function(i){ return i.min > 0 && i.qty <= i.min; });
-  var invValue = items.reduce(function(a,i){ return a + (i.qty * (parseFloat(i.price)||0)); }, 0);
-
-  // Wastage today
-  var wastageToday = waste
-    .filter(function(w){ return w.date === today; })
-    .reduce(function(a,w){ return a + (parseFloat(w.value)||0); }, 0);
-
-  var ctx = '=== ALFA.CO BRANCH DATA CONTEXT ===\n';
-  ctx += 'Branch: ' + (s.branchName||'Unknown') + ' | Date: ' + today + '\n';
-  ctx += 'Manager: ' + (s.name||'Unknown') + ' | Role: ' + (s.role||'branch_mgr') + '\n\n';
-
-  ctx += '--- SALES ---\n';
-  ctx += 'Today: SAR ' + todaySales.toFixed(2) + '\n';
-  ctx += 'This Month: SAR ' + monthSales.toFixed(2) + '\n';
-  ctx += 'Total sales records: ' + sales.length + '\n\n';
-
-  ctx += '--- STAFF ---\n';
-  ctx += 'Total: ' + staff.length + ' | Active: ' + active + ' | On Leave: ' + onLeave + '\n';
-  if (staff.length > 0) {
-    ctx += 'Staff list: ' + staff.slice(0,15).map(function(m){ return m.name + ' (' + (m.dept||'—') + ', ' + (m.status||'Active') + ')'; }).join('; ') + '\n';
-  }
-  ctx += '\n--- INVENTORY ---\n';
-  ctx += 'Total items: ' + items.length + ' | Low stock: ' + lowStock.length + ' | Total value: SAR ' + invValue.toFixed(2) + '\n';
-  if (lowStock.length > 0) {
-    ctx += 'Low stock items: ' + lowStock.map(function(i){ return i.name + ' ('+i.qty+' '+i.unit+', min:'+i.min+')'; }).join('; ') + '\n';
-  }
-  if (items.length > 0) {
-    ctx += 'Sample items: ' + items.slice(0,20).map(function(i){ return i.name+'('+i.qty+' '+i.unit+')'; }).join(', ') + '\n';
-  }
-  ctx += '\n--- WASTAGE ---\n';
-  ctx += 'Today wastage: SAR ' + wastageToday.toFixed(2) + ' | Total entries: ' + waste.length + '\n';
-
-  ctx += '\n--- RECENT MOVEMENTS ---\n';
-  ctx += logs.slice(-10).map(function(l){ return l.date+': '+l.type+' '+l.qty+' '+l.name; }).join('\n') + '\n';
-
-  ctx += '\n=== END CONTEXT ===\n';
-  ctx += 'You are an AI assistant for ALFA.CO restaurant operations. Be concise, practical, and use the data above to give accurate answers. When extracting invoice items, always return JSON.';
-
-  return ctx;
-}
-
-// ── Quick Prompt ──────────────────────────────────────
-function aiQuick(text) {
-  document.getElementById('ai-input').value = text;
-  aiSend();
-}
-
-// ── Send Message ──────────────────────────────────────
-function aiSend(overrideText) {
-  if (_aiLoading) return;
-  var input = document.getElementById('ai-input');
-  var text = (overrideText || input.value || '').trim();
-  if (!text && !_aiPdfData) return;
-  if (!text) text = 'Please analyze this document.';
-
-  input.value = '';
-  input.style.height = 'auto';
-
-  aiAddMsg('user', text);
-
-  // Build message content
-  var content = [];
-  if (_aiPdfData) {
-    if (_aiPdfType === 'application/pdf') {
-      content.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: _aiPdfData } });
-    } else {
-      content.push({ type: 'image', source: { type: 'base64', media_type: _aiPdfType, data: _aiPdfData } });
-    }
-  }
-
-  // Detect if asking to extract invoice items
-  var isInvoiceExtract = /extract|scan|read.*invoice|invoice.*items|add.*inventory|get.*items|parse/i.test(text);
-  var userText = text;
-  if (isInvoiceExtract && _aiPdfData) {
-    userText = text + '\n\nIMPORTANT: Return the extracted items as a JSON array ONLY (no markdown, no explanation before it) in this exact format:\n[{"name":"Item Name","qty":10,"unit":"kg","price":15.50},...]\nThen after the JSON, add a brief summary.';
-  }
-
-  content.push({ type: 'text', text: userText });
-
-  _aiHistory.push({ role: 'user', content: content });
-
-  // Show typing
-  var typingId = 'ai-typing-' + Date.now();
-  aiAddTyping(typingId);
-  _aiLoading = true;
-  document.getElementById('ai-send-btn').disabled = true;
-
-  var systemPrompt = aiGetContext();
-
-// ── Gemini Key persistence ──
-function aiSaveGeminiKey(val) {
-  try { localStorage.setItem('alfa_gemini_key', val.trim()); } catch(e) {}
-}
-function aiLoadGeminiKey() {
-  try {
-    var k = localStorage.getItem('alfa_gemini_key') || '';
-    var inp = document.getElementById('ai-gemini-key');
-    if (inp && k) inp.value = k;
-    return k;
-  } catch(e) { return ''; }
-}
-function aiGetGeminiKey() {
-  var inp = document.getElementById('ai-gemini-key');
-  if (inp && inp.value.trim()) return inp.value.trim();
-  return aiLoadGeminiKey();
-}
-
-// ── Build Gemini contents array from _aiHistory ──
-function aiHistoryToGemini() {
-  return _aiHistory.map(function(msg) {
-    var role = msg.role === 'assistant' ? 'model' : 'user';
-    var parts;
-    if (typeof msg.content === 'string') {
-      parts = [{ text: msg.content }];
-    } else if (Array.isArray(msg.content)) {
-      parts = msg.content.map(function(c) {
-        if (c.type === 'text') return { text: c.text };
-        if (c.type === 'image') return { inlineData: { mimeType: c.source.media_type, data: c.source.data } };
-        if (c.type === 'document') return { inlineData: { mimeType: 'application/pdf', data: c.source.data } };
-        return { text: '' };
-      }).filter(function(p) { return p.text !== '' || p.inlineData; });
-    } else {
-      parts = [{ text: '' }];
-    }
-    return { role: role, parts: parts };
-  });
-}
-
-  var apiKey = aiGetGeminiKey();
-  if (!apiKey) {
-    removeTyping(typingId);
-    _aiLoading = false;
-    document.getElementById('ai-send-btn').disabled = false;
-    aiAddMsg('error-msg', '⚠️ Paste your free Gemini API key in the field below. Get it free at aistudio.google.com/apikey — no credit card needed.');
-    document.getElementById('ai-gemini-key') && document.getElementById('ai-gemini-key').focus();
-    return;
-  }
-
-  // Gemini API — key in URL param, no CORS issues
-  var geminiModel = 'gemini-2.0-flash';
-  var geminiUrl = 'https://generativelanguage.googleapis.com/v1beta/models/' + geminiModel + ':generateContent?key=' + encodeURIComponent(apiKey);
-
-  var geminiBody = {
-    system_instruction: { parts: [{ text: systemPrompt }] },
-    contents: aiHistoryToGemini(),
-    generationConfig: { maxOutputTokens: 1500, temperature: 0.7 }
-  };
-
-  fetch(geminiUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(geminiBody)
-  })
-  .then(function(r) { return r.json(); })
-  .then(function(data) {
-    removeTyping(typingId);
-    _aiLoading = false;
-    document.getElementById('ai-send-btn').disabled = false;
-
-    if (data.error) {
-      var errMsg = data.error.message || 'API error';
-      if (data.error.code === 400) errMsg = 'Invalid API key — check your key at aistudio.google.com/apikey';
-      aiAddMsg('error-msg', '⚠️ ' + errMsg);
-      return;
-    }
-
-    var reply = '';
-    try {
-      reply = data.candidates[0].content.parts[0].text || '';
-    } catch(e) { reply = ''; }
-    if (!reply) { aiAddMsg('error-msg', '⚠️ No response received.'); return; }
-
-    // Push to history
-    _aiHistory.push({ role: 'assistant', content: reply });
-
-    // Detect JSON invoice items
-    var jsonMatch = reply.match(/\[\s*\{[\s\S]*?\}\s*\]/);
-    if (jsonMatch && isInvoiceExtract) {
-      try {
-        var extracted = JSON.parse(jsonMatch[0]);
-        if (extracted.length > 0) {
-          _aiLastExtracted = extracted;
-          var textPart = reply.replace(jsonMatch[0], '').trim();
-          aiAddMsg('assistant', textPart || ('✅ Found ' + extracted.length + ' items in the invoice:'));
-          aiShowInvoiceTable(extracted);
-        } else { aiAddMsg('assistant', reply); }
-      } catch(e) { aiAddMsg('assistant', reply); }
-    } else {
-      aiAddMsg('assistant', reply);
-    }
-  })
-  .catch(function(err) {
-    removeTyping(typingId);
-    _aiLoading = false;
-    document.getElementById('ai-send-btn').disabled = false;
-    aiAddMsg('error-msg', '⚠️ Network error: ' + (err.message || err));
-    console.error('Gemini API error:', err);
-  });
-}
-
-// ── Render Invoice Table ──────────────────────────────
-function aiShowInvoiceTable(items) {
-  var wrap = document.getElementById('ai-messages');
-  var div = document.createElement('div');
-  div.className = 'ai-msg assistant';
-  div.style.maxWidth = '100%';
-  div.style.padding = '10px';
-
-  var rows = items.map(function(it, i) {
-    return '<tr>' +
-      '<td><input id="ai-it-name-'+i+'" value="'+_xe(it.name||'')+'" style="min-width:90px"></td>' +
-      '<td><input id="ai-it-qty-'+i+'" value="'+(it.qty||0)+'" type="number" style="width:55px"></td>' +
-      '<td><input id="ai-it-unit-'+i+'" value="'+_xe(it.unit||'EA')+'" style="width:45px"></td>' +
-      '<td><input id="ai-it-price-'+i+'" value="'+(parseFloat(it.price||0).toFixed(2))+'" type="number" style="width:60px"></td>' +
-    '</tr>';
-  }).join('');
-
-  div.innerHTML =
-    '<div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:6px">📋 Extracted Items — Edit if needed then save:</div>' +
-    '<table class="ai-inv-table">' +
-      '<thead><tr><th>Name</th><th>Qty</th><th>Unit</th><th>Price SAR</th></tr></thead>' +
-      '<tbody>' + rows + '</tbody>' +
-    '</table>' +
-    '<button class="ai-save-inv-btn" onclick="aiSaveInvoiceItems(' + items.length + ')">✅ Add ' + items.length + ' Items to Inventory</button>';
-
-  wrap.appendChild(div);
-  wrap.scrollTop = wrap.scrollHeight;
-}
-
-// ── Save Invoice Items to Firebase ───────────────────
-function aiSaveInvoiceItems(count) {
-  var s = (typeof NX !== 'undefined' && NX.session) || {};
-  if (!s.branchId) { aiAddMsg('error-msg', '⚠️ Not logged in to a branch'); return; }
-
-  var bPath = 'branches/' + s.branchId + '/inv_items/';
-  var saved = 0, skipped = 0;
-
-  for (var i = 0; i < count; i++) {
-    var nameEl  = document.getElementById('ai-it-name-'  + i);
-    var qtyEl   = document.getElementById('ai-it-qty-'   + i);
-    var unitEl  = document.getElementById('ai-it-unit-'  + i);
-    var priceEl = document.getElementById('ai-it-price-' + i);
-    if (!nameEl) continue;
-
-    var name  = (nameEl.value  || '').trim();
-    var qty   = parseFloat(qtyEl.value)   || 0;
-    var unit  = (unitEl.value  || 'EA').trim();
-    var price = parseFloat(priceEl.value) || 0;
-    if (!name) { skipped++; continue; }
-
-    // Generate code from name
-    var code = name.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,8) + '-' + String(Date.now()).slice(-4);
-    var safeCode = code.replace(/[.#$\[\]\/]/g,'_');
-
-    var item = { code: code, name: name, unit: unit, location: 'Dry Storage', min: 0, price: price, supplier: _aiPdfName || 'Invoice', qty: qty };
-
-    // Add to local bItems array
-    if (typeof bItems !== 'undefined') {
-      var existing = (typeof bfindItem === 'function') ? bfindItem(code) : null;
-      if (!existing) {
-        bItems.push(item);
-        saved++;
-      } else {
-        existing.qty += qty;
-        saved++;
-      }
-    }
-
-    // Save to Firebase
-    if (typeof db !== 'undefined' && db) {
-      db.ref(bPath + safeCode).set(item);
-      // Save stock
-      if (typeof bSaveStock === 'function') bSaveStock(code, qty);
-      // Log receipt
-      if (typeof bLogs !== 'undefined') {
-        bLogs.push({ code: code, name: name, type: 'receive', qty: qty, cost: qty * price, note: 'Invoice: ' + (_aiPdfName||'uploaded'), date: (typeof TODAY_BS !== 'undefined' ? TODAY_BS : '') });
-        if (typeof bSaveLogs === 'function') bSaveLogs();
-      }
-    }
-  }
-
-  aiAddMsg('system-msg', '✅ ' + saved + ' items added to inventory' + (skipped ? ' · ' + skipped + ' skipped (no name)' : '') + '. Check Inventory → Items.');
-  aiClearFile();
-
-  // Refresh inventory page if currently on it
-  if (typeof NX !== 'undefined' && (NX.page === 'inv-items' || NX.page === 'inv-moves')) {
-    if (typeof navTo === 'function') setTimeout(function(){ navTo(NX.page); }, 300);
-  }
-}
-
-// ── Helpers ───────────────────────────────────────────
-function aiAddMsg(cls, html) {
-  var wrap = document.getElementById('ai-messages');
-  if (!wrap) return;
-  var div = document.createElement('div');
-  div.className = 'ai-msg ' + cls;
-  div.innerHTML = html.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>');
-  wrap.appendChild(div);
-  wrap.scrollTop = wrap.scrollHeight;
-}
-
-function aiAddTyping(id) {
-  var wrap = document.getElementById('ai-messages');
-  if (!wrap) return;
-  var div = document.createElement('div');
-  div.className = 'ai-typing'; div.id = id;
-  div.innerHTML = '<div class="ai-dot"></div><div class="ai-dot"></div><div class="ai-dot"></div>';
-  wrap.appendChild(div);
-  wrap.scrollTop = wrap.scrollHeight;
-}
-
-function removeTyping(id) {
-  var el = document.getElementById(id);
-  if (el) el.remove();
-}
-
-function _xe(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 </script>
 
 </body>
