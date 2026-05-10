@@ -9250,9 +9250,7 @@ function fbStaffMgrLoad(){
 function fbStaffMgrDel(empId,empName){
   var sess=NX.session||{};
   if(!sess.branchId||!db)return;
-  if(!confirm('Remove '+empName+' from the Check-In and Leave Request portal?
-
-This does NOT delete them from the Staff Directory.'))return;
+  if(!confirm('Remove '+empName+' from the Check-In and Leave Request portal?\n\nThis does NOT delete them from the Staff Directory.'))return;
   db.ref('branches/'+sess.branchId+'/tsEmps').once('value',function(snap){
     var raw=snap.val();
     var emps=!raw?[]:(Array.isArray(raw)?raw.filter(Boolean):Object.values(raw).filter(Boolean));
