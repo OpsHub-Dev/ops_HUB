@@ -3055,7 +3055,7 @@ function rand(min, max) {
 function navTo(pageId) {
   // Standalone portal links — open in new tab
   var portalMap = { '_staff-portal':'staff.html', '_leave-portal':'leave.html', '_checklist-portal':'checklists.html', '_server-drop':'server-drop.html', '_my-portal':'staff-portal.html' };
-  if (portalMap[pageId]) { window.open(portalMap[pageId], '_blank'); return; }
+  if (portalMap[pageId]) { var _pbid=(NX.session||{}).branchId; var _purl=portalMap[pageId]+(_pbid?'?branch='+encodeURIComponent(_pbid):''); window.open(_purl, '_blank'); return; }
 
   NX.page = pageId;
   // Persist last page for refresh restore
@@ -7415,6 +7415,7 @@ function pBranchDash() {
     h += '<p>' + xe(b.brand||'') + (b.location?' \xb7 '+xe(b.location):'') + ' \xb7 ' + fmtDate(now2) + '</p></div>';
     // Hero quick actions — 4 cards
     h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:18px">';
+    var _bId = s.branchId || '';
     var heroes = [
       {icon:'\ud83d\udcf1', label:'Check-In', sub:'Clock in / out', accent:'#00875a', href:'staff.html'},
       {icon:'\u2705', label:'Checklists', sub:'Today\'s tasks',  accent:'#0057ff', href:'checklists.html'},
@@ -7422,7 +7423,8 @@ function pBranchDash() {
       {icon:'\ud83d\udcdd', label:'Leave Request', sub:'Submit / view', accent:'#5b21b6', href:'leave.html'}
     ];
     heroes.forEach(function(c){
-      h += '<a href="'+c.href+'" target="_blank" style="text-decoration:none;color:inherit"><div class="card" style="text-align:center;padding:20px 14px;cursor:pointer;border:1px solid var(--border);transition:all .15s;border-top:3px solid '+c.accent+'">';
+      var _href = _bId ? c.href + '?branch=' + encodeURIComponent(_bId) : c.href;
+      h += '<a href="'+_href+'" target="_blank" style="text-decoration:none;color:inherit"><div class="card" style="text-align:center;padding:20px 14px;cursor:pointer;border:1px solid var(--border);transition:all .15s;border-top:3px solid '+c.accent+'">';
       h += '<div style="font-size:36px;margin-bottom:10px">'+c.icon+'</div>';
       h += '<div style="font-size:14px;font-weight:700;margin-bottom:4px">'+c.label+'</div>';
       h += '<div style="font-size:11px;color:var(--text-secondary)">'+c.sub+'</div>';
@@ -9208,7 +9210,59 @@ function pStaff() {
   }
   h+='<div class="btw"><div class="btw-s"><table class="btbl"><thead><tr><th>Name / Role</th><th>Dept</th><th>Shift ('+bxe(todayName)+')</th><th>Status</th><th>SAP #</th><th>Phone</th><th>Actions</th></tr></thead><tbody>'+(rows||'<tr><td colspan="7" style="text-align:center;color:var(--text-tertiary);padding:28px">No staff found</td></tr>')+'</tbody></table></div></div>';
   setTimeout(function(){var rf=document.getElementById('bstaff-rf');if(rf)rf.onchange=function(){BS._roleFilter=this.value;navTo('staff');};},0);
+  // Firebase Check-In Staff Manager (admin only)
+  if(canEdit&&sess.branchId){
+    h+='<div class="card section" style="margin-top:18px">';
+    h+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">';
+    h+='<div><h3 style="font-size:13px;font-weight:700;color:var(--text-primary);margin:0">&#x1F527; Firebase Check-In Staff List</h3>';
+    h+='<p style="font-size:11px;color:var(--text-secondary);margin:2px 0 0">Staff visible in Check-In &amp; Leave Request portals</p></div>';
+    h+='<button class="btn btn-sm" onclick="fbStaffMgrLoad()">&#x21BB; Refresh</button>';
+    h+='</div>';
+    h+='<div id="fb-staff-mgr-wrap"><div style="text-align:center;padding:20px;color:var(--text-secondary);font-size:12px">Loading...</div></div>';
+    h+='</div>';
+    setTimeout(fbStaffMgrLoad, 100);
+  }
   return h;
+}
+function fbStaffMgrLoad(){
+  var sess=NX.session||{};
+  if(!sess.branchId||!db)return;
+  var wrap=document.getElementById('fb-staff-mgr-wrap');
+  if(!wrap)return;
+  wrap.innerHTML='<div style="text-align:center;padding:16px;color:var(--text-secondary);font-size:12px">&#x23F3; Loading Firebase staff...</div>';
+  db.ref('branches/'+sess.branchId+'/tsEmps').once('value',function(snap){
+    var raw=snap.val();
+    var emps=!raw?[]:(Array.isArray(raw)?raw.filter(Boolean):Object.values(raw).filter(Boolean));
+    emps.sort(function(a,b){return (a.name||'').localeCompare(b.name||'');});
+    if(!emps.length){wrap.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-secondary);font-size:12px">No staff found in Firebase Check-In list.</div>';return;}
+    var tbl='<table class="btbl"><thead><tr><th>Name</th><th>Dept</th><th>ID</th><th style="text-align:center">Remove from Portal</th></tr></thead><tbody>';
+    emps.forEach(function(e){
+      tbl+='<tr><td style="font-weight:600">'+bxe(e.name||'—')+'</td><td>'+bxe(e.dept||'—')+'</td><td style="font-family:var(--mono);font-size:11px;color:var(--text-secondary)">'+bxe(String(e.id||''))+'</td>';
+      tbl+='<td style="text-align:center"><button class="btn btn-sm" style="color:var(--danger)" onclick="fbStaffMgrDel(''+bxe(String(e.id||''))+'',''+bxe(e.name||'')+'')" title="Remove from Firebase Check-In list">&#x1F5D1; Delete</button></td></tr>';
+    });
+    tbl+='</tbody></table>';
+    tbl+='<p style="font-size:10px;color:var(--text-secondary);margin-top:8px">Deleting here removes the person from the Check-In and Leave Request portals immediately.</p>';
+    wrap.innerHTML=tbl;
+  },function(err){wrap.innerHTML='<div style="color:var(--danger);font-size:12px;padding:12px">Error loading Firebase staff: '+bxe(String(err))+'</div>';});
+}
+function fbStaffMgrDel(empId,empName){
+  var sess=NX.session||{};
+  if(!sess.branchId||!db)return;
+  if(!confirm('Remove '+empName+' from the Check-In and Leave Request portal?
+
+This does NOT delete them from the Staff Directory.'))return;
+  db.ref('branches/'+sess.branchId+'/tsEmps').once('value',function(snap){
+    var raw=snap.val();
+    var emps=!raw?[]:(Array.isArray(raw)?raw.filter(Boolean):Object.values(raw).filter(Boolean));
+    var filtered=emps.filter(function(e){return String(e.id)!==String(empId);});
+    db.ref('branches/'+sess.branchId+'/tsEmps').set(filtered.length?filtered:null,function(err){
+      if(err){showToast('Error: '+err,'error');return;}
+      // Also update local BS state
+      BS.tsEmps=BS.tsEmps.filter(function(e){return String(e.id)!==String(empId);});
+      showToast(empName+' removed from portal ✓','success');
+      fbStaffMgrLoad();
+    });
+  });
 }
 function openBranchStaffModal(id){
   var sess=NX.session||{};
