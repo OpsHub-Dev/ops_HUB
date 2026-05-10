@@ -9237,8 +9237,10 @@ function fbStaffMgrLoad(){
     if(!emps.length){wrap.innerHTML='<div style="text-align:center;padding:20px;color:var(--text-secondary);font-size:12px">No staff found in Firebase Check-In list.</div>';return;}
     var tbl='<table class="btbl"><thead><tr><th>Name</th><th>Dept</th><th>ID</th><th style="text-align:center">Remove from Portal</th></tr></thead><tbody>';
     emps.forEach(function(e){
-      tbl+='<tr><td style="font-weight:600">'+bxe(e.name||'—')+'</td><td>'+bxe(e.dept||'—')+'</td><td style="font-family:var(--mono);font-size:11px;color:var(--text-secondary)">'+bxe(String(e.id||''))+'</td>';
-      tbl+='<td style="text-align:center"><button class="btn btn-sm" style="color:var(--danger)" onclick="fbStaffMgrDel(''+bxe(String(e.id||''))+'',''+bxe(e.name||'')+'')" title="Remove from Firebase Check-In list">&#x1F5D1; Delete</button></td></tr>';
+      var eid=String(e.id||'');
+      var ename=String(e.name||'');
+      tbl+='<tr><td style="font-weight:600">'+bxe(ename)+'</td><td>'+bxe(e.dept||'—')+'</td><td style="font-family:var(--mono);font-size:11px;color:var(--text-secondary)">'+bxe(eid)+'</td>';
+      tbl+='<td style="text-align:center"><button class="btn btn-sm" style="color:var(--danger)" data-eid="'+bxe(eid)+'" data-ename="'+bxe(ename)+'" onclick="fbStaffMgrDel(this.dataset.eid,this.dataset.ename)" title="Remove from Firebase Check-In list">&#x1F5D1; Delete</button></td></tr>';
     });
     tbl+='</tbody></table>';
     tbl+='<p style="font-size:10px;color:var(--text-secondary);margin-top:8px">Deleting here removes the person from the Check-In and Leave Request portals immediately.</p>';
