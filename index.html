@@ -9269,7 +9269,28 @@ function saveBranchStaff(id){
 
   closeModalForce();navTo('staff');
 }
-function delBranchStaff(id){var sess=NX.session||{};var allowedRoles=['hr_manager','super_admin','ceo','branch_mgr'];if(allowedRoles.indexOf(sess.role)<0){showToast('You do not have permission to delete staff','error');return;}if(!confirm('Delete this staff member?'))return;BS.staff=BS.staff.filter(function(m){return m.id!==id;});bSaveColl('staff',BS.staff);showToast('Staff deleted');navTo('staff');}
+function delBranchStaff(id){var sess=NX.session||{};var allowedRoles=['hr_manager','super_admin','ceo','branch_mgr'];if(allowedRoles.indexOf(sess.role)<0){showToast('You do not have permission to delete staff','error');return;}var staffMember=BS.staff.find(function(m){return m.id===id;});var staffName=staffMember?staffMember.name:'this staff member';if(!confirm('Delete '+staffName+'?\n\nThis will also remove them from Check-In and Leave Request lists.'))return;
+  // Remove from main staff list
+  BS.staff=BS.staff.filter(function(m){return m.id!==id;});
+  bSaveColl('staff',BS.staff);
+  // Remove from tsEmps (Check-In & Leave Request employee list) — find and remove by matching id
+  var tsEmpsFiltered=BS.tsEmps.filter(function(e){return String(e.id)!==String(id);});
+  BS.tsEmps=tsEmpsFiltered;
+  bSaveColl('tsEmps',tsEmpsFiltered);
+  // Also remove their pending leave requests from tsLeaves
+  if(BS.tsLeaves&&BS.tsLeaves.length){
+    BS.tsLeaves=BS.tsLeaves.filter(function(l){return String(l.empId)!==String(id);});
+    bSaveColl('tsLeaves',BS.tsLeaves);
+  }
+  // Remove from Firebase directly to ensure branch-level cleanup
+  if(db&&sess.branchId){
+    var branchBase='branches/'+sess.branchId;
+    // Re-save tsEmps as array to Firebase
+    db.ref(branchBase+'/tsEmps').set(tsEmpsFiltered.length?tsEmpsFiltered:null);
+    // Remove their attendance records (optional — keeps history but removes name)
+    // db.ref(branchBase+'/tsAtt/'+id).remove(); // uncomment if you want to purge attendance too
+  }
+  showToast(staffName+' removed from all lists ✓','success');navTo('staff');}
 function openNXTransferStaffModal(staffId) {
   var staff = BS.staff.find(function(m){ return m.id === staffId; });
   if (!staff) { showToast('Staff not found','error'); return; }
