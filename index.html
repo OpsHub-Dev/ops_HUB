@@ -3,26 +3,40 @@
 <head>
 <meta charset="UTF-8">
 <script>
-/* Error diagnostic trap — shows real errors instead of "Script error." */
-window.addEventListener('error', function(e) {
-  var msg = (e.error && e.error.message) || e.message || 'Unknown error';
-  var src = e.filename ? ' @ ' + e.filename.split('/').pop() : '';
-  var line = e.lineno ? ':' + e.lineno : '';
-  console.error('[CAUGHT]', msg, src + line, e.error || e);
-  var banner = document.getElementById('_errbar');
-  if (!banner) {
-    banner = document.createElement('div');
-    banner.id = '_errbar';
-    banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#7f1d1d;color:#fff;padding:10px 16px;font:12px monospace;white-space:pre-wrap;max-height:40vh;overflow:auto;border-bottom:2px solid #f87171';
-    document.body && document.body.appendChild(banner);
-  }
-  banner.textContent += msg + src + line + '\n';
-});
+/* Enhanced error diagnostic — captures real errors, stack traces, and promise rejections */
+window.onerror = function(msg, src, line, col, err) {
+  var detail = (err && err.stack) ? err.stack.split('\n').slice(0,3).join(' | ') : (src ? src.replace(/.*\//,'') + ':' + line : '');
+  var display = (msg === 'Script error.' && !src) ? 'Script error (cross-origin — check browser console for details)' : msg;
+  console.error('[onerror]', msg, src, line, err);
+  showErrBanner('[JS] ' + display + (detail ? ' | ' + detail : ''));
+  return false;
+};
 window.addEventListener('unhandledrejection', function(e) {
+  var msg = e.reason && e.reason.message ? e.reason.message : String(e.reason || 'Promise rejected');
   console.error('[PROMISE]', e.reason);
-  var banner = document.getElementById('_errbar');
-  if (banner) banner.textContent += 'PROMISE: ' + (e.reason && e.reason.message || e.reason) + '\n';
+  showErrBanner('[Promise] ' + msg);
 });
+function showErrBanner(msg) {
+  var b = document.getElementById('_errbar');
+  if (!b) {
+    b = document.createElement('div');
+    b.id = '_errbar';
+    b.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:#7f1d1d;color:#fff;padding:8px 14px 8px 14px;font:11px monospace;white-space:pre-wrap;max-height:50vh;overflow:auto;border-bottom:2px solid #f87171;display:none';
+    document.body ? document.body.appendChild(b) : document.addEventListener('DOMContentLoaded', function(){document.body.appendChild(b);b.style.display='';});
+  }
+  b.style.display = '';
+  var row = document.createElement('div');
+  row.style.cssText = 'padding:4px 0;border-bottom:1px solid rgba(255,255,255,.15);display:flex;gap:8px;align-items:flex-start';
+  var close = document.createElement('button');
+  close.textContent = '✕';
+  close.style.cssText = 'background:rgba(255,255,255,.15);border:none;color:#fff;cursor:pointer;padding:0 5px;border-radius:3px;font:10px monospace;flex-shrink:0';
+  close.onclick = function(){b.style.display='none';};
+  var text = document.createElement('span');
+  text.textContent = msg;
+  row.appendChild(close);
+  row.appendChild(text);
+  b.appendChild(row);
+}
 </script>
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
