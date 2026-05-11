@@ -1045,6 +1045,135 @@ div[style*="color:rgba(255,255,255,.4)"][style*="font-size:9px"] { color: var(--
 .cl-cards::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12) !important; }
 
 </style>
+<style>
+/* ══ ENHANCED UI v2.0 — Neumorphism + Space Mono ══ */
+
+/* ── SUMMARY BAR ── */
+#cl-summary-bar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 14px 5px; flex-shrink: 0;
+  background: var(--nm-base, #E7E5E4) !important;
+  border-bottom: 1px solid rgba(0,0,0,0.06) !important;
+  overflow-x: auto; scrollbar-width: none;
+}
+#cl-summary-bar::-webkit-scrollbar { display: none; }
+.cl-sum-chip {
+  display: flex; align-items: center; gap: 5px; flex-shrink: 0;
+  padding: 4px 10px 4px 7px; border-radius: 20px;
+  font-size: 10px; font-weight: 700;
+  font-family: 'Space Mono', 'JetBrains Mono', monospace;
+  cursor: pointer; border: none !important; white-space: nowrap;
+  background: var(--nm-base, #E7E5E4) !important;
+  box-shadow: 2px 2px 6px rgba(0,0,0,0.12), -2px -2px 5px rgba(255,255,255,0.8) !important;
+  color: var(--text3, #6b7280) !important; transition: all 0.15s;
+}
+.cl-sum-chip.complete { color: #006666 !important; box-shadow: inset 2px 2px 5px rgba(0,0,0,0.1), inset -2px -2px 4px rgba(255,255,255,0.8) !important; }
+.cl-sum-chip.partial  { color: #d97706 !important; }
+.cl-sum-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.cl-sum-dot.complete { background: #006666; box-shadow: 0 0 4px rgba(0,102,102,0.5); }
+.cl-sum-dot.partial  { background: #d97706; }
+.cl-sum-dot.empty    { background: rgba(0,0,0,0.15); }
+
+/* ── OVERALL RING ── */
+.cl-overall-ring-wrap { display: flex; align-items: center; gap: 7px; flex-shrink: 0; margin-right: 2px; }
+.cl-ring-svg { transform: rotate(-90deg); }
+.cl-ring-bg { fill: none; stroke: rgba(0,0,0,0.08); }
+.cl-ring-fg { fill: none; stroke: #006666; stroke-linecap: round; transition: stroke-dashoffset .6s cubic-bezier(.4,0,.2,1); }
+.cl-ring-pct { font-size: 11px; font-weight: 800; font-family: 'Space Mono', monospace; color: #006666 !important; line-height: 1; }
+
+/* ── FILTER BAR ── */
+#cl-filter-bar {
+  display: flex; gap: 5px; padding: 5px 12px 2px;
+  flex-shrink: 0; overflow-x: auto; scrollbar-width: none; align-items: center;
+}
+#cl-filter-bar::-webkit-scrollbar { display: none; }
+.cl-filter-pill {
+  flex-shrink: 0; padding: 3px 10px; border-radius: 20px;
+  font-size: 9px; font-weight: 700;
+  font-family: 'Space Mono', monospace;
+  cursor: pointer; border: none !important; white-space: nowrap;
+  background: var(--nm-base, #E7E5E4) !important;
+  color: var(--text3) !important; transition: all 0.13s;
+  box-shadow: 2px 2px 5px rgba(0,0,0,0.1), -2px -2px 4px rgba(255,255,255,0.75) !important;
+}
+.cl-filter-pill.active { background: #006666 !important; color: #fff !important; box-shadow: inset 2px 2px 5px rgba(0,0,0,0.15), inset -1px -1px 3px rgba(255,255,255,0.1) !important; }
+
+/* ── CARD STATUS STRIPE ── */
+.cl-item-card { position: relative; }
+.cl-card-status-stripe {
+  position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  border-radius: 16px 0 0 16px; background: transparent; transition: background 0.2s;
+}
+.cl-item-card.all-ok .cl-card-status-stripe { background: #006666 !important; }
+.cl-item-card.has-no .cl-card-status-stripe { background: #dc2626 !important; }
+
+/* ── DONE BADGE ── */
+.cl-card-done-badge {
+  display: none; align-items: center; gap: 3px;
+  font-size: 8px; font-weight: 700;
+  font-family: 'Space Mono', monospace;
+  color: #006666 !important; border-radius: 5px;
+  padding: 2px 6px; flex-shrink: 0;
+  background: rgba(0,102,102,0.1) !important;
+}
+.cl-item-card.all-ok .cl-card-done-badge { display: flex !important; }
+.cl-item-card.has-no .cl-card-done-badge { display: flex !important; color: #dc2626 !important; background: rgba(220,38,38,0.08) !important; }
+
+/* ── GROUP COMPLETION PILL ── */
+.cl-grp-prog-pill { height: 4px; border-radius: 99px; background: rgba(0,0,0,0.1); width: 36px; overflow: hidden; flex-shrink: 0; }
+.cl-grp-prog-fill { height: 100%; border-radius: 99px; background: #006666; transition: width .4s; }
+.cl-grp-completion { display: flex; align-items: center; gap: 5px; font-family: 'Space Mono', monospace; font-size: 8px; font-weight: 700; }
+
+/* ── FLOAT BUTTON ── */
+#cl-float-status {
+  position: fixed; bottom: 16px; right: 16px; z-index: 80;
+  width: 52px; height: 52px; border-radius: 50%;
+  background: var(--nm-base, #E7E5E4) !important;
+  box-shadow: 4px 4px 14px rgba(0,0,0,0.18), -3px -3px 8px rgba(255,255,255,0.9) !important;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  cursor: pointer; border: none !important; transition: all 0.2s;
+}
+#cl-float-status:hover { transform: scale(1.05); box-shadow: 5px 5px 18px rgba(0,0,0,0.2), -4px -4px 10px rgba(255,255,255,0.95) !important; }
+#cl-float-status.done-all { background: #006666 !important; box-shadow: 4px 4px 14px rgba(0,102,102,0.35), -2px -2px 6px rgba(255,255,255,0.4) !important; }
+.cl-float-num { font-size: 14px; font-weight: 800; font-family: 'Space Mono', monospace; color: #006666; line-height: 1; }
+#cl-float-status.done-all .cl-float-num { color: #fff; }
+.cl-float-lbl { font-size: 7px; font-weight: 700; font-family: 'Space Mono', monospace; color: var(--text3); letter-spacing: 0.3px; text-transform: uppercase; margin-top: 1px; }
+#cl-float-status.done-all .cl-float-lbl { color: rgba(255,255,255,0.8); }
+
+/* ── TYPOGRAPHY UPGRADES ── */
+.cl-hdr-bar h3 { font-family: 'Space Mono', monospace !important; font-size: 11px !important; font-weight: 700 !important; letter-spacing: 0.5px !important; text-transform: uppercase !important; }
+.cl-hdr-bar .sub { font-family: 'JetBrains Mono', monospace !important; font-size: 8.5px !important; }
+.cl-sec-tab { font-family: 'Space Mono', monospace !important; font-size: 10px !important; }
+.cl-sub-tab { font-family: 'Space Mono', monospace !important; font-size: 10px !important; }
+.cl-badge { font-family: 'Space Mono', monospace !important; font-size: 7.5px !important; letter-spacing: 0.6px !important; }
+.cl-prog-lbl { font-family: 'Space Mono', monospace !important; font-size: 8px !important; }
+.cl-sh-title { font-family: 'Space Mono', monospace !important; }
+.cl-ctrl-lbl { font-family: 'Space Mono', monospace !important; }
+#cl-fb-status, #cl-save-ind { font-family: 'Space Mono', monospace !important; font-size: 8px !important; }
+.cl-grp-div { font-family: 'Space Mono', monospace !important; display: flex !important; align-items: center !important; gap: 8px !important; }
+
+/* ── YES/NO buttons ── */
+.cl-yn-btn { min-width: 50px !important; font-family: 'Space Mono', monospace !important; }
+.cl-cb-lbl { font-family: 'Space Mono', monospace !important; }
+
+/* ── MOBILE ── */
+@media (max-width: 480px) {
+  .cl-shifts-row { gap: 4px !important; }
+  .cl-shift-blk { min-width: 100px !important; padding: 5px 6px 4px !important; }
+  .cl-yn-btn { min-width: 42px !important; padding: 5px 7px !important; font-size: 9px !important; }
+  .cl-item-q { font-size: 11px !important; }
+  .cl-card-inner { padding: 8px 10px 6px !important; }
+  #cl-summary-bar { padding: 6px 10px 4px !important; gap: 6px !important; }
+  .cl-sum-chip { font-size: 9px !important; }
+  #cl-float-status { width: 46px; height: 46px; bottom: 12px; right: 12px; }
+  .cl-float-num { font-size: 12px; }
+}
+
+/* ── COMPLETION ANIMATION ── */
+@keyframes clDonePop { 0%{transform:scale(1)} 40%{transform:scale(1.03)} 100%{transform:scale(1)} }
+.cl-item-card.all-ok { animation: clDonePop 0.28s ease; }
+</style>
+
 
 </head>
 <body>
@@ -1121,7 +1250,7 @@ div[style*="color:rgba(255,255,255,.4)"][style*="font-size:9px"] { color: var(--
     <label>WEEK</label><input type="date" id="cl-period-start" oninput="clOnPeriodChange()">
     <label>MOD</label><input type="text" id="cl-mod-name" placeholder="Name" style="width:90px" oninput="clSyncMeta()">
     <span style="margin-left:auto;display:flex;gap:6px;align-items:center">
-      <span id="cl-fb-status" style="font-size:9px;color:var(--text3);font-family:var(--mono)">○ Select Branch</span>
+      <span id="cl-fb-status" style="font-size:9px;color:var(--text3);font-family:var(--mono)">⚡ Connecting...</span>
       <span id="cl-save-ind" style="font-size:9px;color:var(--text3);font-family:var(--mono)">Auto-save on</span>
       <button class="btn sm s" onclick="clSaveNow();toast('Saved ✓','success')" style="flex-shrink:0">💾 Save</button>
       <button id="cl-print-btn" class="btn sm" style="display:none" onclick="clOpenPrint()">🖨 Print</button>
@@ -1131,6 +1260,16 @@ div[style*="color:rgba(255,255,255,.4)"][style*="font-size:9px"] { color: var(--
     </span>
   </div>
   <div class="cl-sub-tabs" id="cl-sub-tabs"></div>
+
+<!-- ── SUMMARY + FILTER BAR (injected v2) ── -->
+<div id="cl-summary-bar" style="display:none"></div>
+<div id="cl-filter-bar" style="display:none">
+  <button class="cl-filter-pill active" data-filter="all" onclick="clSetFilter('all',this)">ALL</button>
+  <button class="cl-filter-pill" data-filter="incomplete" onclick="clSetFilter('incomplete',this)">⭕ INCOMPLETE</button>
+  <button class="cl-filter-pill" data-filter="complete" onclick="clSetFilter('complete',this)">✅ COMPLETE</button>
+  <button class="cl-filter-pill" data-filter="flagged" onclick="clSetFilter('flagged',this)">🚩 FLAGGED</button>
+</div>
+
   <div class="cl-hdr-bar"><h3 id="cl-title"></h3><div class="sub" id="cl-sub"></div></div>
   <div class="cl-prog-wrap"><div class="cl-prog-bar" id="cl-prog"></div></div>
   <div class="cl-prog-lbl" id="cl-prog-lbl"></div>
@@ -1155,6 +1294,12 @@ div[style*="color:rgba(255,255,255,.4)"][style*="font-size:9px"] { color: var(--
     <div id="cl-edit-body" style="overflow-y:auto;max-height:60vh"></div>
   </div>
 </div>
+
+<!-- ── FLOAT STATUS BUTTON (v2) ── -->
+<button id="cl-float-status" style="display:none" onclick="clScrollToFirst('incomplete')">
+  <span class="cl-float-num" id="cl-float-num">0</span>
+  <span class="cl-float-lbl" id="cl-float-lbl">left</span>
+</button>
 <div id="toasts" style="position:fixed;bottom:20px;right:16px;left:16px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none"></div>
   </div>
 </div>
@@ -1195,8 +1340,6 @@ function toast(msg,type){
 // 🏢 BRANCH SELECTOR
 // ═══════════════════════════════════════
 function showBranchScreen(){
-  var el=document.getElementById('cl-fb-status');
-  if(el){el.innerHTML='○ Select Branch';el.style.color='var(--text3)';}
   document.getElementById('loading').classList.add('gone');
   document.getElementById('branch-screen').classList.remove('gone');
   document.getElementById('app').style.display='none';
@@ -1237,6 +1380,7 @@ function submitPin(){
     document.getElementById('pin-inp').value=''; document.getElementById('pin-inp').focus(); return;
   }
   CURRENT_BRANCH=_pendingBranch; BRANCH_PATH='branches/'+_pendingBranch.id;
+  try{localStorage.setItem(CL_SESSION_KEY,JSON.stringify({branchId:_pendingBranch.id,branch:_pendingBranch,expires:Date.now()+10*3600000}));}catch(e){}
   launchChecklist();
 }
 
@@ -1315,13 +1459,22 @@ window.onload=function(){
       var b=snap.val();
       if(b&&b.active!==false){
         CURRENT_BRANCH=b; BRANCH_PATH='branches/'+urlBranch;
+        try{localStorage.setItem(CL_SESSION_KEY,JSON.stringify({branchId:urlBranch,branch:b,expires:Date.now()+10*3600000}));}catch(ex){}
         launchChecklist();
       } else {showBranchScreen();}
     },function(){showBranchScreen();});
     return;
   }
 
-  // 2. Branch selector (no localStorage — URL param is required)
+  // 2. Saved session
+  var sess=null;
+  try{sess=JSON.parse(localStorage.getItem(CL_SESSION_KEY)||'null');}catch(e){}
+  if(sess&&sess.branchId&&sess.expires>Date.now()){
+    CURRENT_BRANCH=sess.branch||null; BRANCH_PATH='branches/'+sess.branchId;
+    launchChecklist(); return;
+  }
+
+  // 3. Branch selector
   showBranchScreen();
 };
 
@@ -2566,6 +2719,230 @@ function patchIcons(){
 }
 document.addEventListener('DOMContentLoaded',function(){setTimeout(patchIcons,200);setTimeout(patchIcons,800);});
 setTimeout(patchIcons,500);
+
+// ══ ENHANCED UI v2.0 JS ══
+var _clFilter = 'all';
+
+function clSetFilter(f, btn) {
+  _clFilter = f;
+  document.querySelectorAll('.cl-filter-pill').forEach(function(p){ p.classList.remove('active'); });
+  if(btn) btn.classList.add('active');
+  // Re-render with filter applied
+  var sec = clSec;
+  if(sec === 'forms') return;
+  clRenderSec(sec);
+}
+
+function clScrollToFirst(state) {
+  var cards = document.querySelectorAll('.cl-item-card');
+  for(var i=0;i<cards.length;i++) {
+    var c = cards[i];
+    if(state === 'incomplete' && !c.classList.contains('all-ok')) {
+      c.scrollIntoView({behavior:'smooth', block:'center'});
+      c.style.transition = 'box-shadow 0.3s';
+      var origShadow = c.style.boxShadow;
+      c.style.boxShadow = '0 0 0 2px rgba(0,102,102,0.5)';
+      setTimeout(function(el,s){ el.style.boxShadow = s; }(c, origShadow), 1200);
+      break;
+    }
+  }
+}
+
+function clUpdateSummaryBar() {
+  var bar = document.getElementById('cl-summary-bar');
+  var filterBar = document.getElementById('cl-filter-bar');
+  var floatBtn = document.getElementById('cl-float-status');
+  var floatNum = document.getElementById('cl-float-num');
+  var floatLbl = document.getElementById('cl-float-lbl');
+  if(!bar) return;
+
+  var sec = clSec;
+  if(sec === 'forms') {
+    bar.style.display = 'none';
+    if(filterBar) filterBar.style.display = 'none';
+    if(floatBtn) floatBtn.style.display = 'none';
+    return;
+  }
+
+  var cls = CL_DATA[sec] || [];
+  bar.style.display = 'flex';
+  if(filterBar) filterBar.style.display = 'flex';
+  if(floatBtn) floatBtn.style.display = 'flex';
+
+  var chips = '';
+  var totalAll = 0, totalDone = 0;
+
+  cls.forEach(function(cl) {
+    if(cl.checkType === 'hygiene' || cl.checkType === 'bartender') return;
+    var di = clDay[sec] || 0;
+    var tot = 0, done = 0;
+    (cl.groups || []).forEach(function(g) {
+      (g.items || []).forEach(function(item) {
+        CL_SHIFTS.forEach(function(sh) {
+          tot++;
+          var s = clS(cl.id, di, item.id, sh);
+          if(s && s.v) done++;
+        });
+      });
+    });
+    totalAll += tot;
+    totalDone += done;
+    var status = done === 0 ? 'empty' : done === tot ? 'complete' : 'partial';
+    var statusLabel = done === tot ? '✓' : (done + '/' + tot);
+    chips += '<button class="cl-sum-chip ' + status + '" onclick="clJumpToSub('' + sec + '',' + cls.indexOf(cl) + ')" title="' + cl.name + '">'
+      + '<span class="cl-sum-dot ' + status + '"></span>'
+      + cl.name
+      + (status !== 'empty' ? ' <span style="opacity:.7">' + statusLabel + '</span>' : '')
+      + '</button>';
+  });
+
+  // Overall ring
+  var pct = totalAll ? Math.round(totalDone / totalAll * 100) : 0;
+  var r = 16, circ = 2 * Math.PI * r;
+  var dash = circ - (pct / 100) * circ;
+  var ringHtml = '<div class="cl-overall-ring-wrap">'
+    + '<svg class="cl-ring-svg" width="38" height="38"><circle class="cl-ring-bg" cx="19" cy="19" r="' + r + '" stroke-width="3.5"/>'
+    + '<circle class="cl-ring-fg" cx="19" cy="19" r="' + r + '" stroke-width="3.5" stroke-dasharray="' + circ.toFixed(1) + '" stroke-dashoffset="' + dash.toFixed(1) + '"/></svg>'
+    + '<span class="cl-ring-pct">' + pct + '%</span>'
+    + '</div>';
+
+  bar.innerHTML = ringHtml + chips;
+
+  // Update float button
+  var remaining = totalAll - totalDone;
+  if(floatNum) floatNum.textContent = remaining;
+  if(floatLbl) floatLbl.textContent = remaining === 0 ? 'done!' : 'left';
+  if(floatBtn) floatBtn.classList.toggle('done-all', remaining === 0);
+}
+
+function clJumpToSub(sec, idx) {
+  clCl[sec] = idx;
+  clRenderSec(sec);
+}
+
+// ── Patch clRenderSec to update summary ──
+var _origClRenderSec = clRenderSec;
+clRenderSec = function(sec) {
+  _origClRenderSec(sec);
+  setTimeout(clUpdateSummaryBar, 50);
+  setTimeout(clUpdateFloatBtn, 60);
+};
+
+function clUpdateFloatBtn() {
+  var sec = clSec;
+  if(sec === 'forms') return;
+  var cls = CL_DATA[sec] || [];
+  var di = clDay[sec] || 0;
+  var total = 0, done = 0;
+  cls.forEach(function(cl) {
+    if(cl.checkType === 'hygiene' || cl.checkType === 'bartender') return;
+    (cl.groups || []).forEach(function(g) {
+      (g.items || []).forEach(function(item) {
+        CL_SHIFTS.forEach(function(sh) {
+          total++;
+          var s = clS(cl.id, di, item.id, sh);
+          if(s && s.v) done++;
+        });
+      });
+    });
+  });
+  var remaining = total - done;
+  var num = document.getElementById('cl-float-num');
+  var lbl = document.getElementById('cl-float-lbl');
+  var btn = document.getElementById('cl-float-status');
+  if(num) num.textContent = remaining;
+  if(lbl) lbl.textContent = remaining === 0 ? 'DONE!' : 'LEFT';
+  if(btn) btn.classList.toggle('done-all', remaining === 0);
+}
+
+// ── Patch clRenderCards to add status stripe + done badge + group progress ──
+var _origClRenderCards = clRenderCards;
+clRenderCards = function(sec, cl, di) {
+  _origClRenderCards(sec, cl, di);
+  // Add status stripes to all cards
+  document.querySelectorAll('.cl-item-card').forEach(function(card) {
+    if(!card.querySelector('.cl-card-status-stripe')) {
+      var stripe = document.createElement('div');
+      stripe.className = 'cl-card-status-stripe';
+      card.insertBefore(stripe, card.firstChild);
+    }
+  });
+  // Add group progress indicators
+  document.querySelectorAll('.cl-grp-div').forEach(function(div, gi) {
+    if(div.querySelector('.cl-grp-completion')) return;
+    var group = (cl.groups || [])[gi];
+    if(!group) return;
+    var tot = 0, done = 0;
+    (group.items || []).forEach(function(item) {
+      CL_SHIFTS.forEach(function(sh) {
+        tot++;
+        var s = clS(cl.id, di, item.id, sh);
+        if(s && s.v) done++;
+      });
+    });
+    var pct = tot ? Math.round(done / tot * 100) : 0;
+    var comp = document.createElement('div');
+    comp.className = 'cl-grp-completion';
+    comp.innerHTML = '<span style="color:var(--text3)">' + done + '/' + tot + '</span>'
+      + '<div class="cl-grp-prog-pill"><div class="cl-grp-prog-fill" style="width:' + pct + '%"></div></div>';
+    div.appendChild(comp);
+  });
+  // Add done badge to completed cards
+  document.querySelectorAll('.cl-item-card').forEach(function(card) {
+    var top = card.querySelector('.cl-card-top');
+    if(!top) return;
+    if(top.querySelector('.cl-card-done-badge')) return;
+    var badge = document.createElement('span');
+    badge.className = 'cl-card-done-badge';
+    badge.innerHTML = card.classList.contains('all-ok') 
+      ? '<svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> DONE'
+      : '<svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> ISSUE';
+    // Insert after flag button
+    var flagBtn = top.querySelector('.cl-flag-btn');
+    if(flagBtn) top.insertBefore(badge, flagBtn);
+    else top.appendChild(badge);
+  });
+  // Apply filter
+  if(_clFilter !== 'all') {
+    clApplyFilter(_clFilter);
+  }
+};
+
+function clApplyFilter(f) {
+  document.querySelectorAll('.cl-item-card').forEach(function(card) {
+    var show = true;
+    if(f === 'complete') show = card.classList.contains('all-ok');
+    else if(f === 'incomplete') show = !card.classList.contains('all-ok');
+    else if(f === 'flagged') show = card.querySelector('.cl-flag-btn.on') !== null;
+    card.style.display = show ? '' : 'none';
+  });
+  // Hide/show group dividers if all their cards are hidden
+  document.querySelectorAll('.cl-grp-div').forEach(function(div) {
+    var next = div.nextElementSibling;
+    var anyVisible = false;
+    while(next && !next.classList.contains('cl-grp-div')) {
+      if(next.classList.contains('cl-item-card') && next.style.display !== 'none') anyVisible = true;
+      next = next.nextElementSibling;
+    }
+    div.style.display = anyVisible ? '' : 'none';
+  });
+}
+
+// Show summary after login
+var _origClDoLogin = clDoLogin;
+clDoLogin = function() {
+  _origClDoLogin();
+  setTimeout(function() {
+    var sb = document.getElementById('cl-summary-bar');
+    var fb = document.getElementById('cl-filter-bar');
+    var fl = document.getElementById('cl-float-status');
+    if(sb) sb.style.display = 'flex';
+    if(fb) fb.style.display = 'flex';
+    if(fl) fl.style.display = 'flex';
+    clUpdateSummaryBar();
+  }, 200);
+};
+
 </script>
 </body></html>';
 
