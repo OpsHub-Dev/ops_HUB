@@ -4517,7 +4517,8 @@ function renderPage(pageId) {
     'recipe-builder': function(){
       var fbCfg='';
       try{var st=localStorage.getItem('alfa_fb_config');if(st)fbCfg='?fbcfg='+btoa(st);}catch(e){}
-      var url='recipe-builder.html'+fbCfg;
+      var _rbid=(NX.session||{}).branchId||'';
+      var url='recipe-builder.html'+fbCfg+(_rbid?(fbCfg?'&':'?')+'branch='+encodeURIComponent(_rbid):'');
       window.open(url,'_blank');
       return '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;text-align:center;padding:40px">'+
         '<div style="font-size:56px;margin-bottom:20px">&#x1F373;</div>'+
@@ -7317,7 +7318,9 @@ function renderPage_(pageId) {
         var stored = localStorage.getItem('alfa_fb_config');
         if (stored) fbCfg = '?fbcfg=' + btoa(stored);
       } catch(e) {}
-      window.open('recipe-builder.html' + fbCfg, '_blank');
+      var _rbid2=(NX.session||{}).branchId||'';
+      var _rburl='recipe-builder.html'+fbCfg+(_rbid2?(fbCfg?'&':'?')+'branch='+encodeURIComponent(_rbid2):'');
+      window.open(_rburl, '_blank');
       return pRecipeBuilderLaunch();
     }
     var fns = {
