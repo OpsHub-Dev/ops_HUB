@@ -3230,7 +3230,8 @@ var NAV_CONFIG = {
       { id:'brand-mgmt',  icon:'🏢', label:'Brand Management' },
       { id:'access-ctrl', icon:'🔐', label:'Access Control' },
       { id:'audit-log',   icon:'📋', label:'Audit Log' },
-      { id:'recipe-builder',icon:'🍳', label:'Recipe Builder' }
+      { id:'recipe-builder',icon:'🍳', label:'Recipe Builder' },
+      { id:'shared-ingredients',icon:'🧂', label:'Shared Ingredients' }
     ]}
   ],
   super_admin: [
@@ -3243,7 +3244,8 @@ var NAV_CONFIG = {
       { id:'brand-mgmt',    icon:'🏢', label:'Brand Management' },
       { id:'access-ctrl',   icon:'🔐', label:'Access Control' },
       { id:'audit-log',     icon:'📋', label:'Audit Log' },
-      { id:'recipe-builder',icon:'🍳', label:'Recipe Builder' }
+      { id:'recipe-builder',icon:'🍳', label:'Recipe Builder' },
+      { id:'shared-ingredients',icon:'🧂', label:'Shared Ingredients' }
     ]}
   ],
   brand_dir: [
@@ -4474,6 +4476,7 @@ function renderPage(pageId) {
     'brand-mgmt': pBrandMgmt,
     'access-ctrl': pAccessCtrl,
     'audit-log': pAuditLog,
+    'shared-ingredients': pSharedIngredients,
     'brand-dash': pBrandDash,
     'brand-branches': pBrandBranches,
     'region-dash': pRegionDash,
@@ -6658,6 +6661,114 @@ function openEditUserModal(userId) {
 
 
 // ── PAGE: AUDIT LOG ──
+function pSharedIngredients() {
+  var sess=NX.session||{};
+  var h='<div class="page-header"><h1>🧂 Shared Ingredients</h1><p>Global ingredient catalog for Recipe Builder — shared/inv_items</p></div>';
+  h+='<div class="header-actions"><div></div><div style="display:flex;gap:8px">';
+  h+='<button class="btn btn-primary" onclick="openSharedIngModal(null)">+ Add Ingredient</button>';
+  h+='</div></div>';
+  // Search
+  h+='<div class="bcard" style="margin-bottom:14px"><input class="form-input" id="si-search" placeholder="Search by code or name..." oninput="renderSharedIngTable(this.value)" style="max-width:340px"></div>';
+  h+='<div id="si-table-wrap">';
+  h+=renderSharedIngTable_inner('');
+  h+='</div>';
+  setTimeout(function(){
+    var inp=document.getElementById('si-search');
+    if(inp) inp.oninput=function(){renderSharedIngTable(this.value);};
+  },0);
+  return h;
+}
+function renderSharedIngTable(q) {
+  var wrap=document.getElementById('si-table-wrap');
+  if(wrap) wrap.innerHTML=renderSharedIngTable_inner(q||'');
+}
+function renderSharedIngTable_inner(q) {
+  q=(q||'').toLowerCase().trim();
+  if(!db) return '<div class="empty-state">Not connected to Firebase</div>';
+  // Read fresh from Firebase each render
+  var cached=window._SI_ITEMS||[];
+  if(!cached.length){
+    db.ref('shared/inv_items').once('value',function(snap){
+      var raw=snap.val();
+      if(raw){
+        var arr=Array.isArray(raw)?raw.filter(Boolean):Object.values(raw).filter(Boolean);
+        window._SI_ITEMS=arr.filter(function(i){return i&&i.name;});
+      } else { window._SI_ITEMS=[]; }
+      renderSharedIngTable('');
+    });
+    return '<div style="text-align:center;padding:30px;color:var(--text-secondary)">⏳ Loading...</div>';
+  }
+  var filtered=q?cached.filter(function(i){
+    return String(i.code||'').toLowerCase().indexOf(q)>=0||String(i.name||'').toLowerCase().indexOf(q)>=0||String(i.category||'').toLowerCase().indexOf(q)>=0;
+  }):cached;
+  filtered=filtered.slice().sort(function(a,b){return String(a.code||'').localeCompare(String(b.code||''));});
+  if(!filtered.length) return '<div class="bcard"><div style="text-align:center;padding:30px;color:var(--text-secondary)">'+(q?'No items match — try a different search':'No shared ingredients yet. Click + Add Ingredient to start.')+'</div></div>';
+  var rows=filtered.map(function(it){
+    return '<tr>'+
+      '<td class="bmono" style="font-weight:700;color:var(--ceo);font-size:10px">'+bxe(it.code||'—')+'</td>'+
+      '<td style="font-weight:600">'+bxe(it.name||'—')+'</td>'+
+      '<td>'+bxe(it.category||'—')+'</td>'+
+      '<td class="bmono">'+bxe(it.unit||'—')+'</td>'+
+      '<td class="bmono" style="color:var(--text-secondary)">'+parseFloat(it.price||0).toFixed(4)+' SAR</td>'+
+      '<td><div style="display:flex;gap:4px">'+
+        '<button class="btn btn-sm" onclick="openSharedIngModal(\''+bxe(String(it.code||''))+'\')" >Edit</button>'+
+        '<button class="btn btn-sm" style="color:var(--danger)" onclick="delSharedIng(\''+bxe(String(it.code||''))+'\')" >Del</button>'+
+      '</div></td>'+
+    '</tr>';
+  }).join('');
+  return '<div class="bcard" style="padding:0;overflow:auto"><table class="btbl"><thead><tr><th>Code</th><th>Name</th><th>Category</th><th>Unit</th><th>Cost/Unit</th><th>Actions</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
+    '<div style="font-size:10px;color:var(--text-tertiary);margin-top:8px;font-family:var(--mono)">'+filtered.length+' ingredient(s) in shared catalog</div>';
+}
+function openSharedIngModal(code) {
+  var it=null;
+  if(code) it=(window._SI_ITEMS||[]).find(function(i){return String(i.code)===String(code);});
+  var UNITS=['g','kg','ml','L','pc','pcs','oz','tbsp','tsp','cup','slice','portion','bunch','pack','can','bottle','bag','box'];
+  var CATS=['Meat','Seafood','Vegetable','Dairy','Bakery','Sauce','Spice','Grain','Beverage','Other'];
+  var uOpts=UNITS.map(function(u){return '<option'+(it&&it.unit===u?' selected':'')+'>'+u+'</option>';}).join('');
+  var cOpts=CATS.map(function(c){return '<option'+(it&&it.category===c?' selected':'')+'>'+c+'</option>';}).join('');
+  var html='<div class="modal-head"><h2>'+(it?'Edit':'Add')+' Shared Ingredient</h2><button class="modal-close" onclick="closeModalForce()">✕</button></div>';
+  html+='<div class="form-row">';
+  html+='<div class="bfg"><label class="form-label">Code *</label><input class="form-input" id="si-code" value="'+bxe(it?it.code:'')+'" '+(it?'readonly':'')+'placeholder="e.g. BEV-01"></div>';
+  html+='<div class="bfg"><label class="form-label">Category</label><select class="form-input form-select" id="si-cat">'+cOpts+'</select></div>';
+  html+='</div>';
+  html+='<div class="bfg"><label class="form-label">Name *</label><input class="form-input" id="si-name" value="'+bxe(it?it.name:'')+'" placeholder="Ingredient name"></div>';
+  html+='<div class="form-row">';
+  html+='<div class="bfg"><label class="form-label">Unit</label><select class="form-input form-select" id="si-unit">'+uOpts+'</select></div>';
+  html+='<div class="bfg"><label class="form-label">Cost per Unit (SAR) *</label><input class="form-input" type="number" step="0.0001" id="si-price" value="'+bxe(it?it.price||'':'')+'" placeholder="0.0000"></div>';
+  html+='</div>';
+  html+='<div class="bfg"><label class="form-label">Supplier</label><input class="form-input" id="si-supplier" value="'+bxe(it?it.supplier||'':'')+'" placeholder="Optional"></div>';
+  html+='<button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="saveSharedIng()">💾 Save Ingredient</button>';
+  openModal(html);
+}
+function saveSharedIng() {
+  var code=(document.getElementById('si-code').value||'').trim();
+  var name=(document.getElementById('si-name').value||'').trim();
+  var price=parseFloat(document.getElementById('si-price').value)||0;
+  if(!code||!name){showToast('Code and Name are required','error');return;}
+  var it={code:code,name:name,category:document.getElementById('si-cat').value,unit:document.getElementById('si-unit').value,price:price,supplier:(document.getElementById('si-supplier').value||'').trim()};
+  var k=code.replace(/[.#$\[\]\/]/g,'_');
+  db.ref('shared/inv_items/'+k).set(it,function(err){
+    if(err){showToast('Save error: '+err,'error');return;}
+    // Update local cache
+    var idx=(window._SI_ITEMS||[]).findIndex(function(i){return String(i.code)===String(code);});
+    if(idx>=0) window._SI_ITEMS[idx]=it; else (window._SI_ITEMS=window._SI_ITEMS||[]).push(it);
+    showToast(name+' saved ✓','success');
+    closeModalForce();
+    renderSharedIngTable(document.getElementById('si-search')?document.getElementById('si-search').value:'');
+  });
+}
+function delSharedIng(code) {
+  var it=(window._SI_ITEMS||[]).find(function(i){return String(i.code)===String(code);});
+  if(!confirm('Delete '+((it&&it.name)||code)+' from shared catalog?'))return;
+  var k=String(code).replace(/[.#$\[\]\/]/g,'_');
+  db.ref('shared/inv_items/'+k).remove(function(err){
+    if(err){showToast('Error: '+err,'error');return;}
+    window._SI_ITEMS=(window._SI_ITEMS||[]).filter(function(i){return String(i.code)!==String(code);});
+    showToast('Deleted ✓','success');
+    renderSharedIngTable(document.getElementById('si-search')?document.getElementById('si-search').value:'');
+  });
+}
+
 function pAuditLog() {
   var h = '<div class="page-header"><h1>Activity Log</h1><p>System events from NXMon · ' + getAccessibleBranches().length + ' branch(es) monitored</p></div>';
   h += '<div class="header-actions"><div></div><div style="display:flex;gap:8px">';
@@ -12384,6 +12495,7 @@ var SEARCH_INDEX = [
   { label:'Brand Management', page:'brand-mgmt', keywords:'brands manage edit add piatto hybrid cafe' },
 { label:'Access Control', page:'access-ctrl', keywords:'access users pins roles permissions security' },
   { label:'Audit Log', page:'audit-log', keywords:'audit log history trail activity' },
+  { label:'Shared Ingredients', page:'shared-ingredients', keywords:'shared ingredients catalog recipe cost inv items global' },
   { label:'Inventory Items', page:'inv-items', keywords:'inventory items stock list' },
   { label:'Receive / Issue Stock', page:'inv-moves', keywords:'receive issue stock transfer moves' },
   { label:'Purchase Orders', page:'inv-orders', keywords:'purchase orders PO supplier' },

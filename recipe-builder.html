@@ -587,30 +587,23 @@ function initFB(){
       }
     });
 
-    // ── Load ALL branches inventory merged — global ingredient pool ──
+    // ── Load shared ingredient catalog (shared/inv_items) ──
     function loadAllBranchesInv(){
       var el=document.getElementById('fbstat');
-      if(el) el.textContent='Loading ingredients...';
-      db.ref('branches').once('value',function(snap){
-        var braw=snap.val()||{};
-        var merged={};
-        Object.keys(braw).forEach(function(bid){
-          var invRaw=braw[bid]&&braw[bid].inv_items;
-          if(!invRaw) return;
-          var arr=Array.isArray(invRaw)?invRaw.filter(Boolean):Object.values(invRaw).filter(Boolean);
-          arr.forEach(function(it){
-            if(!it||!it.name) return;
-            var key=String(it.code||it.name).toLowerCase().replace(/[^a-z0-9]/g,'_');
-            if(!merged[key]||(it.price&&!merged[key].price)) merged[key]=it;
-          });
-        });
-        INV_ITEMS=Object.values(merged).filter(function(i){return i&&i.name;});
-        INV_ITEMS.sort(function(a,b){return (a.name||'').localeCompare(b.name||'');});
+      if(el) el.textContent='Loading shared ingredients...';
+      db.ref('shared/inv_items').once('value',function(snap){
+        var raw=snap.val();
+        if(raw){
+          var arr=Array.isArray(raw)?raw.filter(Boolean):Object.values(raw).filter(Boolean);
+          INV_ITEMS=arr.filter(function(i){return i&&i.name;});
+          INV_ITEMS.sort(function(a,b){return (a.name||'').localeCompare(b.name||'');});
+        } else {
+          INV_ITEMS=[];
+        }
         updateInvBadge();
         if(ROWS.length) renderRows();
         if(el) el.textContent='Connected — '+INV_ITEMS.length+' ingredients';
-        if(INV_ITEMS.length) toast('✓ '+INV_ITEMS.length+' ingredients loaded','success');
-      },function(){
+      },function(err){
         var el=document.getElementById('fbstat');
         if(el) el.textContent='Connected to shared/recipes';
       });
@@ -634,7 +627,7 @@ function saveRecipesToFB(rec){
 
 function updateInvBadge(){
   var el=document.getElementById('inv-badge');
-  if(el) el.textContent=INV_ITEMS.length?'📦 '+INV_ITEMS.length+' items linked':'📦 No inventory linked';
+  if(el) el.textContent=INV_ITEMS.length?'📦 '+INV_ITEMS.length+' shared ingredients':'📦 Shared catalog empty';
 }
 function renderLib(){/* stub — left panel removed */}
 
@@ -1476,8 +1469,8 @@ function filterInvPicker(q) {
   if (!INV_ITEMS.length) {
     list.innerHTML = '<div style="text-align:center;padding:24px 16px;color:var(--tx3);font-size:11px;line-height:1.7">' +
       '<div style="font-size:32px;margin-bottom:8px">⏳</div>' +
-      '<div style="font-weight:700;color:var(--tx);margin-bottom:6px">Loading ingredients...</div>' +
-      '<div style="margin-bottom:12px">Fetching inventory from all branches.</div>' +
+      '<div style="font-weight:700;color:var(--tx);margin-bottom:6px">Loading shared catalog...</div>' +
+      '<div style="margin-bottom:12px">Fetching from shared/inv_items.</div>' +
       '<button onclick="loadAllBranchesInv();setTimeout(function(){filterInvPicker(\'\');},1500)" style="background:var(--primary);color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:11px;cursor:pointer;font-family:var(--font)">↻ Retry</button>' +
       '</div>';
     return;
