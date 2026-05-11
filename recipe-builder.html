@@ -587,38 +587,35 @@ function initFB(){
       }
     });
 
-    // ── Sync inventory items from branch (for auto-costing) ──
-    // Try to get branchId from URL param or localStorage
-    var params2=new URLSearchParams(location.search);
-    BRANCH_ID=params2.get('branch')||params2.get('branchId')||localStorage.getItem('alfa_branch_id')||null;
-    function loadBranchInv(bid){
-      db.ref('branches/'+bid+'/inv_items').on('value',function(snap){
-        var raw2=snap.val();
-        if(raw2){
-          var arr2=Array.isArray(raw2)?raw2.filter(Boolean):Object.values(raw2).filter(Boolean);
-          INV_ITEMS=arr2.filter(function(i){return i&&i.name;});
-          updateInvBadge();
-          if(ROWS.length) renderRows(); // refresh so picker button activates
-          toast('✓ Inventory linked: '+INV_ITEMS.length+' items ready','success');
-        }
-      });
-    }
-    if(BRANCH_ID){
-      loadBranchInv(BRANCH_ID);
-    } else {
-      // Try to discover branch by listing branches node
+    // ── Load ALL branches inventory merged — global ingredient pool ──
+    function loadAllBranchesInv(){
+      var el=document.getElementById('fbstat');
+      if(el) el.textContent='Loading ingredients...';
       db.ref('branches').once('value',function(snap){
-        var braw=snap.val();
-        if(braw){
-          var bkeys=Object.keys(braw);
-          if(bkeys.length){
-            BRANCH_ID=bkeys[0];
-            localStorage.setItem('alfa_branch_id',BRANCH_ID);
-            loadBranchInv(BRANCH_ID);
-          }
-        }
+        var braw=snap.val()||{};
+        var merged={};
+        Object.keys(braw).forEach(function(bid){
+          var invRaw=braw[bid]&&braw[bid].inv_items;
+          if(!invRaw) return;
+          var arr=Array.isArray(invRaw)?invRaw.filter(Boolean):Object.values(invRaw).filter(Boolean);
+          arr.forEach(function(it){
+            if(!it||!it.name) return;
+            var key=String(it.code||it.name).toLowerCase().replace(/[^a-z0-9]/g,'_');
+            if(!merged[key]||(it.price&&!merged[key].price)) merged[key]=it;
+          });
+        });
+        INV_ITEMS=Object.values(merged).filter(function(i){return i&&i.name;});
+        INV_ITEMS.sort(function(a,b){return (a.name||'').localeCompare(b.name||'');});
+        updateInvBadge();
+        if(ROWS.length) renderRows();
+        if(el) el.textContent='Connected — '+INV_ITEMS.length+' ingredients';
+        if(INV_ITEMS.length) toast('✓ '+INV_ITEMS.length+' ingredients loaded','success');
+      },function(){
+        var el=document.getElementById('fbstat');
+        if(el) el.textContent='Connected to shared/recipes';
       });
     }
+    loadAllBranchesInv();
   }catch(e){
     loadLocal();
     renderLib('');renderRB('');renderIngModal();
@@ -1433,8 +1430,39 @@ function openInvPicker(rowIdx) {
   document.getElementById('inv-picker-ov').style.display = 'flex';
   var inp = document.getElementById('inv-picker-search');
   inp.value = '';
-  filterInvPicker('');
+  if (!INV_ITEMS.length && db) {
+    var list = document.getElementById('inv-picker-list');
+    list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--tx3);font-size:11px">⏳ Loading ingredients...</div>';
+    loadAllBranchesInv();
+    setTimeout(function(){ filterInvPicker(''); }, 1500);
+  } else {
+    filterInvPicker('');
+  }
   setTimeout(function(){ inp.focus(); }, 80);
+}
+
+function rbSelectBranch(bid) {
+  BRANCH_ID = bid;
+  localStorage.setItem('alfa_branch_id', bid);
+  var el = document.getElementById('inv-picker-list');
+  if (el) el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--tx3);font-size:11px">⏳ Loading inventory for ' + bid + '...</div>';
+  db.ref('branches/'+bid+'/inv_items').once('value', function(snap){
+    var raw = snap.val();
+    if (raw) {
+      var arr = Array.isArray(raw) ? raw.filter(Boolean) : Object.values(raw).filter(Boolean);
+      INV_ITEMS = arr.filter(function(i){ return i && i.name; });
+    } else {
+      INV_ITEMS = [];
+    }
+    updateInvBadge();
+    if (ROWS.length) renderRows();
+    var q = document.getElementById('inv-picker-search');
+    filterInvPicker(q ? q.value : '');
+    if (INV_ITEMS.length) toast('✓ ' + INV_ITEMS.length + ' items loaded from ' + bid, 'success');
+    else toast('No inventory found for ' + bid + '. Check Firebase inv_items.', 'warning');
+  }, function(err){
+    toast('Error loading inventory: ' + err, 'error');
+  });
 }
 
 function closeInvPicker() {
@@ -1447,9 +1475,10 @@ function filterInvPicker(q) {
   var list = document.getElementById('inv-picker-list');
   if (!INV_ITEMS.length) {
     list.innerHTML = '<div style="text-align:center;padding:24px 16px;color:var(--tx3);font-size:11px;line-height:1.7">' +
-      '<div style="font-size:28px;margin-bottom:8px">📦</div>' +
-      '<div style="font-weight:700;color:var(--tx);margin-bottom:6px">No inventory linked yet</div>' +
-      '<div>Open Recipe Builder from the <b>main app dashboard</b> (not directly) so it can connect to your branch inventory.</div>' +
+      '<div style="font-size:32px;margin-bottom:8px">⏳</div>' +
+      '<div style="font-weight:700;color:var(--tx);margin-bottom:6px">Loading ingredients...</div>' +
+      '<div style="margin-bottom:12px">Fetching inventory from all branches.</div>' +
+      '<button onclick="loadAllBranchesInv();setTimeout(function(){filterInvPicker(\'\');},1500)" style="background:var(--primary);color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:11px;cursor:pointer;font-family:var(--font)">↻ Retry</button>' +
       '</div>';
     return;
   }
