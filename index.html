@@ -3229,7 +3229,8 @@ var NAV_CONFIG = {
     { section:'MANAGEMENT', items:[
       { id:'brand-mgmt',  icon:'🏢', label:'Brand Management' },
       { id:'access-ctrl', icon:'🔐', label:'Access Control' },
-      { id:'audit-log',   icon:'📋', label:'Audit Log' }
+      { id:'audit-log',   icon:'📋', label:'Audit Log' },
+      { id:'recipe-builder',icon:'🍳', label:'Recipe Builder' }
     ]}
   ],
   super_admin: [
@@ -3275,7 +3276,6 @@ var NAV_CONFIG = {
       { id:'low-stock',         icon:'🚨', label:'Low Stock', badge:'lowstock' },
       { id:'inv-report',        icon:'📅', label:'Monthly Report' },
       { id:'wastage',           icon:'🗑️', label:'Wastage Log' },
-      { id:'recipe-builder',    icon:'🍳', label:'Recipe Builder' },
       { id:'bm-transfers',      icon:'🔀', label:'Transfer Requests', badge:'bm-transfers-pending' }
     ]},
     { section:'OPERATIONS', items:[
@@ -3320,9 +3320,6 @@ var NAV_CONFIG = {
     { section:'PAYROLL', items:[
       { id:'hrf-payroll',     icon:'💸', label:'Payroll Overview' },
       { id:'hrf-petty-cash',  icon:'🧾', label:'Petty Cash' }
-    ]},
-    { section:'CULINARY', items:[
-      { id:'recipe-builder',  icon:'🍳', label:'Recipe Builder' }
     ]},
     { section:'REPORTS', items:[
       { id:'hrf-hr-report',   icon:'📋', label:'HR Reports' }
@@ -9108,8 +9105,11 @@ function openBranchWastageModal(){
   var sortedRec=(BS.recipes||[]).slice().sort(function(a,b){return(a.name||'').localeCompare(b.name||'');});
   sortedRec.forEach(function(r){recOpts+='<option value="'+bxe(r.id)+'">'+bxe(r.name)+(r.recipeCode?' ['+bxe(r.recipeCode)+']':'')+'</option>';});
   var html='<div class="modal-head"><h2>Log Wastage</h2><button class="modal-close" onclick="closeModalForce()">&#x2715;</button></div>';
-  html+='<div class="bfg"><label class="form-label">Link to Recipe (auto-calculates cost)</label>';
-  html+='<select class="form-input form-select" id="bw-recipe" onchange="bwOnRecipePick(this.value)">'+recOpts+'</select></div>';
+  var _canPickRecipe=['super_admin','ceo'].indexOf((NX.session||{}).role)>=0;
+  if(_canPickRecipe){
+    html+='<div class="bfg"><label class="form-label">Link to Recipe (auto-calculates cost)</label>';
+    html+='<select class="form-input form-select" id="bw-recipe" onchange="bwOnRecipePick(this.value)">'+recOpts+'</select></div>';
+  }
   html+='<div class="form-row">';
   html+='<div class="bfg"><label class="form-label">Date</label><input class="form-input" type="date" id="bw-date" value="'+TODAY_BS+'"></div>';
   html+='<div class="bfg"><label class="form-label">Reported By</label><select class="form-input form-select" id="bw-by">'+so+'</select></div>';
@@ -9135,6 +9135,7 @@ function openBranchWastageModal(){
 function bwOnRecipePick(recipeId){
   var nameEl=document.getElementById('bw-item'),unitEl=document.getElementById('bw-unit'),noteEl=document.getElementById('bw-cost-note');
   if(!recipeId){if(noteEl)noteEl.textContent='Select a recipe above';bwRecalcCost();return;}
+  if(!document.getElementById('bw-recipe'))return;
   var rec=(BS.recipes||[]).find(function(r){return r.id===recipeId;});
   if(!rec)return;
   if(nameEl&&!nameEl.value)nameEl.value=rec.name||'';
@@ -9143,7 +9144,8 @@ function bwOnRecipePick(recipeId){
   bwRecalcCost();
 }
 function bwRecalcCost(){
-  var recipeId=(document.getElementById('bw-recipe')||{}).value||'';
+  var _recEl=document.getElementById('bw-recipe');
+  var recipeId=_recEl?_recEl.value||'':'';
   var qty=parseFloat((document.getElementById('bw-qty')||{}).value)||0;
   var disp=document.getElementById('bw-cost-display'),noteEl=document.getElementById('bw-cost-note');
   var rec=recipeId?(BS.recipes||[]).find(function(r){return r.id===recipeId;}):null;
@@ -9160,7 +9162,7 @@ function bwUpdateDisplay(){var v=parseFloat((document.getElementById('bw-val')||
 function saveBranchWastage(){
   var item=bgv('bw-item'),qty=parseFloat(bgv('bw-qty'))||0;
   if(!item||qty<=0){showToast('Item and quantity required','error');return;}
-  var recipeId=bgv('bw-recipe');
+  var recipeId=document.getElementById('bw-recipe')?bgv('bw-recipe'):'';
   var rec=recipeId?(BS.recipes||[]).find(function(r){return r.id===recipeId;}):null;
   var overrideVal=parseFloat(bgv('bw-val'))||0;
   var autoCost=rec?rec.costPerPortion*qty:0;
