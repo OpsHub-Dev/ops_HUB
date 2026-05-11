@@ -7978,60 +7978,27 @@ function pBranchDash() {
   var yoyArrow=ytdYoY>=0?'\u25B2':'\u25BC';
 
   var monthsShort=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-
-  // Build SVG line chart
-  var svgW=660,svgH=80,padL=8,padR=8,padT=10,padB=24;
-  var chartW=svgW-padL-padR, chartH=svgH-padT-padB;
-  var maxV=Math.max.apply(null,ytdThisYr.concat(ytdLastYr).map(function(v){return v||0;}));
-  if(maxV===0) maxV=1;
-  function px(i){return padL+(i/(11))*chartW;}
-  function py(v){return padT+chartH-(v/maxV)*chartH;}
-
-  // Build polyline points
-  function pts(arr,upToIdx){
-    var p=[];
-    for(var i=0;i<=upToIdx;i++) p.push(px(i).toFixed(1)+','+py(arr[i]||0).toFixed(1));
-    return p.join(' ');
+  var ytdBars='';
+  for(var ymj=0;ymj<12;ymj++){
+    var isFuture=ymj>thisMonthIdx;
+    var thisV2=ytdThisYr[ymj]||0, lastV2=ytdLastYr[ymj]||0;
+    var hT=thisV2>0?Math.max(4,Math.round(thisV2/maxYtdM*60)):0;
+    var hL=lastV2>0?Math.max(4,Math.round(lastV2/maxYtdM*60)):0;
+    ytdBars+='<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0">'+
+      '<div style="display:flex;align-items:flex-end;gap:2px;height:60px;width:100%;justify-content:center">'+
+        '<div title="'+monthsShort[ymj]+' '+thisYr+': '+formatSAR(thisV2)+'" style="width:10px;height:'+(hT||0)+'px;background:#4a5568;border-radius:2px 2px 0 0;opacity:'+(isFuture?0:1)+'"></div>'+
+        '<div title="'+monthsShort[ymj]+' '+lastYr+': '+formatSAR(lastV2)+'" style="width:10px;height:'+(hL||0)+'px;background:#b45309;border-radius:2px 2px 0 0;opacity:'+(isFuture?0.35:0.85)+'"></div>'+
+      '</div>'+
+      '<div style="font-size:9px;color:var(--text-secondary)">'+monthsShort[ymj]+'</div>'+
+      '</div>';
   }
-
-  // This year: solid up to current month, dashed (lighter) after
-  var thisLine='', lastLine='';
-  // Last year — full 12 months solid
-  lastLine='<polyline points="'+pts(ytdLastYr,11)+'" fill="none" stroke="#b45309" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" opacity="0.85"/>';
-  // This year — solid up to thisMonthIdx
-  thisLine='<polyline points="'+pts(ytdThisYr,thisMonthIdx)+'" fill="none" stroke="#4a5568" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>';
-  // This year — dashed from thisMonthIdx to 11 (future, no data)
-  if(thisMonthIdx<11){
-    var futurePts=[];
-    for(var fi=thisMonthIdx;fi<=11;fi++) futurePts.push(px(fi).toFixed(1)+','+py(0).toFixed(1));
-    thisLine+='<polyline points="'+futurePts.join(' ')+'" fill="none" stroke="#4a5568" stroke-width="1" stroke-dasharray="3,3" opacity="0.3"/>';
-  }
-
-  // Dots for each month
-  var dots='';
-  for(var di=0;di<12;di++){
-    var isFut=di>thisMonthIdx;
-    // Last year dot
-    dots+='<circle cx="'+px(di).toFixed(1)+'" cy="'+py(ytdLastYr[di]||0).toFixed(1)+'" r="2.5" fill="#b45309" opacity="'+(isFut?0.4:0.85)+'"><title>'+monthsShort[di]+' '+lastYr+': '+formatSAR(ytdLastYr[di])+'</title></circle>';
-    // This year dot (only up to current)
-    if(!isFut) dots+='<circle cx="'+px(di).toFixed(1)+'" cy="'+py(ytdThisYr[di]||0).toFixed(1)+'" r="2.5" fill="#4a5568"><title>'+monthsShort[di]+' '+thisYr+': '+formatSAR(ytdThisYr[di])+'</title></circle>';
-  }
-
-  // Month labels
-  var labels='';
-  for(var li=0;li<12;li++){
-    labels+='<text x="'+px(li).toFixed(1)+'" y="'+(svgH-4)+'" text-anchor="middle" font-size="8" fill="#94a3b8" font-family="monospace">'+monthsShort[li]+'</text>';
-  }
-
-  var svgChart='<svg viewBox="0 0 '+svgW+' '+svgH+'" style="width:100%;height:80px" xmlns="http://www.w3.org/2000/svg">'+lastLine+thisLine+dots+labels+'</svg>';
-
   h += '<div class="card"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><span style="font-size:11px;font-weight:700">YTD '+thisYr+' vs '+lastYr+'</span>';
   h += '<span style="font-size:11px;color:'+yoyCol+';font-weight:700;font-family:var(--mono)">'+yoyArrow+' '+(Math.abs(ytdYoY)).toFixed(1)+'%</span></div>';
   h += '<div style="display:flex;gap:14px;font-size:10px;color:var(--text-secondary);margin-bottom:8px">';
-  h += '<div style="display:flex;align-items:center;gap:6px"><span style="display:inline-block;width:20px;height:2px;background:#4a5568;border-radius:2px"></span>'+thisYr+': <strong style="color:var(--text-primary)">'+fsar(ytdThisTotal)+'</strong></div>';
-  h += '<div style="display:flex;align-items:center;gap:6px"><span style="display:inline-block;width:20px;height:2px;background:#b45309;border-radius:2px"></span>'+lastYr+': <strong style="color:#b45309">'+fsar(ytdLastTotal)+'</strong></div>';
+  h += '<div style="display:flex;align-items:center;gap:6px"><span style="display:inline-block;width:10px;height:10px;background:#4a5568;border-radius:2px"></span>'+thisYr+': <strong style="color:var(--text-primary)">'+fsar(ytdThisTotal)+'</strong></div>';
+  h += '<div style="display:flex;align-items:center;gap:6px"><span style="display:inline-block;width:10px;height:10px;background:#b45309;border-radius:2px"></span>'+lastYr+': <strong style="color:#b45309">'+fsar(ytdLastTotal)+'</strong></div>';
   h += '</div>';
-  h += svgChart+'</div>';
+  h += '<div style="display:flex;align-items:flex-end;gap:2px;height:80px;margin-top:8px">'+ytdBars+'</div></div>';
   h += '</div>';
 
   // ROW 5: Recent Orders | Activity | Reminders
@@ -10328,7 +10295,7 @@ function pSales() {
   var s=NX.session||{};
   var h='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">';
   h+='<div style="font-size:11px;font-weight:700;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.08em;font-family:var(--mono)">All Entries</div>';
-  h+='<button class="btn btn-primary" onclick="openBranchSalesModal(null)">+ Add Sales</button></div>';
+  h+='<div style="display:flex;gap:8px"><button class="btn" onclick="openSalesBulkModal()" style="display:flex;align-items:center;gap:6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Bulk Import</button><button class="btn btn-primary" onclick="openBranchSalesModal(null)">+ Add Sales</button></div></div>';
 
   // ── ROW 1: 4 KPI cards ──
   h+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px">';
@@ -10438,6 +10405,115 @@ function pSales() {
 }
 
 function openBranchSalesModal(id){var e=id?BS.sales.find(function(x){return x.id===id;}):null;var html='<div class="modal-head"><h2>'+(e?'Edit Sales Entry':'Add Sales Entry')+'</h2><button class="modal-close" onclick="closeModalForce()">&#x2715;</button></div><div class="bfg"><label class="form-label">Date *</label><input class="form-input" type="date" id="bsl-date" value="'+(e?e.date:TODAY_BS)+'"></div><div class="form-row"><div class="bfg"><label class="form-label">Actual Sales (‫SAR ‬) *</label><input class="form-input" type="number" step="0.01" id="bsl-actual" value="'+(e?e.actual:'')+'" placeholder="0.00"></div><div class="bfg"><label class="form-label">Sales Target (‫SAR ‬) *</label><input class="form-input" type="number" step="0.01" id="bsl-target" value="'+(e?e.target:'')+'" placeholder="0.00"></div></div><button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="saveBranchSales(\''+bxe(id||'')+'\')">Save Entry</button>';openModal(html);}
+function openSalesBulkModal(){
+  var html='<div class="modal-head"><h2>📥 Bulk Sales Import</h2><button class="modal-close" onclick="closeModalForce()">✕</button></div>';
+  html+='<p style="font-size:11px;color:var(--text-secondary);margin-bottom:12px">Drag & drop a CSV file or paste data below. Format: <code style="background:var(--surface-2);padding:1px 5px;border-radius:4px">Date, Actual, Target</code> — one row per day.</p>';
+  
+  // Drop zone
+  html+='<div id="sales-drop-zone" style="border:2px dashed var(--border);border-radius:12px;padding:28px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:12px;background:var(--surface-2)" onclick="document.getElementById(\'sales-file-inp\').click()" ondragover="event.preventDefault();this.style.borderColor=\'var(--primary)\';this.style.background=\'rgba(0,102,102,.06)\'" ondragleave="this.style.borderColor=\'var(--border)\';this.style.background=\'var(--surface-2)\'" ondrop="handleSalesDrop(event)">';
+  html+='<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto 8px;display:block"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>';
+  html+='<div style="font-size:13px;font-weight:700;color:var(--text-primary);font-family:var(--font)">Drop CSV file here</div>';
+  html+='<div style="font-size:11px;color:var(--text-secondary);margin-top:4px">or click to browse · .csv or .txt</div>';
+  html+='<input type="file" id="sales-file-inp" accept=".csv,.txt" style="display:none" onchange="handleSalesFile(this.files[0])">';
+  html+='</div>';
+
+  // Paste area
+  html+='<div style="margin-bottom:10px">';
+  html+='<label style="font-size:10px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:4px">Or paste data directly</label>';
+  html+='<textarea id="sales-paste-area" rows="5" style="width:100%;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:10px;font-family:var(--mono);font-size:11px;color:var(--text-primary);resize:vertical;box-sizing:border-box" placeholder="2026-01-01, 15000, 18000&#10;2026-01-02, 12500, 18000&#10;2026-01-03, 17200, 18000"></textarea>';
+  html+='</div>';
+
+  // Preview table
+  html+='<div id="sales-import-preview" style="margin-bottom:12px"></div>';
+
+  html+='<div style="display:flex;gap:8px">';
+  html+='<button class="btn" style="flex:1" onclick="previewSalesImport()">👁 Preview</button>';
+  html+='<button class="btn btn-primary" style="flex:2" onclick="confirmSalesImport()">✓ Import All</button>';
+  html+='</div>';
+  
+  openModal(html);
+  window._salesImportRows=[];
+}
+
+function handleSalesDrop(e){
+  e.preventDefault();
+  var dz=document.getElementById('sales-drop-zone');
+  dz.style.borderColor='var(--border)';dz.style.background='var(--surface-2)';
+  var f=e.dataTransfer.files[0];
+  if(f) handleSalesFile(f);
+}
+
+function handleSalesFile(f){
+  if(!f)return;
+  var reader=new FileReader();
+  reader.onload=function(ev){
+    var txt=ev.target.result;
+    document.getElementById('sales-paste-area').value=txt;
+    previewSalesImport();
+  };
+  reader.readAsText(f);
+}
+
+function parseSalesCSV(txt){
+  var rows=[];
+  var lines=txt.split(/\r?\n/).filter(function(l){return l.trim();});
+  lines.forEach(function(line,idx){
+    // Skip header row
+    if(idx===0&&isNaN(parseFloat(line.split(/[,\t]/)[1])))return;
+    var parts=line.split(/[,\t]/).map(function(p){return p.trim().replace(/["']/g,'');});
+    if(parts.length<2)return;
+    var date=parts[0];
+    // Validate date format
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(date))return;
+    var actual=parseFloat(parts[1])||0;
+    var target=parseFloat(parts[2])||0;
+    if(actual>0) rows.push({date:date,actual:actual,target:target});
+  });
+  return rows;
+}
+
+function previewSalesImport(){
+  var txt=document.getElementById('sales-paste-area').value||'';
+  var rows=parseSalesCSV(txt);
+  window._salesImportRows=rows;
+  var prev=document.getElementById('sales-import-preview');
+  if(!prev)return;
+  if(!rows.length){
+    prev.innerHTML='<div style="text-align:center;padding:12px;color:var(--text-secondary);font-size:11px">No valid rows found. Check format: YYYY-MM-DD, Actual, Target</div>';
+    return;
+  }
+  // Check for duplicates
+  var tbl='<div style="max-height:200px;overflow-y:auto;border-radius:8px;border:1px solid var(--border)">';
+  tbl+='<table class="btbl" style="margin:0"><thead><tr><th>Date</th><th>Actual</th><th>Target</th><th>Status</th></tr></thead><tbody>';
+  rows.forEach(function(r){
+    var exists=BS.sales.some(function(s){return s.date===r.date;});
+    tbl+='<tr style="'+(exists?'background:rgba(254,153,0,.08)':'')+'">'+
+      '<td style="font-family:var(--mono);font-size:11px">'+bxe(r.date)+'</td>'+
+      '<td style="font-family:var(--mono)">'+bfsar(r.actual)+'</td>'+
+      '<td style="font-family:var(--mono);color:var(--text-secondary)">'+bfsar(r.target)+'</td>'+
+      '<td style="font-size:10px">'+(exists?'<span style="color:#b45309">⚠ Will overwrite</span>':'<span style="color:#00875a">✓ New</span>')+'</td>'+
+    '</tr>';
+  });
+  tbl+='</tbody></table></div>';
+  tbl+='<div style="font-size:10px;color:var(--text-secondary);margin-top:6px;font-family:var(--mono)">'+rows.length+' row(s) ready to import</div>';
+  prev.innerHTML=tbl;
+}
+
+function confirmSalesImport(){
+  var rows=window._salesImportRows||[];
+  if(!rows.length){showToast('Nothing to import — click Preview first','error');return;}
+  var added=0,updated=0;
+  rows.forEach(function(r){
+    var idx=BS.sales.findIndex(function(s){return s.date===r.date;});
+    if(idx>=0){BS.sales[idx].actual=r.actual;BS.sales[idx].target=r.target;updated++;}
+    else{BS.sales.push({id:buid(),date:r.date,actual:r.actual,target:r.target});added++;}
+  });
+  bSaveColl('sales',BS.sales);
+  closeModalForce();
+  showToast('✓ Imported '+added+' new, updated '+updated,'success');
+  navTo('sales');
+}
+
 function saveBranchSales(id){var dt=bgv('bsl-date'),a=bgv('bsl-actual'),t=bgv('bsl-target');if(!dt||!a||!t){showToast('All fields required','error');return;}if(id){var i=BS.sales.findIndex(function(x){return x.id===id;});if(i>=0){BS.sales[i].date=dt;BS.sales[i].actual=parseFloat(a);BS.sales[i].target=parseFloat(t);}}else{BS.sales=BS.sales.filter(function(s2){return s2.date!==dt;});BS.sales.push({id:buid(),date:dt,actual:parseFloat(a),target:parseFloat(t)});}bSaveColl('sales',BS.sales);closeModalForce();showToast('Sales saved','success');navTo('sales');}
 function delBranchSales(id){if(!confirm('Delete this sales entry?'))return;BS.sales=BS.sales.filter(function(x){return x.id!==id;});bSaveColl('sales',BS.sales);showToast('Deleted');navTo('sales');}
 
