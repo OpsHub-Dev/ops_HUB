@@ -6761,7 +6761,7 @@ function saveSharedIng() {
 function openImportPricesModal() {
   // Load available branches
   var html='<div class="modal-head"><h2>📥 Import Prices from Branch</h2><button class="modal-close" onclick="closeModalForce()">✕</button></div>';
-  html+='<p style="font-size:12px;color:var(--text-secondary);margin-bottom:16px">This will read prices from a branch's inventory and update matching items in the shared catalog. Items are matched by code.</p>';
+  html+='<p style="font-size:12px;color:var(--text-secondary);margin-bottom:16px">Reads prices from a branch inventory and updates matching items in the shared catalog by code.</p>';
   html+='<div class="bfg"><label class="form-label">Select Branch</label><select class="form-input form-select" id="imp-branch-sel"><option value="">Loading branches...</option></select></div>';
   html+='<div id="imp-status" style="font-size:11px;color:var(--text-secondary);font-family:var(--mono);margin:8px 0;min-height:18px"></div>';
   html+='<div style="display:flex;gap:8px;margin-top:12px">';
