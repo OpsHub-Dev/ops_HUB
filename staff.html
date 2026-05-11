@@ -913,15 +913,7 @@ var CURRENT_BRANCH = null;
 
 function bPath(rel){ return BRANCH_PATH ? (BRANCH_PATH+'/'+rel) : rel; }
 
-(function(){
-  try{
-    var s=JSON.parse(localStorage.getItem(STAFF_SESSION_KEY)||'null');
-    if(s&&s.branchId&&s.expires>Date.now()){
-      CURRENT_BRANCH=s.branch||null;
-      BRANCH_PATH='branches/'+s.branchId;
-    }
-  }catch(e){}
-})();
+
 
 var TODAY = (function(){
   var d = new Date();
@@ -1289,7 +1281,6 @@ function submitPin(){
   }
   CURRENT_BRANCH=_pendingBranch;
   BRANCH_PATH='branches/'+_pendingBranch.id;
-  try{localStorage.setItem(STAFF_SESSION_KEY,JSON.stringify({branchId:_pendingBranch.id,branch:_pendingBranch,expires:Date.now()+8*3600000}));}catch(e){}
   launchStaffApp();
 }
 
@@ -1321,18 +1312,10 @@ function connectFirebase(){
         var b=snap.val();
         if(b&&b.active!==false){
           CURRENT_BRANCH=b; BRANCH_PATH='branches/'+urlBranch;
-          try{localStorage.setItem(STAFF_SESSION_KEY,JSON.stringify({branchId:urlBranch,branch:b,expires:Date.now()+10*3600000}));}catch(e){}
           launchStaffApp();
         } else { toast('Branch not found: '+urlBranch,'error'); showBranchSelector(); }
       },function(){showBranchSelector();});
       return;
-    }
-    var sess=null;
-    try{sess=JSON.parse(localStorage.getItem(STAFF_SESSION_KEY)||'null');}catch(e){}
-    if(sess&&sess.branchId&&sess.expires>Date.now()){
-      CURRENT_BRANCH=sess.branch||null;
-      BRANCH_PATH='branches/'+sess.branchId;
-      launchStaffApp(); return;
     }
     showBranchSelector();
   }catch(e){
@@ -1342,7 +1325,6 @@ function connectFirebase(){
 }
 
 function switchBranch(){
-  try{localStorage.removeItem(STAFF_SESSION_KEY);}catch(e){}
   if(db){try{db.ref().off();}catch(e){}}
   BRANCH_PATH=''; CURRENT_BRANCH=null; _pendingBranch=null;
   tsEmps=[]; tsAtt={}; staffList=[]; selectedId=null;

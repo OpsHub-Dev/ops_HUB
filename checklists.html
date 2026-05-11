@@ -1235,7 +1235,6 @@ function submitPin(){
     document.getElementById('pin-inp').value=''; document.getElementById('pin-inp').focus(); return;
   }
   CURRENT_BRANCH=_pendingBranch; BRANCH_PATH='branches/'+_pendingBranch.id;
-  try{localStorage.setItem(CL_SESSION_KEY,JSON.stringify({branchId:_pendingBranch.id,branch:_pendingBranch,expires:Date.now()+10*3600000}));}catch(e){}
   launchChecklist();
 }
 
@@ -1314,22 +1313,13 @@ window.onload=function(){
       var b=snap.val();
       if(b&&b.active!==false){
         CURRENT_BRANCH=b; BRANCH_PATH='branches/'+urlBranch;
-        try{localStorage.setItem(CL_SESSION_KEY,JSON.stringify({branchId:urlBranch,branch:b,expires:Date.now()+10*3600000}));}catch(ex){}
         launchChecklist();
       } else {showBranchScreen();}
     },function(){showBranchScreen();});
     return;
   }
 
-  // 2. Saved session
-  var sess=null;
-  try{sess=JSON.parse(localStorage.getItem(CL_SESSION_KEY)||'null');}catch(e){}
-  if(sess&&sess.branchId&&sess.expires>Date.now()){
-    CURRENT_BRANCH=sess.branch||null; BRANCH_PATH='branches/'+sess.branchId;
-    launchChecklist(); return;
-  }
-
-  // 3. Branch selector
+  // 2. Branch selector (no localStorage — URL param is required)
   showBranchScreen();
 };
 

@@ -601,7 +601,7 @@ html, body {
     <div id="add-tab-url">
       <div class="modal-sub">Paste a cloud link or any public audio URL.</div>
       <div class="modal-info">
-        <strong>Google Drive:</strong> Share → "Anyone with link" → paste URL<br>
+        <strong>Google Drive:</strong> Share → "Anyone with link" → Copy link → paste here. File must be MP3/AAC/WAV.<br>
         <strong>OneDrive:</strong> Share → copy link (auto-converted)<br>
         <strong>Dropbox:</strong> Share link (auto-fixed)<br>
         <strong>Direct URL:</strong> Any public .mp3 / .ogg / .wav / .aac
@@ -732,7 +732,7 @@ function load() {
       // Migrate old export=view → export=download for Google Drive
       playlist.forEach(function(t) {
         if (t.url && t.url.includes('drive.google.com') && t.url.includes('export=view')) {
-          t.url = t.url.replace('export=view', 'export=download');
+          var gdMigId = t.url.match(/id=([^&]+)/); if(gdMigId) t.url = 'https://corsproxy.io/?' + encodeURIComponent('https://drive.google.com/uc?export=download&confirm=t&id=' + gdMigId[1]);
           migrated = true;
         }
       });
@@ -759,10 +759,11 @@ function convertUrl(raw) {
   if (!gdId) { var gd3 = u.match(/[?&]id=([^&]+)/); if (u.includes('drive.google.com') && gd3) gdId = gd3[1]; }
 
   if (gdId) {
-    // Use uc?export=download&confirm=t — this bypasses the scan page and
-    // returns raw audio bytes that HTMLAudioElement can stream.
-    // export=view returns HTML (the viewer page), not audio bytes.
-    return 'https://drive.google.com/uc?export=download&confirm=t&id=' + gdId;
+    // Google Drive CORS workaround: use a CORS proxy to stream the audio.
+    // drive.google.com blocks direct browser requests (CORS).
+    // We try corsproxy.io wrapping the direct download URL.
+    var directUrl = 'https://drive.google.com/uc?export=download&confirm=t&id=' + gdId;
+    return 'https://corsproxy.io/?' + encodeURIComponent(directUrl);
   }
 
   if (u.includes('1drv.ms') || u.includes('onedrive.live.com')) {
@@ -1005,7 +1006,23 @@ audio.addEventListener('loadedmetadata', function() {
   }
 });
 audio.addEventListener('error', function() {
-  toast('Could not load audio — check the URL or sharing settings', 'error');
+  var t = playlist[currentIndex];
+  if (t && t.url && t.url.includes('drive.google.com')) {
+    // Try fallback: direct uc download without proxy
+    var m = t.url.match(/id=([^&]+)/);
+    if (m && !t._triedDirect) {
+      t._triedDirect = true;
+      var directUrl = 'https://drive.google.com/uc?export=download&confirm=t&id=' + m[1];
+      audio.src = directUrl;
+      audio.play().catch(function() {
+        toast('Google Drive blocked playback. Make sure the file is shared as 'Anyone with the link' and is a supported audio format (MP3, WAV, AAC).', 'error');
+      });
+      return;
+    }
+    toast('Google Drive blocked playback. Make sure the file is shared as “Anyone with the link” and is a supported audio format (MP3, WAV, AAC).', 'error');
+  } else {
+    toast('Could not load audio — check the URL or sharing settings', 'error');
+  }
 });
 
 function setWavePaused(p) {

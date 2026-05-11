@@ -986,7 +986,6 @@ function submitPinLeave(){
   if(!pin){document.getElementById('pin-err').textContent='Enter PIN';return;}
   if(pin!==String(_pendingBranch.pin)){document.getElementById('pin-err').textContent='Incorrect PIN';document.getElementById('pin-inp').value='';document.getElementById('pin-inp').focus();return;}
   CURRENT_BRANCH=_pendingBranch;BRANCH_PATH='branches/'+_pendingBranch.id;
-  try{localStorage.setItem(LEAVE_KEY,JSON.stringify({branchId:_pendingBranch.id,branch:_pendingBranch,expires:Date.now()+8*3600000}));}catch(e){}
   launchLeave();
 }
 
@@ -1117,14 +1116,11 @@ window.onload=function(){
       var b=snap.val();
       if(b&&b.active!==false){
         CURRENT_BRANCH=b;BRANCH_PATH='branches/'+urlBranch;
-        try{localStorage.setItem(LEAVE_KEY,JSON.stringify({branchId:urlBranch,branch:b,expires:Date.now()+8*3600000}));}catch(ex){}
         launchLeave();
       } else {showBranchScreen();}
     },function(){showBranchScreen();});
     return;
   }
-  var sess=null;try{sess=JSON.parse(localStorage.getItem(LEAVE_KEY)||'null');}catch(e){}
-  if(sess&&sess.branchId&&sess.expires>Date.now()){CURRENT_BRANCH=sess.branch||null;BRANCH_PATH='branches/'+sess.branchId;launchLeave();return;}
   showBranchScreen();
 };
 </script>

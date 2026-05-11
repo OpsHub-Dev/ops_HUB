@@ -710,8 +710,9 @@ function renderRows(){
 
     return '<tr class="ir" draggable="true" data-i="'+i+'">'
       +'<td><span class="dh" title="Reorder">⠿</span></td>'
-      +'<td style="position:relative">'
-        +'<input class="ti" style="min-width:80px" list="inv-datalist" id="ing-name-'+i+'" value="'+xe(r.name)+'" placeholder="Ingredient" oninput="updRow('+i+',\'name\',this.value)" onchange="updRow('+i+',\'name\',this.value)">'
+      +'<td style="position:relative;display:flex;align-items:center;gap:3px">'
+        +(INV_ITEMS.length?'<button class="dr-btn" title="Pick from inventory by code" style="color:var(--primary);font-size:12px;padding:0 4px;height:22px;border-radius:5px" onclick="openInvPicker('+i+')">📦</button>':'')
+        +'<input class="ti" style="min-width:70px;flex:1" list="inv-datalist" id="ing-name-'+i+'" value="'+xe(r.name)+'" placeholder="Ingredient" oninput="updRow('+i+',\'name\',this.value)" onchange="updRow('+i+',\'name\',this.value)">'
         +(badgeHtml?'<span style="position:absolute;right:2px;top:50%;transform:translateY(-50%)">'+badgeHtml+'</span>':'')
       +'</td>'
       +'<td><input class="ti q" type="number" step="0.001" min="0" value="'+xe(r.qty)+'" placeholder="0" oninput="updRow('+i+',\'qty\',this.value)"></td>'
@@ -1422,6 +1423,108 @@ function toast(msg,type){
 document.getElementById('fcd').value=new Date().toISOString().slice(0,10);
 renderRows();rc();
 initFB();
+
+// ── Inventory Item Picker ────────────────────────────────
+var _invPickerRow = null;
+
+function openInvPicker(rowIdx) {
+  _invPickerRow = rowIdx;
+  document.getElementById('inv-picker-ov').style.display = 'flex';
+  var inp = document.getElementById('inv-picker-search');
+  inp.value = '';
+  filterInvPicker('');
+  setTimeout(function(){ inp.focus(); }, 80);
+}
+
+function closeInvPicker() {
+  document.getElementById('inv-picker-ov').style.display = 'none';
+  _invPickerRow = null;
+}
+
+function filterInvPicker(q) {
+  q = (q || '').toLowerCase().trim();
+  var list = document.getElementById('inv-picker-list');
+  if (!INV_ITEMS.length) {
+    list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--tx3);font-size:11px">No inventory linked. Open this from the main app with a branch selected.</div>';
+    return;
+  }
+  var filtered = q ? INV_ITEMS.filter(function(i) {
+    return String(i.code||'').toLowerCase().indexOf(q) >= 0 ||
+           String(i.name||'').toLowerCase().indexOf(q) >= 0;
+  }) : INV_ITEMS;
+  filtered = filtered.slice(0, 80); // cap for performance
+  if (!filtered.length) {
+    list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--tx3);font-size:11px">No items match</div>';
+    return;
+  }
+  list.innerHTML = filtered.map(function(it) {
+    var code = xe(it.code || '');
+    var name = xe(it.name || '');
+    var unit = xe(it.unit || 'pc');
+    var price = parseFloat(it.price || 0).toFixed(4);
+    return '<div onclick="pickInvItem(' + JSON.stringify(it.code) + ')" ' +
+      'style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;cursor:pointer;' +
+      'background:var(--base);box-shadow:var(--sh-rs);margin-bottom:5px;transition:box-shadow .12s" ' +
+      'onmouseover="this.style.boxShadow=\'var(--sh-raise)\';this.style.background=\'var(--base-lt)\'" ' +
+      'onmouseout="this.style.boxShadow=\'var(--sh-rs)\';this.style.background=\'var(--base)\'">' +
+      '<div style="background:rgba(0,102,102,.1);border-radius:6px;padding:3px 7px;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--primary);white-space:nowrap">' + code + '</div>' +
+      '<div style="flex:1;min-width:0">' +
+        '<div style="font-size:11px;font-weight:600;color:var(--tx);font-family:var(--font);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + name + '</div>' +
+        '<div style="font-size:9px;color:var(--tx3);font-family:var(--mono)">' + unit + ' · SAR ' + price + '</div>' +
+      '</div>' +
+      '<div style="font-size:10px;color:var(--primary);font-family:var(--mono);font-weight:700">→</div>' +
+    '</div>';
+  }).join('');
+}
+
+function pickInvItem(code) {
+  if (_invPickerRow === null) return;
+  var it = INV_ITEMS.find(function(i) { return String(i.code) === String(code); });
+  if (!it) return;
+  var i = _invPickerRow;
+  // Fill name, unit, cpu into the row
+  ROWS[i].name = it.name || '';
+  ROWS[i].unit = it.unit || 'g';
+  ROWS[i].cpu  = parseFloat(it.price || 0);
+  ROWS[i]._invCode = String(it.code);
+  renderRows(); rc();
+  closeInvPicker();
+  toast('Added: ' + it.code + ' — ' + it.name, 'success');
+}
+
+// Close picker on overlay click
+document.getElementById('inv-picker-ov').addEventListener('click', function(e) {
+  if (e.target === this) closeInvPicker();
+});
+
+// Keyboard shortcut: Enter to pick first result
+document.getElementById('inv-picker-search').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') {
+    var first = document.querySelector('#inv-picker-list > div');
+    if (first) first.click();
+  }
+  if (e.key === 'Escape') closeInvPicker();
+});
+
 </script>
+
+<!-- Inventory Item Picker Modal -->
+<div id="inv-picker-ov" style="display:none;position:fixed;inset:0;background:rgba(30,41,56,.5);backdrop-filter:blur(4px);z-index:700;align-items:center;justify-content:center">
+  <div style="background:var(--base);border-radius:16px;box-shadow:var(--sh-raise-lg);width:min(480px,95vw);max-height:85vh;display:flex;flex-direction:column">
+    <div style="padding:14px 16px;border-bottom:1px solid rgba(0,0,0,.07);display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-size:13px;font-weight:700;color:var(--tx);font-family:var(--font)">📦 Pick from Inventory</div>
+        <div style="font-size:10px;color:var(--tx3);font-family:var(--mono);margin-top:2px">Search by code or name</div>
+      </div>
+      <button onclick="closeInvPicker()" style="background:var(--base);border:none;border-radius:8px;box-shadow:var(--sh-rs);width:28px;height:28px;cursor:pointer;font-size:14px;color:var(--tx2)">✕</button>
+    </div>
+    <div style="padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.05)">
+      <input id="inv-picker-search" type="text" placeholder="Search code or item name..." 
+        style="width:100%;background:var(--base);border:none;border-radius:9px;box-shadow:var(--sh-inset-sm);padding:8px 12px;font-family:var(--font);font-size:11px;color:var(--tx);outline:none;box-sizing:border-box"
+        oninput="filterInvPicker(this.value)">
+    </div>
+    <div id="inv-picker-list" style="overflow-y:auto;flex:1;padding:8px"></div>
+  </div>
+</div>
 </body>
 </html>
