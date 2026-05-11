@@ -627,7 +627,7 @@ function saveRecipesToFB(rec){
 
 function updateInvBadge(){
   var el=document.getElementById('inv-badge');
-  if(el) el.textContent=INV_ITEMS.length?'📦 '+INV_ITEMS.length+' shared ingredients':'📦 Shared catalog empty';
+  if(el) el.textContent=INV_ITEMS.length?'📦 '+INV_ITEMS.length+' shared ingredients ('+((INV_ITEMS.filter(function(i){return parseFloat(i.price||0)>0;}).length))+' priced)':'📦 Shared catalog empty';
 }
 function renderLib(){/* stub — left panel removed */}
 
@@ -1487,7 +1487,7 @@ function filterInvPicker(q) {
   list.innerHTML = filtered.map(function(it) {
     var code = xe(it.code || '');
     var name = xe(it.name || '');
-    var unit = xe(it.unit || 'pc');
+    var unit = xe(it.unit && it.unit !== it.location ? it.unit : (it.uom || 'EA'));
     var price = parseFloat(it.price || 0).toFixed(4);
     return '<div onclick="pickInvItem(' + JSON.stringify(it.code) + ')" ' +
       'style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;cursor:pointer;' +
@@ -1511,7 +1511,7 @@ function pickInvItem(code) {
   var i = _invPickerRow;
   // Fill name, unit, cpu into the row
   ROWS[i].name = it.name || '';
-  ROWS[i].unit = it.unit || 'g';
+  ROWS[i].unit = (it.unit && it.unit !== it.location) ? it.unit : (it.uom || 'g');
   ROWS[i].cpu  = parseFloat(it.price || 0);
   ROWS[i]._invCode = String(it.code);
   renderRows(); rc();

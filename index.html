@@ -6665,6 +6665,7 @@ function pSharedIngredients() {
   var sess=NX.session||{};
   var h='<div class="page-header"><h1>🧂 Shared Ingredients</h1><p>Global ingredient catalog for Recipe Builder — shared/inv_items</p></div>';
   h+='<div class="header-actions"><div></div><div style="display:flex;gap:8px">';
+  h+='<button class="btn" onclick="openImportPricesModal()">📥 Import Prices from Branch</button>';
   h+='<button class="btn btn-primary" onclick="openSharedIngModal(null)">+ Add Ingredient</button>';
   h+='</div></div>';
   // Search
@@ -6708,7 +6709,7 @@ function renderSharedIngTable_inner(q) {
       '<td class="bmono" style="font-weight:700;color:var(--ceo);font-size:10px">'+bxe(it.code||'—')+'</td>'+
       '<td style="font-weight:600">'+bxe(it.name||'—')+'</td>'+
       '<td>'+bxe(it.category||'—')+'</td>'+
-      '<td class="bmono">'+bxe(it.unit||'—')+'</td>'+
+      '<td class="bmono">'+bxe(it.unit&&it.unit!==it.location?it.unit:(it.uom||'EA'))+'</td>'+
       '<td class="bmono" style="color:var(--text-secondary)">'+parseFloat(it.price||0).toFixed(4)+' SAR</td>'+
       '<td><div style="display:flex;gap:4px">'+
         '<button class="btn btn-sm" onclick="openSharedIngModal(\''+bxe(String(it.code||''))+'\')" >Edit</button>'+
@@ -6757,6 +6758,76 @@ function saveSharedIng() {
     renderSharedIngTable(document.getElementById('si-search')?document.getElementById('si-search').value:'');
   });
 }
+function openImportPricesModal() {
+  // Load available branches
+  var html='<div class="modal-head"><h2>📥 Import Prices from Branch</h2><button class="modal-close" onclick="closeModalForce()">✕</button></div>';
+  html+='<p style="font-size:12px;color:var(--text-secondary);margin-bottom:16px">This will read prices from a branch's inventory and update matching items in the shared catalog. Items are matched by code.</p>';
+  html+='<div class="bfg"><label class="form-label">Select Branch</label><select class="form-input form-select" id="imp-branch-sel"><option value="">Loading branches...</option></select></div>';
+  html+='<div id="imp-status" style="font-size:11px;color:var(--text-secondary);font-family:var(--mono);margin:8px 0;min-height:18px"></div>';
+  html+='<div style="display:flex;gap:8px;margin-top:12px">';
+  html+='<button class="btn btn-primary" style="flex:1" onclick="importPricesFromBranch()">📥 Import Prices</button>';
+  html+='<button class="btn" onclick="closeModalForce()">Cancel</button>';
+  html+='</div>';
+  openModal(html);
+  // Load branches
+  db.ref('admin/branches').once('value',function(snap){
+    var sel=document.getElementById('imp-branch-sel');
+    if(!sel) return;
+    var braw=snap.val()||{};
+    var opts=Object.entries(braw).filter(function(e){return e[1]&&e[1].active!==false;}).map(function(e){
+      var b=e[1]; return '<option value="'+bxe(e[0])+'">'+bxe(b.name||e[0])+(b.city?' ('+b.city+')':'')+'</option>';
+    });
+    sel.innerHTML=opts.length?opts.join(''):'<option value="">No branches found</option>';
+  });
+}
+
+function importPricesFromBranch() {
+  var sel=document.getElementById('imp-branch-sel');
+  var bid=sel?sel.value:'';
+  if(!bid){showToast('Select a branch first','error');return;}
+  var status=document.getElementById('imp-status');
+  if(status) status.textContent='Loading branch inventory...';
+  db.ref('branches/'+bid+'/inv_items').once('value',function(snap){
+    var raw=snap.val();
+    if(!raw){if(status)status.textContent='No inventory found in this branch.';return;}
+    var arr=Array.isArray(raw)?raw.filter(Boolean):Object.values(raw).filter(Boolean);
+    // Build price map by code
+    var priceMap={};
+    arr.forEach(function(it){
+      if(it&&it.code&&(it.price||it.cost)) {
+        priceMap[String(it.code)]={price:parseFloat(it.price||it.cost)||0, unit:it.unit||it.uom||'EA'};
+      }
+    });
+    // Update shared/inv_items matching by code
+    var shared=window._SI_ITEMS||[];
+    var updated=0, missing=0;
+    var updates={};
+    shared.forEach(function(it){
+      var code=String(it.code||'');
+      var match=priceMap[code];
+      if(match&&match.price>0){
+        var k=code.replace(/[.#$\[\]\/]/g,'_');
+        updates['shared/inv_items/'+k+'/price']=match.price;
+        if(!it.unit||it.unit===it.location) updates['shared/inv_items/'+k+'/unit']=match.unit;
+        it.price=match.price;
+        if(!it.unit||it.unit===it.location) it.unit=match.unit;
+        updated++;
+      } else { missing++; }
+    });
+    if(!updated){
+      if(status)status.textContent='No matching codes found with prices. Check codes match.';
+      return;
+    }
+    db.ref('/').update(updates,function(err){
+      if(err){if(status)status.textContent='Error: '+err;return;}
+      window._SI_ITEMS=shared;
+      if(status)status.textContent='✓ Updated '+updated+' items. '+missing+' not found in branch.';
+      showToast('✓ '+updated+' prices imported','success');
+      renderSharedIngTable(document.getElementById('si-search')?document.getElementById('si-search').value:'');
+    });
+  });
+}
+
 function delSharedIng(code) {
   var it=(window._SI_ITEMS||[]).find(function(i){return String(i.code)===String(code);});
   if(!confirm('Delete '+((it&&it.name)||code)+' from shared catalog?'))return;
