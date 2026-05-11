@@ -1045,6 +1045,216 @@ div[style*="color:rgba(255,255,255,.4)"][style*="font-size:9px"] { color: var(--
 .cl-cards::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12) !important; }
 
 </style>
+<style>
+/* ══ SMART CHECKLIST UI v3.0 — Enhanced Layer ══
+   Neumorphic surface · Space Mono · Primary #006666
+   Adds: smart summary bar, filter pills, progress ring,
+         card status stripe, done badge, float counter,
+         group progress bar, quick-complete shimmer
+══════════════════════════════════════════════════ */
+
+/* ── SUMMARY BAR ── */
+#cl-summary-bar {
+  display: none;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px 5px;
+  flex-shrink: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+#cl-summary-bar::-webkit-scrollbar { display: none; }
+
+.cl-ring-wrap {
+  display: flex; align-items: center; gap: 7px;
+  flex-shrink: 0; margin-right: 4px;
+}
+.cl-ring-svg { transform: rotate(-90deg); flex-shrink: 0; }
+.cl-ring-track { fill: none; stroke: rgba(0,0,0,0.09); }
+.cl-ring-fill  { fill: none; stroke: #006666; stroke-linecap: round;
+  transition: stroke-dashoffset .6s cubic-bezier(.4,0,.2,1); }
+.cl-ring-pct {
+  font-size: 12px; font-weight: 800;
+  font-family: 'Space Mono', monospace;
+  color: #006666; line-height: 1;
+}
+
+.cl-sum-chip {
+  display: flex; align-items: center; gap: 5px;
+  flex-shrink: 0; padding: 4px 11px 4px 7px;
+  border-radius: 20px; border: none;
+  font-size: 10px; font-weight: 700;
+  font-family: 'Space Mono', monospace;
+  cursor: pointer; white-space: nowrap;
+  background: var(--nm-base, #E7E5E4);
+  box-shadow: 2px 2px 6px rgba(0,0,0,0.13),
+              -2px -2px 5px rgba(255,255,255,0.82);
+  color: var(--text3);
+  transition: all .14s;
+}
+.cl-sum-chip:hover {
+  box-shadow: 3px 3px 9px rgba(0,0,0,0.16),
+              -2px -2px 6px rgba(255,255,255,0.9);
+}
+.cl-sum-chip.complete {
+  color: #006666;
+  box-shadow: inset 2px 2px 5px rgba(0,0,0,0.11),
+              inset -2px -2px 4px rgba(255,255,255,0.78);
+}
+.cl-sum-chip.partial { color: #b45309; }
+.cl-sum-dot {
+  width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0;
+}
+.cl-sum-dot.complete { background: #006666;
+  box-shadow: 0 0 4px rgba(0,102,102,0.55); }
+.cl-sum-dot.partial  { background: #d97706; }
+.cl-sum-dot.empty    { background: rgba(0,0,0,0.16); }
+
+/* ── FILTER BAR ── */
+#cl-filter-bar {
+  display: none;
+  gap: 5px; padding: 4px 14px 2px;
+  flex-shrink: 0; overflow-x: auto;
+  scrollbar-width: none; align-items: center;
+}
+#cl-filter-bar::-webkit-scrollbar { display: none; }
+.cl-fp {
+  flex-shrink: 0; padding: 3px 11px; border-radius: 20px;
+  font-size: 9px; font-weight: 700;
+  font-family: 'Space Mono', monospace;
+  cursor: pointer; border: none; white-space: nowrap;
+  background: var(--nm-base, #E7E5E4);
+  color: var(--text3);
+  box-shadow: 2px 2px 5px rgba(0,0,0,0.10),
+              -2px -2px 4px rgba(255,255,255,0.78);
+  transition: all .12s;
+}
+.cl-fp:hover { color: var(--text);
+  box-shadow: 3px 3px 7px rgba(0,0,0,0.13),
+              -2px -2px 5px rgba(255,255,255,0.85); }
+.cl-fp.act {
+  background: #006666; color: #fff;
+  box-shadow: inset 2px 2px 5px rgba(0,0,0,0.18),
+              inset -1px -1px 3px rgba(255,255,255,0.12);
+}
+
+/* ── CARD STATUS STRIPE ── */
+.cl-item-card { position: relative; overflow: visible !important; }
+.cl-status-stripe {
+  position: absolute;
+  left: 0; top: 4px; bottom: 4px;
+  width: 3px; border-radius: 3px;
+  background: transparent;
+  transition: background .2s;
+  pointer-events: none;
+}
+.cl-item-card.all-ok  .cl-status-stripe { background: #006666; }
+.cl-item-card.has-no  .cl-status-stripe { background: #ef4444; }
+
+/* ── DONE BADGE ── */
+.cl-done-badge {
+  display: none; align-items: center; gap: 3px;
+  font-size: 8px; font-weight: 700;
+  font-family: 'Space Mono', monospace;
+  border-radius: 5px; padding: 2px 6px; flex-shrink: 0;
+}
+.cl-item-card.all-ok .cl-done-badge {
+  display: flex; color: #006666;
+  background: rgba(0,102,102,0.10);
+}
+.cl-item-card.has-no .cl-done-badge {
+  display: flex; color: #ef4444;
+  background: rgba(239,68,68,0.09);
+}
+
+/* ── GROUP PROGRESS ── */
+.cl-grp-prog {
+  display: flex; align-items: center; gap: 5px;
+  margin-left: auto; flex-shrink: 0;
+  font-family: 'Space Mono', monospace;
+  font-size: 8px; font-weight: 700; color: var(--text3);
+}
+.cl-grp-track {
+  width: 38px; height: 4px; border-radius: 99px;
+  background: rgba(0,0,0,0.10); overflow: hidden; flex-shrink: 0;
+}
+.cl-grp-bar {
+  height: 100%; border-radius: 99px;
+  background: #006666; transition: width .4s;
+}
+
+/* ── FLOAT STATUS BUTTON ── */
+#cl-float-btn {
+  position: fixed; bottom: 16px; right: 16px; z-index: 90;
+  width: 54px; height: 54px; border-radius: 50%;
+  background: var(--nm-base, #E7E5E4);
+  box-shadow: 4px 4px 14px rgba(0,0,0,0.19),
+              -3px -3px 8px rgba(255,255,255,0.92);
+  display: none; flex-direction: column;
+  align-items: center; justify-content: center;
+  cursor: pointer; border: none;
+  transition: all .2s;
+}
+#cl-float-btn:hover {
+  transform: scale(1.06);
+  box-shadow: 5px 5px 18px rgba(0,0,0,0.22),
+              -4px -4px 10px rgba(255,255,255,0.96);
+}
+#cl-float-btn.all-done {
+  background: #006666;
+  box-shadow: 4px 4px 14px rgba(0,102,102,0.38),
+              -2px -2px 6px rgba(255,255,255,0.4);
+}
+#cl-float-num {
+  font-size: 15px; font-weight: 800;
+  font-family: 'Space Mono', monospace;
+  color: #006666; line-height: 1;
+}
+#cl-float-btn.all-done #cl-float-num { color: #fff; }
+#cl-float-lbl {
+  font-size: 7px; font-weight: 700;
+  font-family: 'Space Mono', monospace;
+  color: var(--text3); letter-spacing: .3px;
+  text-transform: uppercase; margin-top: 1px;
+}
+#cl-float-btn.all-done #cl-float-lbl { color: rgba(255,255,255,.75); }
+
+/* ── COMPLETION ANIMATION ── */
+@keyframes clPop {
+  0%  { transform: scale(1); }
+  45% { transform: scale(1.025); }
+  100%{ transform: scale(1); }
+}
+.cl-item-card.all-ok { animation: clPop .28s ease; }
+
+/* ── SMART EMPTY STATE (filtered) ── */
+.cl-empty-filter {
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 32px 16px; gap: 8px; color: var(--text3);
+  font-family: 'Space Mono', monospace; font-size: 11px;
+  text-align: center;
+}
+.cl-empty-filter svg { opacity: .35; }
+
+/* ── TODAY HIGHLIGHT on day tabs ── */
+.cl-day-tab.today-tab {
+  outline: 2px solid rgba(0,102,102,0.4) !important;
+  outline-offset: -2px !important;
+}
+
+/* ── MOBILE ── */
+@media (max-width: 480px) {
+  #cl-float-btn { width: 48px; height: 48px; bottom: 12px; right: 12px; }
+  #cl-float-num { font-size: 13px; }
+  #cl-summary-bar { padding: 6px 10px 4px; gap: 5px; }
+  .cl-sum-chip { font-size: 9px; padding: 3px 8px 3px 6px; }
+  .cl-fp { font-size: 8.5px; padding: 3px 8px; }
+  #cl-filter-bar { padding: 4px 10px 2px; }
+}
+</style>
+
 
 </head>
 <body>
@@ -1131,6 +1341,14 @@ div[style*="color:rgba(255,255,255,.4)"][style*="font-size:9px"] { color: var(--
     </span>
   </div>
   <div class="cl-sub-tabs" id="cl-sub-tabs"></div>
+<!-- ══ SMART SUMMARY BAR v3 ══ -->
+<div id="cl-summary-bar"></div>
+<div id="cl-filter-bar">
+  <button class="cl-fp act" data-f="all"        onclick="clFilter('all',this)">ALL</button>
+  <button class="cl-fp"     data-f="incomplete" onclick="clFilter('incomplete',this)">⭕ PENDING</button>
+  <button class="cl-fp"     data-f="complete"   onclick="clFilter('complete',this)">✅ DONE</button>
+  <button class="cl-fp"     data-f="flagged"    onclick="clFilter('flagged',this)">🚩 FLAGGED</button>
+</div>
   <div class="cl-hdr-bar"><h3 id="cl-title"></h3><div class="sub" id="cl-sub"></div></div>
   <div class="cl-prog-wrap"><div class="cl-prog-bar" id="cl-prog"></div></div>
   <div class="cl-prog-lbl" id="cl-prog-lbl"></div>
@@ -1155,6 +1373,12 @@ div[style*="color:rgba(255,255,255,.4)"][style*="font-size:9px"] { color: var(--
     <div id="cl-edit-body" style="overflow-y:auto;max-height:60vh"></div>
   </div>
 </div>
+
+<!-- ══ FLOAT STATUS BUTTON v3 ══ -->
+<button id="cl-float-btn" onclick="clFloatClick()">
+  <span id="cl-float-num">0</span>
+  <span id="cl-float-lbl">LEFT</span>
+</button>
 <div id="toasts" style="position:fixed;bottom:20px;right:16px;left:16px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none"></div>
   </div>
 </div>
@@ -1650,7 +1874,7 @@ function clInitFBSync(){
     }
     clEnsureST();
     // Only re-render if checklist page is currently visible
-    if(clRole&&document.getElementById('cl-wrap')&&S.p==='checklists'){
+    if(clRole&&document.getElementById('cl-wrap')){
       clRenderSec(clSec);
     }
     if(el){el.innerHTML='⚡ Live';el.style.color='var(--grn)';}
@@ -1658,7 +1882,7 @@ function clInitFBSync(){
     console.error('[CL] Firebase error:',err,'path:',path);
     if(el){el.innerHTML='⚠ Offline';el.style.color='var(--red)';}
     clEnsureST();
-    if(clRole&&document.getElementById('cl-wrap')&&S.p==='checklists'){
+    if(clRole&&document.getElementById('cl-wrap')){
       clRenderSec(clSec);
     }
   });
@@ -2602,6 +2826,288 @@ function clSaveBTItems(){
     else toast('Save error','error');
   });
 }
+
+
+// ══════════════════════════════════════════════════════════════
+// SMART UI v3.0 — Summary bar, filter, float btn, card badges
+// ══════════════════════════════════════════════════════════════
+
+// ── Fix: S.p guard — this file has no S object ──
+// Patch clInitFBSync to remove S.p dependency
+(function(){
+  var _origInitFBSync = clInitFBSync;
+  clInitFBSync = function(){
+    if(!db){
+      var el=document.getElementById('cl-fb-status');
+      if(el){el.innerHTML='⏳ Connecting...';el.style.color='var(--gold)';}
+      setTimeout(clInitFBSync, 800);
+      return;
+    }
+    var wk = clNormWk();
+    var path = bPath('cl_weeks') + '/' + wk;
+    var el = document.getElementById('cl-fb-status');
+    if(el){el.innerHTML='⏳ Loading...';el.style.color='var(--gold)';}
+    if(clFbRef) clFbRef.off();
+    clFbRef = db.ref(path);
+    clFbRef.on('value', function(snap){
+      var d = snap.val();
+      if(d && d.state && Object.keys(d.state).length > 0){
+        if(!clST[wk]) clST[wk] = {};
+        Object.keys(d.state).forEach(function(k){ clST[wk][k] = d.state[k]; });
+        window.monthlyRecords[wk] = {state: d.state, meta: d.meta || {}};
+      }
+      clEnsureST();
+      if(clRole){
+        if(clSec === 'forms') clRenderForms();
+        else clRenderSec(clSec);
+      }
+      if(el){el.innerHTML='⚡ Live';el.style.color='var(--grn)';}
+    }, function(err){
+      console.error('[CL] Firebase error:', err);
+      if(el){el.innerHTML='⚠ Offline';el.style.color='var(--red)';}
+      clEnsureST();
+      if(clRole){
+        if(clSec === 'forms') clRenderForms();
+        else clRenderSec(clSec);
+      }
+    });
+  };
+})();
+
+// ── Active filter state ──
+var _clActiveFilter = 'all';
+
+function clFilter(f, btn) {
+  _clActiveFilter = f;
+  document.querySelectorAll('.cl-fp').forEach(function(p){p.classList.remove('act');});
+  if(btn) btn.classList.add('act');
+  _clApplyFilter();
+}
+
+function _clApplyFilter() {
+  var f = _clActiveFilter;
+  var anyVisible = false;
+  document.querySelectorAll('#cl-cards .cl-item-card').forEach(function(card){
+    var show = f === 'all'
+      ? true
+      : f === 'complete'   ? card.classList.contains('all-ok')
+      : f === 'incomplete' ? !card.classList.contains('all-ok')
+      : f === 'flagged'    ? !!card.querySelector('.cl-flag-btn.on')
+      : true;
+    card.style.display = show ? '' : 'none';
+    if(show) anyVisible = true;
+  });
+  // Hide group dividers if all children hidden; show empty state
+  document.querySelectorAll('#cl-cards .cl-grp-div').forEach(function(div){
+    var sib = div.nextElementSibling;
+    var hasVisible = false;
+    while(sib && !sib.classList.contains('cl-grp-div')){
+      if(sib.classList.contains('cl-item-card') && sib.style.display !== 'none') hasVisible = true;
+      sib = sib.nextElementSibling;
+    }
+    div.style.display = hasVisible ? '' : 'none';
+  });
+  // Empty state
+  var wrap = document.getElementById('cl-cards');
+  var existing = wrap && wrap.querySelector('.cl-empty-filter');
+  if(existing) existing.remove();
+  if(!anyVisible && f !== 'all' && wrap){
+    var em = document.createElement('div');
+    em.className = 'cl-empty-filter';
+    em.innerHTML = '<svg width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>'
+      + '<div>' + (f==='complete' ? 'No completed items yet' : f==='flagged' ? 'No flagged items' : 'All items completed! 🎉') + '</div>';
+    wrap.appendChild(em);
+  }
+}
+
+// ── Summary bar (overall progress ring + per-checklist chips) ──
+function clUpdateSummaryBar() {
+  var bar = document.getElementById('cl-summary-bar');
+  var filterBar = document.getElementById('cl-filter-bar');
+  var floatBtn  = document.getElementById('cl-float-btn');
+  if(!bar) return;
+
+  if(clSec === 'forms'){
+    bar.style.display = 'none';
+    if(filterBar) filterBar.style.display = 'none';
+    if(floatBtn)  floatBtn.style.display  = 'none';
+    return;
+  }
+
+  bar.style.display = 'flex';
+  if(filterBar) filterBar.style.display = 'flex';
+  if(floatBtn)  floatBtn.style.display  = 'flex';
+
+  var cls = CL_DATA[clSec] || [];
+  var totalAll = 0, totalDone = 0;
+  var chips = '';
+
+  cls.forEach(function(cl, ci){
+    if(cl.checkType === 'hygiene' || cl.checkType === 'bartender') return;
+    var di = clDay[clSec] || 0;
+    var tot = 0, done = 0;
+    (cl.groups || []).forEach(function(g){
+      (g.items || []).forEach(function(item){
+        CL_SHIFTS.forEach(function(sh){
+          tot++;
+          var s = clS(cl.id, di, item.id, sh);
+          if(s && s.v && s.v !== null) done++;
+        });
+      });
+    });
+    totalAll  += tot;
+    totalDone += done;
+    var status = done === 0 ? 'empty' : done === tot ? 'complete' : 'partial';
+    var label  = done === tot ? '✓' : (done + '/' + tot);
+    chips += '<button class="cl-sum-chip ' + status + '" onclick="clJumpCl(' + ci + ')" title="' + cl.name + '">'
+      + '<span class="cl-sum-dot ' + status + '"></span>'
+      + cl.name
+      + (done > 0 ? ' <span style="opacity:.65">' + label + '</span>' : '')
+      + '</button>';
+  });
+
+  // Ring
+  var pct   = totalAll ? Math.round(totalDone / totalAll * 100) : 0;
+  var r     = 17, circ = 2 * Math.PI * r;
+  var offset = circ - (pct / 100) * circ;
+  var ring = '<div class="cl-ring-wrap">'
+    + '<svg class="cl-ring-svg" width="40" height="40">'
+    + '<circle class="cl-ring-track" cx="20" cy="20" r="' + r + '" stroke-width="3.5"/>'
+    + '<circle class="cl-ring-fill"  cx="20" cy="20" r="' + r + '" stroke-width="3.5"'
+    + '  stroke-dasharray="' + circ.toFixed(1) + '"'
+    + '  stroke-dashoffset="' + offset.toFixed(1) + '"/>'
+    + '</svg>'
+    + '<span class="cl-ring-pct">' + pct + '%</span>'
+    + '</div>';
+
+  bar.innerHTML = ring + chips;
+
+  // Float button
+  var left = totalAll - totalDone;
+  var fn = document.getElementById('cl-float-num');
+  var fl = document.getElementById('cl-float-lbl');
+  if(fn) fn.textContent = left === 0 ? '✓' : left;
+  if(fl) fl.textContent = left === 0 ? 'DONE!' : 'LEFT';
+  if(floatBtn) floatBtn.classList.toggle('all-done', left === 0);
+}
+
+function clJumpCl(idx) {
+  clCl[clSec] = idx;
+  clRenderSec(clSec);
+}
+
+function clFloatClick() {
+  if(_clActiveFilter === 'incomplete'){
+    // scroll to first incomplete card
+    var cards = document.querySelectorAll('#cl-cards .cl-item-card');
+    for(var i = 0; i < cards.length; i++){
+      if(!cards[i].classList.contains('all-ok') && cards[i].style.display !== 'none'){
+        cards[i].scrollIntoView({behavior:'smooth', block:'center'});
+        cards[i].style.transition = 'box-shadow .3s';
+        var orig = cards[i].style.boxShadow;
+        cards[i].style.boxShadow = '0 0 0 2px rgba(0,102,102,0.55)';
+        setTimeout(function(el, s){ el.style.boxShadow = s; }.bind(null, cards[i], orig), 1400);
+        break;
+      }
+    }
+  } else {
+    clFilter('incomplete', document.querySelector('.cl-fp[data-f="incomplete"]'));
+  }
+}
+
+// ── Patch clRenderSec — update summary + add today highlight ──
+var _origClRenderSec = clRenderSec;
+clRenderSec = function(sec) {
+  _origClRenderSec(sec);
+  _clActiveFilter = 'all';
+  document.querySelectorAll('.cl-fp').forEach(function(p){
+    p.classList.toggle('act', p.dataset.f === 'all');
+  });
+  setTimeout(clUpdateSummaryBar, 40);
+  setTimeout(_clDecorateCards, 50);
+  // Highlight today's day tab
+  setTimeout(function(){
+    var today = new Date();
+    var todayDow = today.getDay();
+    document.querySelectorAll('.cl-day-tab').forEach(function(btn, i){
+      btn.classList.toggle('today-tab', i === todayDow);
+    });
+  }, 55);
+};
+
+// ── Decorate cards with stripe + badge + group progress ──
+function _clDecorateCards() {
+  // Status stripes + done badges
+  document.querySelectorAll('#cl-cards .cl-item-card').forEach(function(card){
+    if(!card.querySelector('.cl-status-stripe')){
+      var stripe = document.createElement('div');
+      stripe.className = 'cl-status-stripe';
+      card.insertBefore(stripe, card.firstChild);
+    }
+    // Done badge — inject into cl-card-top after flag btn
+    var top = card.querySelector('.cl-card-top');
+    if(top && !top.querySelector('.cl-done-badge')){
+      var badge = document.createElement('span');
+      badge.className = 'cl-done-badge';
+      if(card.classList.contains('all-ok')){
+        badge.innerHTML = '<svg width="9" height="9" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> DONE';
+      } else {
+        badge.innerHTML = '<svg width="9" height="9" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> ISSUE';
+      }
+      var flagBtn = top.querySelector('.cl-flag-btn');
+      if(flagBtn) top.insertBefore(badge, flagBtn);
+      else top.appendChild(badge);
+    }
+  });
+
+  // Group progress bars — append to each cl-grp-div
+  var sec  = clSec;
+  var ci   = clCl[sec] || 0;
+  var cl   = (CL_DATA[sec] || [])[ci];
+  var di   = clDay[sec] || 0;
+  if(!cl || !cl.groups) return;
+
+  document.querySelectorAll('#cl-cards .cl-grp-div').forEach(function(div, gi){
+    if(div.querySelector('.cl-grp-prog')) return;
+    var grp = cl.groups[gi];
+    if(!grp) return;
+    var tot = 0, done = 0;
+    (grp.items || []).forEach(function(item){
+      CL_SHIFTS.forEach(function(sh){
+        tot++;
+        var s = clS(cl.id, di, item.id, sh);
+        if(s && s.v && s.v !== null) done++;
+      });
+    });
+    var pct = tot ? Math.round(done / tot * 100) : 0;
+    var prog = document.createElement('div');
+    prog.className = 'cl-grp-prog';
+    prog.innerHTML = '<span>' + done + '/' + tot + '</span>'
+      + '<div class="cl-grp-track"><div class="cl-grp-bar" style="width:' + pct + '%"></div></div>';
+    div.appendChild(prog);
+  });
+}
+
+// ── Show bars on login ──
+var _origClDoLogin = clDoLogin;
+clDoLogin = function(){
+  _origClDoLogin();
+  setTimeout(function(){
+    var bar = document.getElementById('cl-summary-bar');
+    var fb  = document.getElementById('cl-filter-bar');
+    var flt = document.getElementById('cl-float-btn');
+    if(bar) bar.style.display = 'flex';
+    if(fb)  fb.style.display  = 'flex';
+    if(flt) flt.style.display = 'flex';
+    clUpdateSummaryBar();
+  }, 180);
+};
+
+// ── Mark today's day tab on initial bind ──
+var _origClBindPage = clBindPage;
+clBindPage = function(){
+  _origClBindPage();
+};
 
 </script>
 </body>
