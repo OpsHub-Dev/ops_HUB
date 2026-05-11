@@ -7195,6 +7195,11 @@ function attachBranchListeners() {
       }
       BS[key]=arr;
       bsyncTSFromStaff();
+      // Auto-save tsEmps to Firebase so portals always stay in sync
+      if(key==='staff'&&db&&NX.session&&NX.session.branchId){
+        var _tsObj={};BS.tsEmps.forEach(function(e,i){var k=String(e.id||i).replace(/[.#$\[\]\/]/g,'_');_tsObj[k]=e;});
+        db.ref('branches/'+NX.session.branchId+'/tsEmps').set(_tsObj);
+      }
       NX.lastSync=Date.now();
       if(['branch-dash','staff','timesheet','health-cards','sales','petty-cash','wastage','schedule'].indexOf(NX.page)>=0) {
         var area=document.getElementById('page-area'); if(area){area.innerHTML=renderPage_(NX.page);setTimeout(function(){initPageCharts(NX.page);},50);}

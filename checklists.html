@@ -1121,7 +1121,7 @@ div[style*="color:rgba(255,255,255,.4)"][style*="font-size:9px"] { color: var(--
     <label>WEEK</label><input type="date" id="cl-period-start" oninput="clOnPeriodChange()">
     <label>MOD</label><input type="text" id="cl-mod-name" placeholder="Name" style="width:90px" oninput="clSyncMeta()">
     <span style="margin-left:auto;display:flex;gap:6px;align-items:center">
-      <span id="cl-fb-status" style="font-size:9px;color:var(--text3);font-family:var(--mono)">⚡ Connecting...</span>
+      <span id="cl-fb-status" style="font-size:9px;color:var(--text3);font-family:var(--mono)">○ Select Branch</span>
       <span id="cl-save-ind" style="font-size:9px;color:var(--text3);font-family:var(--mono)">Auto-save on</span>
       <button class="btn sm s" onclick="clSaveNow();toast('Saved ✓','success')" style="flex-shrink:0">💾 Save</button>
       <button id="cl-print-btn" class="btn sm" style="display:none" onclick="clOpenPrint()">🖨 Print</button>
@@ -1195,6 +1195,8 @@ function toast(msg,type){
 // 🏢 BRANCH SELECTOR
 // ═══════════════════════════════════════
 function showBranchScreen(){
+  var el=document.getElementById('cl-fb-status');
+  if(el){el.innerHTML='○ Select Branch';el.style.color='var(--text3)';}
   document.getElementById('loading').classList.add('gone');
   document.getElementById('branch-screen').classList.remove('gone');
   document.getElementById('app').style.display='none';
