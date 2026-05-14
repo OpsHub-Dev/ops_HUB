@@ -13946,8 +13946,35 @@ function pHrfAttendance(){
       var bname=(NX_BRANCHES[b.id]||{}).name||b.id;
       staff.forEach(function(m){
         var dayMap={};
-        // tsAtt structure: att[empId][YYYY-MM] = [{date,status,...}]
-        var empAtt=att[String(m.id)]||att[m.name]||{};
+        // tsAtt is keyed by tsEmps ID — cross-reference by ID first, then name
+        // Build a name→attKey lookup from all att keys
+        function findEmpAtt(att, staff) {
+          // Try direct ID match
+          if(att[String(staff.id)]) return att[String(staff.id)];
+          // Try tsEmps cross-reference by name (case-insensitive)
+          var nameLower=(staff.name||'').toLowerCase().trim();
+          var keys=Object.keys(att);
+          for(var ki=0;ki<keys.length;ki++){
+            var k=keys[ki];
+            // Skip month-keyed entries (YYYY-MM format)
+            if(/^\d{4}-\d{2}$/.test(k)) continue;
+            // Each att[key] is either {} (month map) or has month keys
+            var entry=att[k];
+            if(!entry||typeof entry!=='object') continue;
+            // Check if any record in this entry has a matching name
+            var monthKeys=Object.keys(entry);
+            for(var mki=0;mki<monthKeys.length;mki++){
+              var recs=entry[monthKeys[mki]];
+              if(!Array.isArray(recs)||!recs.length) continue;
+              var firstRec=recs[0];
+              if(firstRec&&firstRec.name&&firstRec.name.toLowerCase().trim()===nameLower) return entry;
+              break;
+            }
+          }
+          // Fallback: match att key as name string
+          return att[staff.name]||{};
+        }
+        var empAtt=findEmpAtt(att,m);
         var moRecs=empAtt[selMonth]||[];
         moRecs.forEach(function(r){
           if(!r.date)return;
