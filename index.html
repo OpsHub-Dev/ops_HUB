@@ -13048,7 +13048,7 @@ var _origLaunchApp = launchApp;
 launchApp = function() {
   // Clear HRF data cache on every login so fresh Firebase data is fetched
   if (typeof HRF !== 'undefined') {
-    HRF.staff = {}; HRF.att = {}; HRF.leaves = {}; HRF.sch = {};
+    HRF.staff = {}; HRF.att = {}; HRF.leaves = {}; HRF.sch = {}; HRF.tsEmps = {};
     HRF.health = {}; HRF.pc = {}; HRF.sales = {}; HRF.invoices = {}; HRF.waste = {};
   }
   _origLaunchApp();
@@ -13267,7 +13267,7 @@ function pHrfHrDash() {
   function check(){done++;if(done>=3)renderDash();}
   hrfLoadAll('staff','staff',check);
   hrfLoadAll('tsLeaves','leaves',function(){branches.forEach(function(b){(HRF.leaves[b.id]||[]).forEach(function(l){l._branchId=b.id;});});check();});
-  hrfLoadAll('tsAtt','att',check);
+  hrfLoadAll('tsAtt','att',function(){hrfLoadAll('tsEmps','tsEmps',check);});
   return hrfLoading('Loading HR data\u2026');
 }
 
@@ -13946,29 +13946,38 @@ function pHrfAttendance(){
       var bname=(NX_BRANCHES[b.id]||{}).name||b.id;
       staff.forEach(function(m){
         var dayMap={};
-        // Build name→attKey map (same approach used for schedule matching)
+        // Build nameToAttId from tsEmps — same pattern as schedule fix
+        // tsAtt is keyed by tsEmps.id; tsEmps has .name we can match against staff name
         if(!b._attNameMap){
           b._attNameMap={};
-          Object.keys(att).forEach(function(k){
-            if(/^\d{4}-\d{2}$/.test(k))return; // skip YYYY-MM keys
-            var entry=att[k];
-            if(!entry||typeof entry!=='object')return;
-            // Find any record with a name field to identify the employee
-            var found=false;
-            Object.keys(entry).forEach(function(mk){
-              if(found)return;
-              var recs=entry[mk];
-              if(Array.isArray(recs)&&recs.length&&recs[0]&&recs[0].name){
-                b._attNameMap[recs[0].name.toLowerCase().trim()]=k;
-                found=true;
-              }
+          var tsEmpsList=HRF.tsEmps&&HRF.tsEmps[b.id]||[];
+          if(Array.isArray(tsEmpsList)){
+            tsEmpsList.forEach(function(e){
+              if(e&&e.name) b._attNameMap[e.name.toLowerCase().trim()]=String(e.id||'');
             });
-          });
+          }
+          // Fallback: also scan att keys directly for name fields in records
+          if(!Object.keys(b._attNameMap).length){
+            Object.keys(att).forEach(function(k){
+              if(/^\d{4}-\d{2}$/.test(k))return;
+              var entry=att[k];
+              if(!entry||typeof entry!=='object')return;
+              var found=false;
+              Object.keys(entry).forEach(function(mk){
+                if(found)return;
+                var recs=entry[mk];
+                if(Array.isArray(recs)&&recs.length&&recs[0]&&recs[0].name){
+                  b._attNameMap[recs[0].name.toLowerCase().trim()]=k;
+                  found=true;
+                }
+              });
+            });
+          }
         }
-        // Match by ID first, then by normalized name (same as schedule fix)
+        // Resolve: ID first, then name lookup (resolvedId pattern from schedule fix)
         var mNameNorm=String(m.name||'').toLowerCase().trim();
-        var attKey=att[String(m.id)]?String(m.id):(b._attNameMap[mNameNorm]||m.name);
-        var empAtt=att[attKey]||att[String(m.id)]||att[m.name]||{};
+        var resolvedId=att[String(m.id)]?String(m.id):(b._attNameMap[mNameNorm]||String(m.id));
+        var empAtt=att[resolvedId]||att[m.name]||{};
         var moRecs=empAtt[selMonth]||[];
         moRecs.forEach(function(r){
           if(!r.date)return;
@@ -14207,7 +14216,7 @@ function pHrfAttendance(){
   if(cSt===branches.length&&cAt===branches.length)return renderAtt();
   var done=0;function check(){done++;if(done>=2)navTo('hrf-attendance');}
   if(cSt<branches.length)hrfLoadAll('staff','staff',check);else check();
-  if(cAt<branches.length)hrfLoadAll('tsAtt','att',check);else check();
+  if(cAt<branches.length)hrfLoadAll('tsAtt','att',function(){hrfLoadAll('tsEmps','tsEmps',function(){branches.forEach(function(b){b._attNameMap=null;});check();});});else check();
   return hrfLoading('Loading attendance\u2026');
 }
 
