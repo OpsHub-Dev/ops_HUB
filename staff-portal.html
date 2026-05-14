@@ -634,31 +634,32 @@ function handleSAP() {
   var sap = document.getElementById('sap-inp').value.trim();
   var err = document.getElementById('sap-err');
   if (!sap || sap.length < 3) { err.textContent = 'Please enter a valid SAP number'; return; }
-  err.textContent = ''; 
+  err.textContent = '';
   loginSt.sap = sap;
 
-  // Step 1: Check if staff already has a session record in Firebase
-  db.ref('staff/sessions/' + sap).once('value', function(snap) {
-    var staffData = snap.val();
-    if (staffData && staffData.name) {
-      // Known staff — go straight to PIN
-      loginSt.staffData = staffData;
-      checkPINAndProceed(sap, staffData);
-      return;
-    }
+  // Always verify SAP against branch staff first — never trust cached session alone
+  // This prevents stale/wrong sessions from showing wrong staff data
+  db.ref('admin/branches').once('value', function(bsnap) {
+    var branches = bsnap.val() || {};
+    checkBranchStaff(sap, branches, function(staffRecord) {
+      if (staffRecord) {
+        // Found in branch — always overwrite session with fresh correct data
+        loginSt.staffData = staffRecord;
+        db.ref('staff/sessions/' + sap).set(staffRecord);
+        checkPINAndProceed(sap, staffRecord);
+        return;
+      }
 
-    // Step 2: Search branch staff records
-    db.ref('admin/branches').once('value', function(bsnap) {
-      var branches = bsnap.val() || {};
-      checkBranchStaff(sap, branches, function(staffRecord) {
-        if (staffRecord) {
-          loginSt.staffData = staffRecord;
-          db.ref('staff/sessions/' + sap).set(staffRecord);
-          checkPINAndProceed(sap, staffRecord);
+      // Not in branch staff — fall back to cached session (self-registered users)
+      db.ref('staff/sessions/' + sap).once('value', function(snap) {
+        var staffData = snap.val();
+        if (staffData && staffData.name) {
+          loginSt.staffData = staffData;
+          checkPINAndProceed(sap, staffData);
           return;
         }
 
-        // Step 3: Not found anywhere — allow first-time self-registration
+        // Not found anywhere — allow first-time self-registration
         // They can create a profile by setting their PIN
         // This lets staff register even if HR hasn't pre-loaded them
         var fallback = {
@@ -706,10 +707,8 @@ function checkBranchStaff(sap, branches, cb) {
         var ids = Object.keys(staff);
         for (var i = 0; i < ids.length; i++) {
           var m = staff[ids[i]];
-          if (String(m.sap || '').trim() === String(sap).trim()) {
+          if (String(m.sap || '') === sap) {
             var b = branches[bid];
-            // Always overwrite session so stale data never persists
-            db.ref('staff/sessions/' + sap).remove();
             cb({
               name: m.name,
               role: (m.role || 'staff').toLowerCase() === 'captain' ? 'captain' : (m.role || 'staff').toLowerCase() === 'branch_mgr' ? 'branch_mgr' : 'staff',
