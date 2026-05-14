@@ -13203,12 +13203,16 @@ function hrfLoadAll(coll, cacheKey, cb) {
   branches.forEach(function(b) {
     db.ref('branches/' + b.id + '/' + coll).once('value', function(snap) {
       var raw = snap.val() || {};
-      var arr = Array.isArray(raw) ? raw.filter(Boolean) : Object.values(raw).filter(Boolean);
-      // Attach key to each record
-      if (!Array.isArray(raw)) {
-        Object.keys(raw).forEach(function(k,i){ if(arr[i]) arr[i]._key = k; });
+      // tsAtt must stay as keyed object {eid: {month: [records]}} — never convert to array
+      if (coll === 'tsAtt') {
+        HRF[cacheKey][b.id] = raw;
+      } else {
+        var arr = Array.isArray(raw) ? raw.filter(Boolean) : Object.values(raw).filter(Boolean);
+        if (!Array.isArray(raw)) {
+          Object.keys(raw).forEach(function(k,i){ if(arr[i]) arr[i]._key = k; });
+        }
+        HRF[cacheKey][b.id] = arr;
       }
-      HRF[cacheKey][b.id] = arr;
       loaded++;
       if (loaded === branches.length) cb(HRF[cacheKey]);
     });
@@ -14009,21 +14013,29 @@ function pHrfAttendance(){
       var bname=(NX_BRANCHES[b.id]||{}).name||b.id;
       staff.forEach(function(m){
         var dayMap={};
-        // Build lookup maps from tsEmps — keyed by SAP (primary) and name (fallback)
-        if(!b._attSapMap){
-          b._attSapMap={}; // sap → att key
-          b._attNameMap={}; // normalized name → att key
-          var tsEmpsList=HRF.tsEmps&&HRF.tsEmps[b.id]||[];
-          var tsArr=Array.isArray(tsEmpsList)?tsEmpsList:Object.values(tsEmpsList||{});
-          tsArr.forEach(function(e){
-            if(!e)return;
-            var eid=String(e.id||'');
-            if(e.sap&&String(e.sap).trim()) b._attSapMap[String(e.sap).trim()]=eid;
-            if(e.name) b._attNameMap[e.name.toLowerCase().trim()]=eid;
-          });
+        // att is now a proper keyed object {eid: {month:[records]}}
+        // Try m.id directly, then SAP→eid via tsEmps, then name
+        var resolvedId=null;
+        if(att[String(m.id)]) {
+          resolvedId=String(m.id);
+        } else {
+          // Build SAP→eid and name→eid maps from tsEmps
+          var tsEmpsList2=HRF.tsEmps&&HRF.tsEmps[b.id]||{};
+          var tsArr2=Array.isArray(tsEmpsList2)?tsEmpsList2:Object.values(tsEmpsList2);
+          var mSap=String(m.sap||'').trim();
+          var mNameN=(m.name||'').toLowerCase().trim();
+          for(var ti=0;ti<tsArr2.length;ti++){
+            var te=tsArr2[ti];if(!te)continue;
+            if(mSap&&String(te.sap||'').trim()===mSap){resolvedId=String(te.id||'');break;}
+          }
+          if(!resolvedId){
+            for(var ti2=0;ti2<tsArr2.length;ti2++){
+              var te2=tsArr2[ti2];if(!te2)continue;
+              if(te2.name&&te2.name.toLowerCase().trim()===mNameN){resolvedId=String(te2.id||'');break;}
+            }
+          }
+          if(!resolvedId) resolvedId=String(m.id);
         }
-        // Resolve att key using SAP-first helper
-        var resolvedId=hrResolveAttId(m,att,HRF.tsEmps&&HRF.tsEmps[b.id]||[]);
         var empAtt=att[resolvedId]||{};
         var moRecs=empAtt[selMonth]||[];
         moRecs.forEach(function(r){
@@ -14274,7 +14286,13 @@ function hrfSendPayrollToFinance(month,moLabel){
     var staff=HRF.staff[b.id]||[],att=HRF.att[b.id]||{};
     var bname=(NX_BRANCHES[b.id]||{}).name||b.id;
     staff.forEach(function(m){
-      var _rid1=hrResolveAttId(m,att,HRF.tsEmps&&HRF.tsEmps[b.id]||[]);
+      var _rid1=String(m.id);
+      if(!att[_rid1]){
+        var _te1=HRF.tsEmps&&HRF.tsEmps[b.id]||{};
+        var _ta1=Array.isArray(_te1)?_te1:Object.values(_te1);
+        var _ms1=String(m.sap||'').trim(),_mn1=(m.name||'').toLowerCase().trim();
+        for(var _i1=0;_i1<_ta1.length;_i1++){var _e1=_ta1[_i1];if(!_e1)continue;if(_ms1&&String(_e1.sap||'').trim()===_ms1){_rid1=String(_e1.id||'');break;}if(!_ms1&&_e1.name&&_e1.name.toLowerCase().trim()===_mn1){_rid1=String(_e1.id||'');}}
+      }
       var empAtt=att[_rid1]||{};
       var moRecs=empAtt[month]||[];
       var totL=0,totA=0;
@@ -14296,7 +14314,13 @@ function hrfPrintPayrollReport(month,moLabel){
     var staff=HRF.staff[b.id]||[],att=HRF.att[b.id]||{};
     var bname=(NX_BRANCHES[b.id]||{}).name||b.id;
     staff.forEach(function(m){
-      var _rid2=hrResolveAttId(m,att,HRF.tsEmps&&HRF.tsEmps[b.id]||[]);
+      var _rid2=String(m.id);
+      if(!att[_rid2]){
+        var _te2=HRF.tsEmps&&HRF.tsEmps[b.id]||{};
+        var _ta2=Array.isArray(_te2)?_te2:Object.values(_te2);
+        var _ms2=String(m.sap||'').trim(),_mn2=(m.name||'').toLowerCase().trim();
+        for(var _i2=0;_i2<_ta2.length;_i2++){var _e2=_ta2[_i2];if(!_e2)continue;if(_ms2&&String(_e2.sap||'').trim()===_ms2){_rid2=String(_e2.id||'');break;}if(!_ms2&&_e2.name&&_e2.name.toLowerCase().trim()===_mn2){_rid2=String(_e2.id||'');}}
+      }
       var empAtt=att[_rid2]||{};
       var moRecs=empAtt[month]||[];
       var totL=0,totA=0;
