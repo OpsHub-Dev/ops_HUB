@@ -1050,6 +1050,12 @@ function saveAtt(eid,rec){
 }
 
 function writeAtt(eid,rec){
+  // Inject sap+name into record so HR can match by SAP regardless of ID
+  var emp=tsEmps.find(function(e){return String(e.id)===String(eid);});
+  if(emp){
+    rec.sap=emp.sap||'';
+    rec.empName=emp.name||'';
+  }
   if(!tsAtt[eid]) tsAtt[eid]={};
   if(!tsAtt[eid][MK]) tsAtt[eid][MK]=[];
   var arr=tsAtt[eid][MK];

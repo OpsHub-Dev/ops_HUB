@@ -7291,20 +7291,61 @@ function hrResolveAttId(m, att, tsEmps) {
   var mSap = String(m.sap || '').trim();
   var mName = (m.name || '').toLowerCase().trim();
   var tsArr = Array.isArray(tsEmps) ? tsEmps : Object.values(tsEmps || {});
-  // 1. SAP match (most reliable)
+
+  // 1. Scan actual att records for matching SAP field (most reliable — set by staff.html)
+  if (mSap) {
+    var attKeys = Object.keys(att);
+    for (var ai = 0; ai < attKeys.length; ai++) {
+      var ak = attKeys[ai];
+      if (/^\d{4}-\d{2}$/.test(ak)) continue; // skip YYYY-MM keys
+      var entry = att[ak];
+      if (!entry || typeof entry !== 'object') continue;
+      var monthKeys = Object.keys(entry);
+      for (var mi2 = 0; mi2 < monthKeys.length; mi2++) {
+        var recs = entry[monthKeys[mi2]];
+        if (!Array.isArray(recs) || !recs.length) continue;
+        for (var ri = 0; ri < recs.length; ri++) {
+          if (recs[ri] && String(recs[ri].sap || '').trim() === mSap) return ak;
+        }
+        break; // only check first month's records for speed
+      }
+    }
+  }
+
+  // 2. SAP match via tsEmps list
   if (mSap) {
     for (var i = 0; i < tsArr.length; i++) {
       var e = tsArr[i];
       if (e && String(e.sap || '').trim() === mSap) return String(e.id || '');
     }
   }
-  // 2. Direct ID match in att
+
+  // 3. Direct ID match in att
   if (att[String(m.id)]) return String(m.id);
-  // 3. Name match
+
+  // 4. Name match via tsEmps
   for (var j = 0; j < tsArr.length; j++) {
     var e2 = tsArr[j];
     if (e2 && e2.name && e2.name.toLowerCase().trim() === mName) return String(e2.id || '');
   }
+
+  // 5. Name match in att records
+  var attKeys2 = Object.keys(att);
+  for (var ai2 = 0; ai2 < attKeys2.length; ai2++) {
+    var ak2 = attKeys2[ai2];
+    if (/^\d{4}-\d{2}$/.test(ak2)) continue;
+    var entry2 = att[ak2];
+    if (!entry2 || typeof entry2 !== 'object') continue;
+    var mKeys2 = Object.keys(entry2);
+    for (var mi3 = 0; mi3 < mKeys2.length; mi3++) {
+      var recs2 = entry2[mKeys2[mi3]];
+      if (!Array.isArray(recs2) || !recs2.length) continue;
+      var r0 = recs2[0];
+      if (r0 && r0.empName && r0.empName.toLowerCase().trim() === mName) return ak2;
+      break;
+    }
+  }
+
   return String(m.id);
 }
 function bsyncTSFromStaff() {

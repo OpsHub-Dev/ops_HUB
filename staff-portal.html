@@ -706,8 +706,10 @@ function checkBranchStaff(sap, branches, cb) {
         var ids = Object.keys(staff);
         for (var i = 0; i < ids.length; i++) {
           var m = staff[ids[i]];
-          if (String(m.sap || '') === sap) {
+          if (String(m.sap || '').trim() === String(sap).trim()) {
             var b = branches[bid];
+            // Always overwrite session so stale data never persists
+            db.ref('staff/sessions/' + sap).remove();
             cb({
               name: m.name,
               role: (m.role || 'staff').toLowerCase() === 'captain' ? 'captain' : (m.role || 'staff').toLowerCase() === 'branch_mgr' ? 'branch_mgr' : 'staff',
