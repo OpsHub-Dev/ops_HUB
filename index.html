@@ -7285,12 +7285,34 @@ function seedIfEmpty() {
   });
 }
 
+
+// ── SAP-first attendance resolution helper ──────────────────────────
+function hrResolveAttId(m, att, tsEmps) {
+  var mSap = String(m.sap || '').trim();
+  var mName = (m.name || '').toLowerCase().trim();
+  var tsArr = Array.isArray(tsEmps) ? tsEmps : Object.values(tsEmps || {});
+  // 1. SAP match (most reliable)
+  if (mSap) {
+    for (var i = 0; i < tsArr.length; i++) {
+      var e = tsArr[i];
+      if (e && String(e.sap || '').trim() === mSap) return String(e.id || '');
+    }
+  }
+  // 2. Direct ID match in att
+  if (att[String(m.id)]) return String(m.id);
+  // 3. Name match
+  for (var j = 0; j < tsArr.length; j++) {
+    var e2 = tsArr[j];
+    if (e2 && e2.name && e2.name.toLowerCase().trim() === mName) return String(e2.id || '');
+  }
+  return String(m.id);
+}
 function bsyncTSFromStaff() {
   BS.staff.forEach(function(m){
     var sid=String(m.id),ex=null;
     for(var i=0;i<BS.tsEmps.length;i++) if(BS.tsEmps[i].id===sid){ex=BS.tsEmps[i];break;}
-    if(!ex){BS.tsEmps.push({id:sid,name:m.name,dept:m.dept,pos:m.role||'',phone:m.phone||'',leaveBalance:21});}
-    else{ex.name=m.name;ex.dept=m.dept;if(m.role)ex.pos=m.role;ex.phone=m.phone||'';}
+    if(!ex){BS.tsEmps.push({id:sid,name:m.name,dept:m.dept,pos:m.role||'',phone:m.phone||'',sap:m.sap||'',leaveBalance:21});}
+    else{ex.name=m.name;ex.dept=m.dept;if(m.role)ex.pos=m.role;ex.phone=m.phone||'';ex.sap=m.sap||'';;}
   });
   var ids=BS.staff.map(function(m){return String(m.id);});
   BS.tsEmps=BS.tsEmps.filter(function(e){return ids.indexOf(e.id)>=0;});
@@ -13946,38 +13968,22 @@ function pHrfAttendance(){
       var bname=(NX_BRANCHES[b.id]||{}).name||b.id;
       staff.forEach(function(m){
         var dayMap={};
-        // Build nameToAttId from tsEmps — same pattern as schedule fix
-        // tsAtt is keyed by tsEmps.id; tsEmps has .name we can match against staff name
-        if(!b._attNameMap){
-          b._attNameMap={};
+        // Build lookup maps from tsEmps — keyed by SAP (primary) and name (fallback)
+        if(!b._attSapMap){
+          b._attSapMap={}; // sap → att key
+          b._attNameMap={}; // normalized name → att key
           var tsEmpsList=HRF.tsEmps&&HRF.tsEmps[b.id]||[];
-          if(Array.isArray(tsEmpsList)){
-            tsEmpsList.forEach(function(e){
-              if(e&&e.name) b._attNameMap[e.name.toLowerCase().trim()]=String(e.id||'');
-            });
-          }
-          // Fallback: also scan att keys directly for name fields in records
-          if(!Object.keys(b._attNameMap).length){
-            Object.keys(att).forEach(function(k){
-              if(/^\d{4}-\d{2}$/.test(k))return;
-              var entry=att[k];
-              if(!entry||typeof entry!=='object')return;
-              var found=false;
-              Object.keys(entry).forEach(function(mk){
-                if(found)return;
-                var recs=entry[mk];
-                if(Array.isArray(recs)&&recs.length&&recs[0]&&recs[0].name){
-                  b._attNameMap[recs[0].name.toLowerCase().trim()]=k;
-                  found=true;
-                }
-              });
-            });
-          }
+          var tsArr=Array.isArray(tsEmpsList)?tsEmpsList:Object.values(tsEmpsList||{});
+          tsArr.forEach(function(e){
+            if(!e)return;
+            var eid=String(e.id||'');
+            if(e.sap&&String(e.sap).trim()) b._attSapMap[String(e.sap).trim()]=eid;
+            if(e.name) b._attNameMap[e.name.toLowerCase().trim()]=eid;
+          });
         }
-        // Resolve: ID first, then name lookup (resolvedId pattern from schedule fix)
-        var mNameNorm=String(m.name||'').toLowerCase().trim();
-        var resolvedId=att[String(m.id)]?String(m.id):(b._attNameMap[mNameNorm]||String(m.id));
-        var empAtt=att[resolvedId]||att[m.name]||{};
+        // Resolve att key using SAP-first helper
+        var resolvedId=hrResolveAttId(m,att,HRF.tsEmps&&HRF.tsEmps[b.id]||[]);
+        var empAtt=att[resolvedId]||{};
         var moRecs=empAtt[selMonth]||[];
         moRecs.forEach(function(r){
           if(!r.date)return;
@@ -14216,7 +14222,7 @@ function pHrfAttendance(){
   if(cSt===branches.length&&cAt===branches.length)return renderAtt();
   var done=0;function check(){done++;if(done>=2)navTo('hrf-attendance');}
   if(cSt<branches.length)hrfLoadAll('staff','staff',check);else check();
-  if(cAt<branches.length)hrfLoadAll('tsAtt','att',function(){hrfLoadAll('tsEmps','tsEmps',function(){branches.forEach(function(b){b._attNameMap=null;});check();});});else check();
+  if(cAt<branches.length)hrfLoadAll('tsAtt','att',function(){hrfLoadAll('tsEmps','tsEmps',function(){branches.forEach(function(b){b._attNameMap=null;b._attSapMap=null;});check();});});else check();
   return hrfLoading('Loading attendance\u2026');
 }
 
@@ -14227,7 +14233,8 @@ function hrfSendPayrollToFinance(month,moLabel){
     var staff=HRF.staff[b.id]||[],att=HRF.att[b.id]||{};
     var bname=(NX_BRANCHES[b.id]||{}).name||b.id;
     staff.forEach(function(m){
-      var empAtt=att[String(m.id)]||att[m.name]||{};
+      var _rid1=hrResolveAttId(m,att,HRF.tsEmps&&HRF.tsEmps[b.id]||[]);
+      var empAtt=att[_rid1]||{};
       var moRecs=empAtt[month]||[];
       var totL=0,totA=0;
       moRecs.forEach(function(r){var st=r.status||r.st||'';if(st==='absent')totA++;else if(st==='late')totL++;});
@@ -14248,7 +14255,8 @@ function hrfPrintPayrollReport(month,moLabel){
     var staff=HRF.staff[b.id]||[],att=HRF.att[b.id]||{};
     var bname=(NX_BRANCHES[b.id]||{}).name||b.id;
     staff.forEach(function(m){
-      var empAtt=att[String(m.id)]||att[m.name]||{};
+      var _rid2=hrResolveAttId(m,att,HRF.tsEmps&&HRF.tsEmps[b.id]||[]);
+      var empAtt=att[_rid2]||{};
       var moRecs=empAtt[month]||[];
       var totL=0,totA=0;
       moRecs.forEach(function(r){var st=r.status||r.st||'';if(st==='absent')totA++;else if(st==='late')totL++;});
