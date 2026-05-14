@@ -7654,8 +7654,8 @@ function pBranchDash() {
 
   var act2=0,onL2=0,onLeaveList=[];
   BS.staff.forEach(function(m){ if(m.status==='Active')act2++; else if(m.status==='On Leave'){onL2++;onLeaveList.push(m);} });
-  var deptCount={Manager:0,Kitchen:0,FOH:0};
-  BS.staff.forEach(function(m){if(deptCount[m.dept]!==undefined)deptCount[m.dept]++;});
+  var deptCount={Management:0,Kitchen:0,FOH:0};
+  BS.staff.forEach(function(m){var nd=normalizeDept(m.dept||'');if(deptCount[nd]!==undefined)deptCount[nd]++;});
   var hExp=0,hSoon=0,hNear=0,hOk=0,hExpList=[];
   BS.health.forEach(function(hc){
     if(!hc.medExp)return;
@@ -7936,7 +7936,7 @@ function pBranchDash() {
   h += '<div class="card" style="padding:0;overflow:hidden">';
   h += '<div style="padding:12px 14px;border-bottom:1px solid var(--border)"><span style="font-size:13px;font-weight:700">By Department</span></div>';
   h += '<div style="padding:10px 14px">';
-  [['Manager','#b45309'],['Kitchen','#0057ff'],['FOH','#00875a']].forEach(function(pair){
+  [['Management','#b45309'],['Kitchen','#0057ff'],['FOH','#00875a']].forEach(function(pair){
     h+='<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border)">';
     h+='<div style="width:8px;height:8px;border-radius:50%;background:'+pair[1]+';flex-shrink:0"></div>';
     h+='<span style="font-size:13px;font-weight:500;flex:1">'+pair[0]+'</span>';
@@ -12159,7 +12159,7 @@ function initHcDeptChart() {
   var ctx = document.getElementById('chart-hc-dept');
   if (!ctx) return;
   // Use BS.staff if available (branch manager), otherwise show empty
-  var mgr = BS.staff.filter(function(m){return m.dept==='Manager';}).length;
+  var mgr = BS.staff.filter(function(m){return normalizeDept(m.dept||'')==='Management';}).length;
   var kit = BS.staff.filter(function(m){return m.dept==='Kitchen';}).length;
   var foh = BS.staff.filter(function(m){return m.dept==='FOH';}).length;
   var total = BS.staff.length;
@@ -12168,7 +12168,7 @@ function initHcDeptChart() {
   delete opts.scales;
   NX.charts.hcDept = new Chart(ctx, {
     type:'doughnut',
-    data:{ labels:['Manager','Kitchen','FOH'], datasets:[{ data:[mgr||1,kit||1,foh||1], backgroundColor:['#92400e80','#3b9eff80','#05966980'], borderColor:['#b45309','#0057ff','#00875a'], borderWidth:2 }] },
+    data:{ labels:['Management','Kitchen','FOH'], datasets:[{ data:[mgr||1,kit||1,foh||1], backgroundColor:['#92400e80','#3b9eff80','#05966980'], borderColor:['#b45309','#0057ff','#00875a'], borderWidth:2 }] },
     options:opts
   });
 }
@@ -13949,12 +13949,36 @@ function pHrfAttendance(){
         // tsAtt structure: att[empId][YYYY-MM] = [{date,status,...}]
         var empAtt=att[String(m.id)]||att[m.name]||{};
         var moRecs=empAtt[selMonth]||[];
-        moRecs.forEach(function(r){if(r.date)dayMap[r.date.slice(-2)]=r;});
+        moRecs.forEach(function(r){
+          if(!r.date)return;
+          // Normalize: staff.html saves as r.st, HR expects r.status
+          if(r.st&&!r.status) r.status=r.st;
+          dayMap[r.date.slice(-2)]=r;
+        });
         // Also check flat day keys under att[YYYY-MM][empId]
         var dayKeys=att[selMonth]||{};
         var flatRec=dayKeys[String(m.id)]||dayKeys[m.name];
         if(flatRec&&flatRec.status){var dd=selMonth+'-01';dayMap['01']=flatRec;}
 
+        // Overlay approved sick/leave records from tsLeaves
+        var empLeaves=HRF.leaves[b.id]||[];
+        empLeaves.forEach(function(lv){
+          if((lv.status||'pending')!=='approved')return;
+          if(String(lv.empId||lv.employeeId)!==String(m.id)&&(lv.empName||lv.name||'')!==m.name)return;
+          var lvType=(lv.type||'').toLowerCase();
+          var lvSt=lvType.indexOf('sick')>=0?'sick':'dayoff';
+          // Fill each day of the leave range
+          var from=lv.from||lv.startDate||'';
+          var to=lv.to||lv.endDate||from;
+          if(!from||from.slice(0,7)!==selMonth)return;
+          var cur=new Date(from);
+          var end=new Date(to);
+          while(cur<=end){
+            var ds2=String(cur.getDate()<10?'0'+cur.getDate():cur.getDate());
+            if(!dayMap[ds2]){dayMap[ds2]={date:selMonth+'-'+ds2,status:lvSt,_fromLeave:true};}
+            cur.setDate(cur.getDate()+1);
+          }
+        });
         var totP=0,totL=0,totA=0,totAbsent=0,totSick=0,totHol=0,totOff=0;
         for(var di=1;di<=totalDays;di++){
           var ds=String(di<10?'0'+di:di);
@@ -14176,7 +14200,7 @@ function hrfSendPayrollToFinance(month,moLabel){
       var empAtt=att[String(m.id)]||att[m.name]||{};
       var moRecs=empAtt[month]||[];
       var totL=0,totA=0;
-      moRecs.forEach(function(r){if(r.status==='absent')totA++;else if(r.status==='late')totL++;});
+      moRecs.forEach(function(r){var st=r.status||r.st||'';if(st==='absent')totA++;else if(st==='late')totL++;});
       if(totA>0||totL>0)deductions.push({name:m.name,dept:m.dept||'',branch:bname,absent:totA,late:totL,salary:m.salary||m.basicSalary||0});
     });
   });
@@ -14197,7 +14221,7 @@ function hrfPrintPayrollReport(month,moLabel){
       var empAtt=att[String(m.id)]||att[m.name]||{};
       var moRecs=empAtt[month]||[];
       var totL=0,totA=0;
-      moRecs.forEach(function(r){if(r.status==='absent')totA++;else if(r.status==='late')totL++;});
+      moRecs.forEach(function(r){var st=r.status||r.st||'';if(st==='absent')totA++;else if(st==='late')totL++;});
       if(totA>0||totL>0){var sal=m.salary||m.basicSalary||0;var perDay=sal?Math.round(sal/30):0;deductions.push({name:m.name,dept:m.dept||'',branch:bname,absent:totA,late:totL,salary:sal,est:perDay?(totA+totL)*perDay:0});}
     });
   });
