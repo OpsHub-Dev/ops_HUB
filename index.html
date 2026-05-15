@@ -3291,6 +3291,8 @@ var NAV_CONFIG = {
       { id:'bm-leave',          icon:'🏖️', label:'Leave Management', badge:'bm-leave-pending' }
     ]},
     { section:'COMMUNICATIONS', items:[
+      { id:'bm-compliance',      icon:'🏛️', label:'Compliance & Costs', badge:'bm-compliance-expiry' },
+      { id:'bm-assets',           icon:'🗂️', label:'Asset Register' },
       { id:'bm-announcements',  icon:'📢', label:'Announcements', badge:'bm-ann-unread' },
       { id:'bm-music-player',   icon:'🎵', label:'Music Player' }
     ]}
@@ -3335,6 +3337,7 @@ var NAV_CONFIG = {
     { section:'REVENUE & COSTS', items:[
       { id:'hrf-revenue',     icon:'💰', label:'Revenue' },
       { id:'hrf-pnl',         icon:'📈', label:'P&L Statement' },
+      { id:'hrf-compliance',   icon:'🏛️', label:'Fixed Costs & Permits' },
       { id:'hrf-food-cost',   icon:'🍽️', label:'Food Cost' },
       { id:'hrf-expenses',    icon:'🧾', label:'Expenses' }
     ]},
@@ -4502,6 +4505,8 @@ function renderPage(pageId) {
     'bm-leave':          pBmLeave,
     'bm-payroll':        pBmPayroll,
     'bm-transfers':      pBmTransfers,
+    'bm-compliance':      pBmCompliance,
+    'bm-assets':          pBmAssets,
     'bm-announcements':  pBmAnnouncements,
     'bm-music-player':   function(){
       var s=NX.session||{};
@@ -4541,6 +4546,7 @@ function renderPage(pageId) {
     'hrf-petty-cash': pHrfPettyCash,
     'hrf-revenue':    pHrfRevenue,
     'hrf-pnl':        pHrfPnL,
+    'hrf-compliance': pHrfCompliance,
     'hrf-food-cost':  pHrfFoodCost,
     'hrf-expenses':   pHrfExpenses,
     'hrf-invoices':   pHrfInvoices,
@@ -11552,11 +11558,11 @@ function pDSR(){
     body+=grp('Company Provides (‫SAR ‬)','<input type="number" step="0.01" placeholder="e.g. 10000" value="'+(D.mfCompany||'')+'" oninput="dsrUp(\'mfCompany\',this.value)" style="'+fi+'font-size:18px;padding:9px 12px;color:var(--ceo)">');
     body+='<div style="background:var(--surface-2);border-radius:9px;padding:12px;margin-top:8px">';
     function msl(l,v,c,bold){return '<div style="'+sline+(bold?'font-weight:700':'')+'"><span style="color:var(--text-secondary)">'+l+'</span><span style="font-family:var(--mono);color:'+(c||'var(--text-primary)')+'">'+v.toFixed(2)+'</span></div>';}
-    body+=msl('Cash I Have',haveTotal);body+=msl('Change in Safe',changeTotal);body+=msl('Closed Petty Cash',closedPC);body+=msl('Ongoing Petty Cash',ongoingPC);
+    body+=msl('Cash',haveTotal);body+=msl('Change in Safe',changeTotal);body+=msl('Closed Petty Cash',closedPC);body+=msl('Ongoing Petty Cash',ongoingPC);
     body+=msl('Total I Account For',mfTotal,'var(--ceo)',true);
     body+=msl('Difference vs Company',mfDiff,Math.abs(mfDiff)<0.01?'#00875a':mfDiff<0?'#c0392b':'#b45309',true);
     body+='</div></div>';
-    body+='<div style="'+card+'"><div style="'+secHdr+'">Cash I Have</div>'+denomGrid('mfh',DENOMS_MF.have)+'<div style="font-size:11px;color:var(--ceo);font-family:var(--mono);margin-top:8px;font-weight:700">Total: '+bfsar(haveTotal)+'</div></div>';
+    body+='<div style="'+card+'"><div style="'+secHdr+'">Cash</div>'+denomGrid('mfh',DENOMS_MF.have)+'<div style="font-size:11px;color:var(--ceo);font-family:var(--mono);margin-top:8px;font-weight:700">Total: '+bfsar(haveTotal)+'</div></div>';
     body+='</div>';
     body+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">';
     body+='<div style="'+card+'"><div style="'+secHdr+'">Change in Safe</div>'+denomGrid('mfc',DENOMS_MF.change)+'<div style="font-size:11px;color:var(--ceo);font-family:var(--mono);margin-top:8px;font-weight:700">Total: '+bfsar(changeTotal)+'</div></div>';
@@ -11668,18 +11674,34 @@ function dsrUpdDenom(k,v){
 function dsrSave(){var D=_dsrD();var activeDate=_dsrActiveDate();if(db&&NX.session&&NX.session.branchId){db.ref(dsrFbPath(activeDate)).set(D,function(err){if(err)showToast('Save failed','error');else showToast('DSR saved to Firebase ✓','success');});}else{try{localStorage.setItem('dsr_nexus_'+activeDate,JSON.stringify(D));showToast('DSR saved locally ✓','success');}catch(e){showToast('Save failed','error');}}}
 function dsrClear(){
   var activeDate=_dsrActiveDate();
-  if(!confirm('Clear DSR data for '+activeDate+'?\n\nThis will reset all tabs EXCEPT Master File.\nMaster File company info will be preserved.'))return;
+  if(!confirm('Clear DSR data for '+activeDate+'?\n\nThis will reset all tabs EXCEPT Master File.\nAll Master File data (cash counts, petty cash, safe items) will be preserved.'))return;
   var s=NX.session||{};
   var current=BS.dsrState[activeDate]||{};
-  // Preserve Master File data
-  var preservedMF=current.mfCompany||'';
-  var preservedRestName=current.restName||s.branchName||'';
-  var blank={date:activeDate,restName:preservedRestName,food:'',bev:'',misc:'',vat:'',vatAlfa:'',guests:'',mfCompany:preservedMF,discounts:[],payments:[{id:'p1',method:'Cash',amount:''},{id:'p2',method:'MADA',amount:''},{id:'p3',method:'VISA',amount:''},{id:'p4',method:'Qlub',amount:''}],delivery:[],servers:[],closedPetty:[],ongoingPetty:[],safeItems:[],denoms:{},tab:'overview'};
+  // Preserve ALL Master File data — mfCompany, all denoms (mfh_*/mfc_*), closedPetty, ongoingPetty, safeItems
+  var preservedDenoms={};
+  Object.keys(current.denoms||{}).forEach(function(k){
+    if(k.indexOf('mfh_')===0||k.indexOf('mfc_')===0) preservedDenoms[k]=(current.denoms||{})[k];
+  });
+  var blank={
+    date:activeDate,
+    restName:current.restName||s.branchName||'',
+    food:'',bev:'',misc:'',vat:'',vatAlfa:'',guests:'',
+    // ── Master File preserved ──
+    mfCompany:current.mfCompany||'',
+    closedPetty:current.closedPetty||[],
+    ongoingPetty:current.ongoingPetty||[],
+    safeItems:current.safeItems||[],
+    denoms:Object.assign({},preservedDenoms),
+    // ── Reset everything else ──
+    discounts:[],
+    payments:[{id:'p1',method:'Cash',amount:''},{id:'p2',method:'MADA',amount:''},{id:'p3',method:'VISA',amount:''},{id:'p4',method:'Qlub',amount:''}],
+    delivery:[],servers:[],tab:'overview'
+  };
   BS.dsrState[activeDate]=blank;
   if(db&&NX.session&&NX.session.branchId){
     db.ref(dsrFbPath(activeDate)).set(blank,function(err){
       if(err)showToast('Firebase save failed: '+err.message,'error');
-      else showToast('DSR cleared (Master File preserved) ✓','success');
+      else showToast('DSR cleared — Master File preserved ✓','success');
     });
   }
   navTo('dsr');
@@ -11701,13 +11723,23 @@ function dsrEndShift(){
       var nextDate=new Date(activeDate+'T00:00:00');
       nextDate.setDate(nextDate.getDate()+1);
       var nextStr=nextDate.getFullYear()+'-'+String(nextDate.getMonth()+1).padStart(2,'0')+'-'+String(nextDate.getDate()).padStart(2,'0');
-      // Initialize next day with Master File carry-over
+      // Initialize next day — carry forward ALL Master File data
       var s=NX.session||{};
+      var nextDenoms={};
+      Object.keys(D.denoms||{}).forEach(function(k){
+        if(k.indexOf('mfh_')===0||k.indexOf('mfc_')===0) nextDenoms[k]=(D.denoms||{})[k];
+      });
       BS.dsrState[nextStr]={
         date:nextStr,restName:D.restName||s.branchName||'',food:'',bev:'',misc:'',vat:'',vatAlfa:'',guests:'',
+        // ── Master File carried forward ──
         mfCompany:D.mfCompany||'',
+        closedPetty:D.closedPetty||[],
+        ongoingPetty:D.ongoingPetty||[],
+        safeItems:D.safeItems||[],
+        denoms:nextDenoms,
+        // ── Fresh day data ──
         discounts:[],payments:[{id:'p1',method:'Cash',amount:''},{id:'p2',method:'MADA',amount:''},{id:'p3',method:'VISA',amount:''},{id:'p4',method:'Qlub',amount:''}],
-        delivery:[],servers:[],closedPetty:[],ongoingPetty:[],safeItems:[],denoms:{},tab:'overview'
+        delivery:[],servers:[],tab:'overview'
       };
       BS.dsrActiveDate=nextStr;
       BS._dsrDateChanged=true;
@@ -13116,7 +13148,7 @@ launchApp = function() {
   // Clear HRF data cache on every login so fresh Firebase data is fetched
   if (typeof HRF !== 'undefined') {
     HRF.staff = {}; HRF.att = {}; HRF.leaves = {}; HRF.sch = {}; HRF.tsEmps = {};
-    HRF.health = {}; HRF.pc = {}; HRF.sales = {}; HRF.invoices = {}; HRF.waste = {};
+    HRF.health = {}; HRF.pc = {}; HRF.sales = {}; HRF.invoices = {}; HRF.waste = {}; HRF.compliance = null; HRF.assets = {};
   }
   _origLaunchApp();
   var role = NX.session && NX.session.role;
@@ -14884,54 +14916,190 @@ function pHrfRevenue(){
   return hrfLoading('Loading revenue\u2026');
 }
 
+
+// ── FINANCE: COMPLIANCE & PERMITS VIEW ──────────────────────────────────────
+function pHrfCompliance(){
+  var branches=hrfBranches();
+  function render(){
+    var now=new Date();
+    function daysUntil(d){if(!d)return 9999;return Math.ceil((new Date(d)-now)/86400000);}
+    function urgBadge(d){var du=daysUntil(d);if(du<0)return'<span style="background:rgba(192,57,43,.15);color:#c0392b;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700">EXPIRED</span>';if(du<=7)return'<span style="background:rgba(192,57,43,.12);color:#c0392b;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700">'+du+'d</span>';if(du<=30)return'<span style="background:rgba(180,83,17,.12);color:#b45309;border-radius:10px;padding:1px 6px;font-size:10px">'+du+'d</span>';return'';}
+    var allItems=[],totalFixed=0,totalServices=0;
+    branches.forEach(function(b){
+      var bname=(NX_BRANCHES[b.id]||{}).name||b.id;
+      var comp=HRF.compliance&&HRF.compliance[b.id];
+      if(!comp)return;
+      (comp.recurring||[]).forEach(function(r){r._branch=bname;r._branchId=b.id;r._kind='recurring';allItems.push(r);totalFixed+=parseFloat(r.monthlyCost)||0;});
+      (comp.services||[]).forEach(function(r){r._branch=bname;r._branchId=b.id;r._kind='service';allItems.push(r);totalServices+=parseFloat(r.monthlyCost)||0;});
+      (comp.permits||[]).forEach(function(r){r._branch=bname;r._branchId=b.id;r._kind='permit';allItems.push(r);});
+    });
+    var expired=allItems.filter(function(x){return daysUntil(x.expiry||x.renewalDate)<=0;}).length;
+    var warn7=allItems.filter(function(x){var du=daysUntil(x.expiry||x.renewalDate);return du>0&&du<=7;}).length;
+    var warn30=allItems.filter(function(x){var du=daysUntil(x.expiry||x.renewalDate);return du>7&&du<=30;}).length;
+    var h=hrfHeader('Fixed Costs \u0026 Permits','Across all branches \u2014 synced from branch managers','');
+    if(expired||warn7||warn30){h+='<div style="background:rgba(192,57,43,.08);border:1px solid rgba(192,57,43,.25);border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;gap:20px;align-items:center;flex-wrap:wrap"><span style="font-size:16px">\u26a0\ufe0f</span>';if(expired)h+='<span style="color:#c0392b;font-weight:700;font-size:13px">'+expired+' records EXPIRED</span>';if(warn7)h+='<span style="color:#c0392b;font-weight:700;font-size:13px">'+warn7+' expire within 7 days</span>';if(warn30)h+='<span style="color:#b45309;font-size:13px">'+warn30+' expire within 30 days</span>';h+='</div>';}
+    h+='<div class="hrf-kpi-grid" style="margin-bottom:20px">';
+    h+=hrfKpi('\ud83c\udfe0','Monthly Fixed',hfsar(totalFixed),'Rent \u00b7 elec \u00b7 water','var(--fin-color)');
+    h+=hrfKpi('\ud83d\udd27','Monthly Services',hfsar(totalServices),'Maint \u00b7 cleaning','var(--payroll-color)');
+    h+=hrfKpi('\ud83e\udeb7','Active Permits',allItems.filter(function(x){return x._kind==='permit';}).length,'Licences tracked','var(--info)');
+    h+=hrfKpi('\u26a0\ufe0f','Expiry Alerts',expired+warn7+warn30,'Expired or <30d','var(--danger)');
+    h+='</div>';
+    var sorted=allItems.slice().sort(function(a,b){return daysUntil(a.expiry||a.renewalDate)-daysUntil(b.expiry||b.renewalDate);});
+    var rows='';
+    sorted.forEach(function(item){
+      var expD=item.expiry||item.renewalDate||'';
+      var kindMap={recurring:'<span style="background:rgba(29,158,117,.12);color:#0F6E56;border-radius:8px;padding:1px 7px;font-size:10px">Fixed</span>',service:'<span style="background:rgba(91,33,182,.12);color:#5b21b6;border-radius:8px;padding:1px 7px;font-size:10px">Service</span>',permit:'<span style="background:rgba(0,87,255,.12);color:#0057ff;border-radius:8px;padding:1px 7px;font-size:10px">Permit</span>'};
+      rows+='<tr><td><div style="font-weight:600">'+hxe(item.name||'\u2014')+'</div><div style="font-size:10px;color:var(--text-tertiary)">'+hxe(item._branch)+'</div></td><td>'+(kindMap[item._kind]||'')+'</td><td style="font-size:12px">'+hxe(item.type||item.authority||'\u2014')+'</td><td style="font-family:var(--mono)">'+(item.monthlyCost?hfsar(parseFloat(item.monthlyCost)):'\u2014')+'</td><td style="font-family:var(--mono);font-size:12px">'+hxe(expD||'\u2014')+' '+urgBadge(expD)+'</td></tr>';
+    });
+    if(!rows)h+='<div style="text-align:center;padding:32px;color:var(--text-tertiary)">No compliance data yet. Branch managers need to add records and click Send to Finance.</div>';
+    else h+=hrfTable(['Name / Branch','Type','Category','Monthly SAR','Expiry'],rows);
+    return h;
+  }
+  if(!HRF.compliance){
+    HRF.compliance={};
+    var brs=hrfBranches();var loaded=0;
+    brs.forEach(function(b){db.ref('branches/'+b.id+'/compliance').once('value',function(snap){if(snap.val())HRF.compliance[b.id]=snap.val();if(++loaded===brs.length)navTo('hrf-compliance');});});
+    return hrfLoading('Loading compliance data\u2026');
+  }
+  return render();
+}
+
 // ── P&L ──
 function pHrfPnL(){
   var branches=hrfBranches();
   function renderPnL(){
     var d=new Date(new Date().getTime()+3*3600000);var curYear=d.getFullYear();
-    var revByMo=new Array(12).fill(0),wasteByMo=new Array(12).fill(0),pcByMo=new Array(12).fill(0);
+    var selMonth=NX._pnlMonth||(curYear+'-'+(d.getMonth()<9?'0':'')+(d.getMonth()+1));
+    var selYear=parseInt(selMonth.slice(0,4));
+    var moIdx=parseInt(selMonth.slice(5,7))-1;
+
+    // Revenue from sales/DSR
+    var revByMo=new Array(12).fill(0);
     branches.forEach(function(b){
-      (HRF.sales[b.id]||[]).forEach(function(e){if(!e.date||!e.date.startsWith(String(curYear)))return;var mo=parseInt(e.date.slice(5,7),10)-1;if(mo>=0&&mo<12)revByMo[mo]+=parseFloat(e.actual||e.total||e.amount||0);});
-      (HRF.waste[b.id]||[]).forEach(function(w){if(!w.date||!w.date.startsWith(String(curYear)))return;var mo=parseInt(w.date.slice(5,7),10)-1;if(mo>=0&&mo<12)wasteByMo[mo]+=parseFloat(w.value||w.cost||w.amount||0);});
-      (HRF.pc[b.id]||[]).forEach(function(p){if(!p.date||!p.date.startsWith(String(curYear)))return;var mo=parseInt(p.date.slice(5,7),10)-1;if(mo>=0&&mo<12)pcByMo[mo]+=parseFloat(p.amount||0);});
+      (HRF.sales[b.id]||[]).forEach(function(e){if(!e.date||!e.date.startsWith(String(selYear)))return;var mo=parseInt(e.date.slice(5,7),10)-1;if(mo>=0&&mo<12)revByMo[mo]+=parseFloat(e.actual||e.total||e.amount||0);});
     });
-    var ytdRev=0,ytdWaste=0,ytdPC=0;
-    for(var mo=0;mo<=d.getMonth();mo++){ytdRev+=revByMo[mo];ytdWaste+=wasteByMo[mo];ytdPC+=pcByMo[mo];}
-    var ytdCosts=ytdWaste+ytdPC,ytdProfit=ytdRev-ytdCosts;
-    var h=hrfHeader('P&amp;L Statement','YTD '+curYear+' \u00b7 Real Firebase data','');
-    h+='<div class="hrf-kpi-grid">';
-    h+=hrfKpi('&#x1F4B0;','YTD Revenue',hfsar(ytdRev),curYear+' to date','var(--fin-color)');
-    h+=hrfKpi('&#x1F5D1;&#xFE0F;','Wastage Cost',hfsar(ytdWaste),'All branches','var(--danger)');
-    h+=hrfKpi('&#x1F4B5;','Petty Cash',hfsar(ytdPC),'Operational','var(--warning)');
-    h+=hrfKpi('&#x1F4C8;','Net (approx.)',hfsar(ytdProfit),'Rev minus costs','var(--payroll-color)');
+
+    // COGS: wastage
+    var wasteByMo=new Array(12).fill(0);
+    branches.forEach(function(b){(HRF.waste[b.id]||[]).forEach(function(w){if(!w.date||!w.date.startsWith(String(selYear)))return;var mo=parseInt(w.date.slice(5,7),10)-1;if(mo>=0&&mo<12)wasteByMo[mo]+=parseFloat(w.value||w.cost||w.amount||0);});});
+
+    // Labour: payroll
+    var payByMo=new Array(12).fill(0);
+    branches.forEach(function(b){
+      var staff=HRF.staff[b.id]||[];
+      var monthlyPay=staff.reduce(function(s,m){var base=parseFloat(m.basicSalary||m.salary||0);var h=Math.round(base*0.25);var t=Math.round(base*0.10);var gross=base+h+t;var gosi=Math.round(gross*0.09);return s+gross+gosi;},0);
+      for(var mi=0;mi<12;mi++)payByMo[mi]+=monthlyPay;
+    });
+
+    // Fixed costs & services from compliance
+    var fixedByMo=new Array(12).fill(0);
+    var permitAnnual=0;
+    branches.forEach(function(b){
+      var comp=HRF.compliance&&HRF.compliance[b.id];if(!comp)return;
+      var monthlyFixed=(comp.recurring||[]).reduce(function(s,r){return s+(parseFloat(r.monthlyCost)||0);},0);
+      var monthlyServices=(comp.services||[]).reduce(function(s,r){return s+(parseFloat(r.monthlyCost)||0);},0);
+      for(var mi=0;mi<12;mi++)fixedByMo[mi]+=monthlyFixed+monthlyServices;
+      permitAnnual+=(comp.permits||[]).reduce(function(s,p){return s+(parseFloat(p.monthlyCost)||0);},0);
+      for(var mi2=0;mi2<12;mi2++)fixedByMo[mi2]+=permitAnnual/12;
+    });
+
+    // Petty cash (operational / admin)
+    var pcByMo=new Array(12).fill(0);
+    branches.forEach(function(b){(HRF.pc[b.id]||[]).forEach(function(p){if(!p.date||!p.date.startsWith(String(selYear)))return;var mo=parseInt(p.date.slice(5,7),10)-1;if(mo>=0&&mo<12)pcByMo[mo]+=parseFloat(p.amount||0);});});
+
+    // YTD totals
+    var ytdRev=0,ytdWaste=0,ytdPay=0,ytdFixed=0,ytdPC=0;
+    for(var mi=0;mi<=Math.min(moIdx,d.getMonth());mi++){ytdRev+=revByMo[mi];ytdWaste+=wasteByMo[mi];ytdPay+=payByMo[mi];ytdFixed+=fixedByMo[mi];ytdPC+=pcByMo[mi];}
+    var ytdGross=ytdRev-ytdWaste;
+    var ytdEBITDA=ytdGross-ytdPay;
+    var ytdNet=ytdEBITDA-ytdFixed-ytdPC;
+    var margin=ytdRev>0?(ytdNet/ytdRev*100):0;
+
+    // Month picker
+    var moOpts='';for(var mi2=0;mi2<=d.getMonth();mi2++){var ym=selYear+'-'+(mi2<9?'0':'')+(mi2+1);var lbl=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][mi2]+' '+selYear;moOpts+='<option value="'+ym+'"'+(ym===selMonth?' selected':'')+'>'+lbl+'</option>';}
+
+    var INP='padding:7px 10px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;color:var(--text-primary);font-family:var(--font);font-size:13px;outline:none';
+    var h=hrfHeader('P\u0026L Statement','Full Profit \u0026 Loss \u00b7 '+selYear,
+      '<select style="'+INP+'" onchange="NX._pnlMonth=this.value;navTo(\'hrf-pnl\')">'+moOpts+'</select>'+
+      '<button class="btn btn-primary" onclick="navTo(\'hrf-compliance\')">View Fixed Costs</button>');
+
+    // Top KPI row
+    h+='<div class="hrf-kpi-grid" style="grid-template-columns:repeat(5,1fr)">';
+    h+=hrfKpi('\ud83d\udcb0','YTD Revenue',hfsar(ytdRev),'Top line','var(--fin-color)');
+    h+=hrfKpi('\ud83e\ude96','Gross Profit',hfsar(ytdGross),'After food cost',(ytdGross>=0?'#00875a':'#c0392b'));
+    h+=hrfKpi('\ud83e\uddd1\u200d\ud83d\udcbc','EBITDA',hfsar(ytdEBITDA),'After labour',(ytdEBITDA>=0?'#00875a':'#c0392b'));
+    h+=hrfKpi('\ud83d\udcc8','Net Profit',hfsar(ytdNet),(margin.toFixed(1)+'% margin'),(ytdNet>=0?'#00875a':'#c0392b'));
+    h+=hrfKpi('\ud83d\udce6','Fixed Costs',hfsar(ytdFixed),'Rent \u00b7 permits \u00b7 svcs','var(--warning)');
     h+='</div>';
-    h+='<div class="hrf-chart-card hrf-section"><div style="font-size:14px;font-weight:700;margin-bottom:16px">Revenue vs Costs \u2014 '+curYear+'</div><div style="height:260px"><canvas id="hrf-chart-pnl"></canvas></div></div>';
+
+    // P&L waterfall for selected month
+    var mRev=revByMo[moIdx]||0,mWaste=wasteByMo[moIdx]||0,mPay=payByMo[moIdx]||0,mFixed=fixedByMo[moIdx]||0,mPC=pcByMo[moIdx]||0;
+    var mGross=mRev-mWaste,mEBITDA=mGross-mPay,mNet=mEBITDA-mFixed-mPC;
+    var moName=['January','February','March','April','May','June','July','August','September','October','November','December'][moIdx]+' '+selYear;
+
+    h+='<div class="hrf-section" style="margin-bottom:20px"><div style="font-size:14px;font-weight:700;margin-bottom:14px">'+moName+' \u2014 P\u0026L Statement</div>';
+    function pl(l,v,indent,bold,color){var c=color||(v>=0?'var(--fin-color)':'#c0392b');return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);'+(bold?'font-weight:700':'')+'"><span style="padding-left:'+(indent?'20px':'0')+';color:var(--text-secondary)">'+l+'</span><span style="font-family:var(--mono);color:'+c+'">'+hfsar(v)+'</span></div>';}
+    function plsec(t){return '<div style="font-size:10px;font-weight:700;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.1em;padding:12px 0 4px">'+t+'</div>';}
+
+    h+=plsec('Revenue');
+    h+=pl('Net Sales Revenue',mRev,false,false,'var(--fin-color)');
+    h+=plsec('Cost of Goods Sold');
+    h+=pl('Food & Beverage Cost (Wastage)',-mWaste,true,false,'#c0392b');
+    h+=pl('= Gross Profit',mGross,false,true,(mGross>=0?'#00875a':'#c0392b'));
+    h+=plsec('Labour');
+    h+=pl('Payroll + Allowances + GOSI',-mPay,true,false,'#c0392b');
+    h+=pl('= EBITDA',mEBITDA,false,true,(mEBITDA>=0?'#00875a':'#c0392b'));
+    h+=plsec('Fixed Operating Expenses');
+    h+=pl('Rent, Electricity, Water, Gas',-mFixed,true,false,'#c0392b');
+    h+=plsec('Admin & Other');
+    h+=pl('Petty Cash / Operational',-mPC,true,false,'#c0392b');
+    h+=pl('= NET PROFIT / (LOSS)',mNet,false,true,(mNet>=0?'#00875a':'#c0392b'));
+    if(mRev>0)h+='<div style="text-align:right;font-size:11px;color:var(--text-tertiary);padding-top:6px">Net margin: <strong style="color:'+(mNet>=0?'#00875a':'#c0392b')+'">'+(mNet/mRev*100).toFixed(1)+'%</strong></div>';
+    h+='</div>';
+
+    // Monthly table
     var rows='';
-    for(var mo2=0;mo2<=d.getMonth();mo2++){
-      var rev=revByMo[mo2],costs=wasteByMo[mo2]+pcByMo[mo2],net=rev-costs;
-      var nc=net>=0?'#00875a':'#c0392b';
-      rows+='<tr><td><strong>'+HRF_MONTHS[mo2]+' '+curYear+'</strong></td>'+
-        '<td style="font-family:var(--mono);color:var(--fin-color)">'+hfsar(rev)+'</td>'+
-        '<td style="font-family:var(--mono);color:var(--danger)">'+hfsar(costs)+'</td>'+
+    for(var mi3=0;mi3<=Math.min(moIdx,d.getMonth());mi3++){
+      var r=revByMo[mi3],w=wasteByMo[mi3],p=payByMo[mi3],f=fixedByMo[mi3],pc=pcByMo[mi3];
+      var net=r-w-p-f-pc;var nc=net>=0?'#00875a':'#c0392b';
+      rows+='<tr><td><strong>'+['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][mi3]+' '+selYear+'</strong></td>'+
+        '<td style="font-family:var(--mono);color:var(--fin-color)">'+hfsar(r)+'</td>'+
+        '<td style="font-family:var(--mono);color:#c0392b">'+hfsar(w)+'</td>'+
+        '<td style="font-family:var(--mono);color:#c0392b">'+hfsar(p)+'</td>'+
+        '<td style="font-family:var(--mono);color:#c0392b">'+hfsar(f)+'</td>'+
         '<td style="font-family:var(--mono);color:'+nc+';font-weight:700">'+hfsar(net)+'</td>'+
-        '<td style="font-family:var(--mono);color:var(--text-secondary)">'+(rev?(net/rev*100).toFixed(1)+'%':'—')+'</td></tr>';
+        '<td style="font-family:var(--mono);color:var(--text-secondary)">'+(r>0?(net/r*100).toFixed(1)+'%':'—')+'</td></tr>';
     }
-    h+='<div class="hrf-section" style="margin-top:20px"><div style="font-size:13px;font-weight:700;margin-bottom:12px">Monthly P&amp;L</div>';
-    h+=hrfTable(['Month','Revenue','Costs','Net','Margin'],rows)+'</div>';
-    h+='<p style="font-size:11px;color:var(--text-tertiary);margin-top:8px">&#x26A0;&#xFE0F; Costs = wastage + petty cash. Full P&amp;L needs payroll and invoice integration.</p>';
-    NX._hrfPnLRev=revByMo;NX._hrfPnLCosts=Array.from({length:12},function(_,i){return wasteByMo[i]+pcByMo[i];});
+    h+=hrfTable(['Month','Revenue','Food Cost','Labour','Fixed Opex','Net Profit','Margin'],rows);
+    h+='<p style="font-size:11px;color:var(--text-tertiary);margin-top:8px">\u2139\ufe0f Labour = gross payroll + allowances + GOSI (9%). Fixed Opex from Compliance module. Add compliance records for full accuracy.</p>';
     return h;
   }
+
+  // Load everything in parallel
+  var needs=[];
   var c1=branches.filter(function(b){return HRF.sales[b.id];}).length;
   var c2=branches.filter(function(b){return HRF.waste[b.id];}).length;
   var c3=branches.filter(function(b){return HRF.pc[b.id];}).length;
-  if(c1===branches.length&&c2===branches.length&&c3===branches.length)return renderPnL();
-  var done=0;function check(){done++;if(done>=3)navTo('hrf-pnl');}
-  if(c1<branches.length)hrfLoadAll('sales','sales',check);else check();
-  if(c2<branches.length)hrfLoadAll('waste','waste',check);else check();
-  if(c3<branches.length)hrfLoadAll('pc','pc',check);else check();
-  return hrfLoading('Loading P&L data\u2026');
+  var c4=branches.filter(function(b){return HRF.staff[b.id];}).length;
+  if(c1===branches.length&&c2===branches.length&&c3===branches.length&&c4===branches.length){
+    if(!HRF.compliance){
+      HRF.compliance={};
+      var brs=hrfBranches();var loaded=0;
+      brs.forEach(function(b){db.ref('branches/'+b.id+'/compliance').once('value',function(snap){if(snap.val())HRF.compliance[b.id]=snap.val();if(++loaded===brs.length)navTo('hrf-pnl');});});
+      return hrfLoading('Loading P\u0026L data\u2026');
+    }
+    return renderPnL();
+  }
+  var done=0;var total=0;
+  function check(){if(++done>=total)navTo('hrf-pnl');}
+  if(c1<branches.length){total++;hrfLoadAll('sales','sales',check);}
+  if(c2<branches.length){total++;hrfLoadAll('waste','waste',check);}
+  if(c3<branches.length){total++;hrfLoadAll('pc','pc',check);}
+  if(c4<branches.length){total++;hrfLoadAll('staff','staff',check);}
+  if(!total)navTo('hrf-pnl');
+  return hrfLoading('Loading P\u0026L data\u2026');
 }
+
 
 // ── FOOD COST ──
 function pHrfFoodCost(){
@@ -15651,6 +15819,208 @@ function bmLoadTransfers(cb) {
     if(cb)cb();
   });
 }
+
+// ── BRANCH: COMPLIANCE & FIXED COSTS ─────────────────────────────────────────
+function pBmCompliance() {
+  attachBranchListeners();
+  var s = NX.session||{};
+  var branchId = s.branchId||'';
+  var tab = BS._compTab||'recurring';
+  if(!BS._compData){
+    BS._compData={recurring:[],permits:[],services:[]};
+    if(db&&branchId){
+      db.ref('branches/'+branchId+'/compliance').once('value',function(snap){
+        var v=snap.val()||{};
+        BS._compData={recurring:Array.isArray(v.recurring)?v.recurring:(v.recurring?Object.values(v.recurring):[]),permits:Array.isArray(v.permits)?v.permits:(v.permits?Object.values(v.permits):[]),services:Array.isArray(v.services)?v.services:(v.services?Object.values(v.services):[])};
+        navTo('bm-compliance');
+      });
+      return '<div style="text-align:center;padding:40px;color:var(--text-tertiary)">Loading\u2026</div>';
+    }
+  }
+  var D=BS._compData;
+  var now=new Date();
+  function daysUntil(d){if(!d)return 9999;return Math.ceil((new Date(d)-now)/86400000);}
+  function urgBadge(d){var du=daysUntil(d);if(du<0)return'<span style="background:rgba(192,57,43,.15);color:#c0392b;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700">EXPIRED</span>';if(du<=7)return'<span style="background:rgba(192,57,43,.12);color:#c0392b;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700">'+du+'d</span>';if(du<=30)return'<span style="background:rgba(180,83,17,.12);color:#b45309;border-radius:10px;padding:1px 6px;font-size:10px">'+du+'d</span>';if(du<=90)return'<span style="background:var(--surface-2);color:var(--text-tertiary);border-radius:10px;padding:1px 6px;font-size:10px">'+du+'d</span>';return'';}
+  var allItems=D.recurring.concat(D.permits).concat(D.services);
+  var expired=allItems.filter(function(x){return daysUntil(x.expiry||x.renewalDate)<=0;}).length;
+  var warn7=allItems.filter(function(x){var du=daysUntil(x.expiry||x.renewalDate);return du>0&&du<=7;}).length;
+  var warn30=allItems.filter(function(x){var du=daysUntil(x.expiry||x.renewalDate);return du>7&&du<=30;}).length;
+  var totRecurring=D.recurring.reduce(function(s,r){return s+(parseFloat(r.monthlyCost)||0);},0);
+  var totServices=D.services.reduce(function(s,r){return s+(parseFloat(r.monthlyCost)||0);},0);
+
+  var h='<div class="page-header"><h1>\ud83c\udfd9\ufe0f Compliance & Fixed Costs</h1><p>Recurring expenses, permits, and service contracts \u2014 all expiry tracked</p></div>';
+  if(expired||warn7||warn30){h+='<div style="background:rgba(192,57,43,.08);border:1px solid rgba(192,57,43,.25);border-radius:10px;padding:12px 16px;margin-bottom:16px;display:flex;gap:16px;align-items:center;flex-wrap:wrap"><span style="font-size:18px">\u26a0\ufe0f</span>';if(expired)h+='<span style="font-size:12px;color:#c0392b;font-weight:700">'+expired+' EXPIRED</span>';if(warn7)h+='<span style="font-size:12px;color:#c0392b;font-weight:700">'+warn7+' expire in 7 days</span>';if(warn30)h+='<span style="font-size:12px;color:#b45309">'+warn30+' expire in 30 days</span>';h+='</div>';}
+
+  h+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:16px">';
+  h+='<div class="bsc"><div class="bsc-lbl">Fixed costs/mo</div><div class="bsc-val bmono" style="font-size:16px">'+bfsar(totRecurring)+'</div></div>';
+  h+='<div class="bsc"><div class="bsc-lbl">Services/mo</div><div class="bsc-val bmono" style="font-size:16px">'+bfsar(totServices)+'</div></div>';
+  h+='<div class="bsc"><div class="bsc-lbl">Total/mo</div><div class="bsc-val bmono" style="font-size:16px">'+bfsar(totRecurring+totServices)+'</div></div>';
+  h+='<div class="bsc"><div class="bsc-lbl">Permits</div><div class="bsc-val bmono" style="font-size:18px">'+D.permits.length+'</div></div>';
+  h+='</div>';
+
+  var tabs=[['recurring','\ud83c\udfe0 Fixed Costs'],['permits','\ud83e\udeb7 Permits'],['services','\ud83d\udd27 Services']];
+  h+='<div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">';
+  tabs.forEach(function(t){h+='<button class="btn'+(tab===t[0]?' btn-primary':'')+'" onclick="BS._compTab=\''+t[0]+'\';BS._compData=BS._compData;navTo(\'bm-compliance\')">'+t[1]+'</button>';});
+  h+='<button class="btn btn-primary" style="margin-left:auto;background:var(--accent);color:#000" onclick="bmCompAddModal(\''+tab+'\')">+ Add</button>';
+  h+='<button class="btn" onclick="bmCompSendToFinance()">\ud83d\udce4 Send to Finance</button>';
+  h+='</div>';
+
+  function costTable(items,type){
+    if(!items.length)return'<div style="text-align:center;padding:32px;color:var(--text-tertiary);font-size:13px">No records yet \u2014 click <strong>+ Add</strong> to start</div>';
+    var cols=type==='permits'?['Name','Authority / Reference','Issue Date','Expiry','Status','Actions']:['Name','Category','Monthly SAR','Renewal Date','Vendor','Actions'];
+    var rows='';
+    items.forEach(function(item,i){
+      var expD=item.expiry||item.renewalDate||'';
+      rows+='<tr><td><div style="font-weight:600">'+hxe(item.name||'\u2014')+'</div>'+(item.reference?'<div style="font-size:10px;color:var(--text-tertiary)">'+hxe(item.reference)+'</div>':'')+('</td>');
+      if(type==='permits'){rows+='<td style="font-size:12px">'+hxe(item.authority||'\u2014')+'</td><td style="font-family:var(--mono);font-size:12px">'+hxe(item.issueDate||'\u2014')+'</td>';}
+      else{rows+='<td><span style="background:var(--surface-2);border-radius:8px;padding:2px 8px;font-size:10px">'+hxe(item.type||item.category||'\u2014')+'</span></td><td style="font-family:var(--mono);font-weight:700">'+bfsar(parseFloat(item.monthlyCost)||0)+'</td>';}
+      rows+='<td style="font-family:var(--mono);font-size:12px">'+hxe(expD||'\u2014')+' '+urgBadge(expD)+'</td>';
+      if(type==='permits')rows+='<td>'+urgBadge(expD)+'</td>';
+      else rows+='<td style="font-size:12px">'+hxe(item.vendor||'\u2014')+'</td>';
+      rows+='<td><div style="display:flex;gap:4px"><button class="btn btn-sm" onclick="bmCompEdit(\''+type+'\','+i+')">Edit</button><button class="btn btn-sm" style="color:var(--danger)" onclick="bmCompDel(\''+type+'\','+i+')">Del</button></div></td></tr>';
+    });
+    return hrfTable(cols,rows);
+  }
+  if(tab==='recurring') h+=costTable(D.recurring,'recurring');
+  if(tab==='permits')   h+=costTable(D.permits,'permits');
+  if(tab==='services')  h+=costTable(D.services,'services');
+  return h;
+}
+function bmCompAddModal(type){
+  var titles={recurring:'Add Fixed Cost',permits:'Add Permit / Licence',services:'Add Service Contract'};
+  var fi='background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text-primary);font-size:13px;outline:none;width:100%;font-family:var(--font);margin-bottom:10px';
+  var fl='display:block;font-size:10px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px';
+  function fi2(l,id,t,ph,v){return'<div><label style="'+fl+'">'+l+'</label><input style="'+fi+'" type="'+(t||'text')+'" id="bc-'+id+'" placeholder="'+(ph||'')+'" value="'+(v||'')+'"></div>';}
+  function sel(l,id,opts,v){return'<div><label style="'+fl+'">'+l+'</label><select style="'+fi+'" id="bc-'+id+'">'+opts.map(function(o){return'<option value="'+o+'"'+(o===v?' selected':'')+'>'+o+'</option>';}).join('')+'</select></div>';}
+  var body='';
+  if(type==='permits'){
+    body+=fi2('Permit / Licence Name','name','text','e.g. Municipal Trading Licence','');
+    body+=sel('Issuing Authority','authority',['Municipality','Civil Defence','Ministry of Commerce','Ministry of Health','Ministry of Labor','SAMA','ZATCA','Food Authority','Other'],'');
+    body+=fi2('Reference / Licence Number','reference','text','Licence No.','');
+    body+=fi2('Issue Date','issueDate','date','','');
+    body+=fi2('Expiry Date','expiry','date','','');
+    body+=fi2('Renewal Cost (SAR)','monthlyCost','number','Annual renewal fee','');
+    body+=fi2('Notes','notes','text','Responsible person, notes','');
+  } else {
+    var typeOpts=type==='recurring'?['Rent','Electricity','Water','Gas','Internet','Municipal fees','Insurance','Other fixed']:['HVAC maintenance','Pest control','Fire system check','Elevator service','Cleaning service','IT support','Uniform service','Waste disposal','Security','Other service'];
+    body+=fi2('Name / Description','name','text','e.g. Monthly Rent','');
+    body+=sel('Category','type',typeOpts,'');
+    body+=fi2('Monthly Cost (SAR)','monthlyCost','number','e.g. 15000','');
+    body+=fi2('Vendor / Supplier','vendor','text','Company name','');
+    body+=fi2('Contract Start','startDate','date','','');
+    body+=fi2('Renewal / Expiry Date','renewalDate','date','','');
+    body+=fi2('Notes','notes','text','Contract number, remarks','');
+  }
+  body+='<button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="bmCompSave(\''+type+'\',null)">Add Record</button>';
+  openModal('<div class="modal-head"><h2>'+titles[type]+'</h2><button class="modal-close" onclick="closeModalForce()">\u00d7</button></div>'+body);
+}
+function bmCompEdit(type,idx){
+  var item=(BS._compData||{})[type][idx];if(!item)return;
+  bmCompAddModal(type);
+  ['name','type','monthlyCost','vendor','startDate','renewalDate','notes','reference','authority','issueDate','expiry'].forEach(function(k){var el=document.getElementById('bc-'+k);if(el&&item[k]!==undefined)el.value=item[k];});
+  var btn=document.querySelector('#modal .btn.btn-primary');if(btn){btn.setAttribute('onclick','bmCompSave(\''+type+'\','+idx+')');btn.textContent='Save Changes';}
+}
+function bmCompSave(type,idx){
+  if(!BS._compData)BS._compData={recurring:[],permits:[],services:[]};
+  var arr=BS._compData[type];
+  function gv(id){var el=document.getElementById('bc-'+id);return el?el.value.trim():'';}
+  var rec={name:gv('name'),type:gv('type'),monthlyCost:parseFloat(gv('monthlyCost'))||0,vendor:gv('vendor'),startDate:gv('startDate'),renewalDate:gv('renewalDate'),notes:gv('notes'),reference:gv('reference'),authority:gv('authority'),issueDate:gv('issueDate'),expiry:gv('expiry'),updatedAt:new Date().toISOString()};
+  if(!rec.name){showToast('Name is required','error');return;}
+  if(idx===null)arr.push(rec);else arr[idx]=rec;
+  BS._compData[type]=arr;
+  var s=NX.session||{};
+  if(db&&s.branchId){db.ref('branches/'+s.branchId+'/compliance/'+type).set(arr,function(err){if(err)showToast('Save failed: '+err.message,'error');else{closeModalForce();showToast('Saved \u2713','success');navTo('bm-compliance');}});}
+  else{closeModalForce();showToast('Saved','success');navTo('bm-compliance');}
+}
+function bmCompDel(type,idx){
+  if(!confirm('Delete this record?'))return;
+  BS._compData[type].splice(idx,1);
+  var s=NX.session||{};
+  if(db&&s.branchId)db.ref('branches/'+s.branchId+'/compliance/'+type).set(BS._compData[type]);
+  navTo('bm-compliance');
+}
+function bmCompSendToFinance(){
+  var s=NX.session||{};if(!db||!s.branchId){showToast('No connection','error');return;}
+  db.ref('shared/compliance/'+s.branchId).set({branchId:s.branchId,branchName:s.branchName||s.entityName||'',recurring:BS._compData.recurring||[],permits:BS._compData.permits||[],services:BS._compData.services||[],sentAt:new Date().toISOString()},function(err){if(err)showToast('Failed','error');else showToast('Sent to Finance \u2713','success');});
+}
+
+// ── BRANCH: ASSET REGISTER ───────────────────────────────────────────────────
+function pBmAssets(){
+  attachBranchListeners();
+  var s=NX.session||{};var branchId=s.branchId||'';
+  if(!BS._assetData){
+    BS._assetData=[];
+    if(db&&branchId){
+      db.ref('branches/'+branchId+'/assets').once('value',function(snap){var v=snap.val();BS._assetData=Array.isArray(v)?v:(v?Object.values(v).filter(Boolean):[]);navTo('bm-assets');});
+      return'<div style="text-align:center;padding:40px;color:var(--text-tertiary)">Loading assets\u2026</div>';
+    }
+  }
+  var assets=BS._assetData;
+  var now=new Date();
+  function daysUntil(d){if(!d)return 9999;return Math.ceil((new Date(d)-now)/86400000);}
+  function urgBadge(d){var du=daysUntil(d);if(du<0)return'<span style="background:rgba(192,57,43,.15);color:#c0392b;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700">EXP</span>';if(du<=30)return'<span style="background:rgba(180,83,17,.12);color:#b45309;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700">'+du+'d</span>';return'';}
+  var totalValue=assets.reduce(function(s,a){return s+(parseFloat(a.value)||0);},0);
+  var needsMaint=assets.filter(function(a){return daysUntil(a.nextService)<=30;}).length;
+  var h='<div class="page-header"><h1>\ud83d\uddc2\ufe0f Asset Register</h1><p>All branch equipment, value tracking, and maintenance schedules</p></div>';
+  h+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:16px">';
+  h+='<div class="bsc"><div class="bsc-lbl">Total assets</div><div class="bsc-val bmono" style="font-size:18px">'+assets.length+'</div></div>';
+  h+='<div class="bsc"><div class="bsc-lbl">Total value</div><div class="bsc-val bmono" style="font-size:16px">'+bfsar(totalValue)+'</div></div>';
+  h+='<div class="bsc"><div class="bsc-lbl">Need service</div><div class="bsc-val bmono" style="font-size:18px;color:#b45309">'+needsMaint+'</div></div>';
+  h+='</div>';
+  h+='<div style="display:flex;gap:8px;margin-bottom:12px"><button class="btn btn-primary" style="background:var(--accent);color:#000" onclick="bmAssetModal(null)">+ Add Asset</button><button class="btn" onclick="bmAssetToFinance()">\ud83d\udce4 Send to Finance</button></div>';
+  if(!assets.length)return h+'<div style="text-align:center;padding:40px;color:var(--text-tertiary);font-size:13px">No assets recorded \u2014 click <strong>+ Add Asset</strong> to start</div>';
+  var rows='';
+  assets.forEach(function(a,i){
+    rows+='<tr><td><div style="font-weight:600">'+hxe(a.name||'\u2014')+'</div><div style="font-size:10px;color:var(--text-tertiary)">'+hxe(a.assetId||'')+'</div></td>';
+    rows+='<td><span style="background:var(--surface-2);border-radius:8px;padding:2px 8px;font-size:10px">'+hxe(a.category||'\u2014')+'</span></td>';
+    rows+='<td style="font-family:var(--mono)">'+bfsar(parseFloat(a.value)||0)+'</td>';
+    rows+='<td style="font-size:12px">'+hxe(a.purchaseDate||'\u2014')+'</td>';
+    rows+='<td style="font-size:12px">'+hxe(a.nextService||'\u2014')+' '+urgBadge(a.nextService)+'</td>';
+    rows+='<td style="font-size:12px"><span style="background:var(--surface-2);border-radius:8px;padding:2px 7px;font-size:10px">'+hxe(a.condition||'\u2014')+'</span></td>';
+    rows+='<td><div style="display:flex;gap:4px"><button class="btn btn-sm" onclick="bmAssetModal('+i+')">Edit</button><button class="btn btn-sm" style="color:var(--danger)" onclick="bmAssetDel('+i+')">Del</button></div></td></tr>';
+  });
+  h+=hrfTable(['Asset','Category','Value SAR','Purchase Date','Next Service','Condition','Actions'],rows);
+  return h;
+}
+function bmAssetModal(idx){
+  var a=idx!==null?(BS._assetData||[])[idx]:{};
+  var fi='background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text-primary);font-size:13px;outline:none;width:100%;font-family:var(--font);margin-bottom:10px';
+  var fl='display:block;font-size:10px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px';
+  function fi2(l,id,t,ph,v){return'<div><label style="'+fl+'">'+l+'</label><input style="'+fi+'" type="'+(t||'text')+'" id="ba-'+id+'" placeholder="'+(ph||'')+'" value="'+(v||'')+'"></div>';}
+  function sel2(l,id,opts,v){return'<div><label style="'+fl+'">'+l+'</label><select style="'+fi+'" id="ba-'+id+'">'+opts.map(function(o){return'<option value="'+o+'"'+(o===v?' selected':'')+'>'+o+'</option>';}).join('')+'</select></div>';}
+  var body='';
+  body+=fi2('Asset Name','name','text','e.g. Walk-in Chiller',a.name||'');
+  body+=sel2('Category','category',['Kitchen Equipment','HVAC','Refrigeration','Furniture','POS & IT','Vehicle','Safety Equipment','Signage','Generator','Other'],a.category||'');
+  body+=fi2('Asset ID / Serial','assetId','text','e.g. KIT-001',a.assetId||'');
+  body+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'+fi2('Purchase Value (SAR)','value','number','',a.value||'')+sel2('Condition','condition',['Excellent','Good','Fair','Needs repair','Out of service'],a.condition||'Good')+'</div>';
+  body+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'+fi2('Purchase Date','purchaseDate','date','',a.purchaseDate||'')+fi2('Warranty Expiry','warrantyExpiry','date','',a.warrantyExpiry||'')+'</div>';
+  body+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">'+fi2('Last Service','lastService','date','',a.lastService||'')+fi2('Next Service Due','nextService','date','',a.nextService||'')+'</div>';
+  body+=fi2('Vendor / Supplier','vendor','text','',a.vendor||'')+fi2('Notes','notes','text','',a.notes||'');
+  body+='<button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="bmAssetSave('+(idx===null?'null':idx)+')">'+(idx===null?'Add Asset':'Save Changes')+'</button>';
+  openModal('<div class="modal-head"><h2>'+(idx===null?'Add Asset':'Edit Asset')+'</h2><button class="modal-close" onclick="closeModalForce()">\u00d7</button></div>'+body);
+}
+function bmAssetSave(idx){
+  if(!BS._assetData)BS._assetData=[];
+  function gv(id){var el=document.getElementById('ba-'+id);return el?el.value.trim():'';}
+  var rec={name:gv('name'),category:gv('category'),assetId:gv('assetId'),value:parseFloat(gv('value'))||0,condition:gv('condition'),purchaseDate:gv('purchaseDate'),warrantyExpiry:gv('warrantyExpiry'),lastService:gv('lastService'),nextService:gv('nextService'),vendor:gv('vendor'),notes:gv('notes'),updatedAt:new Date().toISOString()};
+  if(!rec.name){showToast('Asset name required','error');return;}
+  if(idx===null)BS._assetData.push(rec);else BS._assetData[idx]=rec;
+  var s=NX.session||{};
+  if(db&&s.branchId){db.ref('branches/'+s.branchId+'/assets').set(BS._assetData,function(err){if(err)showToast('Save failed: '+err.message,'error');else{closeModalForce();showToast('Saved \u2713','success');BS._assetData=null;navTo('bm-assets');}});}
+  else{closeModalForce();showToast('Saved','success');navTo('bm-assets');}
+}
+function bmAssetDel(idx){
+  if(!confirm('Delete this asset?'))return;
+  BS._assetData.splice(idx,1);
+  var s=NX.session||{};
+  if(db&&s.branchId)db.ref('branches/'+s.branchId+'/assets').set(BS._assetData);
+  navTo('bm-assets');
+}
+function bmAssetToFinance(){
+  var s=NX.session||{};if(!db||!s.branchId){showToast('No connection','error');return;}
+  db.ref('shared/assets/'+s.branchId).set({branchId:s.branchId,branchName:s.branchName||'',assets:BS._assetData||[],sentAt:new Date().toISOString()},function(err){if(err)showToast('Failed','error');else showToast('Asset register sent to Finance \u2713','success');});
+}
+
 
 // ── 1. INVOICES ──────────────────────────────────────────────
 function pBmInvoices() {
