@@ -9665,7 +9665,11 @@ function approveStaffTransfer(reqId, reqEncoded) {
   var staffKey = String(req.staffId).replace(/[.#$[\]\/]/g, '_');
   var srcBranch = Object.values(NX_BRANCHES).find(function(b){ return b.id === req.fromBranch; });
   var srcName = (srcBranch&&srcBranch.name||req.fromBranchName||'').toLowerCase();
-  var keepAtSource = srcName.indexOf('hybrid') >= 0;
+  var destBranch = Object.values(NX_BRANCHES).find(function(b){ return b.id === req.toBranch; });
+  var destName = (destBranch&&destBranch.name||req.toBranchName||'').toLowerCase();
+  // Keep at source ONLY if source is Hybrid AND destination is NOT also Hybrid
+  // (Hybrid2192Hybrid = real transfer, so always remove from source)
+  var keepAtSource = srcName.indexOf('hybrid') >= 0 && destName.indexOf('hybrid') < 0;
   var role = (NX.session||{}).role;
   var nextPage = role === 'regional' ? 'headcount' : 'access-ctrl';
 
