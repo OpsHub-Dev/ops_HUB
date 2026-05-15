@@ -14062,30 +14062,38 @@ function hrfDoReassign(empId,fromBranchId){
 function hrfDeleteEmp(empId,branchId){
   if(!confirm('Delete this employee permanently?\n\nThis removes them from the branch staff list.'))return;
   if(!db){showToast('Not connected','error');return;}
-  // Read raw Firebase node directly to handle both array and keyed-object formats
-  db.ref('branches/'+branchId+'/staff').once('value',function(snap){
-    var raw=snap.val();
-    if(!raw){showToast('Staff list not found','error');return;}
-    if(Array.isArray(raw)){
-      var idx=raw.findIndex(function(x){return x&&String(x.id)===String(empId);});
-      if(idx<0){showToast('Employee not found','error');return;}
-      raw.splice(idx,1);
-      db.ref('branches/'+branchId+'/staff').set(raw,function(err){
+  // Try _key from cache first (set by hrfLoadAll), fallback to full Firebase scan
+  var cached=(HRF.staff[branchId]||[]);
+  var emp=cached.find(function(x){return String(x.id)===String(empId);});
+  var fbKey=emp&&emp._key?emp._key:null;
+  console.log('[DELETE] empId='+empId+' branchId='+branchId+' fbKey='+fbKey+' empFound='+(!!emp));
+  function doDelete(key){
+    if(key){
+      // Targeted remove — only deletes this one record
+      db.ref('branches/'+branchId+'/staff/'+key).remove(function(err){
         if(err){showToast('Delete failed: '+err.message,'error');return;}
         HRF.staff[branchId]=(HRF.staff[branchId]||[]).filter(function(x){return String(x.id)!==String(empId);});
         showToast('Employee deleted \u2713','success');navTo('hrf-employees');
       });
     } else {
-      var keyToRemove=null;
-      Object.keys(raw).forEach(function(k){if(raw[k]&&String(raw[k].id)===String(empId))keyToRemove=k;});
-      if(!keyToRemove){showToast('Employee not found','error');return;}
-      db.ref('branches/'+branchId+'/staff/'+keyToRemove).remove(function(err){
-        if(err){showToast('Delete failed: '+err.message,'error');return;}
-        HRF.staff[branchId]=(HRF.staff[branchId]||[]).filter(function(x){return String(x.id)!==String(empId);});
-        showToast('Employee deleted \u2713','success');navTo('hrf-employees');
+      // Fallback: read full node from Firebase, find key, then remove
+      db.ref('branches/'+branchId+'/staff').once('value',function(snap){
+        var raw=snap.val();
+        if(!raw){showToast('Staff not found in Firebase','error');return;}
+        var foundKey=null;
+        if(Array.isArray(raw)){
+          var idx=raw.findIndex(function(x){return x&&String(x.id)===String(empId);});
+          if(idx>=0){raw.splice(idx,1);db.ref('branches/'+branchId+'/staff').set(raw,function(e){if(e){showToast('Delete failed: '+e.message,'error');return;}HRF.staff[branchId]=(HRF.staff[branchId]||[]).filter(function(x){return String(x.id)!==String(empId);});showToast('Employee deleted \u2713','success');navTo('hrf-employees');});}
+          else showToast('Employee not found','error');
+        } else {
+          Object.keys(raw).forEach(function(k){if(raw[k]&&String(raw[k].id)===String(empId))foundKey=k;});
+          if(!foundKey){showToast('Employee not found','error');return;}
+          db.ref('branches/'+branchId+'/staff/'+foundKey).remove(function(e){if(e){showToast('Delete failed: '+e.message,'error');return;}HRF.staff[branchId]=(HRF.staff[branchId]||[]).filter(function(x){return String(x.id)!==String(empId);});showToast('Employee deleted \u2713','success');navTo('hrf-employees');});
+        }
       });
     }
-  });
+  }
+  doDelete(fbKey);
 }
 
 // ── ATTENDANCE ──
