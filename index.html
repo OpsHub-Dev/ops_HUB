@@ -14061,13 +14061,30 @@ function hrfDoReassign(empId,fromBranchId){
 }
 function hrfDeleteEmp(empId,branchId){
   if(!confirm('Delete this employee permanently?\n\nThis removes them from the branch staff list.'))return;
-  if(!db)return;
-  var arr=(HRF.staff[branchId]||[]).filter(function(x){return x.id!==empId;});
-  function toObj(a){var o={};a.forEach(function(item){if(!item)return;var k=String(item.id||'').replace(/[.#$\[\]\/]/g,'_')||'x';o[k]=item;});return o;}
-  db.ref('branches/'+branchId+'/staff').set(toObj(arr),function(err){
-    if(err){showToast('Delete failed: '+err.message,'error');return;}
-    HRF.staff[branchId]=arr;
-    showToast('Employee deleted','success');navTo('hrf-employees');
+  if(!db){showToast('Not connected','error');return;}
+  // Read raw Firebase node directly to handle both array and keyed-object formats
+  db.ref('branches/'+branchId+'/staff').once('value',function(snap){
+    var raw=snap.val();
+    if(!raw){showToast('Staff list not found','error');return;}
+    if(Array.isArray(raw)){
+      var idx=raw.findIndex(function(x){return x&&String(x.id)===String(empId);});
+      if(idx<0){showToast('Employee not found','error');return;}
+      raw.splice(idx,1);
+      db.ref('branches/'+branchId+'/staff').set(raw,function(err){
+        if(err){showToast('Delete failed: '+err.message,'error');return;}
+        HRF.staff[branchId]=(HRF.staff[branchId]||[]).filter(function(x){return String(x.id)!==String(empId);});
+        showToast('Employee deleted \u2713','success');navTo('hrf-employees');
+      });
+    } else {
+      var keyToRemove=null;
+      Object.keys(raw).forEach(function(k){if(raw[k]&&String(raw[k].id)===String(empId))keyToRemove=k;});
+      if(!keyToRemove){showToast('Employee not found','error');return;}
+      db.ref('branches/'+branchId+'/staff/'+keyToRemove).remove(function(err){
+        if(err){showToast('Delete failed: '+err.message,'error');return;}
+        HRF.staff[branchId]=(HRF.staff[branchId]||[]).filter(function(x){return String(x.id)!==String(empId);});
+        showToast('Employee deleted \u2713','success');navTo('hrf-employees');
+      });
+    }
   });
 }
 
