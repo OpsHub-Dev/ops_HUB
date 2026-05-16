@@ -280,10 +280,11 @@ html,body{height:100%;background:var(--base);color:var(--tx);font-family:var(--f
               <tbody id="itbody"></tbody>
             </table>
 
-            <div style="display:flex;gap:5px;margin-top:6px;align-items:center">
-              <button class="btn btn-sm btn-p" onclick="addRow()">+ Add Ingredient</button>
-              <button class="btn btn-sm" onclick="autoFillAllCosts()" title="Auto-fill all costs from inventory" style="color:var(--primary)">↻ Auto-cost All</button>
-              <span id="inv-badge" style="font-size:9px;color:var(--tx3);font-family:var(--mono);margin-left:4px">📦 Connecting…</span>
+            <div style="display:flex;gap:5px;margin-top:8px;align-items:center;flex-wrap:wrap">
+              <button class="btn btn-p" onclick="openInvPicker(null)" style="font-size:11px;padding:7px 14px;font-weight:700">&#x1F4E6; Pick from Inventory</button>
+              <button class="btn btn-sm" onclick="addRow()" style="color:var(--tx2)">+ Blank Row</button>
+              <button class="btn btn-sm" onclick="autoFillAllCosts()" title="Auto-fill all costs from inventory" style="color:var(--primary)">&#x21BB; Auto-cost All</button>
+              <span id="inv-badge" style="font-size:9px;color:var(--tx3);font-family:var(--mono);margin-left:4px">&#x1F4E6; Connecting&hellip;</span>
             </div>
           </div>
           <div class="tc-col">
@@ -627,7 +628,7 @@ function saveRecipesToFB(rec){
 
 function updateInvBadge(){
   var el=document.getElementById('inv-badge');
-  if(el) el.textContent=INV_ITEMS.length?'📦 '+INV_ITEMS.length+' shared ingredients ('+((INV_ITEMS.filter(function(i){return parseFloat(i.price||0)>0;}).length))+' priced)':'📦 Shared catalog empty';
+  if(el) el.textContent=INV_ITEMS.length?'📦 '+INV_ITEMS.length+' shared ingredients':'📦 Shared catalog empty';
 }
 function renderLib(){/* stub — left panel removed */}
 
@@ -1419,20 +1420,100 @@ initFB();
 var _invPickerRow = null;
 
 function openInvPicker(rowIdx) {
-  _invPickerRow = rowIdx;
+  _invPickerRow = (rowIdx !== undefined && rowIdx !== null) ? rowIdx : null;
+  _pickerSelectedItem = null;
   document.getElementById('inv-picker-ov').style.display = 'flex';
   var inp = document.getElementById('inv-picker-search');
   inp.value = '';
+  hidePapPanel();
   if (!INV_ITEMS.length && db) {
-    var list = document.getElementById('inv-picker-list');
-    list.innerHTML = '<div style="text-align:center;padding:20px;color:var(--tx3);font-size:11px">⏳ Loading ingredients...</div>';
+    document.getElementById('inv-picker-list').innerHTML =
+      '<div style="text-align:center;padding:28px 16px;color:var(--tx3);font-size:11px;line-height:1.8">'+
+      '<div style="font-size:32px;margin-bottom:10px">⏳</div>'+
+      '<div style="font-weight:700;color:var(--tx);margin-bottom:6px;font-size:13px">Loading inventory…</div>'+
+      '<div style="margin-bottom:14px">Fetching items from your branch.</div>'+
+      '<button onclick="loadAllBranchesInv();setTimeout(function(){filterInvPicker(\'\');},1800)" '+
+      'style="background:var(--primary);color:#fff;border:none;border-radius:10px;padding:10px 22px;font-size:12px;cursor:pointer;font-family:var(--font);font-weight:700">↻ Retry</button>'+
+      '</div>';
     loadAllBranchesInv();
-    setTimeout(function(){ filterInvPicker(''); }, 1500);
+    setTimeout(function(){ filterInvPicker(''); }, 1800);
   } else {
     filterInvPicker('');
   }
   setTimeout(function(){ inp.focus(); }, 80);
 }
+
+var _pickerSelectedItem = null;
+
+function hidePapPanel(){
+  var p = document.getElementById('inv-picker-add-panel');
+  if(p){ p.style.display='none'; }
+}
+
+function showPickerAddPanel(it){
+  _pickerSelectedItem = it;
+  var p = document.getElementById('inv-picker-add-panel');
+  if(!p) return;
+  p.style.display = 'block';
+  document.getElementById('pap-name').textContent = it.name||'';
+  document.getElementById('pap-code').textContent = it.code||'';
+  document.getElementById('pap-inv-price').textContent = 'SAR '+parseFloat(it.price||0).toFixed(4)+' / '+(it.unit||'g');
+  var invUnit = it.unit||'g';
+  var units = ['g','kg','ml','L','pc','pcs','oz','tbsp','tsp','cup','slice','portion','bunch','pack','can','bottle','bag','box'];
+  if(units.indexOf(invUnit)<0) units.unshift(invUnit);
+  else{ units.splice(units.indexOf(invUnit),1); units.unshift(invUnit); }
+  document.getElementById('pap-unit').innerHTML = units.map(function(u){return '<option value="'+u+'"'+(u===invUnit?' selected':'')+'>'+u+'</option>';}).join('');
+  document.getElementById('pap-qty').value = '';
+  updatePapConv();
+  setTimeout(function(){ document.getElementById('pap-qty').focus(); }, 60);
+}
+
+function updatePapConv(){
+  if(!_pickerSelectedItem) return;
+  var it = _pickerSelectedItem;
+  var ru = document.getElementById('pap-unit').value;
+  var invPrice = parseFloat(it.price||0);
+  var invUnit = it.unit||'g';
+  var el = document.getElementById('pap-conversion');
+  if(!invPrice){ el.innerHTML='<span style="color:var(--warn)">⚠ No price set — cost will be 0. Add price in Inventory first.</span>'; return; }
+  if(ru===invUnit){
+    el.innerHTML='<span style="color:var(--ok);font-weight:700">✓ SAR '+invPrice.toFixed(4)+' / '+ru+' (same unit)</span>';
+  } else {
+    var conv = convertCost(invPrice,invUnit,ru);
+    if(conv!==null){
+      el.innerHTML='SAR '+invPrice.toFixed(4)+'/'+invUnit+' <span style="color:var(--primary);font-weight:700">→</span> <span style="color:var(--ok);font-weight:700">SAR '+conv.toFixed(4)+' / '+ru+' ✓</span>';
+    } else {
+      el.innerHTML='<span style="color:var(--warn)">⚠ Cannot convert <strong>'+invUnit+'</strong> → <strong>'+ru+'</strong> (incompatible units). Pick same family.</span>';
+    }
+  }
+}
+
+function papAddIngredient(){
+  if(!_pickerSelectedItem) return;
+  var it = _pickerSelectedItem;
+  var qty = parseFloat(document.getElementById('pap-qty').value)||0;
+  if(qty<=0){ document.getElementById('pap-qty').style.boxShadow='inset 0 0 0 2px var(--err)'; document.getElementById('pap-qty').focus(); toast('Enter quantity','warning'); return; }
+  var ru  = document.getElementById('pap-unit').value;
+  var invPrice = parseFloat(it.price||0);
+  var invUnit  = it.unit||'g';
+  var cpu = 0;
+  if(invPrice>0){
+    var conv = convertCost(invPrice,invUnit,ru);
+    cpu = (conv!==null) ? conv : invPrice;
+  }
+  if(_invPickerRow!==null && ROWS[_invPickerRow]){
+    ROWS[_invPickerRow].name=it.name||''; ROWS[_invPickerRow].qty=qty;
+    ROWS[_invPickerRow].unit=ru; ROWS[_invPickerRow].cpu=cpu;
+    ROWS[_invPickerRow]._invCode=String(it.code); ROWS[_invPickerRow]._invUnit=invUnit; ROWS[_invPickerRow]._invPrice=invPrice;
+  } else {
+    ROWS.push({name:it.name||'',qty:qty,unit:ru,cpu:cpu,_invCode:String(it.code),_invUnit:invUnit,_invPrice:invPrice});
+  }
+  renderRows(); rc(); closeInvPicker();
+  var msg='✔ '+it.name+' × '+qty+' '+ru;
+  if(cpu>0) msg+=' — cost SAR '+(cpu*qty).toFixed(3);
+  toast(msg,'success');
+}
+
 
 function rbSelectBranch(bid) {
   BRANCH_ID = bid;
@@ -1487,7 +1568,7 @@ function filterInvPicker(q) {
   list.innerHTML = filtered.map(function(it) {
     var code = xe(it.code || '');
     var name = xe(it.name || '');
-    var unit = xe(it.unit && it.unit !== it.location ? it.unit : (it.uom || 'EA'));
+    var unit = xe(it.unit || 'pc');
     var price = parseFloat(it.price || 0).toFixed(4);
     return '<div onclick="pickInvItem(' + JSON.stringify(it.code) + ')" ' +
       'style="display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;cursor:pointer;' +
@@ -1511,7 +1592,7 @@ function pickInvItem(code) {
   var i = _invPickerRow;
   // Fill name, unit, cpu into the row
   ROWS[i].name = it.name || '';
-  ROWS[i].unit = (it.unit && it.unit !== it.location) ? it.unit : (it.uom || 'g');
+  ROWS[i].unit = it.unit || 'g';
   ROWS[i].cpu  = parseFloat(it.price || 0);
   ROWS[i]._invCode = String(it.code);
   renderRows(); rc();
@@ -1536,21 +1617,47 @@ document.getElementById('inv-picker-search').addEventListener('keydown', functio
 </script>
 
 <!-- Inventory Item Picker Modal -->
-<div id="inv-picker-ov" style="display:none;position:fixed;inset:0;background:rgba(30,41,56,.5);backdrop-filter:blur(4px);z-index:700;align-items:center;justify-content:center">
-  <div style="background:var(--base);border-radius:16px;box-shadow:var(--sh-raise-lg);width:min(480px,95vw);max-height:85vh;display:flex;flex-direction:column">
-    <div style="padding:14px 16px;border-bottom:1px solid rgba(0,0,0,.07);display:flex;align-items:center;justify-content:space-between">
+<div id="inv-picker-ov" style="display:none;position:fixed;inset:0;background:rgba(30,41,56,.55);backdrop-filter:blur(4px);z-index:700;align-items:center;justify-content:center;padding:12px">
+  <div style="background:var(--base);border-radius:18px;box-shadow:var(--sh-rl);width:min(520px,100%);max-height:90vh;display:flex;flex-direction:column">
+    <div style="padding:14px 16px;border-bottom:1px solid rgba(0,0,0,.07);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
       <div>
-        <div style="font-size:13px;font-weight:700;color:var(--tx);font-family:var(--font)">📦 Pick from Inventory</div>
-        <div style="font-size:10px;color:var(--tx3);font-family:var(--mono);margin-top:2px">Search by code or name</div>
+        <div style="font-size:14px;font-weight:700;color:var(--tx)">&#x1F4E6; Add Ingredient from Inventory</div>
+        <div style="font-size:10px;color:var(--tx3);font-family:var(--mono);margin-top:2px">Search &rarr; select &rarr; enter qty &rarr; add to recipe</div>
       </div>
-      <button onclick="closeInvPicker()" style="background:var(--base);border:none;border-radius:8px;box-shadow:var(--sh-rs);width:28px;height:28px;cursor:pointer;font-size:14px;color:var(--tx2)">✕</button>
+      <button onclick="closeInvPicker()" style="background:var(--base);border:none;border-radius:8px;box-shadow:var(--sh-rs);width:30px;height:30px;cursor:pointer;font-size:15px;color:var(--tx2)">&#x2715;</button>
     </div>
-    <div style="padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.05)">
-      <input id="inv-picker-search" type="text" placeholder="Search code or item name..." 
-        style="width:100%;background:var(--base);border:none;border-radius:9px;box-shadow:var(--sh-inset-sm);padding:8px 12px;font-family:var(--font);font-size:11px;color:var(--tx);outline:none;box-sizing:border-box"
+    <div style="padding:10px 14px;border-bottom:1px solid rgba(0,0,0,.05);flex-shrink:0">
+      <input id="inv-picker-search" type="text" placeholder="Type item name or code&hellip;"
+        style="width:100%;background:var(--base);border:none;border-radius:10px;box-shadow:var(--sh-i);padding:10px 14px;font-family:var(--font);font-size:13px;color:var(--tx);outline:none;box-sizing:border-box"
         oninput="filterInvPicker(this.value)">
     </div>
-    <div id="inv-picker-list" style="overflow-y:auto;flex:1;padding:8px"></div>
+    <div id="inv-picker-list" style="overflow-y:auto;flex:1;padding:8px;min-height:80px;max-height:260px"></div>
+    <div id="inv-picker-add-panel" style="display:none;flex-shrink:0;border-top:2px solid rgba(0,102,102,.2);background:rgba(0,102,102,.04);padding:14px 16px;border-radius:0 0 18px 18px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <div style="background:rgba(0,102,102,.12);border-radius:8px;padding:4px 10px;font-family:var(--mono);font-size:10px;font-weight:700;color:var(--primary);flex-shrink:0" id="pap-code"></div>
+        <div style="font-size:13px;font-weight:700;color:var(--tx);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="pap-name"></div>
+        <div style="font-size:10px;font-family:var(--mono);color:var(--tx3);flex-shrink:0" id="pap-inv-price"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <div>
+          <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--tx3);margin-bottom:5px">Quantity *</div>
+          <input id="pap-qty" type="number" min="0.001" step="0.001" placeholder="e.g. 200"
+            style="width:100%;background:var(--base);border:none;border-radius:9px;box-shadow:var(--sh-i);padding:9px 12px;font-family:var(--mono);font-size:16px;font-weight:700;color:var(--tx);outline:none;box-sizing:border-box;text-align:center"
+            oninput="updatePapConv()" onkeydown="if(event.key==='Enter')papAddIngredient()">
+        </div>
+        <div>
+          <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--tx3);margin-bottom:5px">Recipe Unit</div>
+          <select id="pap-unit"
+            style="width:100%;background:var(--base);border:none;border-radius:9px;box-shadow:var(--sh-i);padding:9px 12px;font-family:var(--mono);font-size:13px;color:var(--tx);outline:none;box-sizing:border-box"
+            onchange="updatePapConv()"></select>
+        </div>
+      </div>
+      <div id="pap-conversion" style="font-size:11px;font-family:var(--mono);padding:7px 10px;background:rgba(0,0,0,.04);border-radius:8px;margin-bottom:12px;min-height:26px"></div>
+      <button onclick="papAddIngredient()"
+        style="width:100%;padding:12px;background:var(--primary);color:#fff;border:none;border-radius:11px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font);box-shadow:4px 4px 12px rgba(0,102,102,.3),-2px -2px 6px rgba(255,255,255,.5)">
+        + Add to Recipe
+      </button>
+    </div>
   </div>
 </div>
 </body>
