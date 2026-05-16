@@ -459,7 +459,12 @@ html,body{height:100%;background:var(--base);color:var(--tx);font-family:var(--f
 // ═══════════════════════════════════════════════════
 var db=null, RECIPES=[], INGS=[], CID=null, ROWS=[], DSI=null;
 var INV_ITEMS=[]; // live inventory items from branches/.../inv_items (has price + unit)
-var BRANCH_ID=null;
+var BRANCH_ID=(function(){
+  try{
+    var p=new URLSearchParams(window.location.search);
+    return p.get('branch')||localStorage.getItem('alfa_branch_id')||null;
+  }catch(e){return null;}
+})();
 
 // ═══════════════════════════════════════════════════
 //  UOM CONVERSION ENGINE
@@ -588,26 +593,63 @@ function initFB(){
       }
     });
 
-    // ── Load shared ingredient catalog (shared/inv_items) ──
+    // ── Load inventory from branch then fallback chain ──
     function loadAllBranchesInv(){
       var el=document.getElementById('fbstat');
-      if(el) el.textContent='Loading shared ingredients...';
-      db.ref('shared/inv_items').once('value',function(snap){
-        var raw=snap.val();
-        if(raw){
-          var arr=Array.isArray(raw)?raw.filter(Boolean):Object.values(raw).filter(Boolean);
-          INV_ITEMS=arr.filter(function(i){return i&&i.name;});
-          INV_ITEMS.sort(function(a,b){return (a.name||'').localeCompare(b.name||'');});
-        } else {
-          INV_ITEMS=[];
-        }
+      if(el) el.textContent='Loading inventory…';
+
+      function toArr(raw){
+        if(!raw) return [];
+        var a=Array.isArray(raw)?raw.filter(Boolean):Object.values(raw).filter(Boolean);
+        return a.filter(function(i){return i&&i.name;});
+      }
+      function done(items, src){
+        INV_ITEMS=items.slice();
+        INV_ITEMS.sort(function(a,b){return(a.name||'').localeCompare(b.name||'');});
         updateInvBadge();
         if(ROWS.length) renderRows();
-        if(el) el.textContent='Connected — '+INV_ITEMS.length+' ingredients';
-      },function(err){
-        var el=document.getElementById('fbstat');
-        if(el) el.textContent='Connected to shared/recipes';
-      });
+        var q=document.getElementById('inv-picker-search');
+        filterInvPicker(q?q.value:'');
+        if(el) el.textContent=INV_ITEMS.length?'✓ '+INV_ITEMS.length+' items loaded':'⚠ No items found';
+        if(!INV_ITEMS.length) toast('No inventory items found. Add items in Inventory → Items first.','warning');
+        else toast('✓ '+INV_ITEMS.length+' items loaded from '+src,'success');
+      }
+      function scanAllBranches(){
+        db.ref('admin/branches').once('value',function(bsnap){
+          var braw=bsnap.val()||{};
+          var bids=Object.keys(braw).filter(function(k){return braw[k];});
+          if(!bids.length){done([],'no branches');return;}
+          var all=[],loaded=0;
+          bids.forEach(function(bid){
+            db.ref('branches/'+bid+'/inv_items').once('value',function(s){
+              all=all.concat(toArr(s.val()));
+              if(++loaded===bids.length) done(all,'all branches');
+            });
+          });
+        });
+      }
+      if(BRANCH_ID){
+        db.ref('branches/'+BRANCH_ID+'/inv_items').once('value',function(snap){
+          var items=toArr(snap.val());
+          if(items.length){done(items,BRANCH_ID);return;}
+          // Nothing in branch — try shared catalog
+          db.ref('shared/inv_items').once('value',function(s2){
+            var items2=toArr(s2.val());
+            if(items2.length){done(items2,'shared catalog');return;}
+            scanAllBranches();
+          });
+        },function(err){
+          if(el) el.textContent='⚠ Load error — check permissions';
+          toast('Inventory load error: '+err,'error');
+        });
+      } else {
+        // No branch ID — try shared first then scan
+        db.ref('shared/inv_items').once('value',function(snap){
+          var items=toArr(snap.val());
+          if(items.length){done(items,'shared catalog');return;}
+          scanAllBranches();
+        });
+      }
     }
     loadAllBranchesInv();
   }catch(e){
@@ -628,7 +670,7 @@ function saveRecipesToFB(rec){
 
 function updateInvBadge(){
   var el=document.getElementById('inv-badge');
-  if(el) el.textContent=INV_ITEMS.length?'📦 '+INV_ITEMS.length+' shared ingredients':'📦 Shared catalog empty';
+  if(el) el.textContent=INV_ITEMS.length?'📦 '+INV_ITEMS.length+' items loaded':'📦 No inventory — add items first';
 }
 function renderLib(){/* stub — left panel removed */}
 
@@ -1551,7 +1593,7 @@ function filterInvPicker(q) {
     list.innerHTML = '<div style="text-align:center;padding:24px 16px;color:var(--tx3);font-size:11px;line-height:1.7">' +
       '<div style="font-size:32px;margin-bottom:8px">⏳</div>' +
       '<div style="font-weight:700;color:var(--tx);margin-bottom:6px">Loading shared catalog...</div>' +
-      '<div style="margin-bottom:12px">Fetching from shared/inv_items.</div>' +
+      '<div style="margin-bottom:12px">Fetching from your branch inventory…</div>' +
       '<button onclick="loadAllBranchesInv();setTimeout(function(){filterInvPicker(\'\');},1500)" style="background:var(--primary);color:#fff;border:none;border-radius:8px;padding:8px 18px;font-size:11px;cursor:pointer;font-family:var(--font)">↻ Retry</button>' +
       '</div>';
     return;

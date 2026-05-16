@@ -7154,7 +7154,7 @@ var BS = {
   tsEmps:[], tsAtt:{}, tsLeaves:[],
   tsTab:'att', tsLTab:'all', tsSt:'present', tsViewDate:'', attFilt:'all', fd:'All', _roleFilter:'All',
   inv_loc:'', inv_sts:'', inv_uom:'', inv_page:0, waresFilter:'all', q:'',
-  _branchConfig:{}, recipes:[]
+  _branchConfig:{}, recipes:undefined, _compData:undefined, _assetData:undefined
 };
 var bItems = [], bLogs = [], bOrders = [];
 var _bListenersAttached = false;
@@ -9350,15 +9350,17 @@ function pWastage(){
   return h+'<div class="btw"><div class="btw-s"><table class="btbl"><thead><tr><th>Date</th><th>Item</th><th>Qty</th><th>Reason</th><th>Cost</th><th>By</th><th></th></tr></thead><tbody>'+(rows||'<tr><td colspan="7" style="text-align:center;color:var(--text-tertiary);padding:28px">No wastage entries</td></tr>')+'</tbody></table></div></div>';
 }
 function openBranchWastageModal(){
-  // Load recipes from Firebase if not already loaded
-  if(db && (!BS.recipes||!BS.recipes.length)){
+  // If recipes not loaded yet, load once then open — but NEVER recurse
+  if(db && BS.recipes===undefined){
+    BS.recipes=[];  // mark as loading so we don't recurse
     db.ref('shared/recipes').once('value',function(snap){
       var raw=snap.val();
-      if(raw){BS.recipes=Array.isArray(raw)?raw.filter(Boolean):Object.values(raw).filter(Boolean);}
+      BS.recipes=raw?(Array.isArray(raw)?raw.filter(Boolean):Object.values(raw).filter(Boolean)):[];
       openBranchWastageModal();
     });
     return;
   }
+  // BS.recipes is now either [] (no recipes) or populated — always proceed
   var so='<option value="">\u2014</option>'+BS.staff.map(function(s){return'<option>'+bxe(s.name)+'</option>';}).join('');
   var sortedRec=(BS.recipes||[]).slice().sort(function(a,b){return(a.name||'').localeCompare(b.name||'');});
   var recOpts='<option value="">\u2014 Select a recipe \u2014</option>';
@@ -15014,11 +15016,20 @@ function pHrfCompliance(){
     else h+=hrfTable(['Name / Branch','Type','Category','Monthly SAR','Expiry'],rows);
     return h;
   }
-  if(!HRF.compliance){
-    HRF.compliance={};
-    var brs=hrfBranches();var loaded=0;
-    brs.forEach(function(b){db.ref('branches/'+b.id+'/compliance').once('value',function(snap){if(snap.val())HRF.compliance[b.id]=snap.val();if(++loaded===brs.length)navTo('hrf-compliance');});});
-    return hrfLoading('Loading compliance data\u2026');
+  if(!HRF.compliance || HRF.compliance._loading){
+    if(!HRF.compliance){
+      HRF.compliance={_loading:true};
+      var brs=hrfBranches();var loaded=0;
+      brs.forEach(function(b){db.ref('branches/'+b.id+'/compliance').once('value',function(snap){
+        if(snap.val())HRF.compliance[b.id]=snap.val();
+        if(++loaded===brs.length){
+          delete HRF.compliance._loading;
+          var area=document.getElementById('page-area');
+          if(area&&NX.page==='hrf-compliance'){area.innerHTML=renderPage_('hrf-compliance');}
+        }
+      });});
+    }
+    return hrfLoading('Loading compliance data…');
   }
   return render();
 }
@@ -15141,13 +15152,21 @@ function pHrfPnL(){
   var c3=branches.filter(function(b){return HRF.pc[b.id];}).length;
   var c4=branches.filter(function(b){return HRF.staff[b.id];}).length;
   if(c1===branches.length&&c2===branches.length&&c3===branches.length&&c4===branches.length){
-    if(!HRF.compliance){
-      HRF.compliance={};
-      var brs=hrfBranches();var loaded=0;
-      brs.forEach(function(b){db.ref('branches/'+b.id+'/compliance').once('value',function(snap){if(snap.val())HRF.compliance[b.id]=snap.val();if(++loaded===brs.length)navTo('hrf-pnl');});});
-      return hrfLoading('Loading P\u0026L data\u2026');
+    if(!HRF.compliance || HRF.compliance._loading){
+      if(!HRF.compliance){
+        HRF.compliance={_loading:true};
+        var brs=hrfBranches();var loaded=0;
+        brs.forEach(function(b){db.ref('branches/'+b.id+'/compliance').once('value',function(snap){
+          if(snap.val())HRF.compliance[b.id]=snap.val();
+          if(++loaded===brs.length){
+            delete HRF.compliance._loading;
+            var area=document.getElementById('page-area');
+            if(area&&NX.page==='hrf-pnl'){area.innerHTML=renderPage_('hrf-pnl');}
+          }
+        });});
+      }
+      return hrfLoading('Loading P&L data…');
     }
-    return renderPnL();
   }
   var done=0;var total=0;
   function check(){if(++done>=total)navTo('hrf-pnl');}
@@ -15885,16 +15904,20 @@ function pBmCompliance() {
   var s = NX.session||{};
   var branchId = s.branchId||'';
   var tab = BS._compTab||'recurring';
-  if(!BS._compData){
-    BS._compData={recurring:[],permits:[],services:[]};
-    if(db&&branchId){
-      db.ref('branches/'+branchId+'/compliance').once('value',function(snap){
-        var v=snap.val()||{};
-        BS._compData={recurring:Array.isArray(v.recurring)?v.recurring:(v.recurring?Object.values(v.recurring):[]),permits:Array.isArray(v.permits)?v.permits:(v.permits?Object.values(v.permits):[]),services:Array.isArray(v.services)?v.services:(v.services?Object.values(v.services):[])};
-        navTo('bm-compliance');
-      });
-      return '<div style="text-align:center;padding:40px;color:var(--text-tertiary)">Loading\u2026</div>';
+  if(!BS._compData || BS._compData._loading){
+    if(!BS._compData){
+      BS._compData={_loading:true,recurring:[],permits:[],services:[]};
+      if(db&&branchId){
+        db.ref('branches/'+branchId+'/compliance').once('value',function(snap){
+          var v=snap.val()||{};
+          function toA(x){return Array.isArray(x)?x:(x?Object.values(x):[]);}
+          BS._compData={recurring:toA(v.recurring),permits:toA(v.permits),services:toA(v.services)};
+          var area=document.getElementById('page-area');
+          if(area&&NX.page==='bm-compliance'){area.innerHTML=renderPage_('bm-compliance');}
+        });
+      } else { BS._compData={recurring:[],permits:[],services:[]}; }
     }
+    return '<div style="text-align:center;padding:40px;color:var(--text-tertiary)">Loading…</div>';
   }
   var D=BS._compData;
   var now=new Date();
@@ -16007,12 +16030,19 @@ function bmCompSendToFinance(){
 function pBmAssets(){
   attachBranchListeners();
   var s=NX.session||{};var branchId=s.branchId||'';
-  if(!BS._assetData){
-    BS._assetData=[];
-    if(db&&branchId){
-      db.ref('branches/'+branchId+'/assets').once('value',function(snap){var v=snap.val();BS._assetData=Array.isArray(v)?v:(v?Object.values(v).filter(Boolean):[]);navTo('bm-assets');});
-      return'<div style="text-align:center;padding:40px;color:var(--text-tertiary)">Loading assets\u2026</div>';
+  if(BS._assetData === undefined || BS._assetData === null){
+    if(BS._assetData === undefined){
+      BS._assetData = null;  // mark as loading
+      if(db&&branchId){
+        db.ref('branches/'+branchId+'/assets').once('value',function(snap){
+          var v=snap.val();
+          BS._assetData=Array.isArray(v)?v:(v?Object.values(v).filter(Boolean):[]);
+          var area=document.getElementById('page-area');
+          if(area&&NX.page==='bm-assets'){area.innerHTML=renderPage_('bm-assets');}
+        });
+      } else { BS._assetData=[]; }
     }
+    return '<div style="text-align:center;padding:40px;color:var(--text-tertiary)">Loading assets…</div>';
   }
   var assets=BS._assetData;
   var now=new Date();
