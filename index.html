@@ -3230,7 +3230,6 @@ var NAV_CONFIG = {
       { id:'brand-mgmt',  icon:'🏢', label:'Brand Management' },
       { id:'access-ctrl', icon:'🔐', label:'Access Control' },
       { id:'audit-log',   icon:'📋', label:'Audit Log' },
-      { id:'recipe-builder',icon:'🍳', label:'Recipe Builder' },
       { id:'shared-ingredients',icon:'🧂', label:'Shared Ingredients' }
     ]}
   ],
@@ -3244,7 +3243,6 @@ var NAV_CONFIG = {
       { id:'brand-mgmt',    icon:'🏢', label:'Brand Management' },
       { id:'access-ctrl',   icon:'🔐', label:'Access Control' },
       { id:'audit-log',     icon:'📋', label:'Audit Log' },
-      { id:'recipe-builder',icon:'🍳', label:'Recipe Builder' },
       { id:'shared-ingredients',icon:'🧂', label:'Shared Ingredients' }
     ]}
   ],
@@ -4518,21 +4516,6 @@ function renderPage(pageId) {
         '<div style="font-size:13px;color:var(--text-secondary);margin-bottom:24px;max-width:360px;line-height:1.7">The music player has opened in a new tab. Use it to manage your branch playlist and prayer-aware auto-pause.</div>' +
         '<a href="'+url+'" target="_blank" style="text-decoration:none"><button class="btn btn-primary" style="padding:12px 28px;font-size:13px">&#x1F3B5; Open Music Player</button></a>' +
         '</div>';
-    },
-    'recipe-builder': function(){
-      var fbCfg='';
-      try{var st=localStorage.getItem('alfa_fb_config');if(st)fbCfg='?fbcfg='+btoa(st);}catch(e){}
-      var _rbid=(NX.session||{}).branchId||'';
-      var url='recipe-builder.html'+fbCfg+(_rbid?(fbCfg?'&':'?')+'branch='+encodeURIComponent(_rbid):'');
-      window.open(url,'_blank');
-      return '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;text-align:center;padding:40px">'+
-        '<div style="font-size:56px;margin-bottom:20px">&#x1F373;</div>'+
-        '<div style="font-size:20px;font-weight:800;color:var(--text-primary);margin-bottom:8px">Recipe Builder</div>'+
-        '<div style="font-size:13px;color:var(--text-secondary);margin-bottom:24px;max-width:380px;line-height:1.7">'+
-          'The Recipe Builder has opened in a new tab. Build recipes with ingredients and costs — saved to Firebase and linked to Wastage Log auto-costing.'+
-        '</div>'+
-        '<a href="'+url+'" target="_blank" style="text-decoration:none"><button class="btn btn-primary" style="padding:12px 28px;font-size:13px">&#x1F373; Open Recipe Builder</button></a>'+
-      '</div>';
     },
     // ── HR & Finance Manager pages ──
     'hrf-hr-dash':    pHrfHrDash,
@@ -7465,14 +7448,6 @@ function attachBranchListeners() {
   db.ref(bPath('pcGLs')).on('value', function(snap){ var v=snap.val(); if(v&&v.length)BS.pcGLs=v; });
   db.ref(bPath('pcCycleNo')).on('value', function(snap){ var v=snap.val(); if(v!==null&&v!==undefined)BS.pcCycleNo=v; });
   db.ref(bPath('pcArchive')).on('value', function(snap){ BS.pcArchive=snap.val()||[]; });
-  // Load shared recipe catalog for wastage cost auto-calculation
-  db.ref('shared/recipes').on('value', function(snap){
-    var raw=snap.val();
-    if(!raw) BS.recipes=[];
-    else if(Array.isArray(raw)) BS.recipes=raw.filter(Boolean);
-    else BS.recipes=Object.values(raw).filter(Boolean);
-  });
-
   // Load new BM data (transfers + announcements) once on attach, then update badges
   if(NX.session&&(NX.session.role==='branch_mgr'||NX.session.role==='staff')){
     bmLoadTransfers(null);
@@ -7559,18 +7534,6 @@ function attachBranchListeners() {
 // Helper to re-render current page without destroying charts (used by listeners)
 function renderPage_(pageId) {
   try {
-    // Recipe Builder opens in a new tab (standalone HTML) — always return the launch card
-    if (pageId === 'recipe-builder') {
-      var fbCfg = '';
-      try {
-        var stored = localStorage.getItem('alfa_fb_config');
-        if (stored) fbCfg = '?fbcfg=' + btoa(stored);
-      } catch(e) {}
-      var _rbid2=(NX.session||{}).branchId||'';
-      var _rburl='recipe-builder.html'+fbCfg+(_rbid2?(fbCfg?'&':'?')+'branch='+encodeURIComponent(_rbid2):'');
-      window.open(_rburl, '_blank');
-      return pRecipeBuilderLaunch();
-    }
     var fns = {
       'branch-dash':pBranchDash,'inv-items':pInvItems,'inv-moves':pInvMoves,'inv-orders':pInvOrders,
       'low-stock':pLowStock,'inv-report':pInvReport,'wastage':pWastage,'staff':pStaff,
@@ -7579,17 +7542,6 @@ function renderPage_(pageId) {
     };
     return fns[pageId] ? fns[pageId]() : '';
   } catch(e) { return '<div class="empty-state"><div class="es-icon">&#x26A0;&#xFE0F;</div><p>' + bxe(e.message) + '</p></div>'; }
-}
-
-function pRecipeBuilderLaunch() {
-  return '<div class="empty-state" style="padding:60px 20px">'+
-    '<div style="font-size:56px;margin-bottom:16px">&#x1F373;</div>'+
-    '<h3 style="font-size:18px;font-weight:700;margin-bottom:8px">Recipe Builder</h3>'+
-    '<p style="color:var(--text-secondary);margin-bottom:24px;max-width:360px;margin-left:auto;margin-right:auto;line-height:1.7">'+
-      'The Recipe Builder has opened in a new tab. Build and cost recipes there — they are automatically saved to Firebase and linked to the Wastage Log here.'+
-    '</p>'+
-    '<button class="btn btn-primary" onclick="window.open(\'recipe-builder.html\',\'_blank\')">&#x1F373; Open Recipe Builder</button>'+
-  '</div>';
 }
 
 // ── CSS for branch pages (OpsHub style, scoped) ──
@@ -9348,77 +9300,121 @@ function pWastage(){
   h+='</div>';
   h+='<div class="header-actions"><div></div><button class="btn btn-primary" onclick="openBranchWastageModal()">+ Log Wastage</button></div>';
   return h+'<div class="btw"><div class="btw-s"><table class="btbl"><thead><tr><th>Date</th><th>Item</th><th>Qty</th><th>Reason</th><th>Cost</th><th>By</th><th></th></tr></thead><tbody>'+(rows||'<tr><td colspan="7" style="text-align:center;color:var(--text-tertiary);padding:28px">No wastage entries</td></tr>')+'</tbody></table></div></div>';
-}
 function openBranchWastageModal(){
   var so='<option value="">\u2014</option>'+BS.staff.map(function(s2){return '<option>'+bxe(s2.name)+'</option>';}).join('');
-  var recOpts='<option value="">\u2014 Manual entry (no recipe) \u2014</option>';
-  var sortedRec=(BS.recipes||[]).slice().sort(function(a,b){return(a.name||'').localeCompare(b.name||'');});
-  sortedRec.forEach(function(r){recOpts+='<option value="'+bxe(r.id)+'">'+bxe(r.name)+(r.recipeCode?' ['+bxe(r.recipeCode)+']':'')+'</option>';});
   var html='<div class="modal-head"><h2>Log Wastage</h2><button class="modal-close" onclick="closeModalForce()">&#x2715;</button></div>';
-  var _canPickRecipe=['super_admin','ceo'].indexOf((NX.session||{}).role)>=0;
-  if(_canPickRecipe){
-    html+='<div class="bfg"><label class="form-label">Link to Recipe (auto-calculates cost)</label>';
-    html+='<select class="form-input form-select" id="bw-recipe" onchange="bwOnRecipePick(this.value)">'+recOpts+'</select></div>';
-  }
   html+='<div class="form-row">';
   html+='<div class="bfg"><label class="form-label">Date</label><input class="form-input" type="date" id="bw-date" value="'+TODAY_BS+'"></div>';
   html+='<div class="bfg"><label class="form-label">Reported By</label><select class="form-input form-select" id="bw-by">'+so+'</select></div>';
   html+='</div>';
+  html+='<div class="bfg" style="position:relative">';
+  html+='<label class="form-label">Item Name * <span id="bw-inv-tag" style="display:none;background:rgba(0,102,102,.12);color:#006666;font-size:9px;padding:2px 7px;border-radius:6px;font-family:monospace;margin-left:6px"></span></label>';
+  html+='<input class="form-input" id="bw-item" placeholder="Type to search inventory\u2026" autocomplete="off" oninput="bwFilterInv(this.value)">';
+  html+='<div id="bw-inv-drop" style="display:none;position:absolute;left:0;right:0;top:100%;background:var(--surface-1,#f4f2f1);border-radius:10px;box-shadow:0 8px 28px rgba(0,0,0,.18);z-index:999;max-height:220px;overflow-y:auto;margin-top:3px"></div>';
+  html+='<input type="hidden" id="bw-inv-code">';
+  html+='</div>';
   html+='<div class="form-row">';
-  html+='<div class="bfg"><label class="form-label">Item Name *</label><input class="form-input" id="bw-item" placeholder="Item name / recipe name"></div>';
   html+='<div class="bfg"><label class="form-label">Reason</label><select class="form-input form-select" id="bw-reason"><option value="">\u2014</option>'+WR.map(function(r){return '<option>'+bxe(r)+'</option>';}).join('')+'</select></div>';
+  html+='<div class="bfg"><label class="form-label">Unit</label><input class="form-input" id="bw-unit" placeholder="kg, pcs\u2026" readonly style="color:var(--text-secondary)"></div>';
   html+='</div>';
   html+='<div class="form-row">';
   html+='<div class="bfg"><label class="form-label">Qty Wasted *</label><input class="form-input" type="number" id="bw-qty" step="0.001" placeholder="0" oninput="bwRecalcCost()"></div>';
-  html+='<div class="bfg"><label class="form-label">Unit</label><input class="form-input" id="bw-unit" placeholder="kg, pcs, portion\u2026"></div>';
+  html+='<div class="bfg"><label class="form-label">Unit Cost (SAR)</label><input class="form-input" type="number" id="bw-unit-cost" step="0.0001" placeholder="Auto from inventory" oninput="bwRecalcCost()"></div>';
   html+='</div>';
   html+='<div style="background:var(--surface-2);border-radius:10px;padding:12px 14px;margin-bottom:12px;display:flex;gap:14px;flex-wrap:wrap;align-items:center">';
   html+='<div style="flex:1;min-width:130px"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-tertiary);margin-bottom:3px">Auto-Calculated Cost</div>';
-  html+='<div id="bw-cost-display" style="font-size:22px;font-weight:700;font-family:var(--mono);color:var(--danger)">SAR 0.00</div>';
-  html+='<div id="bw-cost-note" style="font-size:10px;color:var(--text-tertiary);font-family:var(--mono);margin-top:2px">Select a recipe above</div></div>';
-  html+='<div style="flex:1;min-width:130px"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-tertiary);margin-bottom:3px">Override Cost (‫SAR ‬)</div>';
-  html+='<input class="form-input" type="number" id="bw-val" step="0.01" placeholder="Leave blank = use auto" oninput="bwUpdateDisplay()"></div>';
+  html+='<div id="bw-cost-display" style="font-size:22px;font-weight:700;font-family:var(--mono);color:var(--danger)">SAR 0.00</div>';
+  html+='<div id="bw-cost-note" style="font-size:10px;color:var(--text-tertiary);font-family:var(--mono);margin-top:2px">Select item &amp; enter qty</div></div>';
+  html+='<div style="flex:1;min-width:130px"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-tertiary);margin-bottom:3px">Override Total (SAR)</div>';
+  html+='<input class="form-input" type="number" id="bw-val" step="0.01" placeholder="Leave blank \u2013 use auto" oninput="bwUpdateDisplay()"></div>';
   html+='</div>';
   html+='<button class="btn btn-primary" style="width:100%" onclick="saveBranchWastage()">Log Wastage</button>';
   openModal(html);
+  setTimeout(function(){
+    document.addEventListener('click',function _bwOuter(e){
+      var drop=document.getElementById('bw-inv-drop');
+      if(drop&&!drop.contains(e.target)&&e.target.id!=='bw-item')drop.style.display='none';
+      if(!document.getElementById('bw-item'))document.removeEventListener('click',_bwOuter);
+    });
+  },100);
 }
-function bwOnRecipePick(recipeId){
-  var nameEl=document.getElementById('bw-item'),unitEl=document.getElementById('bw-unit'),noteEl=document.getElementById('bw-cost-note');
-  if(!recipeId){if(noteEl)noteEl.textContent='Select a recipe above';bwRecalcCost();return;}
-  if(!document.getElementById('bw-recipe'))return;
-  var rec=(BS.recipes||[]).find(function(r){return r.id===recipeId;});
-  if(!rec)return;
-  if(nameEl&&!nameEl.value)nameEl.value=rec.name||'';
-  if(unitEl)unitEl.value=rec.yieldUnit||'portion';
-  if(noteEl)noteEl.textContent='SAR '+(rec.costPerPortion||0).toFixed(3);
+function bwFilterInv(q){
+  var drop=document.getElementById('bw-inv-drop');
+  if(!drop)return;
+  q=(q||'').toLowerCase().trim();
+  if(!q){drop.style.display='none';return;}
+  var src=bItems&&bItems.length?bItems:[];
+  var filtered=src.filter(function(i){
+    return i&&((i.name||'').toLowerCase().indexOf(q)>=0||(i.code||'').toLowerCase().indexOf(q)>=0);
+  }).slice(0,12);
+  if(!filtered.length){
+    drop.innerHTML='<div style="padding:14px;text-align:center;font-size:11px;color:var(--text-tertiary)">No items found</div>';
+    drop.style.display='block';return;
+  }
+  drop.innerHTML=filtered.map(function(it){
+    var price=parseFloat(it.price||0);
+    var safe=JSON.stringify(JSON.stringify(it));
+    return '<div onclick="bwPickInvItem('+safe+')" style="padding:10px 14px;cursor:pointer;border-bottom:1px solid rgba(0,0,0,.06);transition:background .1s" onmouseover="this.style.background=\'rgba(0,102,102,.07)\'" onmouseout="this.style.background=\'\'">'
+      +'<div style="font-weight:700;font-size:12px;color:var(--text-primary)">'+bxe(it.name||'')+'</div>'
+      +'<div style="font-size:10px;color:var(--text-tertiary);font-family:monospace;margin-top:2px">'+bxe(it.code||'\u2014')+' \u00b7 '+bxe(it.unit||'ea')+' \u00b7 SAR\xa0'+price.toFixed(4)+'/unit</div>'
+      +'</div>';
+  }).join('');
+  drop.style.display='block';
+}
+function bwPickInvItem(json){
+  var it=JSON.parse(json);
+  var nameEl=document.getElementById('bw-item');
+  var unitEl=document.getElementById('bw-unit');
+  var costEl=document.getElementById('bw-unit-cost');
+  var codeEl=document.getElementById('bw-inv-code');
+  var tagEl=document.getElementById('bw-inv-tag');
+  if(nameEl)nameEl.value=it.name||'';
+  if(unitEl)unitEl.value=it.unit||'ea';
+  if(costEl)costEl.value=parseFloat(it.price||0).toFixed(4);
+  if(codeEl)codeEl.value=String(it.code||'');
+  if(tagEl){tagEl.textContent=it.code||'';tagEl.style.display='inline';}
+  var drop=document.getElementById('bw-inv-drop');
+  if(drop)drop.style.display='none';
   bwRecalcCost();
 }
 function bwRecalcCost(){
-  var _recEl=document.getElementById('bw-recipe');
-  var recipeId=_recEl?_recEl.value||'':'';
   var qty=parseFloat((document.getElementById('bw-qty')||{}).value)||0;
-  var disp=document.getElementById('bw-cost-display'),noteEl=document.getElementById('bw-cost-note');
-  var rec=recipeId?(BS.recipes||[]).find(function(r){return r.id===recipeId;}):null;
-  if(rec&&qty>0){
-    var cost=rec.costPerPortion*qty;
-    if(disp)disp.textContent='SAR '+cost.toFixed(2);
-    if(noteEl)noteEl.textContent='SAR AUTO: '+qty+' × SAR '+(rec.costPerPortion||0).toFixed(3)+'/portion';
-    var ov=document.getElementById('bw-val');if(ov&&!ov.value)ov.value=cost.toFixed(2);
-  } else {
-    if(disp)disp.textContent='SAR '+(parseFloat((document.getElementById('bw-val')||{}).value)||0).toFixed(2);
+  var unitCost=parseFloat((document.getElementById('bw-unit-cost')||{}).value)||0;
+  var disp=document.getElementById('bw-cost-display');
+  var noteEl=document.getElementById('bw-cost-note');
+  var total=qty*unitCost;
+  if(disp)disp.textContent='SAR\xa0'+total.toFixed(2);
+  if(noteEl){
+    if(qty>0&&unitCost>0)noteEl.textContent=qty+' \u00d7 SAR\xa0'+unitCost.toFixed(4)+' = SAR\xa0'+total.toFixed(2);
+    else noteEl.textContent='Select item & enter qty';
   }
+  var ov=document.getElementById('bw-val');
+  if(ov&&!ov.value&&total>0)ov.value=total.toFixed(2);
 }
-function bwUpdateDisplay(){var v=parseFloat((document.getElementById('bw-val')||{}).value)||0;var disp=document.getElementById('bw-cost-display');if(disp)disp.textContent='SAR '+v.toFixed(2);}
+function bwUpdateDisplay(){var v=parseFloat((document.getElementById('bw-val')||{}).value)||0;var disp=document.getElementById('bw-cost-display');if(disp)disp.textContent='SAR\xa0'+v.toFixed(2);}
 function saveBranchWastage(){
   var item=bgv('bw-item'),qty=parseFloat(bgv('bw-qty'))||0;
   if(!item||qty<=0){showToast('Item and quantity required','error');return;}
-  var recipeId=document.getElementById('bw-recipe')?bgv('bw-recipe'):'';
-  var rec=recipeId?(BS.recipes||[]).find(function(r){return r.id===recipeId;}):null;
+  var unitCost=parseFloat(bgv('bw-unit-cost'))||0;
+  var autoCost=qty*unitCost;
   var overrideVal=parseFloat(bgv('bw-val'))||0;
-  var autoCost=rec?rec.costPerPortion*qty:0;
   var finalCost=overrideVal>0?overrideVal:autoCost;
-  BS.waste.push({id:buid(),date:bgv('bw-date')||TODAY_BS,item:item,qty:qty,unit:bgv('bw-unit'),reason:bgv('bw-reason'),value:finalCost,by:bgv('bw-by'),recipeId:recipeId||'',recipeCode:rec?rec.recipeCode||'':''});
-  bSaveColl('waste',BS.waste);closeModalForce();showToast('Wastage logged \u2014 Cost: '+bfsar(finalCost),'success');navTo('wastage');
+  var invCode=bgv('bw-inv-code')||'';
+  BS.waste.push({id:buid(),date:bgv('bw-date')||TODAY_BS,item:item,qty:qty,unit:bgv('bw-unit'),reason:bgv('bw-reason'),value:finalCost,unitCost:unitCost,invCode:invCode,by:bgv('bw-by')});
+  if(invCode&&db&&NX.session&&NX.session.branchId){
+    var safeCode=String(invCode).replace(/[.#$\[\]\/]/g,'_');
+    var stockRef=db.ref('branches/'+NX.session.branchId+'/stock/'+safeCode);
+    stockRef.once('value',function(snap){
+      var cur=parseFloat((snap.val()||{}).qty||0)||0;
+      stockRef.update({qty:Math.max(0,parseFloat((cur-qty).toFixed(4)))});
+    });
+  }
+  bSaveColl('waste',BS.waste);
+  closeModalForce();
+  showToast('Wastage logged \u2014 Cost: '+bfsar(finalCost),'success');
+  navTo('wastage');
+}
+
 }
 
 function delBranchWaste(id){if(!confirm('Delete this wastage entry?'))return;BS.waste=BS.waste.filter(function(w){return w.id!==id;});bSaveColl('waste',BS.waste);showToast('Deleted');navTo('wastage');}
