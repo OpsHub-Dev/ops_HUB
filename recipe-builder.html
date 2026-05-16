@@ -573,10 +573,14 @@ function initFB(){
     if(!cfg)throw new Error('no config');
     if(!firebase.apps.length)firebase.initializeApp(cfg);
     db=firebase.database();
-    ['cbadge'].forEach(function(id){var el=document.getElementById(id);if(el){el.textContent='Live';el.className='cbadge live';}});
-    var _fs=document.getElementById('fbstat');if(_fs)_fs.textContent='Firebase connected';
-    // Update inv-badge to show loading state (not "Connecting…")
+    // Show "connecting" until Firebase confirms the connection
     var _ib=document.getElementById('inv-badge');if(_ib)_ib.textContent='📦 Loading inventory…';
+    db.ref('.info/connected').on('value',function(snap){
+      var connected=snap.val()===true;
+      var el=document.getElementById('cbadge');
+      if(el){el.textContent=connected?'● Live':'○ Offline';el.className='cbadge '+(connected?'live':'off');}
+      var fs=document.getElementById('fbstat');if(fs)fs.textContent=connected?'Firebase connected':'Offline — check connection';
+    });
     // Load recipes from Firebase
     db.ref('shared/recipes').on('value',function(snap){
       var raw=snap.val();
@@ -672,7 +676,10 @@ function initFB(){
   }catch(e){
     loadLocal();
     renderLib('');renderRB('');renderIngModal();
-    var _fs2=document.getElementById('fbstat');if(_fs2)_fs2.textContent='Local mode — no Firebase';
+    var _cb=document.getElementById('cbadge');if(_cb){_cb.textContent='○ No Config';_cb.className='cbadge off';}
+    var _fs2=document.getElementById('fbstat');if(_fs2)_fs2.textContent='Local mode — open from main app for Firebase';
+    var _ib2=document.getElementById('inv-badge');if(_ib2)_ib2.textContent='📦 Open from main app to load inventory';
+    console.warn('Recipe Builder: Firebase not configured.',e.message);
   }
 }
 

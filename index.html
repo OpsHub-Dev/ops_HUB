@@ -7588,7 +7588,7 @@ function pRecipeBuilderLaunch() {
     '<p style="color:var(--text-secondary);margin-bottom:24px;max-width:360px;margin-left:auto;margin-right:auto;line-height:1.7">'+
       'The Recipe Builder has opened in a new tab. Build and cost recipes there — they are automatically saved to Firebase and linked to the Wastage Log here.'+
     '</p>'+
-    '<button class="btn btn-primary" onclick="window.open(\'recipe-builder.html\',\'_blank\')">&#x1F373; Open Recipe Builder</button>'+
+    '<button class="btn btn-primary" onclick="(function(){var fc=\'\';try{var st=localStorage.getItem(\'alfa_fb_config\');if(st)fc=\'?fbcfg=\'+btoa(st);}catch(e){}var bid=(NX.session||{}).branchId||\'\';var url=\'recipe-builder.html\'+fc+(bid?(fc?\'&\':\'?\')+\'branch=\'+encodeURIComponent(bid):\'\');window.open(url,\'_blank\');}())">&#x1F373; Open Recipe Builder</button>'+
   '</div>';
 }
 
