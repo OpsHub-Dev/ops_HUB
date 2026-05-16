@@ -2901,8 +2901,6 @@ function initFirebase() {
       firebase.initializeApp(FB_CONFIG);
     }
     db = firebase.database();
-    // Persist config so recipe-builder.html can read it when opened as a new tab
-    try{ localStorage.setItem('alfa_fb_config', JSON.stringify(FB_CONFIG)); }catch(e){}
     // Real-time connection status from Firebase
     db.ref('.info/connected').on('value', function(snap) {
       var online = !!snap.val();
@@ -3061,11 +3059,7 @@ function navTo(pageId) {
 
   NX.page = pageId;
   // Persist last page for refresh restore
-  // Don't persist external-tab pages as last page
-  var _externalPages=['recipe-builder','bm-music-player'];
-  if(_externalPages.indexOf(pageId)<0){
-    try { localStorage.setItem('nx_last_page', pageId); } catch(e) {}
-  }
+  try { localStorage.setItem('nx_last_page', pageId); } catch(e) {}
   updateTopBar(pageId);
   renderSidebar();
   window.scrollTo(0, 0);
@@ -4526,8 +4520,10 @@ function renderPage(pageId) {
         '</div>';
     },
     'recipe-builder': function(){
+      var fbCfg='';
+      try{var st=localStorage.getItem('alfa_fb_config');if(st)fbCfg='?fbcfg='+btoa(st);}catch(e){}
       var _rbid=(NX.session||{}).branchId||'';
-      var url='recipe-builder.html'+(_rbid?'?branch='+encodeURIComponent(_rbid):'');
+      var url='recipe-builder.html'+fbCfg+(_rbid?(fbCfg?'&':'?')+'branch='+encodeURIComponent(_rbid):'');
       window.open(url,'_blank');
       return '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;text-align:center;padding:40px">'+
         '<div style="font-size:56px;margin-bottom:20px">&#x1F373;</div>'+
@@ -7158,7 +7154,7 @@ var BS = {
   tsEmps:[], tsAtt:{}, tsLeaves:[],
   tsTab:'att', tsLTab:'all', tsSt:'present', tsViewDate:'', attFilt:'all', fd:'All', _roleFilter:'All',
   inv_loc:'', inv_sts:'', inv_uom:'', inv_page:0, waresFilter:'all', q:'',
-  _branchConfig:{}, recipes:undefined, _compData:undefined, _assetData:undefined
+  _branchConfig:{}, recipes:[]
 };
 var bItems = [], bLogs = [], bOrders = [];
 var _bListenersAttached = false;
@@ -7565,8 +7561,13 @@ function renderPage_(pageId) {
   try {
     // Recipe Builder opens in a new tab (standalone HTML) — always return the launch card
     if (pageId === 'recipe-builder') {
+      var fbCfg = '';
+      try {
+        var stored = localStorage.getItem('alfa_fb_config');
+        if (stored) fbCfg = '?fbcfg=' + btoa(stored);
+      } catch(e) {}
       var _rbid2=(NX.session||{}).branchId||'';
-      var _rburl='recipe-builder.html'+(_rbid2?'?branch='+encodeURIComponent(_rbid2):'');
+      var _rburl='recipe-builder.html'+fbCfg+(_rbid2?(fbCfg?'&':'?')+'branch='+encodeURIComponent(_rbid2):'');
       window.open(_rburl, '_blank');
       return pRecipeBuilderLaunch();
     }
@@ -7587,7 +7588,7 @@ function pRecipeBuilderLaunch() {
     '<p style="color:var(--text-secondary);margin-bottom:24px;max-width:360px;margin-left:auto;margin-right:auto;line-height:1.7">'+
       'The Recipe Builder has opened in a new tab. Build and cost recipes there — they are automatically saved to Firebase and linked to the Wastage Log here.'+
     '</p>'+
-    '<button class="btn btn-primary" onclick="(function(){var fc=\'\';try{var st=localStorage.getItem(\'alfa_fb_config\');if(st)fc=\'?fbcfg=\'+btoa(st);}catch(e){}var bid=(NX.session||{}).branchId||\'\';var url=\'recipe-builder.html\'+fc+(bid?(fc?\'&\':\'?\')+\'branch=\'+encodeURIComponent(bid):\'\');window.open(url,\'_blank\');}())">&#x1F373; Open Recipe Builder</button>'+
+    '<button class="btn btn-primary" onclick="window.open(\'recipe-builder.html\',\'_blank\')">&#x1F373; Open Recipe Builder</button>'+
   '</div>';
 }
 
@@ -9326,25 +9327,15 @@ function pWastage(){
   var tc=BS.waste.filter(function(w){return w.date===TODAY_BS;}).length;
   var rows=data.map(function(w){
     var hasRecipe=!!(w.recipeId);
-    var deducted=w.stockDeducted&&(w.deductedItems||[]).length>0;
     var costBadge=hasRecipe
       ?'<span style="font-size:9px;background:rgba(0,102,102,.12);color:#006666;padding:1px 6px;border-radius:10px;font-weight:700">AUTO</span>'
       :'<span style="font-size:9px;background:rgba(180,83,9,.1);color:#b45309;padding:1px 6px;border-radius:10px">EST</span>';
-    var stockBadge=deducted
-      ?'<span title="'+bxe((w.deductedItems||[]).map(function(d){return d.name+': -'+d.qty+' '+d.unit+' ('+d.before+'\u2192'+d.after+')';}).join(', '))+'" style="cursor:help;font-size:9px;background:rgba(192,57,43,.1);color:#c0392b;padding:1px 6px;border-radius:10px;font-weight:700">-'+( w.deductedItems||[]).length+' items</span>'
-      :'';
-    var ingBreakdown='';
-    if(deducted){
-      ingBreakdown='<div style="margin-top:3px;font-size:9px;color:var(--text-tertiary);font-family:var(--mono)">';
-      (w.deductedItems||[]).forEach(function(d){ingBreakdown+='\u2796 '+d.name+' '+d.qty+' '+d.unit+'  ';});
-      ingBreakdown+='</div>';
-    }
     return '<tr>'+
       '<td class="bmono" style="color:var(--text-tertiary);font-size:11px">'+bfdate(w.date)+'</td>'+
-      '<td style="font-weight:600;color:var(--text-primary)">'+bxe(w.item)+(w.recipeCode?'<div style="font-size:9px;color:var(--text-tertiary);font-family:monospace">'+bxe(w.recipeCode)+'</div>':'')+ingBreakdown+'</td>'+
+      '<td style="font-weight:600;color:var(--text-primary)">'+bxe(w.item)+(w.recipeCode?'<div style="font-size:9px;color:var(--text-tertiary);font-family:monospace">'+bxe(w.recipeCode)+'</div>':'')+'</td>'+
       '<td class="bmono">'+bxe(w.qty)+' '+bxe(w.unit||'')+'</td>'+
       '<td>'+bpl(w.reason||'\u2014','#c0392b')+'</td>'+
-      '<td class="bmono" style="color:var(--danger);font-weight:600">'+bfsar(w.value)+'<br>'+costBadge+' '+stockBadge+'</td>'+
+      '<td class="bmono" style="color:var(--danger);font-weight:600">'+bfsar(w.value)+' '+costBadge+'</td>'+
       '<td style="color:var(--text-secondary)">'+bxe(w.by||'\u2014')+'</td>'+
       '<td><button class="btn btn-sm" style="color:var(--danger)" onclick="delBranchWaste(\''+bxe(w.id)+'\')">Del</button></td>'+
     '</tr>';
@@ -9359,162 +9350,76 @@ function pWastage(){
   return h+'<div class="btw"><div class="btw-s"><table class="btbl"><thead><tr><th>Date</th><th>Item</th><th>Qty</th><th>Reason</th><th>Cost</th><th>By</th><th></th></tr></thead><tbody>'+(rows||'<tr><td colspan="7" style="text-align:center;color:var(--text-tertiary);padding:28px">No wastage entries</td></tr>')+'</tbody></table></div></div>';
 }
 function openBranchWastageModal(){
-  // If recipes not loaded yet, load once then open — but NEVER recurse
-  if(db && BS.recipes===undefined){
-    BS.recipes=[];  // mark as loading so we don't recurse
-    db.ref('shared/recipes').once('value',function(snap){
-      var raw=snap.val();
-      BS.recipes=raw?(Array.isArray(raw)?raw.filter(Boolean):Object.values(raw).filter(Boolean)):[];
-      openBranchWastageModal();
-    });
-    return;
-  }
-  // BS.recipes is now either [] (no recipes) or populated — always proceed
-  var so='<option value="">\u2014</option>'+BS.staff.map(function(s){return'<option>'+bxe(s.name)+'</option>';}).join('');
+  var so='<option value="">\u2014</option>'+BS.staff.map(function(s2){return '<option>'+bxe(s2.name)+'</option>';}).join('');
+  var recOpts='<option value="">\u2014 Manual entry (no recipe) \u2014</option>';
   var sortedRec=(BS.recipes||[]).slice().sort(function(a,b){return(a.name||'').localeCompare(b.name||'');});
-  var recOpts='<option value="">\u2014 Select a recipe \u2014</option>';
-  sortedRec.forEach(function(r){
-    var label=bxe(r.name)+(r.recipeCode?' ['+bxe(r.recipeCode)+']':'');
-    var cost='SAR '+(parseFloat(r.costPerPortion||0)).toFixed(3)+'/'+bxe(r.yieldUnit||'portion');
-    recOpts+='<option value="'+bxe(r.id)+'" data-cpu="'+bxe(r.costPerPortion||0)+'" data-unit="'+bxe(r.yieldUnit||'portion')+'">'+label+' \u2014 '+cost+'</option>';
-  });
-
-  var html='<div class="modal-head"><h2>\ud83d\uddd1\ufe0f Log Wastage</h2><button class="modal-close" onclick="closeModalForce()">&#x2715;</button></div>';
-
-  // ── Recipe picker — the heart of the modal ──
-  html+='<div class="bfg" style="margin-bottom:0">';
-  html+='<label class="form-label" style="font-size:11px;font-weight:700;color:var(--primary)">Recipe *</label>';
-  html+='<select class="form-input form-select" id="bw-recipe" onchange="bwOnRecipePick(this.value)" style="font-size:13px;padding:10px 12px">';
-  html+=recOpts+'</select></div>';
-
-  // Recipe cost card — shows live when recipe selected
-  html+='<div id="bw-recipe-card" style="display:none;background:rgba(0,102,102,.06);border:1px solid rgba(0,102,102,.2);border-radius:10px;padding:12px 14px;margin:10px 0">';
-  html+='<div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">';
-  html+='<div><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-tertiary)">Cost per portion</div>';
-  html+='<div id="bw-cpu-display" style="font-size:20px;font-weight:700;font-family:var(--mono);color:var(--primary)">SAR 0.000</div></div>';
-  html+='<div style="font-size:22px;color:var(--text-tertiary)">&times;</div>';
-  html+='<div style="flex:1;min-width:100px"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-tertiary);margin-bottom:4px">Portions wasted *</div>';
-  html+='<input class="form-input" type="number" id="bw-qty" min="0.001" step="0.001" placeholder="e.g. 2" style="font-size:18px;font-weight:700;text-align:center" oninput="bwRecalcCost()">';
-  html+='</div>';
-  html+='<div style="font-size:22px;color:var(--text-tertiary)">=</div>';
-  html+='<div><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-tertiary)">Total cost</div>';
-  html+='<div id="bw-cost-display" style="font-size:20px;font-weight:700;font-family:var(--mono);color:var(--danger)">SAR 0.00</div></div>';
-  html+='</div></div>';
-
-  html+='<div class="form-row" style="margin-top:10px">';
+  sortedRec.forEach(function(r){recOpts+='<option value="'+bxe(r.id)+'">'+bxe(r.name)+(r.recipeCode?' ['+bxe(r.recipeCode)+']':'')+'</option>';});
+  var html='<div class="modal-head"><h2>Log Wastage</h2><button class="modal-close" onclick="closeModalForce()">&#x2715;</button></div>';
+  var _canPickRecipe=['super_admin','ceo'].indexOf((NX.session||{}).role)>=0;
+  if(_canPickRecipe){
+    html+='<div class="bfg"><label class="form-label">Link to Recipe (auto-calculates cost)</label>';
+    html+='<select class="form-input form-select" id="bw-recipe" onchange="bwOnRecipePick(this.value)">'+recOpts+'</select></div>';
+  }
+  html+='<div class="form-row">';
   html+='<div class="bfg"><label class="form-label">Date</label><input class="form-input" type="date" id="bw-date" value="'+TODAY_BS+'"></div>';
   html+='<div class="bfg"><label class="form-label">Reported By</label><select class="form-input form-select" id="bw-by">'+so+'</select></div>';
   html+='</div>';
   html+='<div class="form-row">';
-  html+='<div class="bfg"><label class="form-label">Reason</label><select class="form-input form-select" id="bw-reason"><option value="">\u2014</option>'+WR.map(function(r){return'<option>'+bxe(r)+'</option>';}).join('')+'</select></div>';
-  html+='<div class="bfg"><label class="form-label">Override Cost (SAR) <span style="font-size:9px;color:var(--text-tertiary)">optional</span></label><input class="form-input" type="number" id="bw-val" step="0.01" placeholder="Leave blank \u2014 auto calculated" oninput="bwUpdateDisplay()"></div>';
+  html+='<div class="bfg"><label class="form-label">Item Name *</label><input class="form-input" id="bw-item" placeholder="Item name / recipe name"></div>';
+  html+='<div class="bfg"><label class="form-label">Reason</label><select class="form-input form-select" id="bw-reason"><option value="">\u2014</option>'+WR.map(function(r){return '<option>'+bxe(r)+'</option>';}).join('')+'</select></div>';
   html+='</div>';
-
-  // No recipes warning
-  if(!sortedRec.length){
-    html+='<div style="background:rgba(241,165,0,.1);border:1px solid rgba(241,165,0,.3);border-radius:8px;padding:10px 12px;font-size:11px;color:#b45309;margin-bottom:8px">';
-    html+='\u26a0\ufe0f No recipes found. Build recipes in the <strong>Recipe Builder</strong> first \u2014 their cost per portion will auto-calculate here.</div>';
-  }
-
-  html+='<button class="btn btn-primary" style="width:100%;margin-top:4px;background:linear-gradient(135deg,#c0392b,#e74c3c);font-size:13px;padding:12px" onclick="saveBranchWastage()">\ud83d\uddd1\ufe0f Log Wastage</button>';
+  html+='<div class="form-row">';
+  html+='<div class="bfg"><label class="form-label">Qty Wasted *</label><input class="form-input" type="number" id="bw-qty" step="0.001" placeholder="0" oninput="bwRecalcCost()"></div>';
+  html+='<div class="bfg"><label class="form-label">Unit</label><input class="form-input" id="bw-unit" placeholder="kg, pcs, portion\u2026"></div>';
+  html+='</div>';
+  html+='<div style="background:var(--surface-2);border-radius:10px;padding:12px 14px;margin-bottom:12px;display:flex;gap:14px;flex-wrap:wrap;align-items:center">';
+  html+='<div style="flex:1;min-width:130px"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-tertiary);margin-bottom:3px">Auto-Calculated Cost</div>';
+  html+='<div id="bw-cost-display" style="font-size:22px;font-weight:700;font-family:var(--mono);color:var(--danger)">SAR 0.00</div>';
+  html+='<div id="bw-cost-note" style="font-size:10px;color:var(--text-tertiary);font-family:var(--mono);margin-top:2px">Select a recipe above</div></div>';
+  html+='<div style="flex:1;min-width:130px"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-tertiary);margin-bottom:3px">Override Cost (‫SAR ‬)</div>';
+  html+='<input class="form-input" type="number" id="bw-val" step="0.01" placeholder="Leave blank = use auto" oninput="bwUpdateDisplay()"></div>';
+  html+='</div>';
+  html+='<button class="btn btn-primary" style="width:100%" onclick="saveBranchWastage()">Log Wastage</button>';
   openModal(html);
 }
-
 function bwOnRecipePick(recipeId){
-  var card=document.getElementById('bw-recipe-card');
-  var cpuEl=document.getElementById('bw-cpu-display');
-  var costEl=document.getElementById('bw-cost-display');
-  var valEl=document.getElementById('bw-val');
-  if(!recipeId){if(card)card.style.display='none';return;}
+  var nameEl=document.getElementById('bw-item'),unitEl=document.getElementById('bw-unit'),noteEl=document.getElementById('bw-cost-note');
+  if(!recipeId){if(noteEl)noteEl.textContent='Select a recipe above';bwRecalcCost();return;}
+  if(!document.getElementById('bw-recipe'))return;
   var rec=(BS.recipes||[]).find(function(r){return r.id===recipeId;});
   if(!rec)return;
-  if(card)card.style.display='block';
-  var cpu=parseFloat(rec.costPerPortion)||0;
-  if(cpuEl)cpuEl.textContent='SAR '+cpu.toFixed(3)+' /'+bxe(rec.yieldUnit||'portion');
-  // Clear override so auto re-calculates
-  if(valEl)valEl.value='';
+  if(nameEl&&!nameEl.value)nameEl.value=rec.name||'';
+  if(unitEl)unitEl.value=rec.yieldUnit||'portion';
+  if(noteEl)noteEl.textContent='SAR '+(rec.costPerPortion||0).toFixed(3);
   bwRecalcCost();
 }
-
 function bwRecalcCost(){
-  var recipeId=(document.getElementById('bw-recipe')||{}).value||'';
+  var _recEl=document.getElementById('bw-recipe');
+  var recipeId=_recEl?_recEl.value||'':'';
   var qty=parseFloat((document.getElementById('bw-qty')||{}).value)||0;
+  var disp=document.getElementById('bw-cost-display'),noteEl=document.getElementById('bw-cost-note');
   var rec=recipeId?(BS.recipes||[]).find(function(r){return r.id===recipeId;}):null;
-  var costEl=document.getElementById('bw-cost-display');
-  var valEl=document.getElementById('bw-val');
   if(rec&&qty>0){
-    var cost=parseFloat(rec.costPerPortion||0)*qty;
-    if(costEl)costEl.textContent='SAR '+cost.toFixed(2);
-    // Only auto-fill override if user hasn't typed one
-    if(valEl&&!valEl.value)valEl.value=cost.toFixed(2);
+    var cost=rec.costPerPortion*qty;
+    if(disp)disp.textContent='SAR '+cost.toFixed(2);
+    if(noteEl)noteEl.textContent='SAR AUTO: '+qty+' × SAR '+(rec.costPerPortion||0).toFixed(3)+'/portion';
+    var ov=document.getElementById('bw-val');if(ov&&!ov.value)ov.value=cost.toFixed(2);
   } else {
-    var manual=parseFloat((valEl||{}).value)||0;
-    if(costEl)costEl.textContent='SAR '+manual.toFixed(2);
+    if(disp)disp.textContent='SAR '+(parseFloat((document.getElementById('bw-val')||{}).value)||0).toFixed(2);
   }
 }
-
-function bwUpdateDisplay(){
-  var v=parseFloat((document.getElementById('bw-val')||{}).value)||0;
-  var disp=document.getElementById('bw-cost-display');
-  if(disp)disp.textContent='SAR '+v.toFixed(2);
-}
-
-function bwOnInvPick(){}  // kept for compatibility — no longer used
-
+function bwUpdateDisplay(){var v=parseFloat((document.getElementById('bw-val')||{}).value)||0;var disp=document.getElementById('bw-cost-display');if(disp)disp.textContent='SAR '+v.toFixed(2);}
 function saveBranchWastage(){
-  var recipeId=(document.getElementById('bw-recipe')||{}).value||'';
+  var item=bgv('bw-item'),qty=parseFloat(bgv('bw-qty'))||0;
+  if(!item||qty<=0){showToast('Item and quantity required','error');return;}
+  var recipeId=document.getElementById('bw-recipe')?bgv('bw-recipe'):'';
   var rec=recipeId?(BS.recipes||[]).find(function(r){return r.id===recipeId;}):null;
-  if(!rec){showToast('Please select a recipe','error');return;}
-  var qty=parseFloat((document.getElementById('bw-qty')||{}).value)||0;
-  if(qty<=0){showToast('Enter the number of portions wasted','error');return;}
-  var autoCost=parseFloat(rec.costPerPortion||0)*qty;
-  var overrideVal=parseFloat((document.getElementById('bw-val')||{}).value)||0;
+  var overrideVal=parseFloat(bgv('bw-val'))||0;
+  var autoCost=rec?rec.costPerPortion*qty:0;
   var finalCost=overrideVal>0?overrideVal:autoCost;
-  var today=(document.getElementById('bw-date')||{}).value||TODAY_BS;
-  var reason=(document.getElementById('bw-reason')||{}).value||'';
-  var by=(document.getElementById('bw-by')||{}).value||'';
-
-  // ── Auto-explode recipe: deduct every ingredient from stock ──
-  var deductedItems=[];
-  var portions=parseInt(rec.portions)||1;
-  var ings=rec.ingredients||[];
-
-  ings.forEach(function(ing){
-    var qtyPerPortion=(parseFloat(ing.qty)||0)/portions;
-    var totalDeduct=qtyPerPortion*qty;
-    if(totalDeduct<=0)return;
-    // Match to inventory item: try invCode first, then name
-    var stockItem=null;
-    if(ing.invCode){stockItem=bItems.find(function(x){return String(x.code)===String(ing.invCode);});}
-    if(!stockItem&&ing.name){var n=ing.name.toLowerCase();stockItem=bItems.find(function(x){return(x.name||'').toLowerCase()===n;});}
-    if(stockItem){
-      var before=parseFloat(stockItem.qty)||0;
-      var after=Math.max(0,before-totalDeduct);
-      stockItem.qty=after;
-      bSaveStock(stockItem.code,after);
-      bLogs.push({code:stockItem.code,name:stockItem.name,type:'waste',qty:totalDeduct,
-        cost:totalDeduct*(parseFloat(stockItem.price||ing.invPrice||ing.costPerUnit)||0),
-        note:'Wastage: '+rec.name+' \u00d7'+qty+' portions'+(reason?' \u2014 '+reason:''),date:today});
-      deductedItems.push({name:ing.name,qty:totalDeduct.toFixed(3),unit:ing.unit,before:before.toFixed(2),after:after.toFixed(2)});
-    }
-  });
-  if(bLogs.length)bSaveLogs();
-
-  var entry={id:buid(),date:today,item:rec.name,qty:qty,unit:rec.yieldUnit||'portion',
-    reason:reason,value:finalCost,by:by,recipeId:recipeId,recipeCode:rec.recipeCode||'',
-    costPerPortion:parseFloat(rec.costPerPortion||0),
-    stockDeducted:deductedItems.length>0,deductedItems:deductedItems};
-  BS.waste.push(entry);
-  bSaveColl('waste',BS.waste);
-  closeModalForce();
-
-  var msg='\ud83d\uddd1\ufe0f '+rec.name+' \u00d7'+qty+' logged \u2014 Cost: '+bfsar(finalCost);
-  if(deductedItems.length) msg+=' \u2014 '+deductedItems.length+' ingredients deducted \u2714';
-  else if(ings.length) msg+=' (link items in Recipe Builder to auto-deduct stock)';
-  showToast(msg,'success');
-  navTo('wastage');
+  BS.waste.push({id:buid(),date:bgv('bw-date')||TODAY_BS,item:item,qty:qty,unit:bgv('bw-unit'),reason:bgv('bw-reason'),value:finalCost,by:bgv('bw-by'),recipeId:recipeId||'',recipeCode:rec?rec.recipeCode||'':''});
+  bSaveColl('waste',BS.waste);closeModalForce();showToast('Wastage logged \u2014 Cost: '+bfsar(finalCost),'success');navTo('wastage');
 }
-
 
 function delBranchWaste(id){if(!confirm('Delete this wastage entry?'))return;BS.waste=BS.waste.filter(function(w){return w.id!==id;});bSaveColl('waste',BS.waste);showToast('Deleted');navTo('wastage');}
 
@@ -15050,20 +14955,11 @@ function pHrfCompliance(){
     else h+=hrfTable(['Name / Branch','Type','Category','Monthly SAR','Expiry'],rows);
     return h;
   }
-  if(!HRF.compliance || HRF.compliance._loading){
-    if(!HRF.compliance){
-      HRF.compliance={_loading:true};
-      var brs=hrfBranches();var loaded=0;
-      brs.forEach(function(b){db.ref('branches/'+b.id+'/compliance').once('value',function(snap){
-        if(snap.val())HRF.compliance[b.id]=snap.val();
-        if(++loaded===brs.length){
-          delete HRF.compliance._loading;
-          var area=document.getElementById('page-area');
-          if(area&&NX.page==='hrf-compliance'){area.innerHTML=renderPage_('hrf-compliance');}
-        }
-      });});
-    }
-    return hrfLoading('Loading compliance data…');
+  if(!HRF.compliance){
+    HRF.compliance={};
+    var brs=hrfBranches();var loaded=0;
+    brs.forEach(function(b){db.ref('branches/'+b.id+'/compliance').once('value',function(snap){if(snap.val())HRF.compliance[b.id]=snap.val();if(++loaded===brs.length)navTo('hrf-compliance');});});
+    return hrfLoading('Loading compliance data\u2026');
   }
   return render();
 }
@@ -15186,21 +15082,13 @@ function pHrfPnL(){
   var c3=branches.filter(function(b){return HRF.pc[b.id];}).length;
   var c4=branches.filter(function(b){return HRF.staff[b.id];}).length;
   if(c1===branches.length&&c2===branches.length&&c3===branches.length&&c4===branches.length){
-    if(!HRF.compliance || HRF.compliance._loading){
-      if(!HRF.compliance){
-        HRF.compliance={_loading:true};
-        var brs=hrfBranches();var loaded=0;
-        brs.forEach(function(b){db.ref('branches/'+b.id+'/compliance').once('value',function(snap){
-          if(snap.val())HRF.compliance[b.id]=snap.val();
-          if(++loaded===brs.length){
-            delete HRF.compliance._loading;
-            var area=document.getElementById('page-area');
-            if(area&&NX.page==='hrf-pnl'){area.innerHTML=renderPage_('hrf-pnl');}
-          }
-        });});
-      }
-      return hrfLoading('Loading P&L data…');
+    if(!HRF.compliance){
+      HRF.compliance={};
+      var brs=hrfBranches();var loaded=0;
+      brs.forEach(function(b){db.ref('branches/'+b.id+'/compliance').once('value',function(snap){if(snap.val())HRF.compliance[b.id]=snap.val();if(++loaded===brs.length)navTo('hrf-pnl');});});
+      return hrfLoading('Loading P\u0026L data\u2026');
     }
+    return renderPnL();
   }
   var done=0;var total=0;
   function check(){if(++done>=total)navTo('hrf-pnl');}
@@ -15938,20 +15826,16 @@ function pBmCompliance() {
   var s = NX.session||{};
   var branchId = s.branchId||'';
   var tab = BS._compTab||'recurring';
-  if(!BS._compData || BS._compData._loading){
-    if(!BS._compData){
-      BS._compData={_loading:true,recurring:[],permits:[],services:[]};
-      if(db&&branchId){
-        db.ref('branches/'+branchId+'/compliance').once('value',function(snap){
-          var v=snap.val()||{};
-          function toA(x){return Array.isArray(x)?x:(x?Object.values(x):[]);}
-          BS._compData={recurring:toA(v.recurring),permits:toA(v.permits),services:toA(v.services)};
-          var area=document.getElementById('page-area');
-          if(area&&NX.page==='bm-compliance'){area.innerHTML=renderPage_('bm-compliance');}
-        });
-      } else { BS._compData={recurring:[],permits:[],services:[]}; }
+  if(!BS._compData){
+    BS._compData={recurring:[],permits:[],services:[]};
+    if(db&&branchId){
+      db.ref('branches/'+branchId+'/compliance').once('value',function(snap){
+        var v=snap.val()||{};
+        BS._compData={recurring:Array.isArray(v.recurring)?v.recurring:(v.recurring?Object.values(v.recurring):[]),permits:Array.isArray(v.permits)?v.permits:(v.permits?Object.values(v.permits):[]),services:Array.isArray(v.services)?v.services:(v.services?Object.values(v.services):[])};
+        navTo('bm-compliance');
+      });
+      return '<div style="text-align:center;padding:40px;color:var(--text-tertiary)">Loading\u2026</div>';
     }
-    return '<div style="text-align:center;padding:40px;color:var(--text-tertiary)">Loading…</div>';
   }
   var D=BS._compData;
   var now=new Date();
@@ -16064,19 +15948,12 @@ function bmCompSendToFinance(){
 function pBmAssets(){
   attachBranchListeners();
   var s=NX.session||{};var branchId=s.branchId||'';
-  if(BS._assetData === undefined || BS._assetData === null){
-    if(BS._assetData === undefined){
-      BS._assetData = null;  // mark as loading
-      if(db&&branchId){
-        db.ref('branches/'+branchId+'/assets').once('value',function(snap){
-          var v=snap.val();
-          BS._assetData=Array.isArray(v)?v:(v?Object.values(v).filter(Boolean):[]);
-          var area=document.getElementById('page-area');
-          if(area&&NX.page==='bm-assets'){area.innerHTML=renderPage_('bm-assets');}
-        });
-      } else { BS._assetData=[]; }
+  if(!BS._assetData){
+    BS._assetData=[];
+    if(db&&branchId){
+      db.ref('branches/'+branchId+'/assets').once('value',function(snap){var v=snap.val();BS._assetData=Array.isArray(v)?v:(v?Object.values(v).filter(Boolean):[]);navTo('bm-assets');});
+      return'<div style="text-align:center;padding:40px;color:var(--text-tertiary)">Loading assets\u2026</div>';
     }
-    return '<div style="text-align:center;padding:40px;color:var(--text-tertiary)">Loading assets…</div>';
   }
   var assets=BS._assetData;
   var now=new Date();
