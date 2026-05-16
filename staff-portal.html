@@ -1012,7 +1012,7 @@ function renderDashboard() {
       '<div class="kpi" style="--kc:var(--warning)"><div class="kpi-l">LATE</div><div class="kpi-v">' + late + '</div><div class="kpi-s">Days</div></div>' +
       '<div class="kpi" style="--kc:#f97316"><div class="kpi-l">SICK LEAVE</div><div class="kpi-v">' + sick + '</div><div class="kpi-s">Days</div></div>' +
       '<div class="kpi" style="--kc:var(--danger)"><div class="kpi-l">ABSENT</div><div class="kpi-v">' + absent + '</div><div class="kpi-s">Days</div></div>' +
-      '<div class="kpi" style="--kc:var(--primary)"><div class="kpi-l">LEAVE BALANCE</div><div class="kpi-v">' + leaveBal + '</div><div class="kpi-s">of ' + leaveBal + ' days</div></div>' +
+      '<div class="kpi" style="--kc:var(--primary)"><div class="kpi-l">LEAVE BALANCE</div><div class="kpi-v">' + leaveBal + '</div><div class="kpi-s">Days remaining</div></div>' +
       '<div class="kpi" style="--kc:var(--success)"><div class="kpi-l">INCIDENTS FILED</div><div class="kpi-v">' + incCount + '</div><div class="kpi-s">Total reports</div></div>';
   }
 
@@ -1039,25 +1039,41 @@ function renderDashboard() {
     });
   } else { tryRender(); }
 
-  // 2. Leave balance from tsEmps leaveBalance field
-  if (u.branchId && u.staffId) {
+  // 2. Leave balance — read from tsEmps (BM set) OR branches staff (HR set), match by staffId or SAP
+  if (u.branchId) {
+    // Try tsEmps first (Branch Manager sets this via timesheet → employees tab)
     db.ref('branches/' + u.branchId + '/tsEmps').once('value', function(snap) {
       var raw = snap.val() || {};
-      var emps = Array.isArray(raw) ? raw : Object.values(raw);
-      var emp = emps.find(function(e){ return e && String(e.id) === String(u.staffId); });
-      if (emp && emp.leaveBalance != null) leaveBal = emp.leaveBalance;
-      else {
-        // fallback: staff/leave path
-        db.ref('staff/leave/' + u.sap).once('value', function(ls) {
-          var leaves = ls.val() || {};
-          var taken = 0;
-          Object.values(leaves).forEach(function(l){ if(l.type==='annual'&&l.status!=='rejected') taken+=(l.days||0); });
-          leaveBal = Math.max(0, 21 - taken);
-          tryRender();
-        });
-        return;
+      var emps = Array.isArray(raw) ? raw.filter(Boolean) : Object.values(raw).filter(Boolean);
+      var emp = emps.find(function(e){
+        return e && (String(e.id) === String(u.staffId) || String(e.sap||'') === String(u.sap||''));
+      });
+      if (emp && emp.leaveBalance != null) {
+        leaveBal = parseInt(emp.leaveBalance) || 21;
+        tryRender();
+      } else {
+        // Fallback: HR staff record at branches/{id}/staff/{staffId}
+        var hrPath = u.staffId
+          ? 'branches/' + u.branchId + '/staff/' + u.staffId
+          : null;
+        if (hrPath) {
+          db.ref(hrPath).once('value', function(s2) {
+            var rec = s2.val() || {};
+            if (rec.leaveBalance != null) leaveBal = parseInt(rec.leaveBalance) || 21;
+            else if (rec.annualLeave != null) leaveBal = parseInt(rec.annualLeave) || 21;
+            tryRender();
+          });
+        } else {
+          // Last fallback: legacy staff/leave path
+          db.ref('staff/leave/' + u.sap).once('value', function(ls) {
+            var leaves = ls.val() || {};
+            var taken = 0;
+            Object.values(leaves).forEach(function(l){ if(l.type==='annual'&&l.status!=='rejected') taken+=(l.days||0); });
+            leaveBal = Math.max(0, 21 - taken);
+            tryRender();
+          });
+        }
       }
-      tryRender();
     });
   } else {
     db.ref('staff/leave/' + u.sap).once('value', function(snap) {
