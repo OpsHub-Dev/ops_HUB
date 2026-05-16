@@ -852,7 +852,7 @@ function collect(){
     created:gv('fcd'),revised:gv('frv'),recipeCode:gv('fcode'),technique:gv('ftech'),
     sigChecked:gv('sig-checked')||'HECTOR ALFONSO GUDIEL',
     sigApproved:gv('sig-approved')||'JON NOROTSKY',
-    ingredients:ROWS.map(function(r){return{name:r.name,qty:r.qty,unit:r.unit,costPerUnit:r.cpu};}),
+    ingredients:ROWS.map(function(r){return{name:r.name,qty:r.qty,unit:r.unit,costPerUnit:r.cpu,invCode:r._invCode||'',invUnit:r._invUnit||r.unit||'',invPrice:r._invPrice||r.cpu||0};}),
     totalCost:tot,portions:ports,costPerPortion:tot/ports,
     sellPrice:parseFloat(document.getElementById('fprice').value)||0,
     yieldUnit:'portion',savedAt:new Date().toISOString()};

@@ -9327,15 +9327,25 @@ function pWastage(){
   var tc=BS.waste.filter(function(w){return w.date===TODAY_BS;}).length;
   var rows=data.map(function(w){
     var hasRecipe=!!(w.recipeId);
+    var deducted=w.stockDeducted&&(w.deductedItems||[]).length>0;
     var costBadge=hasRecipe
       ?'<span style="font-size:9px;background:rgba(0,102,102,.12);color:#006666;padding:1px 6px;border-radius:10px;font-weight:700">AUTO</span>'
       :'<span style="font-size:9px;background:rgba(180,83,9,.1);color:#b45309;padding:1px 6px;border-radius:10px">EST</span>';
+    var stockBadge=deducted
+      ?'<span title="'+bxe((w.deductedItems||[]).map(function(d){return d.name+': -'+d.qty+' '+d.unit+' ('+d.before+'\u2192'+d.after+')';}).join(', '))+'" style="cursor:help;font-size:9px;background:rgba(192,57,43,.1);color:#c0392b;padding:1px 6px;border-radius:10px;font-weight:700">-'+( w.deductedItems||[]).length+' items</span>'
+      :'';
+    var ingBreakdown='';
+    if(deducted){
+      ingBreakdown='<div style="margin-top:3px;font-size:9px;color:var(--text-tertiary);font-family:var(--mono)">';
+      (w.deductedItems||[]).forEach(function(d){ingBreakdown+='\u2796 '+d.name+' '+d.qty+' '+d.unit+'  ';});
+      ingBreakdown+='</div>';
+    }
     return '<tr>'+
       '<td class="bmono" style="color:var(--text-tertiary);font-size:11px">'+bfdate(w.date)+'</td>'+
-      '<td style="font-weight:600;color:var(--text-primary)">'+bxe(w.item)+(w.recipeCode?'<div style="font-size:9px;color:var(--text-tertiary);font-family:monospace">'+bxe(w.recipeCode)+'</div>':'')+'</td>'+
+      '<td style="font-weight:600;color:var(--text-primary)">'+bxe(w.item)+(w.recipeCode?'<div style="font-size:9px;color:var(--text-tertiary);font-family:monospace">'+bxe(w.recipeCode)+'</div>':'')+ingBreakdown+'</td>'+
       '<td class="bmono">'+bxe(w.qty)+' '+bxe(w.unit||'')+'</td>'+
       '<td>'+bpl(w.reason||'\u2014','#c0392b')+'</td>'+
-      '<td class="bmono" style="color:var(--danger);font-weight:600">'+bfsar(w.value)+' '+costBadge+'</td>'+
+      '<td class="bmono" style="color:var(--danger);font-weight:600">'+bfsar(w.value)+'<br>'+costBadge+' '+stockBadge+'</td>'+
       '<td style="color:var(--text-secondary)">'+bxe(w.by||'\u2014')+'</td>'+
       '<td><button class="btn btn-sm" style="color:var(--danger)" onclick="delBranchWaste(\''+bxe(w.id)+'\')">Del</button></td>'+
     '</tr>';
@@ -9461,26 +9471,51 @@ function saveBranchWastage(){
   var autoCost=parseFloat(rec.costPerPortion||0)*qty;
   var overrideVal=parseFloat((document.getElementById('bw-val')||{}).value)||0;
   var finalCost=overrideVal>0?overrideVal:autoCost;
-  var entry={
-    id:buid(),
-    date:(document.getElementById('bw-date')||{}).value||TODAY_BS,
-    item:rec.name,
-    qty:qty,
-    unit:rec.yieldUnit||'portion',
-    reason:(document.getElementById('bw-reason')||{}).value||'',
-    value:finalCost,
-    by:(document.getElementById('bw-by')||{}).value||'',
-    recipeId:recipeId,
-    recipeCode:rec.recipeCode||'',
+  var today=(document.getElementById('bw-date')||{}).value||TODAY_BS;
+  var reason=(document.getElementById('bw-reason')||{}).value||'';
+  var by=(document.getElementById('bw-by')||{}).value||'';
+
+  // ── Auto-explode recipe: deduct every ingredient from stock ──
+  var deductedItems=[];
+  var portions=parseInt(rec.portions)||1;
+  var ings=rec.ingredients||[];
+
+  ings.forEach(function(ing){
+    var qtyPerPortion=(parseFloat(ing.qty)||0)/portions;
+    var totalDeduct=qtyPerPortion*qty;
+    if(totalDeduct<=0)return;
+    // Match to inventory item: try invCode first, then name
+    var stockItem=null;
+    if(ing.invCode){stockItem=bItems.find(function(x){return String(x.code)===String(ing.invCode);});}
+    if(!stockItem&&ing.name){var n=ing.name.toLowerCase();stockItem=bItems.find(function(x){return(x.name||'').toLowerCase()===n;});}
+    if(stockItem){
+      var before=parseFloat(stockItem.qty)||0;
+      var after=Math.max(0,before-totalDeduct);
+      stockItem.qty=after;
+      bSaveStock(stockItem.code,after);
+      bLogs.push({code:stockItem.code,name:stockItem.name,type:'waste',qty:totalDeduct,
+        cost:totalDeduct*(parseFloat(stockItem.price||ing.invPrice||ing.costPerUnit)||0),
+        note:'Wastage: '+rec.name+' \u00d7'+qty+' portions'+(reason?' \u2014 '+reason:''),date:today});
+      deductedItems.push({name:ing.name,qty:totalDeduct.toFixed(3),unit:ing.unit,before:before.toFixed(2),after:after.toFixed(2)});
+    }
+  });
+  if(bLogs.length)bSaveLogs();
+
+  var entry={id:buid(),date:today,item:rec.name,qty:qty,unit:rec.yieldUnit||'portion',
+    reason:reason,value:finalCost,by:by,recipeId:recipeId,recipeCode:rec.recipeCode||'',
     costPerPortion:parseFloat(rec.costPerPortion||0),
-    stockDeducted:false
-  };
+    stockDeducted:deductedItems.length>0,deductedItems:deductedItems};
   BS.waste.push(entry);
   bSaveColl('waste',BS.waste);
   closeModalForce();
-  showToast('\ud83d\uddd1\ufe0f Wastage logged \u2014 '+bxe(rec.name)+' \u00d7'+qty+' \u2014 Cost: '+bfsar(finalCost),'success');
+
+  var msg='\ud83d\uddd1\ufe0f '+rec.name+' \u00d7'+qty+' logged \u2014 Cost: '+bfsar(finalCost);
+  if(deductedItems.length) msg+=' \u2014 '+deductedItems.length+' ingredients deducted \u2714';
+  else if(ings.length) msg+=' (link items in Recipe Builder to auto-deduct stock)';
+  showToast(msg,'success');
   navTo('wastage');
 }
+
 
 function delBranchWaste(id){if(!confirm('Delete this wastage entry?'))return;BS.waste=BS.waste.filter(function(w){return w.id!==id;});bSaveColl('waste',BS.waste);showToast('Deleted');navTo('wastage');}
 
