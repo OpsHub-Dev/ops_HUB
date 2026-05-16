@@ -327,14 +327,7 @@ textarea.fi{resize:vertical;min-height:80px}
       <div class="page active" id="page-dashboard">
         <div style="padding:20px 0 0">
           <div id="welcome-banner" style="margin-bottom:14px"></div>
-          <!-- Attendance KPI strip -->
-          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px" id="att-kpi-row">
-            <div class="kpi" style="--kc:var(--success)"><div class="kpi-l">Present</div><div class="kpi-v" id="att-present">—</div><div class="kpi-s">This month</div></div>
-            <div class="kpi" style="--kc:var(--warning)"><div class="kpi-l">Late</div><div class="kpi-v" id="att-late">—</div><div class="kpi-s">Days</div></div>
-            <div class="kpi" style="--kc:#f97316"><div class="kpi-l">Sick Leave</div><div class="kpi-v" id="att-sick">—</div><div class="kpi-s">Days</div></div>
-            <div class="kpi" style="--kc:var(--danger)"><div class="kpi-l">Absent</div><div class="kpi-v" id="att-absent">—</div><div class="kpi-s">Days</div></div>
-          </div>
-          <div class="g2" style="margin-bottom:14px" id="kpi-row"></div>
+          <div class="g2" style="margin-bottom:14px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px" id="kpi-row"></div>
           <div class="card"><div class="ctitle"><div class="cdot"></div>Quick Actions</div><div id="quick-actions"></div></div>
           <div class="card"><div class="ctitle"><div class="cdot"></div>Today's Shift</div><div id="today-shift"></div></div>
         </div>
@@ -1007,48 +1000,80 @@ function renderDashboard() {
     (u.dept ? '<div style="font-size:9px;color:var(--text3);font-family:var(--mono);margin-top:2px">' + u.dept + (u.shift ? ' · ' + u.shift : '') + '</div>' : '') +
     (u.role==='captain'||u.role==='branch_mgr'?'<span class="badge bg-p" style="margin-top:6px">⭐ ' + (u.role==='captain'?'CAPTAIN':'BRANCH MGR') + '</span>':'') + '</div></div></div>';
 
-  // KPIs from Firebase
-  db.ref('staff/leave/' + u.sap).once('value', function(snap) {
-    var leaves = snap.val() || {};
-    var taken = 0;
-    Object.values(leaves).forEach(function(l) { if (l.type === 'annual' && l.status !== 'rejected') taken += (l.days || 0); });
-    // Read allocated balance from branch staff record (HR can set leaveBalance), fallback to 21
-    function setBalKpi(alloc) {
-      var bal = alloc - taken;
-      document.getElementById('kpi-row').innerHTML =
-        '<div class="kpi" style="--kc:var(--primary)"><div class="kpi-l">Leave Balance</div><div class="kpi-v">' + bal + '</div><div class="kpi-s">of ' + alloc + ' days</div></div>' +
-        '<div class="kpi" style="--kc:var(--success)"><div class="kpi-l">Incidents Filed</div><div class="kpi-v" id="dash-inc-count">—</div><div class="kpi-s">Total reports</div></div>';
-      db.ref('staff/incidents/' + u.sap).once('value', function(isnap) {
-        var inc = isnap.val() || {};
-        var el = document.getElementById('dash-inc-count'); if (el) el.textContent = Object.keys(inc).length;
-      });
-    }
-    if (u.branchId && u.staffId) {
-      db.ref('branches/' + u.branchId + '/staff/' + u.staffId).once('value', function(bsnap) {
-        var bm = bsnap.val() || {};
-        setBalKpi(parseInt(bm.leaveBalance || bm.annualLeave || 21));
-      });
-    } else { setBalKpi(21); }
-  });
+  // ── Attendance KPIs: read from branches/{branchId}/tsAtt/{staffId}/{YYYY-MM} ──
+  var now2 = new Date();
+  var monthKey = now2.getFullYear() + '-' + String(now2.getMonth()+1).padStart(2,'0');
 
-  // Attendance KPIs — read this month's attendance record
-  var nowM = new Date(); var ym = nowM.getFullYear() + '-' + (nowM.getMonth() < 9 ? '0' : '') + (nowM.getMonth() + 1);
-  if (u.branchId && (u.staffId || u.sap)) {
-    var attKey = u.staffId || u.sap;
-    db.ref('branches/' + u.branchId + '/att/' + attKey + '/' + ym).once('value', function(asnap) {
-      var recs = asnap.val() || {};
-      var totP = 0, totL = 0, totS = 0, totA = 0;
-      Object.values(recs).forEach(function(r) {
-        var st = (r.status || r.st || '').toLowerCase();
-        if (st === 'present') totP++;
-        else if (st === 'late') totL++;
-        else if (st === 'sick') totS++;
-        else if (st === 'absent') totA++;
+  function renderKpiRow(present, late, sick, absent, leaveBal, incCount) {
+    var el = document.getElementById('kpi-row');
+    if (!el) return;
+    el.innerHTML =
+      '<div class="kpi" style="--kc:var(--success)"><div class="kpi-l">PRESENT</div><div class="kpi-v">' + present + '</div><div class="kpi-s">This month</div></div>' +
+      '<div class="kpi" style="--kc:var(--warning)"><div class="kpi-l">LATE</div><div class="kpi-v">' + late + '</div><div class="kpi-s">Days</div></div>' +
+      '<div class="kpi" style="--kc:#f97316"><div class="kpi-l">SICK LEAVE</div><div class="kpi-v">' + sick + '</div><div class="kpi-s">Days</div></div>' +
+      '<div class="kpi" style="--kc:var(--danger)"><div class="kpi-l">ABSENT</div><div class="kpi-v">' + absent + '</div><div class="kpi-s">Days</div></div>' +
+      '<div class="kpi" style="--kc:var(--primary)"><div class="kpi-l">LEAVE BALANCE</div><div class="kpi-v">' + leaveBal + '</div><div class="kpi-s">of ' + leaveBal + ' days</div></div>' +
+      '<div class="kpi" style="--kc:var(--success)"><div class="kpi-l">INCIDENTS FILED</div><div class="kpi-v">' + incCount + '</div><div class="kpi-s">Total reports</div></div>';
+  }
+
+  var attPresent=0, attLate=0, attSick=0, attAbsent=0;
+  var leaveBal=21, incCount=0;
+  var pending=3;
+
+  function tryRender(){ pending--; if(pending<=0) renderKpiRow(attPresent,attLate,attSick,attAbsent,leaveBal,incCount); }
+
+  // 1. Attendance from tsAtt
+  if (u.branchId && u.staffId) {
+    db.ref('branches/' + u.branchId + '/tsAtt/' + u.staffId + '/' + monthKey).once('value', function(snap) {
+      var recs = snap.val() || [];
+      if (!Array.isArray(recs)) recs = Object.values(recs);
+      recs.forEach(function(r) {
+        if (!r) return;
+        var st = (r.st || r.status || '').toLowerCase();
+        if (st === 'present') attPresent++;
+        else if (st === 'late') attLate++;
+        else if (st === 'sick') attSick++;
+        else if (st === 'absent') attAbsent++;
       });
-      var setEl = function(id, v) { var el = document.getElementById(id); if (el) el.textContent = v; };
-      setEl('att-present', totP); setEl('att-late', totL); setEl('att-sick', totS); setEl('att-absent', totA);
+      tryRender();
+    });
+  } else { tryRender(); }
+
+  // 2. Leave balance from tsEmps leaveBalance field
+  if (u.branchId && u.staffId) {
+    db.ref('branches/' + u.branchId + '/tsEmps').once('value', function(snap) {
+      var raw = snap.val() || {};
+      var emps = Array.isArray(raw) ? raw : Object.values(raw);
+      var emp = emps.find(function(e){ return e && String(e.id) === String(u.staffId); });
+      if (emp && emp.leaveBalance != null) leaveBal = emp.leaveBalance;
+      else {
+        // fallback: staff/leave path
+        db.ref('staff/leave/' + u.sap).once('value', function(ls) {
+          var leaves = ls.val() || {};
+          var taken = 0;
+          Object.values(leaves).forEach(function(l){ if(l.type==='annual'&&l.status!=='rejected') taken+=(l.days||0); });
+          leaveBal = Math.max(0, 21 - taken);
+          tryRender();
+        });
+        return;
+      }
+      tryRender();
+    });
+  } else {
+    db.ref('staff/leave/' + u.sap).once('value', function(snap) {
+      var leaves = snap.val() || {};
+      var taken = 0;
+      Object.values(leaves).forEach(function(l){ if(l.type==='annual'&&l.status!=='rejected') taken+=(l.days||0); });
+      leaveBal = Math.max(0, 21 - taken);
+      tryRender();
     });
   }
+
+  // 3. Incidents count
+  db.ref('staff/incidents/' + u.sap).once('value', function(snap) {
+    incCount = Object.keys(snap.val() || {}).length;
+    tryRender();
+  });
 
   var actions = [
     {ico:'🏖️',lbl:'Apply for Leave',sub:'Annual · Sick · Emergency',page:'leave'},
@@ -1490,42 +1515,31 @@ function renderLeave() {
   var lf = document.getElementById('lv-from'); var lt = document.getElementById('lv-to');
   if (lf && !lf.value) lf.value = today;
   if (lt && !lt.value) lt.value = today;
-
-  // Determine leave allocation from branch staff record (HR sets leaveBalance), fallback 21
-  function doRenderLeave(alloc) {
-    // Load from Firebase
-    db.ref('staff/leave/' + u.sap).once('value', function(snap) {
-      var leaves = [];
-      snap.forEach(function(c) { leaves.unshift(Object.assign({_key:c.key},c.val())); });
-      var taken = 0, pending = 0;
-      leaves.forEach(function(l) {
-        if (l.type === 'annual' && l.status !== 'rejected') taken += (l.days||0);
-        if (l.status === 'pending') pending++;
-      });
-      var bal = alloc - taken;
-      document.getElementById('leave-kpi').innerHTML =
-        '<div class="kpi" style="--kc:var(--primary)"><div class="kpi-l">Balance</div><div class="kpi-v">' + bal + '</div><div class="kpi-s">of ' + alloc + ' days</div></div>' +
-        '<div class="kpi" style="--kc:var(--warning)"><div class="kpi-l">Taken</div><div class="kpi-v">' + taken + '</div><div class="kpi-s">Days used</div></div>' +
-        '<div class="kpi" style="--kc:var(--success)"><div class="kpi-l">Pending</div><div class="kpi-v">' + pending + '</div><div class="kpi-s">Requests</div></div>';
-      var el = document.getElementById('lt-bal'); if (el) el.textContent = bal + ' left';
-      var sc = { approved: 'bg-g', pending: 'bg-a', rejected: 'bg-r' };
-      var ti = { annual: '🏖️', sick: '🤒', emergency: '🚨', dayoff: '☀️', unpaid: '📋', training: '📚' };
-      document.getElementById('lv-history').innerHTML = leaves.length ? leaves.map(function(l) {
-        return '<tr><td><span class="badge bg-t">' + (ti[l.type]||'📋') + ' ' + l.type + '</span></td>' +
-          '<td>' + new Date(l.from + 'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short'}) + '</td>' +
-          '<td>' + new Date(l.to + 'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short'}) + '</td>' +
-          '<td style="font-family:var(--mono)">' + l.days + 'd</td>' +
-          '<td><span class="badge ' + (sc[l.status]||'bg-a') + '">' + (l.status||'pending') + '</span></td></tr>';
-      }).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:16px">No leave requests yet</td></tr>';
+  // Load from Firebase
+  db.ref('staff/leave/' + u.sap).once('value', function(snap) {
+    var leaves = [];
+    snap.forEach(function(c) { leaves.unshift(Object.assign({_key:c.key},c.val())); });
+    var taken = 0, pending = 0;
+    leaves.forEach(function(l) {
+      if (l.type === 'annual' && l.status !== 'rejected') taken += (l.days||0);
+      if (l.status === 'pending') pending++;
     });
-  }
-
-  if (u.branchId && u.staffId) {
-    db.ref('branches/' + u.branchId + '/staff/' + u.staffId).once('value', function(bsnap) {
-      var bm = bsnap.val() || {};
-      doRenderLeave(parseInt(bm.leaveBalance || bm.annualLeave || 21));
-    });
-  } else { doRenderLeave(21); }
+    var bal = 21 - taken;
+    document.getElementById('leave-kpi').innerHTML =
+      '<div class="kpi" style="--kc:var(--primary)"><div class="kpi-l">Balance</div><div class="kpi-v">' + bal + '</div><div class="kpi-s">Annual days left</div></div>' +
+      '<div class="kpi" style="--kc:var(--warning)"><div class="kpi-l">Taken</div><div class="kpi-v">' + taken + '</div><div class="kpi-s">Days used</div></div>' +
+      '<div class="kpi" style="--kc:var(--success)"><div class="kpi-l">Pending</div><div class="kpi-v">' + pending + '</div><div class="kpi-s">Requests</div></div>';
+    var el = document.getElementById('lt-bal'); if (el) el.textContent = bal + ' left';
+    var sc = { approved: 'bg-g', pending: 'bg-a', rejected: 'bg-r' };
+    var ti = { annual: '🏖️', sick: '🤒', emergency: '🚨', dayoff: '☀️', unpaid: '📋', training: '📚' };
+    document.getElementById('lv-history').innerHTML = leaves.length ? leaves.map(function(l) {
+      return '<tr><td><span class="badge bg-t">' + (ti[l.type]||'📋') + ' ' + l.type + '</span></td>' +
+        '<td>' + new Date(l.from + 'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short'}) + '</td>' +
+        '<td>' + new Date(l.to + 'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short'}) + '</td>' +
+        '<td style="font-family:var(--mono)">' + l.days + 'd</td>' +
+        '<td><span class="badge ' + (sc[l.status]||'bg-a') + '">' + (l.status||'pending') + '</span></td></tr>';
+    }).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:16px">No leave requests yet</td></tr>';
+  });
 }
 function submitLeave() {
   var from = document.getElementById('lv-from').value;
@@ -1558,17 +1572,22 @@ function submitLeave() {
 
 /* ═══════════════════════════════════════════════════════
    TRAINING — Firebase: staff/training/{sap} + staff/modules/{branchId}
-   NO default modules — training is empty until captain publishes one
 ═══════════════════════════════════════════════════════ */
+var BASE_MODULES = [
+  {id:'tm1',title:'Food Safety Level 1',cat:'Safety & Compliance',dur:45,ico:'🍽️'},
+  {id:'tm2',title:'Customer Excellence',cat:'Customer Service',dur:30,ico:'⭐'},
+  {id:'tm3',title:'Emergency Procedures',cat:'Safety & Compliance',dur:60,ico:'🚨'},
+  {id:'tm4',title:'POS System Training',cat:'Operations',dur:25,ico:'💻'},
+];
 function renderTraining() {
   var u = CU; if (!u) return;
   db.ref('staff/training/' + u.sap).once('value', function(snap) {
     var progress = snap.val() || {};
     var branchRef = u.branchId ? db.ref('staff/modules/' + u.branchId) : null;
     function render(capMods) {
-      var allMods = (capMods || []).map(function(m, i) {
-        return { id: 'cap' + i, title: m.title, cat: m.category, dur: m.duration, ico: '📋', content: m.content || '' };
-      });
+      var allMods = BASE_MODULES.concat((capMods || []).map(function(m, i) {
+        return { id: 'cap' + i, title: m.title, cat: m.category, dur: m.duration, ico: '📋' };
+      }));
       var done = 0, inProg = 0;
       allMods.forEach(function(m) { var p = progress[m.id] || {}; if (p.status === 'completed') done++; else if (p.status === 'in-progress') inProg++; });
       document.getElementById('training-kpi').innerHTML =
@@ -1576,7 +1595,7 @@ function renderTraining() {
         '<div class="kpi" style="--kc:var(--warning)"><div class="kpi-l">In Progress</div><div class="kpi-v">' + inProg + '</div><div class="kpi-s">modules</div></div>';
       var sc = { completed: 'bg-g', 'in-progress': 'bg-a', 'not-started': 'bg-b' };
       var sl = { completed: 'Completed', 'in-progress': 'In Progress', 'not-started': 'Not Started' };
-      document.getElementById('training-modules').innerHTML = allMods.length ? allMods.map(function(m) {
+      document.getElementById('training-modules').innerHTML = allMods.map(function(m) {
         var p = progress[m.id] || { status: 'not-started', progress: 0 };
         return '<div class="mcard" onclick="openModule(\'' + m.id + '\')">' +
           '<div class="mico">' + m.ico + '</div>' +
@@ -1584,11 +1603,7 @@ function renderTraining() {
           '<div style="font-size:9px;color:var(--text3);font-family:var(--mono)">' + m.cat + ' · ' + m.dur + ' min' + (p.score ? ' · Score: ' + p.score + '%' : '') + '</div>' +
           '<div class="mbar"><div class="mbar-f" style="width:' + (p.progress||0) + '%"></div></div></div>' +
           '<span class="badge ' + (sc[p.status]||'bg-b') + '">' + (sl[p.status]||'Not Started') + '</span></div>';
-      }).join('') :
-        '<div style="text-align:center;padding:32px 20px;color:var(--text3)">' +
-        '<div style="font-size:36px;margin-bottom:12px">📚</div>' +
-        '<div style="font-size:13px;font-weight:700;margin-bottom:6px">No Training Modules Yet</div>' +
-        '<div style="font-size:11px;font-family:var(--mono)">Your captain or manager will assign modules here.</div></div>';
+      }).join('');
     }
     if (branchRef) {
       branchRef.once('value', function(ms) {
