@@ -9350,18 +9350,19 @@ function bwFilterInv(q){
     drop.innerHTML='<div style="padding:14px;text-align:center;font-size:11px;color:var(--text-tertiary)">No items found</div>';
     drop.style.display='block';return;
   }
-  drop.innerHTML=filtered.map(function(it){
+  window._bwDropItems=filtered;
+  drop.innerHTML=filtered.map(function(it,idx){
     var price=parseFloat(it.price||0);
-    var safe=JSON.stringify(JSON.stringify(it));
-    return '<div onclick="bwPickInvItem('+safe+')" style="padding:10px 14px;cursor:pointer;border-bottom:1px solid rgba(0,0,0,.06);transition:background .1s" onmouseover="this.style.background=\'rgba(0,102,102,.07)\'" onmouseout="this.style.background=\'\'">'
+    return '<div onclick="bwPickInvItem('+idx+')" style="padding:10px 14px;cursor:pointer;border-bottom:1px solid rgba(0,0,0,.06);transition:background .1s" onmouseover="this.style.background=\'rgba(0,102,102,.07)\'" onmouseout="this.style.background=\'\'">'
       +'<div style="font-weight:700;font-size:12px;color:var(--text-primary)">'+bxe(it.name||'')+'</div>'
       +'<div style="font-size:10px;color:var(--text-tertiary);font-family:monospace;margin-top:2px">'+bxe(it.code||'\u2014')+' \u00b7 '+bxe(it.unit||'ea')+' \u00b7 SAR\xa0'+price.toFixed(4)+'/unit</div>'
       +'</div>';
   }).join('');
   drop.style.display='block';
 }
-function bwPickInvItem(json){
-  var it=JSON.parse(json);
+function bwPickInvItem(idx){
+  var it=(window._bwDropItems||[])[idx];
+  if(!it)return;
   var nameEl=document.getElementById('bw-item');
   var unitEl=document.getElementById('bw-unit');
   var costEl=document.getElementById('bw-unit-cost');
