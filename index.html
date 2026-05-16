@@ -3229,8 +3229,7 @@ var NAV_CONFIG = {
     { section:'MANAGEMENT', items:[
       { id:'brand-mgmt',  icon:'🏢', label:'Brand Management' },
       { id:'access-ctrl', icon:'🔐', label:'Access Control' },
-      { id:'audit-log',   icon:'📋', label:'Audit Log' },
-      { id:'shared-ingredients',icon:'🧂', label:'Shared Ingredients' }
+      { id:'audit-log',   icon:'📋', label:'Audit Log' }
     ]}
   ],
   super_admin: [
@@ -3242,8 +3241,7 @@ var NAV_CONFIG = {
     { section:'SYSTEM', items:[
       { id:'brand-mgmt',    icon:'🏢', label:'Brand Management' },
       { id:'access-ctrl',   icon:'🔐', label:'Access Control' },
-      { id:'audit-log',     icon:'📋', label:'Audit Log' },
-      { id:'shared-ingredients',icon:'🧂', label:'Shared Ingredients' }
+      { id:'audit-log',     icon:'📋', label:'Audit Log' }
     ]}
   ],
   brand_dir: [
@@ -9300,6 +9298,7 @@ function pWastage(){
   h+='</div>';
   h+='<div class="header-actions"><div></div><button class="btn btn-primary" onclick="openBranchWastageModal()">+ Log Wastage</button></div>';
   return h+'<div class="btw"><div class="btw-s"><table class="btbl"><thead><tr><th>Date</th><th>Item</th><th>Qty</th><th>Reason</th><th>Cost</th><th>By</th><th></th></tr></thead><tbody>'+(rows||'<tr><td colspan="7" style="text-align:center;color:var(--text-tertiary);padding:28px">No wastage entries</td></tr>')+'</tbody></table></div></div>';
+}
 function openBranchWastageModal(){
   var so='<option value="">\u2014</option>'+BS.staff.map(function(s2){return '<option>'+bxe(s2.name)+'</option>';}).join('');
   var html='<div class="modal-head"><h2>Log Wastage</h2><button class="modal-close" onclick="closeModalForce()">&#x2715;</button></div>';
