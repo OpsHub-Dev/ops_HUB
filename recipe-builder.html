@@ -574,7 +574,9 @@ function initFB(){
     if(!firebase.apps.length)firebase.initializeApp(cfg);
     db=firebase.database();
     ['cbadge'].forEach(function(id){var el=document.getElementById(id);if(el){el.textContent='Live';el.className='cbadge live';}});
-    var _fs=document.getElementById('fbstat');if(_fs)_fs.textContent='Connected to shared/recipes';
+    var _fs=document.getElementById('fbstat');if(_fs)_fs.textContent='Firebase connected';
+    // Update inv-badge to show loading state (not "Connecting…")
+    var _ib=document.getElementById('inv-badge');if(_ib)_ib.textContent='📦 Loading inventory…';
     // Load recipes from Firebase
     db.ref('shared/recipes').on('value',function(snap){
       var raw=snap.val();
@@ -584,7 +586,8 @@ function initFB(){
       renderRB(gv('rbsrch'));
       document.getElementById('rcnt').textContent=RECIPES.length;
     });
-    // Load ingredient library from Firebase (shared/ingredients)
+    // Load shared/ingredients (admin-managed catalog — used as fallback if branch has no inv_items)
+    // This is NOT the branch inventory — it's a centrally-managed ingredient price list
     db.ref('shared/ingredients').on('value',function(snap){
       var raw=snap.val();
       if(raw){
@@ -615,15 +618,29 @@ function initFB(){
         else toast('✓ '+INV_ITEMS.length+' items loaded from '+src,'success');
       }
       function scanAllBranches(){
-        db.ref('admin/branches').once('value',function(bsnap){
-          var braw=bsnap.val()||{};
-          var bids=Object.keys(braw).filter(function(k){return braw[k];});
-          if(!bids.length){done([],'no branches');return;}
-          var all=[],loaded=0;
-          bids.forEach(function(bid){
-            db.ref('branches/'+bid+'/inv_items').once('value',function(s){
-              all=all.concat(toArr(s.val()));
-              if(++loaded===bids.length) done(all,'all branches');
+        // Try shared/ingredients (admin-curated catalog) first
+        db.ref('shared/ingredients').once('value',function(isnap){
+          var sharedIngs=toArr(isnap.val());
+          db.ref('admin/branches').once('value',function(bsnap){
+            var braw=bsnap.val()||{};
+            var bids=Object.keys(braw).filter(function(k){return braw[k];});
+            if(!bids.length){
+              // Use shared/ingredients if no branches
+              if(sharedIngs.length) done(sharedIngs,'shared ingredients');
+              else done([],'no inventory found');
+              return;
+            }
+            var all=sharedIngs.slice(),loaded=0;
+            bids.forEach(function(bid){
+              db.ref('branches/'+bid+'/inv_items').once('value',function(s){
+                all=all.concat(toArr(s.val()));
+                if(++loaded===bids.length){
+                  // Deduplicate by name
+                  var seen={};
+                  all=all.filter(function(x){var k=(x.name||'').toLowerCase();if(seen[k])return false;seen[k]=true;return true;});
+                  done(all,'all branches');
+                }
+              });
             });
           });
         });
