@@ -2901,6 +2901,8 @@ function initFirebase() {
       firebase.initializeApp(FB_CONFIG);
     }
     db = firebase.database();
+    // Persist config so recipe-builder.html can read it when opened as a new tab
+    try{ localStorage.setItem('alfa_fb_config', JSON.stringify(FB_CONFIG)); }catch(e){}
     // Real-time connection status from Firebase
     db.ref('.info/connected').on('value', function(snap) {
       var online = !!snap.val();
@@ -3059,7 +3061,11 @@ function navTo(pageId) {
 
   NX.page = pageId;
   // Persist last page for refresh restore
-  try { localStorage.setItem('nx_last_page', pageId); } catch(e) {}
+  // Don't persist external-tab pages as last page
+  var _externalPages=['recipe-builder','bm-music-player'];
+  if(_externalPages.indexOf(pageId)<0){
+    try { localStorage.setItem('nx_last_page', pageId); } catch(e) {}
+  }
   updateTopBar(pageId);
   renderSidebar();
   window.scrollTo(0, 0);
@@ -4520,10 +4526,8 @@ function renderPage(pageId) {
         '</div>';
     },
     'recipe-builder': function(){
-      var fbCfg='';
-      try{var st=localStorage.getItem('alfa_fb_config');if(st)fbCfg='?fbcfg='+btoa(st);}catch(e){}
       var _rbid=(NX.session||{}).branchId||'';
-      var url='recipe-builder.html'+fbCfg+(_rbid?(fbCfg?'&':'?')+'branch='+encodeURIComponent(_rbid):'');
+      var url='recipe-builder.html'+(_rbid?'?branch='+encodeURIComponent(_rbid):'');
       window.open(url,'_blank');
       return '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;text-align:center;padding:40px">'+
         '<div style="font-size:56px;margin-bottom:20px">&#x1F373;</div>'+
@@ -7561,13 +7565,8 @@ function renderPage_(pageId) {
   try {
     // Recipe Builder opens in a new tab (standalone HTML) — always return the launch card
     if (pageId === 'recipe-builder') {
-      var fbCfg = '';
-      try {
-        var stored = localStorage.getItem('alfa_fb_config');
-        if (stored) fbCfg = '?fbcfg=' + btoa(stored);
-      } catch(e) {}
       var _rbid2=(NX.session||{}).branchId||'';
-      var _rburl='recipe-builder.html'+fbCfg+(_rbid2?(fbCfg?'&':'?')+'branch='+encodeURIComponent(_rbid2):'');
+      var _rburl='recipe-builder.html'+(_rbid2?'?branch='+encodeURIComponent(_rbid2):'');
       window.open(_rburl, '_blank');
       return pRecipeBuilderLaunch();
     }
