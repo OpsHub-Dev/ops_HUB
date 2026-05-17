@@ -1471,7 +1471,7 @@ function updateDashboard(){
   if(!clRole)return;
   var now=new Date();
   var hours=now.getHours();
-  var greet=hours<12?'Good morning':'hours<17?'Good afternoon':'Good evening';
+  var greet=hours<12?'Good morning':hours<17?'Good afternoon':'Good evening';
   greet = hours<12?'Good morning 🌅':hours<17?'Good afternoon ☀️':'Good evening 🌙';
   document.getElementById('dash-title').textContent = greet;
   document.getElementById('dash-date').textContent = now.toLocaleDateString('en-GB',{weekday:'long',year:'numeric',month:'long',day:'numeric'}) + ' · Week ' + clNormWk();
