@@ -1968,15 +1968,15 @@ function renderForms(){
   var today=new Date().toLocaleDateString('en-GB',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
   var forms=[
     {id:'form_chiller',icon:'❄️',name:'Chiller Temperature Log',desc:'Daily chiller temperature control — 0°C to 5°C',color:'var(--prog-bg)',border:'var(--prog-bd)',
-     build:function(){return buildTempForm('CHILLER TEMPERATURE LOG','0°C to 5°C',['Walk-in Chiller','2-Door Chiller (Salad)','2-Door Chiller (Meat)','2-Door Chiller (Soup)','2-Door Chiller (Beverages)','Standby Chiller','Back-up Dispatcher'],branch,today);}},
+     build:function(b,t){return buildTempForm('CHILLER TEMPERATURE LOG','0°C to 5°C',['Walk-in Chiller','2-Door Chiller (Salad)','2-Door Chiller (Meat)','2-Door Chiller (Soup)','2-Door Chiller (Beverages)','Standby Chiller','Back-up Dispatcher'],b,t);}},
     {id:'form_freezer',icon:'🧊',name:'Freezer Temperature Log',desc:'Daily freezer temperature control — -18°C to -22°C',color:'var(--pend-bg)',border:'var(--pend-bd)',
-     build:function(){return buildTempForm('FREEZER TEMPERATURE LOG','-18°C to -22°C',['Walk-in Freezer','Gelato Display Freezer (-15/-16°C)','Blast Freezer','Under-counter Freezer'],branch,today);}},
+     build:function(b,t){return buildTempForm('FREEZER TEMPERATURE LOG','-18°C to -22°C',['Walk-in Freezer','Gelato Display Freezer (-15/-16°C)','Blast Freezer','Under-counter Freezer'],b,t);}},
     {id:'form_cooling',icon:'🌡️',name:'Cooling Log',desc:'Food cooling temperature record for HACCP compliance',color:'var(--over-bg)',border:'var(--over-bd)',
-     build:function(){return buildCoolingForm(branch,today);}},
+     build:function(b,t){return buildCoolingForm(b,t);}},
     {id:'form_waste',icon:'🗑️',name:'Waste Control Log',desc:'Daily food waste tracking and cost recording',color:'var(--done-bg)',border:'var(--done-bd)',
-     build:function(){return buildWasteForm(branch,today);}},
+     build:function(b,t){return buildWasteForm(b,t);}},
     {id:'form_receiving',icon:'📦',name:'Receiving Log',desc:'Incoming goods temperature and quality check record',color:'var(--neutral-bg)',border:'var(--border)',
-     build:function(){return buildReceivingForm(branch,today);}},
+     build:function(b,t){return buildReceivingForm(b,t);}},
   ];
   forms.forEach(function(f){
     var card=document.createElement('div');card.className='form-card';
@@ -1986,14 +1986,43 @@ function renderForms(){
       +'<button class="form-card-action" style="border-color:'+f.border+'">🖨 Open & Print →</button>';
     (function(ff){
       card.querySelector('.form-card-action').onclick=function(){
-        var html=ff.build();
-        var w=window.open('','_blank','width=1000,height=700');
-        if(w){w.document.write(html);w.document.close();}
-        else showToast&&showToast('Allow pop-ups to open forms','warning');
+        var branchName=CURRENT_BRANCH?CURRENT_BRANCH.name||CURRENT_BRANCH.id||'':'';
+        var todayStr=new Date().toLocaleDateString('en-GB',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+        var html=ff.build(branchName,todayStr);
+        openFormOverlay(html);
       };
     })(f);
     grid.appendChild(card);
   });
+}
+
+function openFormOverlay(html){
+  // Remove existing overlay if any
+  var existing=document.getElementById('form-overlay');
+  if(existing)existing.remove();
+  // Create full-screen overlay with iframe
+  var ov=document.createElement('div');
+  ov.id='form-overlay';
+  ov.style.cssText='position:fixed;inset:0;z-index:9999;background:#fff;display:flex;flex-direction:column';
+  // Top bar
+  var bar=document.createElement('div');
+  bar.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:#1a2340;color:#fff;flex-shrink:0';
+  bar.innerHTML='<span style="font-weight:700;font-size:14px">📋 ALFA.CO Control Form</span>'
+    +'<div style="display:flex;gap:10px">'
+    +'<button onclick="document.getElementById(\'form-iframe\').contentWindow.print()" style="background:#006666;color:#fff;border:none;border-radius:8px;padding:8px 18px;font-weight:700;font-size:13px;cursor:pointer">🖨 Print / Save PDF</button>'
+    +'<button onclick="document.getElementById(\'form-overlay\').remove()" style="background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-weight:700;font-size:13px;cursor:pointer">✕ Close</button>'
+    +'</div>';
+  ov.appendChild(bar);
+  // iframe
+  var iframe=document.createElement('iframe');
+  iframe.id='form-iframe';
+  iframe.style.cssText='flex:1;border:none;width:100%;background:#fff';
+  ov.appendChild(iframe);
+  document.body.appendChild(ov);
+  // Write HTML into iframe
+  iframe.contentDocument.open();
+  iframe.contentDocument.write(html);
+  iframe.contentDocument.close();
 }
 
 function _formStyle(){
