@@ -1300,10 +1300,20 @@ html, body {
 .role-label strong {
   color: var(--text-primary) !important;
 }
+.pin-dots {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  align-items: center;
+  margin: 20px 0 4px;
+}
 .pin-dot {
-  border-color: rgba(30,41,56,0.2) !important;
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid rgba(30,41,56,0.2) !important;
   background: var(--nm-base);
   box-shadow: var(--nm-inset-sm);
+  transition: all .2s;
+  display: inline-block;
 }
 .pin-dot.filled {
   background: var(--primary) !important;
@@ -4249,7 +4259,7 @@ function renderLoginPIN(card) {
       (branch && (role === 'branch_mgr' || role === 'staff') ? '<div style="font-size:12px;color:var(--text-secondary);margin-top:4px">' + xe(branch.name||'') + (branch.location?' · '+xe(branch.location):'') + '</div>' : '') +
       '<div style="font-size:11px;color:var(--text-tertiary);margin-top:8px">' + rh.hint + '</div>' +
     '</div>' +
-    '<div class="pin-dots" id="pin-dots"><span></span><span></span><span></span><span></span></div>' +
+    '<div class="pin-dots" id="pin-dots"><span id="pd0" class="pin-dot"></span><span id="pd1" class="pin-dot"></span><span id="pd2" class="pin-dot"></span><span id="pd3" class="pin-dot"></span></div>' +
     '<div id="pin-error" style="color:var(--danger);font-size:12px;text-align:center;min-height:18px;margin:4px 0 10px"></div>' +
     (role === 'staff' ?
       '<button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="verifyPIN()">Login →</button>' :
