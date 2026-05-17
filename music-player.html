@@ -1015,7 +1015,7 @@ audio.addEventListener('error', function() {
       var directUrl = 'https://drive.google.com/uc?export=download&confirm=t&id=' + m[1];
       audio.src = directUrl;
       audio.play().catch(function() {
-        toast('Google Drive blocked playback. Make sure the file is shared as 'Anyone with the link' and is a supported audio format (MP3, WAV, AAC).', 'error');
+        toast('Google Drive blocked playback. Make sure the file is shared as \'Anyone with the link\' and is a supported audio format (MP3, WAV, AAC).', 'error');
       });
       return;
     }
