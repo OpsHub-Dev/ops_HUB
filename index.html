@@ -3214,7 +3214,7 @@ function renderSidebar() {
 }
 
 function getRoleColor(role) {
-  var m = { super_admin:'#c0392b', ceo:'#b45309', brand_dir:'#5b21b6', regional:'#0057ff', branch_mgr:'#00875a', staff:'#94a3b8', hr_manager:'#5b21b6', finance_dir:'#00875a' };
+  var m = { super_admin:'#c0392b', ceo:'#b45309', brand_dir:'#5b21b6', regional:'#0057ff', branch_mgr:'#00875a', staff:'#94a3b8', hr_manager:'#a78bfa', finance_dir:'#d97706' };
   return m[role] || '#94a3b8';
 }
 function getRoleLabel(role) {
@@ -3338,23 +3338,26 @@ var NAV_CONFIG = {
   finance_dir: [
     { section:'FINANCE OVERVIEW', items:[
       { id:'hrf-fin-dash',    icon:'📊', label:'Finance Dashboard' },
+      { id:'hrf-pnl',         icon:'📈', label:'P&L Statement' },
       { id:'hrf-approvals',   icon:'✅', label:'Expense Approvals', badge:'hrf-pending' }
     ]},
-    { section:'REVENUE & COSTS', items:[
-      { id:'hrf-revenue',     icon:'💰', label:'Revenue' },
-      { id:'hrf-pnl',         icon:'📈', label:'P&L Statement' },
-      { id:'hrf-compliance',   icon:'🏛️', label:'Fixed Costs & Permits' },
-      { id:'hrf-food-cost',   icon:'🍽️', label:'Food Cost' },
-      { id:'hrf-expenses',    icon:'🧾', label:'Expenses' }
-    ]},
-    { section:'OPERATIONS', items:[
-      { id:'hrf-pos',         icon:'🛒', label:'Purchase Orders', badge:'hrf-po-pending' },
-      { id:'hrf-invoices',    icon:'📋', label:'Supplier Invoices' },
-      { id:'hrf-petty-cash',  icon:'💵', label:'Petty Cash' },
+    { section:'REVENUE', items:[
+      { id:'hrf-revenue',     icon:'💰', label:'Revenue & Sales' },
       { id:'hrf-dsr',         icon:'📑', label:'DSR Summary' }
     ]},
+    { section:'COSTS & EXPENSES', items:[
+      { id:'hrf-payroll',     icon:'💸', label:'Payroll Overview' },
+      { id:'hrf-food-cost',   icon:'🍽️', label:'Food Cost & Wastage' },
+      { id:'hrf-petty-cash',  icon:'💵', label:'Petty Cash' },
+      { id:'hrf-expenses',    icon:'🧾', label:'Expenses' },
+      { id:'hrf-compliance',  icon:'🏛️', label:'Fixed Costs & Permits' }
+    ]},
+    { section:'PROCUREMENT', items:[
+      { id:'hrf-pos',         icon:'🛒', label:'Purchase Orders', badge:'hrf-po-pending' },
+      { id:'hrf-invoices',    icon:'📋', label:'Supplier Invoices' }
+    ]},
     { section:'REPORTS', items:[
-      { id:'hrf-fin-report',  icon:'📄', label:'Financial Reports' }
+      { id:'hrf-fin-report',  icon:'📄', label:'Financial Report' }
     ]}
   ]
 };
@@ -13540,78 +13543,258 @@ function pHrfHrDash() {
 function pHrfFinDash() {
   var branches=hrfBranches();
   function renderFinDash(){
-    var totRev=0,totCash=0,totCard=0,totDel=0,totPC=0,pendInv=0,pendInvAmt=0;
+    var d=new Date(new Date().getTime()+3*3600000);
+    var curMonth=HRF_MONTHS[d.getMonth()]+' '+d.getFullYear();
+    var curMoPfx=d.getFullYear()+'-'+(d.getMonth()<9?'0':'')+(d.getMonth()+1);
+    var selYear=d.getFullYear();
+
+    // ── Revenue & payment breakdown MTD ──
+    var totRev=0,totCash=0,totCard=0,totDel=0;
     var revByBranch={};
-    var curMoPfx=HRF_TODAY;
+    var revByMo=new Array(12).fill(0);
     branches.forEach(function(b){
       var bname=(NX_BRANCHES[b.id]||{}).name||b.id;
       var brev=0;
       (HRF.sales[b.id]||[]).forEach(function(e){
-        if(!e.date||e.date.slice(0,7)!==curMoPfx)return;
         var amt=parseFloat(e.actual||e.total||e.amount||0);
+        // YTD monthly
+        if(e.date&&e.date.startsWith(String(selYear))){var mo=parseInt(e.date.slice(5,7),10)-1;if(mo>=0&&mo<12)revByMo[mo]+=amt;}
+        // MTD only
+        if(!e.date||e.date.slice(0,7)!==curMoPfx)return;
         brev+=amt;totRev+=amt;
         totCash+=parseFloat(e.cash||0);
         totCard+=parseFloat(e.card||e.mada||0)+parseFloat(e.visa||0)+parseFloat(e.amex||0);
         totDel+=parseFloat(e.delivery||0);
       });
       revByBranch[bname]=(revByBranch[bname]||0)+brev;
-      (HRF.pc[b.id]||[]).forEach(function(p){totPC+=parseFloat(p.amount||0);});
-      (HRF.invoices[b.id]||[]).forEach(function(i){
-        if(i.status==='Pending'||i.status==='Overdue'){pendInv++;pendInvAmt+=parseFloat(i.amount||i.total||0);}
+    });
+
+    // ── Costs MTD ──
+    var totPC=0,totWaste=0;
+    var wasteByMo=new Array(12).fill(0);
+    var pcByMo=new Array(12).fill(0);
+    branches.forEach(function(b){
+      (HRF.pc[b.id]||[]).forEach(function(p){
+        var amt=parseFloat(p.amount||0);
+        if(p.date&&p.date.slice(0,7)===curMoPfx)totPC+=amt;
+        if(p.date&&p.date.startsWith(String(selYear))){var mo=parseInt(p.date.slice(5,7),10)-1;if(mo>=0&&mo<12)pcByMo[mo]+=amt;}
+      });
+      (HRF.waste[b.id]||[]).forEach(function(w){
+        var amt=parseFloat(w.value||w.cost||w.amount||0);
+        if(w.date&&w.date.slice(0,7)===curMoPfx)totWaste+=amt;
+        if(w.date&&w.date.startsWith(String(selYear))){var mo=parseInt(w.date.slice(5,7),10)-1;if(mo>=0&&mo<12)wasteByMo[mo]+=amt;}
       });
     });
-    var d=new Date(new Date().getTime()+3*3600000);
-    var curMonth=HRF_MONTHS[d.getMonth()]+' '+d.getFullYear();
-    var h=hrfHeader('Finance Dashboard','Live financial data \u00b7 '+curMonth,
-      '<button class="btn" onclick="navTo(\'hrf-invoices\')">&#x1F4CB; Invoices</button>'+
-      '<button class="btn btn-primary" onclick="navTo(\'hrf-pnl\')">&#x1F4C8; P&amp;L</button>');
-    h+='<div class="hrf-kpi-grid">';
-    h+=hrfKpi('&#x1F4B0;','Revenue MTD',hfsar(totRev),curMonth,'var(--fin-color)');
-    h+=hrfKpi('&#x1F4B5;','Cash Sales',hfsar(totCash),'This month','var(--payroll-color)');
-    h+=hrfKpi('&#x1F4B3;','Card Sales',hfsar(totCard),'MADA + VISA + AMEX','var(--info)');
-    h+=hrfKpi('&#x1F6F5;','Delivery',hfsar(totDel),'Aggregators','#b45309');
-    h+=hrfKpi('&#x1F9FE;','Petty Cash',hfsar(totPC),'All branches','var(--warning)');
-    h+=hrfKpi('&#x1F4CB;','Pending Invoices',pendInv+' inv',hfsar(pendInvAmt),'var(--danger)');
-    h+='</div>';
-    var maxRev=Math.max.apply(null,Object.values(revByBranch).concat([1]));
-    var rows2='';
-    Object.keys(revByBranch).forEach(function(bn){
-      var rev=revByBranch[bn];
-      var pct=Math.round(rev/maxRev*100);
-      rows2+='<tr><td><strong>'+hxe(bn)+'</strong></td>'+
-        '<td style="font-family:var(--mono);color:var(--fin-color)">'+hfsar(rev)+'</td>'+
-        '<td style="width:160px"><div style="height:6px;background:var(--surface-3);border-radius:3px"><div style="height:100%;width:'+pct+'%;background:var(--fin-color);border-radius:3px"></div></div></td></tr>';
+
+    // ── Labour MTD (from payroll staff records × months) ──
+    var totLabour=0;
+    branches.forEach(function(b){
+      (HRF.staff[b.id]||[]).forEach(function(m){
+        var base=parseFloat(m.basicSalary||m.salary||0);
+        var h_allow=Math.round(base*0.25);
+        var t_allow=Math.round(base*0.10);
+        var gross=base+h_allow+t_allow;
+        totLabour+=gross+Math.round(gross*0.09);
+      });
     });
-    h+='<div class="hrf-section"><div style="font-size:14px;font-weight:700;margin-bottom:14px">Revenue by Branch — '+curMonth+'</div>';
-    h+=hrfTable(['Branch','MTD Revenue','Relative'],rows2)+'</div>';
-    h+='<div class="hrf-grid-2">'+
-      '<div class="hrf-chart-card"><div style="font-size:14px;font-weight:700;margin-bottom:16px">Revenue vs Costs (6 Months)</div><div style="height:240px"><canvas id="hrf-chart-rev-cost"></canvas></div></div>'+
-      '<div class="hrf-chart-card"><div style="font-size:14px;font-weight:700;margin-bottom:16px">Revenue by Branch</div><div style="height:240px"><canvas id="hrf-chart-cost-pie"></canvas></div></div></div>';
+
+    // ── Fixed costs MTD (from compliance module) ──
+    var totFixed=0;
+    branches.forEach(function(b){
+      var comp=HRF.compliance&&HRF.compliance[b.id];if(!comp)return;
+      totFixed+=(comp.recurring||[]).reduce(function(s,r){return s+(parseFloat(r.monthlyCost)||0);},0);
+      totFixed+=(comp.services||[]).reduce(function(s,r){return s+(parseFloat(r.monthlyCost)||0);},0);
+      totFixed+=(comp.permits||[]).reduce(function(s,p){return s+(parseFloat(p.monthlyCost)||0);},0)/12;
+    });
+
+    // ── Invoices ──
+    var pendInv=0,pendInvAmt=0,overdueInv=0;
     var allInv=[];
-    branches.forEach(function(b){(HRF.invoices[b.id]||[]).forEach(function(i){i._branchName=(NX_BRANCHES[b.id]||{}).name||b.id;allInv.push(i);});});
-    var overdue=allInv.filter(function(i){return i.status==='Overdue'||i.status==='Pending';}).slice(0,6);
-    if(overdue.length){
+    branches.forEach(function(b){
+      (HRF.invoices[b.id]||[]).forEach(function(i){
+        i._branchName=(NX_BRANCHES[b.id]||{}).name||b.id;
+        allInv.push(i);
+        if(i.status==='Pending'){pendInv++;pendInvAmt+=parseFloat(i.amount||i.total||0);}
+        if(i.status==='Overdue'){overdueInv++;pendInvAmt+=parseFloat(i.amount||i.total||0);}
+      });
+    });
+
+    // ── Computed KPIs ──
+    var grossProfit=totRev-totWaste;
+    var totCosts=totWaste+totLabour+totFixed+totPC;
+    var netProfit=totRev-totCosts;
+    var grossMargin=totRev>0?(grossProfit/totRev*100):0;
+    var netMargin=totRev>0?(netProfit/totRev*100):0;
+    var foodCostPct=totRev>0?(totWaste/totRev*100):0;
+    var labourPct=totRev>0?(totLabour/totRev*100):0;
+
+    // ── Header ──
+    var h=hrfHeader('Finance Dashboard',
+      'Live consolidated data \u00b7 '+curMonth,
+      '<button class="btn" onclick="navTo(\'hrf-invoices\')">'+
+        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="margin-right:5px;vertical-align:-2px"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>'+
+        'Invoices'+(overdueInv>0?'<span style="background:#c0392b;color:#fff;border-radius:9px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:5px">'+overdueInv+' overdue</span>':'')+'</button>'+
+      '<button class="btn btn-primary" onclick="navTo(\'hrf-pnl\')">'+
+        '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="margin-right:5px;vertical-align:-2px"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>'+
+        'P&amp;L Statement</button>');
+
+    // ── TOP ROW: Revenue KPIs ──
+    h+='<div style="font-size:10px;font-weight:700;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px;padding-top:4px">Revenue — '+curMonth+'</div>';
+    h+='<div class="hrf-kpi-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px">';
+    h+=hrfKpi('<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><line x1="12" y1="6" x2="12" y2="18"/></svg>',
+      'Net Revenue',hfsar(totRev),curMonth,'var(--fin-color)');
+    h+=hrfKpi('<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>',
+      'Cash',hfsar(totCash),'POS cash','#10b981');
+    h+=hrfKpi('<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="16" cy="13" r="2"/></svg>',
+      'Card',hfsar(totCard),'MADA+VISA+AMEX','var(--info)');
+    h+=hrfKpi('<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>',
+      'Delivery',hfsar(totDel),'Aggregators','#f97316');
+    h+='</div>';
+
+    // ── SECOND ROW: Profitability KPIs ──
+    h+='<div style="font-size:10px;font-weight:700;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px">Profitability — '+curMonth+'</div>';
+    h+='<div class="hrf-kpi-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:20px">';
+    var gpColor=grossProfit>=0?'#00875a':'#c0392b';
+    var npColor=netProfit>=0?'#00875a':'#c0392b';
+    h+=hrfKpi('<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>',
+      'Gross Profit',hfsar(grossProfit),'Margin: '+grossMargin.toFixed(1)+'%',gpColor);
+    h+=hrfKpi('<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>',
+      'Net Profit',hfsar(netProfit),'Margin: '+netMargin.toFixed(1)+'%',npColor);
+    h+=hrfKpi('<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+      'Labour Cost',hfsar(totLabour),labourPct.toFixed(1)+'% of revenue','#a78bfa');
+    h+=hrfKpi('<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>',
+      'Food Cost',hfsar(totWaste),foodCostPct.toFixed(1)+'% of revenue',foodCostPct>10?'#c0392b':foodCostPct>5?'#b45309':'#00875a');
+    h+='</div>';
+
+    // ── THIRD ROW: Cost breakdown + Invoices alert ──
+    h+='<div class="hrf-grid-2" style="margin-bottom:20px">';
+
+    // Cost Breakdown Card
+    h+='<div class="hrf-chart-card" style="padding:20px">';
+    h+='<div style="font-size:13px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:8px">'+
+      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--fin-color)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></svg>'+
+      'Cost Structure — '+curMonth+'</div>';
+    var costItems=[
+      {label:'Food Cost (COGS)',val:totWaste,pct:totRev>0?totWaste/totRev*100:0,col:'#c0392b'},
+      {label:'Labour & GOSI',val:totLabour,pct:totRev>0?totLabour/totRev*100:0,col:'#a78bfa'},
+      {label:'Fixed Opex',val:totFixed,pct:totRev>0?totFixed/totRev*100:0,col:'#f97316'},
+      {label:'Petty Cash',val:totPC,pct:totRev>0?totPC/totRev*100:0,col:'#fbbf24'}
+    ];
+    costItems.forEach(function(ci){
+      h+='<div style="margin-bottom:10px">'+
+        '<div style="display:flex;justify-content:space-between;margin-bottom:4px">'+
+          '<span style="font-size:12px;color:var(--text-secondary)">'+ci.label+'</span>'+
+          '<span style="font-family:var(--mono);font-size:12px;color:var(--text-primary);font-weight:600">'+hfsar(ci.val)+' <span style="color:'+ci.col+';font-size:10px">('+ci.pct.toFixed(1)+'%)</span></span>'+
+        '</div>'+
+        '<div style="height:5px;background:var(--surface-3);border-radius:3px">'+
+          '<div style="height:100%;width:'+Math.min(ci.pct,100)+'%;background:'+ci.col+';border-radius:3px;transition:width .4s ease"></div>'+
+        '</div></div>';
+    });
+    h+='<div style="border-top:1px solid var(--border);margin-top:14px;padding-top:10px;display:flex;justify-content:space-between">'+
+      '<span style="font-size:12px;font-weight:700;color:var(--text-primary)">Total Costs</span>'+
+      '<span style="font-family:var(--mono);font-size:13px;font-weight:800;color:#c0392b">'+hfsar(totCosts)+'</span></div>';
+    h+='</div>';
+
+    // Revenue by Branch Card
+    h+='<div class="hrf-chart-card" style="padding:20px">';
+    h+='<div style="font-size:13px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:8px">'+
+      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--fin-color)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>'+
+      'Revenue by Branch — '+curMonth+'</div>';
+    var maxRev=Math.max.apply(null,Object.values(revByBranch).concat([1]));
+    var totalBrRev=Object.values(revByBranch).reduce(function(s,v){return s+v;},0)||1;
+    Object.keys(revByBranch).sort(function(a,b){return revByBranch[b]-revByBranch[a];}).forEach(function(bn){
+      var rev=revByBranch[bn];
+      var barPct=Math.round(rev/maxRev*100);
+      var sharePct=(rev/totalBrRev*100).toFixed(1);
+      h+='<div style="margin-bottom:10px">'+
+        '<div style="display:flex;justify-content:space-between;margin-bottom:4px">'+
+          '<span style="font-size:12px;color:var(--text-secondary);font-weight:600">'+hxe(bn)+'</span>'+
+          '<span style="font-family:var(--mono);font-size:12px;color:var(--fin-color);font-weight:600">'+hfsar(rev)+' <span style="color:var(--text-tertiary);font-size:10px">('+sharePct+'%)</span></span>'+
+        '</div>'+
+        '<div style="height:5px;background:var(--surface-3);border-radius:3px">'+
+          '<div style="height:100%;width:'+barPct+'%;background:var(--fin-color);border-radius:3px;transition:width .4s ease"></div>'+
+        '</div></div>';
+    });
+    if(!Object.keys(revByBranch).length)h+='<div style="text-align:center;color:var(--text-tertiary);font-size:12px;padding:20px">No revenue recorded this month</div>';
+    h+='</div>';
+    h+='</div>'; // end hrf-grid-2
+
+    // ── CHART: 6-month Revenue vs Costs trend ──
+    h+='<div class="hrf-grid-2" style="margin-bottom:20px">';
+    h+='<div class="hrf-chart-card"><div style="font-size:13px;font-weight:700;margin-bottom:12px">Revenue vs Costs — YTD '+selYear+'</div><div style="height:220px"><canvas id="hrf-chart-rev-cost"></canvas></div></div>';
+    h+='<div class="hrf-chart-card"><div style="font-size:13px;font-weight:700;margin-bottom:12px">Revenue Mix — '+curMonth+'</div><div style="height:220px"><canvas id="hrf-chart-cost-pie"></canvas></div></div>';
+    h+='</div>';
+
+    // ── Pending/Overdue Invoices ──
+    var actionInv=allInv.filter(function(i){return i.status==='Overdue'||i.status==='Pending';}).sort(function(a,b){return (b.date||'').localeCompare(a.date||'');}).slice(0,8);
+    if(actionInv.length){
+      h+='<div class="hrf-section" style="border-left:3px solid #c0392b">';
+      h+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">'+
+        '<div style="font-size:13px;font-weight:700;display:flex;align-items:center;gap:8px">'+
+          '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#c0392b" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>'+
+          'Action Required — '+(pendInv+overdueInv)+' Invoices Pending/Overdue</div>'+
+        '<button class="btn btn-sm" onclick="navTo(\'hrf-invoices\')">View All</button></div>';
       var invRows='';
-      overdue.forEach(function(inv){
+      actionInv.forEach(function(inv){
         var sc=inv.status==='Overdue'?'#c0392b':'#b45309';
-        invRows+='<tr><td>'+hxe(inv.supplier||inv.vendor||'—')+'</td><td>'+hxe(inv._branchName)+'</td>'+
-          '<td style="font-family:var(--mono)">'+hfsar(inv.amount||inv.total||0)+'</td>'+
+        invRows+='<tr><td><strong>'+hxe(inv.supplier||inv.vendor||'—')+'</strong></td><td>'+hxe(inv._branchName)+'</td>'+
+          '<td style="font-family:var(--mono);color:var(--fin-color)">'+hfsar(inv.amount||inv.total||0)+'</td>'+
           '<td>'+hxe(inv.date||'—')+'</td><td>'+hrfBadge(inv.status,sc)+'</td></tr>';
       });
-      h+='<div class="hrf-section"><div style="font-size:14px;font-weight:700;margin-bottom:14px">&#x26A0;&#xFE0F; Pending/Overdue Invoices</div>';
-      h+=hrfTable(['Supplier','Branch','Amount','Date','Status'],invRows)+'</div>';
+      h+=hrfTable(['Supplier','Branch','Amount','Date','Status'],invRows);
+      h+='</div>';
     }
-    NX._hrfRevByBranch=revByBranch;NX._hrfSales=HRF.sales;
+
+    // ── Quick links to modules ──
+    h+='<div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:8px;padding:16px;background:var(--surface-2);border-radius:12px;border:1px solid var(--border)">';
+    var qlinks=[
+      {icon:'📈',label:'P&L Statement',page:'hrf-pnl'},
+      {icon:'💰',label:'Revenue',page:'hrf-revenue'},
+      {icon:'💸',label:'Payroll',page:'hrf-payroll'},
+      {icon:'🍽️',label:'Food Cost',page:'hrf-food-cost'},
+      {icon:'🏛️',label:'Fixed Costs',page:'hrf-compliance'},
+      {icon:'🛒',label:'Purchase Orders',page:'hrf-pos'},
+      {icon:'📋',label:'Invoices',page:'hrf-invoices'},
+      {icon:'📑',label:'DSR',page:'hrf-dsr'},
+      {icon:'📄',label:'Finance Report',page:'hrf-fin-report'}
+    ];
+    qlinks.forEach(function(q){
+      h+='<button class="btn" onclick="navTo(\''+q.page+'\')" style="font-size:12px;gap:6px;display:flex;align-items:center">'+q.icon+' '+q.label+'</button>';
+    });
+    h+='</div>';
+
+    // Store for chart init
+    NX._hrfRevByBranch=revByBranch;
+    NX._hrfRevByMo=revByMo;
+    NX._hrfCostsByMo=revByMo.map(function(_,i){return wasteByMo[i]+pcByMo[i];});
+    NX._hrfCashCardDel=[totCash,totCard,totDel,Math.max(0,totRev-totCash-totCard-totDel)];
+    NX._hrfSales=HRF.sales;
+
     var area=document.getElementById('page-area');
     if(area){area.innerHTML=h;setTimeout(function(){initPageCharts('hrf-fin-dash');},80);}
   }
-  var cached=branches.filter(function(b){return HRF.sales[b.id];});
-  if(cached.length===branches.length&&branches.length>0){setTimeout(renderFinDash,0);return hrfLoading('Refreshing\u2026');}
-  var done=0;
-  function check(){done++;if(done>=3)renderFinDash();}
-  hrfLoadAll('sales','sales',check);
-  hrfLoadAll('pc','pc',check);
-  hrfLoadAll('invoices','invoices',check);
+
+  // Load all needed data in parallel
+  var needLoad=0,doneLoad=0;
+  function check(){doneLoad++;if(doneLoad>=needLoad)renderFinDash();}
+  var hasSales=branches.every(function(b){return HRF.sales[b.id];});
+  var hasPC=branches.every(function(b){return HRF.pc[b.id];});
+  var hasInv=branches.every(function(b){return HRF.invoices[b.id];});
+  var hasWaste=branches.every(function(b){return HRF.waste[b.id];});
+  var hasStaff=branches.every(function(b){return HRF.staff[b.id];});
+  var hasComp=!!HRF.compliance;
+  if(!hasSales){needLoad++;hrfLoadAll('sales','sales',check);}
+  if(!hasPC){needLoad++;hrfLoadAll('pc','pc',check);}
+  if(!hasInv){needLoad++;hrfLoadAll('invoices','invoices',check);}
+  if(!hasWaste){needLoad++;hrfLoadAll('waste','waste',check);}
+  if(!hasStaff){needLoad++;hrfLoadAll('staff','staff',check);}
+  if(!hasComp&&db){
+    needLoad++;
+    HRF.compliance={};
+    var brs2=branches;var cloaded=0;
+    brs2.forEach(function(b){db.ref('branches/'+b.id+'/compliance').once('value',function(snap){if(snap.val())HRF.compliance[b.id]=snap.val();if(++cloaded===brs2.length)check();});});
+  }
+  if(needLoad===0)return (renderFinDash(),'');
   return hrfLoading('Loading finance data\u2026');
 }
 
@@ -16068,6 +16251,18 @@ function hrfInitAttTrendChart(){
 
 function hrfInitRevCostChart(){
   var d=new Date(new Date().getTime()+3*3600000);
+  var curMo=d.getMonth();
+  // Use pre-computed YTD data if available (set by new finance dashboard)
+  if(NX._hrfRevByMo&&NX._hrfCostsByMo){
+    var labels=HRF_MONTHS.slice(0,curMo+1);
+    hrfMkChart('hrf-chart-rev-cost',{type:'bar',
+      data:{labels:labels,datasets:[
+        {label:'Revenue',data:NX._hrfRevByMo.slice(0,curMo+1),backgroundColor:'rgba(52,211,153,.25)',borderColor:'#00875a',borderWidth:2,borderRadius:4},
+        {label:'Costs',data:NX._hrfCostsByMo.slice(0,curMo+1),backgroundColor:'rgba(248,113,113,.2)',borderColor:'#c0392b',borderWidth:2,borderRadius:4}
+      ]},options:hrfBaseOpts()});
+    return;
+  }
+  // Fallback: compute from raw data (last 6 months)
   var months=[];for(var i=5;i>=0;i--){var mo=(d.getMonth()-i+12)%12;months.push({mo:mo,label:HRF_MONTHS[mo]});}
   var rev=[],costs=[];
   months.forEach(function(m){
@@ -16088,13 +16283,24 @@ function hrfInitRevCostChart(){
 
 function hrfInitCostPieChart(){
   var c=hrfChartDefaults();
-  var revByBranch=NX._hrfRevByBranch||{};
-  var labels=Object.keys(revByBranch);
-  var colors=['#00875a','#0057ff','#5b21b6','#b45309','#c0392b','#b45309','#94a3b8','#0057ff'];
-  hrfMkChart('hrf-chart-cost-pie',{type:'doughnut',
-    data:{labels:labels,datasets:[{data:labels.map(function(k){return revByBranch[k];}),backgroundColor:colors.map(function(c2){return c2+'aa';}),borderColor:colors,borderWidth:2}]},
-    options:{responsive:true,maintainAspectRatio:false,cutout:'60%',
-      plugins:{legend:{position:'right',labels:{color:c.tick,font:{family:'Plus Jakarta Sans',size:11},padding:10,boxWidth:10}}}}});
+  // Show payment method breakdown (Cash / Card / Delivery / Other)
+  var cashCardDel=NX._hrfCashCardDel||[];
+  if(cashCardDel.length===4&&cashCardDel.some(function(v){return v>0;})){
+    hrfMkChart('hrf-chart-cost-pie',{type:'doughnut',
+      data:{labels:['Cash','Card','Delivery','Other'],
+        datasets:[{data:cashCardDel,backgroundColor:['rgba(52,211,153,.7)','rgba(96,165,250,.7)','rgba(251,146,60,.7)','rgba(148,163,184,.4)'],borderColor:['#00875a','#3b82f6','#f97316','#94a3b8'],borderWidth:2}]},
+      options:{responsive:true,maintainAspectRatio:false,cutout:'60%',
+        plugins:{legend:{position:'right',labels:{color:c.tick,font:{family:'Plus Jakarta Sans',size:11},padding:10,boxWidth:10}}}}}}); 
+  } else {
+    // Fallback to branch breakdown
+    var revByBranch=NX._hrfRevByBranch||{};
+    var labels=Object.keys(revByBranch);
+    var colors=['#00875a','#0057ff','#5b21b6','#b45309','#c0392b','#f97316','#94a3b8','#0057ff'];
+    hrfMkChart('hrf-chart-cost-pie',{type:'doughnut',
+      data:{labels:labels,datasets:[{data:labels.map(function(k){return revByBranch[k];}),backgroundColor:colors.map(function(c2){return c2+'aa';}),borderColor:colors,borderWidth:2}]},
+      options:{responsive:true,maintainAspectRatio:false,cutout:'60%',
+        plugins:{legend:{position:'right',labels:{color:c.tick,font:{family:'Plus Jakarta Sans',size:11},padding:10,boxWidth:10}}}}});
+  }
 }
 
 function hrfInitRevMonthlyChart(){
