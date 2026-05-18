@@ -13794,7 +13794,7 @@ function pHrfFinDash() {
     var brs2=branches;var cloaded=0;
     brs2.forEach(function(b){db.ref('branches/'+b.id+'/compliance').once('value',function(snap){if(snap.val())HRF.compliance[b.id]=snap.val();if(++cloaded===brs2.length)check();});});
   }
-  if(needLoad===0)return (renderFinDash(),'');
+  if(needLoad===0){setTimeout(renderFinDash,0);return hrfLoading('Refreshing\u2026');}
   return hrfLoading('Loading finance data\u2026');
 }
 
