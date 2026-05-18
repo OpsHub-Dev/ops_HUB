@@ -2901,63 +2901,6 @@ var NX = {
 
 // Checklist module globals (must be declared at top level)
 var clNxState = {};
-var CL_NX_ADMIN_PIN = '1422';
-// CL_DATA_NX: hardcoded checklist structure (same as checklists.html CL_DATA)
-var CL_DATA_NX = {
- mod:[
-  {id:'mod_gelato',name:'Salad & Gelato',sub:'MOD Frontline — Salad & Gelato — 11:30 AM & 5:30 PM',checkType:'temp',groups:[
-   {name:'GELATO DISPLAY',items:[{id:'gelato',label:'Gelato Freezer Display -15/-16\u00b0C',yellow:true,hasTemp:true},{id:'vanilla',label:'Vanilla, Chocolate, Strawberry, Oreo, Cotton Candy',yellow:false,hasTemp:false},{id:'pistachio',label:'Pistachio, Hazelnuts, Mango, Ferrero, Macha, Tiramisu',yellow:false,hasTemp:false},{id:'fruitti',label:'Fruitti Bosco, Lemon',yellow:false,hasTemp:false}]},
-   {name:'CHILLER',items:[{id:'chiller2d',label:'2 Door Chiller 0-5\u00b0C',yellow:true,hasTemp:true},{id:'onion',label:'Onion, Tomato, Italian Dressing',yellow:false,hasTemp:false}]}]},
-  {id:'mod_pastry',name:'Pastry & Receiving',sub:'MOD Frontline — Pastry & Receiving — 11:30 AM & 5:30 PM',checkType:'temp',groups:[
-   {name:'EQUIPMENT',items:[{id:'oven',label:'Convection Oven 180\u00b0C',yellow:true,hasTemp:true},{id:'wic',label:'Walk-in Chiller 0-5\u00b0C',yellow:true,hasTemp:true},{id:'wif',label:'Walk-in Freezer -18 to -22\u00b0C',yellow:true,hasTemp:true}]},
-   {name:'ITEMS',items:[{id:'gelato2',label:'Gelato Ice Cream',yellow:false,hasTemp:false},{id:'desserts',label:'Tiramisu, Fondente, Creme Brulee, Sampler',yellow:false,hasTemp:false},{id:'cheese_r',label:'Fresh Mozza, Ricotta, Mascarpone, Goat Cheese',yellow:false,hasTemp:false},{id:'protein',label:'Chicken, Salmon, Hammour, Topside, Chuck Roll (Thawing)',yellow:false,hasTemp:false},{id:'beef',label:'Beef Bacon, Strip Loin, Tenderloin',yellow:false,hasTemp:false},{id:'prep_r',label:'Bruschette, Lasagna, Meatballs',yellow:false,hasTemp:false}]}]},
-  {id:'mod_fryer',name:'Fryer & Pizza',sub:'MOD Frontline — Fryer & Pizza — 11:30 AM & 5:30 PM',checkType:'temp',groups:[
-   {name:'EQUIPMENT',items:[{id:'fryer160',label:'Fryer Machine 160\u00b0C',yellow:true,hasTemp:true},{id:'fryer180',label:'Fryer Machine 180\u00b0C',yellow:true,hasTemp:true},{id:'pizzaoven',label:'Pizza Oven 600-650\u00b0F',yellow:true,hasTemp:true}]},
-   {name:'BACKUP & MISE EN PLACE',items:[{id:'backup1',label:'Tartar Sauce, Italian Dressing, Boiled Potato (Back up)',yellow:false,hasTemp:false},{id:'backup2',label:'Pesto Sauce, Parmesan Ground, Portion Butter Block',yellow:false,hasTemp:false},{id:'pizzaitem',label:'Pizza Dough, Pizza Sauce, Shredded Mozzarella',yellow:false,hasTemp:false},{id:'topping1',label:'Meatballs, Cooked Bell Pepper, Grilled Eggplant',yellow:false,hasTemp:false},{id:'topping2',label:'Grilled Zucchini, Artichoke, Caramelized Onion, Rocca',yellow:false,hasTemp:false},{id:'cheese2',label:'G. Parmesan, Shredded Fontina, Goat Cheese, Balsamic',yellow:false,hasTemp:false},{id:'meats',label:'Beef Ham, Pepperoni, Fresh Mozzarella',yellow:false,hasTemp:false}]}]},
-  {id:'mod_salad',name:'Salad & Prep',sub:'MOD Frontline — Salad & Prep — 11:30 AM & 5:30 PM',checkType:'temp',groups:[
-   {name:'CHILLER',items:[{id:'saladch',label:'Salad 2 Door Chiller 0-5\u00b0C',yellow:true,hasTemp:true}]},
-   {name:'ITEMS',items:[{id:'bs1',label:'Artichoke Dip, Sliced Bruschette, Garlic Mayo, Chives Goat Cheese',yellow:false,hasTemp:false},{id:'bs2',label:'Crouton, S/W Bread, Eggplant, Mushroom Cooked, Citrus',yellow:false,hasTemp:false},{id:'bs3',label:'Bell Pepper Cooked, Shredded Mozza, Tartar Sauce',yellow:false,hasTemp:false},{id:'salad_f',label:'Rocca, Lettuce, Pomodoro Mixture, Pesto, Garlic Mayo',yellow:false,hasTemp:false},{id:'herbs',label:'Oregano, Olive Oil',yellow:false,hasTemp:false},{id:'vegs',label:'Sliced Cucumber, Sliced Onion, Tomato (Prepared)',yellow:false,hasTemp:false},{id:'greens',label:'Fresh Rocca, Lettuce Iceberg (Prepared)',yellow:false,hasTemp:false},{id:'seafood_b',label:'Calamari, Mozzarella, Zucchini & Artichoke, Fish Fillet (Back up)',yellow:false,hasTemp:false}]}]},
-  {id:'mod_grill',name:'Grill Section',sub:'MOD Frontline — Grill Section — 11:30 AM & 5:30 PM',checkType:'temp',groups:[
-   {name:'EQUIPMENT',items:[{id:'bainmarie',label:'Bain Marie 63\u00b0C',yellow:true,hasTemp:true},{id:'maingrill',label:'Main Grill 200-220\u00b0C',yellow:true,hasTemp:true},{id:'convoven',label:'Convection Oven 250\u00b0C',yellow:true,hasTemp:true},{id:'meatch',label:'Meat 2 Door Chiller 0-5\u00b0C',yellow:true,hasTemp:true},{id:'soupch',label:'Soup 2 Door Chiller 0-5\u00b0C',yellow:true,hasTemp:true}]},
-   {name:'MISE EN PLACE',items:[{id:'seasoning',label:'Melted Butter, Steak Seasoning',yellow:false,hasTemp:false},{id:'soup1',label:'Hybrid Daily Soup',yellow:false,hasTemp:false},{id:'soup2',label:'Onion Soup',yellow:false,hasTemp:false},{id:'sauces',label:'Mash Potato, Lemon Sauce, Alfredo Sauce',yellow:false,hasTemp:false},{id:'sauces2',label:'Romano, Peppercorn, Marinara, Mushroom Sauce',yellow:false,hasTemp:false}]}]},
-  {id:'mod_pasta',name:'Pasta Section',sub:'MOD Frontline — Pasta Section — 11:30 AM & 5:30 PM',checkType:'temp',groups:[
-   {name:'EQUIPMENT',items:[{id:'blancher',label:'Pasta Blancher 80-100\u00b0C',yellow:true,hasTemp:true},{id:'cooked_ch',label:'Cooked Pasta Dispatcher Cooler 0-5\u00b0C',yellow:true,hasTemp:true},{id:'backup_ch',label:'Back-up Dispatcher Cooler 0-5\u00b0C',yellow:true,hasTemp:true}]},
-   {name:'MISE EN PLACE',items:[{id:'sauces_p',label:'Creme Sauce, Pomodoro, 4 Cheese Sauce, Bolognese',yellow:false,hasTemp:false},{id:'spices',label:'Mixed Spices, Chili, Panko Breading, Parmesan Cheese',yellow:false,hasTemp:false},{id:'vegs_p',label:'Broccoli, Grill Chicken, Onion, Garlic Paste, Goat Cheese',yellow:false,hasTemp:false},{id:'herbs_p',label:'Fresh Mozz, Parsley, Basil, Cherry Tom, Asparagus, Pesto',yellow:false,hasTemp:false},{id:'misc_p',label:'Capers, Garlic Sliced, Artichoke, Shrimp Cooked, Spinach',yellow:false,hasTemp:false},{id:'mush',label:'Fresh Mush, Wild Mush, Green Peas, Pomodoro, Bacon',yellow:false,hasTemp:false},{id:'seafood_p',label:'F. Mussel, Cooked Shrimp 20/30, Calamari',yellow:false,hasTemp:false}]}]},
-  {id:'mod_bar_open',name:'Bar Opening',sub:'MOD Bar Checklist — Opening',checkType:'cb',groups:[
-   {name:'WALKTHROUGH',items:[{id:'equip',label:'All equipment are properly working'},{id:'items_a',label:'All items available'},{id:'bar_pp',label:'Barista aware of P&P levels'},{id:'chiller_w',label:'Working Chiller'},{id:'beverages',label:'Holsten / Aquafina / Aquapanna / St.Pelligrino'},{id:'bases',label:'At least 1 base of each is ready for morning shift'},{id:'pour_c',label:'Pouring containers are clean and organized'},{id:'whipped',label:'Whipped cream and chocolate syrup in stock'}]},
-   {name:'BAR COUNTER',items:[{id:'garnish',label:'Garnish tray is stocked (enough for 2 hours)'},{id:'bar_tools',label:'Bar tools readily available'},{id:'glassware',label:'Glassware all stocked'},{id:'paper_i',label:'All paper items available'},{id:'sugar',label:'Sugarbowls / Rimming sponge ready'}]},
-   {name:'BACKUP CHILLER',items:[{id:'kids_j',label:'Al Safi Kids Juice (Apple & Orange) Available'},{id:'bk_g',label:'Backup garnish covered and labelled'},{id:'prep_i',label:'All prep items organized'},{id:'fresh_f',label:'Fresh fruit stocked according to P&P'},{id:'milk',label:'Milk & Steaming pitcher readily available'}]},
-   {name:'BACKUP CABINETS',items:[{id:'bar_t2',label:'Bar tools available'},{id:'electronic',label:'Electronic bar equipment charged & available'},{id:'espresso',label:'Espresso beans available'},{id:'paper_bk',label:'Paper items available'}]}]},
-  {id:'mod_bar_close',name:'Bar Closing',sub:'MOD Bar Checklist — Closing',checkType:'cb',groups:[
-   {name:'WORKING CHILLER',items:[{id:'c_holsten',label:'Holsten / Aquafina / Aquapanna / St.Pelligrino'},{id:'c_bases',label:'At least 1 base ready for morning shift'},{id:'c_pour',label:'Pouring containers clean and organized'},{id:'c_whipped',label:'Whipped cream and chocolate syrup in stock'},{id:'c_pnp',label:'OH & P&P correctly followed'}]},
-   {name:'BAR COUNTER',items:[{id:'c_garnish',label:'Garnish fruit trays clean and empty'},{id:'c_tools',label:'Bar tools clean and organized'},{id:'c_glass',label:'Glassware clean & stocked \u2014 no fingerprints'},{id:'c_straws',label:'Straws & Paper items stocked'}]},
-   {name:'BACKUP CHILLER',items:[{id:'c_kids',label:'Kids Al Safi [Apple & Orange]'},{id:'c_bk',label:'Remaining backups in 6th containers [covered & labelled]'},{id:'c_syrup',label:'Simple Syrup & bases ready for next day'},{id:'c_fruit',label:'Fresh fruit stocked \u2014 in accordance with P&P'},{id:'c_milk',label:'Milk & Steaming pitchers available'}]},
-   {name:'BACKUP CABINETS',items:[{id:'c_bkt',label:'Bar tools available and working'},{id:'c_bki',label:'Backup items available; espresso beans/straws/etc..'}]}]}
- ],
- foh:[
-  {id:'foh_waiter',name:"Waiter's Checklist",sub:"WAITER'S CHECKLIST — 11:00AM & 5:45PM",checkType:'cb',groups:[
-   {name:'SERVER STATION',items:[{id:'w_menu',label:'English/Arabic/Dessert menu \u2014 untorn, no scratches'},{id:'w_togo',label:'To-go menu \u2014 available & ready for service'},{id:'w_bill',label:'Bill jackets \u2014 cleaned, wiped & organized'},{id:'w_cond',label:'Condiments set holders \u2014 cleaned'},{id:'w_condref',label:'Condiments \u2014 refilled as per standard & organized'},{id:'w_tooth',label:'Toothpick holders \u2014 cleaned & refilled (6 pcs.)'},{id:'w_chili',label:'Chili oil bottles \u2014 cleaned, wiped & refilled (6 bottles)'},{id:'w_ketch',label:'Ketchup bottles \u2014 cleaned, refilled (20 bottles)'},{id:'w_tabasco',label:'Tabasco (red/green) \u2014 cleaned & refilled (24 bottles)'},{id:'w_pepper',label:'Fresh pepper mill \u2014 cleaned & refilled'},{id:'w_napkins',label:'Folded napkins/beverage napkins \u2014 organized & ready'},{id:'w_spray',label:'Spray bottles (glass cleaner/sanitizer) \u2014 full & ready'},{id:'w_silver',label:'Silverware & tableware back-up \u2014 cleaned, wiped, complete'}]},
-   {name:'TABLES, CHAIRS, PLANTS',items:[{id:'w_tableset',label:'Table set-up \u2014 complete & as per standard'},{id:'w_tables',label:'Tables & bases \u2014 cleaned & stable; base \u2014 polished'},{id:'w_booth',label:'Booth tables \u2014 couches cleaned & wiped'},{id:'w_plants',label:'Plants & d\u00e9cor \u2014 cleaned & presentable'}]},
-   {name:'WASH / COMFORT ROOM',items:[{id:'w_soap',label:'Soap dispenser, air freshener \u2014 cleaned & refilled'},{id:'w_toilet',label:'Toilet paper, paper roll dispenser \u2014 cleaned, full'},{id:'w_trash',label:'Trash can, toilet brush & holder \u2014 cleaned'},{id:'w_faucet',label:'Faucets \u2014 cleaned, wiped & high water pressure'},{id:'w_mirror',label:'Mirror \u2014 cleaned, wiped & spotless'},{id:'w_sink',label:'Sinks, lavatory, urinal \u2014 cleaned & sanitized'},{id:'w_rcl',label:'Restroom checklist \u2014 available & hanged'}]},
-   {name:'POINT-OF-SALE',items:[{id:'w_pos',label:'POS terminal \u2014 cleaned & working'},{id:'w_printer',label:'Receipt printer & span machine \u2014 cleaned & working'},{id:'w_money',label:'Money detector \u2014 cleaned & working'},{id:'w_rolls',label:'Thermal & span rolls back-up \u2014 readily available'},{id:'w_phone',label:'Telephone handset \u2014 cleaned & working'}]},
-   {name:'OTHERS',items:[{id:'w_floor',label:'Floor \u2014 swept & mopped; umbrellas \u2014 cleaned'},{id:'w_trcans',label:'Trash cans \u2014 washed, cleaned & polished'},{id:'w_window',label:'Kitchen window glass & door \u2014 cleaned & wiped'},{id:'w_trays',label:'Trays & tray jacks \u2014 cleaned, wiped & ready'},{id:'w_ltg',label:'Lightings \u2014 working & in good condition'}]},
-   {name:'CLEANING MATERIALS',items:[{id:'w_mopsink',label:'Mop sink \u2014 washed, cleaned & organized'},{id:'w_brooms',label:'Brooms & dust pans \u2014 washed, cleaned & kept ready (2 sets)'},{id:'w_mop',label:'Mop, mop bucket & wringer \u2014 washed, cleaned & kept ready'}]},
-   {name:'PARKING AREA',items:[{id:'w_sidewalk',label:'Sidewalk \u2014 swept, cleaned & well-maintained'},{id:'w_entrance',label:'Main entrance \u2014 floor swept & mopped; plants \u2014 cleaned'},{id:'w_outdoor',label:'Tables & chairs \u2014 cleaned, arranged & in good condition'}]}]},
-  {id:'foh_barista',name:'Barista Opening/Closing',sub:'Barista Opening-Closing Checklist \u2014 AM & PM Shifts',checkType:'cb',groups:[
-   {name:'TO GO SUPPLIES',items:[{id:'ba_pepscup',label:'Pepsi Co. Polar Cups / Lids'},{id:'ba_togocarr',label:'To Go Beverage Carriers'},{id:'ba_plcups',label:'Transparent Plastic Cups / Lids'},{id:'ba_espcups',label:'Espresso/Cappuccino Cups & Lids'},{id:'ba_straw',label:'Flexible Straw / Sip Straw / Boba Straws'},{id:'ba_napkins',label:'Beverage Napkins'},{id:'ba_gloves',label:'Gloves (2 Box per Shift) & Hairnets'},{id:'ba_sugar',label:"Sugar White / Sweet n' Low (10)"}]},
-   {name:'BACK-UP STATION',items:[{id:'ba_pepsibib',label:'Pepsi Bib Available & Tube hose'},{id:'ba_dietbib',label:'Diet Pepsi Bib Available'},{id:'ba_7upbib',label:'7 UP Bib Available'},{id:'ba_mirdbib',label:'Miranda Bib Available'},{id:'ba_mtnbib',label:'Mountain Dew Bib Available'}]}]}
- ],
- boh:[
-  {id:'boh_kitchen',name:'Kitchen Opening',sub:'BOH Kitchen Checklist \u2014 Opening',checkType:'cb',groups:[
-   {name:'EQUIPMENT',items:[{id:'bk_ac',label:'All A/C & Lights ON & working'},{id:'bk_wic',label:'Walk-in Chiller 0-5\u00b0C \u2014 clean and working'},{id:'bk_wif',label:'Walk-in Freezer -18\u00b0C \u2014 clean and working'},{id:'bk_oven',label:'Ovens pre-heated & working'},{id:'bk_grill',label:'Grills cleaned & pre-heated'}]},
-   {name:'HYGIENE & SAFETY',items:[{id:'bk_gloves',label:'Gloves, hairnets & aprons available'},{id:'bk_soap',label:'Soap & sanitizer at all stations'},{id:'bk_temp',label:'Temp logs filled for all cold storage'},{id:'bk_fifo',label:'FIFO rotation applied to all items'}]},
-   {name:'PREP',items:[{id:'bk_sauces',label:'All sauces & bases prepared for service'},{id:'bk_proteins',label:'Proteins thawed & portioned'},{id:'bk_veg',label:'Vegetables cleaned, cut & ready'},{id:'bk_garnish',label:'Garnishes prepared & organized'}]}]},
-  {id:'boh_prep',name:'Prep Station',sub:'PREPARATION CHECKLIST \u2014 11:00 AM & 5:00 PM',checkType:'cb',groups:[
-   {name:'EQUIPMENT & TEMP',items:[{id:'pr_aclight',label:'All A/C & Light ON & Working'},{id:'pr_standch',label:'Standing Chiller +0\u00b0C to +5\u00b0C \u2014 Clean and working'}]},
-   {name:'COMPLEMENTARY SALAD PREP',items:[{id:'pr_tomato',label:'Produce, Tomato, Cucumber'},{id:'pr_iceberg',label:'Iceberg, Rocca'},{id:'pr_onion',label:'Onion, Romaine lettuce & Spinach'}]},
-   {name:'OTHERS',items:[{id:'pr_water',label:'Water coming in the sink'},{id:'pr_trash',label:'Step on Trash can clean with inserted bag'},{id:'pr_area',label:'Preparation area always clean'}]}]}
- ]
-};
 var clNxRole  = null;
 
 // ── Firebase Initialization ──────────────────────────────────────────────────
@@ -13539,6 +13482,7 @@ function pHrfEmployees(){
     var h=hrfHeader('Employee Directory',filtered.length+' of '+allStaff.length+' staff',
       '<button class="btn" onclick="openHrfBranchAccessMgr()">\uD83D\uDD11 Branch Access</button>'+
       '<button class="btn" onclick="hrfExportEmployees()">&#x2B07; Export CSV</button>'+
+      '<button class="btn" onclick="hrfOpenImportModal()">&#x2B06; Import CSV</button>'+
       '<button class="btn btn-primary" onclick="openHrfEmpModal(null,null)">+ Add Employee</button>'+
       '<button class="btn" style="background:rgba(0,102,102,.1);color:#006666;border:1px solid rgba(0,102,102,.2)" onclick="hrfSyncAllSapIndex()" title="Sync SAP numbers to branch schedule index">🔗 Sync SAP to Schedule</button>');
     // ── Search: uses id="hrf-emp-search" and filters in-place (no navTo on every keystroke) ──
@@ -15678,12 +15622,26 @@ function hrfSubmitLeave(){
 
 function hrfExportEmployees(){
   var branches=hrfBranches();
-  var rows=['Name,SAP,Department,Role,Branch,Status,Phone,Nationality'];
+  var HEADERS=[
+    'name','sap','email','phone','dept','role','status','nationality',
+    'branch','workerType','companyId',
+    'hireDate','contractType','contractEndDate','probationEnd','shift',
+    'basicSalary','housingAllowance','transportAllowance','otherAllowances','gosiEnrolled',
+    'leaveBalance','annualLeave',
+    'iqama','iqamaExpiry',
+    'bankName','iban',
+    'emergencyName','emergencyPhone',
+    'hrNotes'
+  ];
+  var rows=[HEADERS.join(',')];
   branches.forEach(function(b){
     var bname=(NX_BRANCHES[b.id]||{}).name||b.id;
     (HRF.staff[b.id]||[]).forEach(function(m){
-      rows.push([m.name,m.sap||m.id||'',m.dept||'',m.role||'',bname,m.status||'Active',m.phone||'',m.nationality||'']
-        .map(function(v){return '"'+String(v).replace(/"/g,'""')+'"';}).join(','));
+      var vals=HEADERS.map(function(h){
+        var v=h==='branch'?bname:(m[h]!==undefined&&m[h]!==null?m[h]:'');
+        return '"'+String(v).replace(/"/g,'""')+'"';
+      });
+      rows.push(vals.join(','));
     });
   });
   var blob=new Blob([rows.join('\n')],{type:'text/csv'});
@@ -15691,7 +15649,165 @@ function hrfExportEmployees(){
   a.href=URL.createObjectURL(blob);
   a.download='employees_'+new Date().toISOString().slice(0,10)+'.csv';
   a.click();
-  showToast('Export complete \u2713','success');
+  showToast('Export complete — '+( rows.length-1)+' employees','success');
+}
+
+function hrfOpenImportModal(){
+  var h='<div class="modal-head"><h2>⬆ Import Employees (CSV)</h2><button class="modal-close" onclick="closeModalForce()">✕</button></div>';
+  h+='<div style="background:var(--surface-2);border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:11px;color:var(--text-secondary);line-height:1.8">';
+  h+='<strong style="color:var(--text-primary)">Required columns:</strong> <code>name, sap, branch</code><br>';
+  h+='<strong style="color:var(--text-primary)">Optional columns:</strong> email, phone, dept, role, status, nationality, workerType, hireDate, contractType, contractEndDate, probationEnd, shift, basicSalary, housingAllowance, transportAllowance, otherAllowances, gosiEnrolled, leaveBalance, iqama, iqamaExpiry, bankName, iban, emergencyName, emergencyPhone, hrNotes<br>';
+  h+='<strong style="color:var(--text-primary)">Tip:</strong> Use the Export CSV first to get the exact format, fill it in Excel, then import.';
+  h+='</div>';
+  h+='<div class="bfg"><label class="form-label">Select CSV File</label>';
+  h+='<input type="file" id="hrf-imp-file" accept=".csv,.txt" style="width:100%;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:10px;font-family:var(--font);font-size:12px;color:var(--text-primary)" onchange="hrfPreviewImport(this)"></div>';
+  h+='<div id="hrf-imp-preview" style="margin-top:12px"></div>';
+  h+='<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px">';
+  h+='<button class="btn" onclick="closeModalForce()">Cancel</button>';
+  h+='<button class="btn btn-primary" id="hrf-imp-btn" disabled onclick="hrfDoImport()">⬆ Import All</button>';
+  h+='</div>';
+  openModal(h);
+}
+
+window._hrfImportRows=[];
+
+function hrfPreviewImport(input){
+  var file=input.files[0];if(!file)return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var txt=e.target.result;
+    var parsed=hrfParseCSV(txt);
+    window._hrfImportRows=parsed.rows;
+    var prev=document.getElementById('hrf-imp-preview');
+    var btn=document.getElementById('hrf-imp-btn');
+    if(!parsed.rows.length){
+      if(prev)prev.innerHTML='<div style="color:var(--danger);font-size:12px;padding:10px">No valid rows found. Check your CSV format.</div>';
+      if(btn)btn.disabled=true;return;
+    }
+    // Show preview table — first 5 rows
+    var cols=['name','sap','branch','dept','role','status','basicSalary'];
+    var tbl='<div style="font-size:11px;font-weight:700;color:var(--text-secondary);margin-bottom:6px">Preview — '+parsed.rows.length+' rows found (showing first 5)</div>';
+    tbl+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px">';
+    tbl+='<thead><tr>'+cols.map(function(c){return '<th style="padding:5px 8px;text-align:left;background:var(--surface-2);border:1px solid var(--border);font-weight:700;color:var(--text-secondary)">'+c+'</th>';}).join('')+'</tr></thead><tbody>';
+    parsed.rows.slice(0,5).forEach(function(r,ri){
+      tbl+='<tr>'+cols.map(function(c){return '<td style="padding:5px 8px;border:1px solid var(--border);color:var(--text-primary)'+(ri%2?';background:var(--surface-2)':'')+'">'+(r[c]||'—')+'</td>';}).join('')+'</tr>';
+    });
+    tbl+='</tbody></table></div>';
+    if(prev)prev.innerHTML=tbl;
+    if(btn)btn.disabled=false;
+  };
+  reader.readAsText(file);
+}
+
+function hrfParseCSV(txt){
+  var lines=txt.split(/\r?\n/).filter(function(l){return l.trim();});
+  if(!lines.length)return{headers:[],rows:[]};
+  function splitLine(l){
+    var res=[],cur='',inQ=false;
+    for(var i=0;i<l.length;i++){
+      var c=l[i];
+      if(c==='"'){if(inQ&&l[i+1]==='"'){cur+='"';i++;}else inQ=!inQ;}
+      else if(c===','&&!inQ){res.push(cur.trim());cur='';}
+      else cur+=c;
+    }
+    res.push(cur.trim());return res;
+  }
+  var headers=splitLine(lines[0]).map(function(h){return h.toLowerCase().replace(/[^a-z0-9]/g,'');});
+  var rows=[];
+  lines.slice(1).forEach(function(l){
+    if(!l.trim())return;
+    var vals=splitLine(l);
+    var row={};
+    headers.forEach(function(h,i){row[h]=vals[i]||'';});
+    if(row.name)rows.push(row);
+  });
+  return{headers:headers,rows:rows};
+}
+
+function hrfDoImport(){
+  var rows=window._hrfImportRows||[];
+  if(!rows.length){showToast('No rows to import','error');return;}
+  if(!db){showToast('Firebase not connected','error');return;}
+  var branches=hrfBranches();
+  // Group rows by branch name
+  var byBranch={};
+  rows.forEach(function(r){
+    var bname=(r.branch||'').toLowerCase().trim();
+    var branch=branches.find(function(b){
+      return (NX_BRANCHES[b.id]||{}).name.toLowerCase()===bname||b.id.toLowerCase()===bname;
+    });
+    if(!branch){showToast('Branch not found for: '+r.name+' ('+r.branch+')','warning');return;}
+    if(!byBranch[branch.id])byBranch[branch.id]=[];
+    byBranch[branch.id].push(r);
+  });
+  var branchIds=Object.keys(byBranch);
+  if(!branchIds.length){showToast('No valid branch matches found','error');return;}
+  var done=0,total=branchIds.length;
+  function toObj(arr){
+    var obj={};
+    arr.forEach(function(item){
+      if(!item)return;
+      var k=String(item.id||'').replace(/[.#$\[\]\/]/g,'_')||'item_'+Math.random().toString(36).slice(2);
+      obj[k]=item;
+    });
+    return obj;
+  }
+  branchIds.forEach(function(bid){
+    var existing=(HRF.staff[bid]||[]).slice();
+    byBranch[bid].forEach(function(r){
+      var newRec={
+        id:buid(),
+        name:r.name||'',
+        sap:r.sap||'',
+        email:r.email||'',
+        phone:r.phone||'',
+        dept:normalizeDept(r.dept||''),
+        role:r.role||'',
+        status:r.status||'Active',
+        nationality:r.nationality||'',
+        workerType:r.workertype||r.workerType||'company',
+        companyId:r.companyid||r.companyId||'',
+        hireDate:r.hiredate||r.hireDate||'',
+        joinDate:r.hiredate||r.hireDate||'',
+        contractType:r.contracttype||r.contractType||'Full-Time',
+        contractEndDate:r.contractenddate||r.contractEndDate||'',
+        probationEnd:r.probationend||r.probationEnd||'',
+        shift:r.shift||'',
+        defaultShift:r.shift||'',
+        basicSalary:parseFloat(r.basicsalary||r.basicSalary)||0,
+        salary:parseFloat(r.basicsalary||r.basicSalary)||0,
+        housingAllowance:parseFloat(r.housingallowance||r.housingAllowance)||0,
+        transportAllowance:parseFloat(r.transportallowance||r.transportAllowance)||0,
+        otherAllowances:parseFloat(r.otherallowances||r.otherAllowances)||0,
+        gosiEnrolled:r.gosienrolled||r.gosiEnrolled||'yes',
+        leaveBalance:parseInt(r.leavebalance||r.leaveBalance)||21,
+        annualLeave:parseInt(r.leavebalance||r.leaveBalance)||21,
+        iqama:r.iqama||'',
+        iqamaExpiry:r.iqamaexpiry||r.iqamaExpiry||'',
+        bankName:r.bankname||r.bankName||'',
+        iban:r.iban||'',
+        emergencyName:r.emergencyname||r.emergencyName||'',
+        emergencyPhone:r.emergencyphone||r.emergencyPhone||'',
+        hrNotes:r.hrnotes||r.hrNotes||'',
+        branchId:bid
+      };
+      // If SAP already exists — update, else add
+      var idx=existing.findIndex(function(x){return x.sap&&x.sap===newRec.sap;});
+      if(idx>=0)existing[idx]=Object.assign({},existing[idx],newRec,{id:existing[idx].id});
+      else existing.push(newRec);
+    });
+    HRF.staff[bid]=existing;
+    db.ref('branches/'+bid+'/staff').set(toObj(existing),function(err){
+      if(err){showToast('Error saving to '+bid+': '+err.message,'error');return;}
+      _hrfWriteSapIndex(bid,existing);
+      done++;
+      if(done===total){
+        closeModalForce();
+        showToast('✓ Imported '+rows.length+' employees across '+total+' branch(es)','success');
+        navTo('hrf-employees');
+      }
+    });
+  });
 }
 
 // ── CHART RENDERERS ──
