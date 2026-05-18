@@ -10403,6 +10403,8 @@ function handleHealthImport(input){
         '<td class="bmono" style="font-size:11px">'+bxe(c.trainExp||'—')+'</td>'+
         '<td>'+action+'</td></tr>';
     }).join('');
+    // Store for confirm button — avoid JSON-in-onclick issues with special chars
+    window._hcImportPending=newCards;
     var moreMsg=newCards.length>8?'<div style="font-size:11px;color:var(--text-tertiary);margin-top:6px">…and '+(newCards.length-8)+' more rows</div>':'';
     var errMsg=errors.length?'<div style="background:rgba(192,57,43,.08);border:1px solid rgba(192,57,43,.2);border-radius:8px;padding:10px;margin-top:10px;font-size:11px;color:#c0392b">'+errors.join('<br>')+'</div>':'';
     openModal(
@@ -10415,7 +10417,7 @@ function handleHealthImport(input){
       moreMsg+errMsg+
       '<div style="display:flex;gap:8px;margin-top:14px">'+
         '<button class="btn" style="flex:1" onclick="closeModalForce()">Cancel</button>'+
-        '<button class="btn btn-primary" style="flex:2" onclick="confirmHealthImport('+JSON.stringify(newCards).replace(/</g,'\\u003c')+')">'+
+        '<button class="btn btn-primary" style="flex:2" onclick="confirmHealthImport()">'+
           '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:5px"><polyline points="20 6 9 17 4 12"/></svg>'+
           'Confirm Import ('+newCards.length+' rows)</button>'+
       '</div>'
@@ -10424,7 +10426,9 @@ function handleHealthImport(input){
   reader.readAsText(file);
 }
 
-function confirmHealthImport(newCards){
+function confirmHealthImport(){
+  var newCards=window._hcImportPending||[];
+  if(!newCards.length){showToast('Nothing to import','error');return;}
   var added=0,updated=0;
   newCards.forEach(function(c){
     var idx=BS.health.findIndex(function(h2){return h2.name===c.name;});
@@ -10443,6 +10447,7 @@ function confirmHealthImport(newCards){
     }
   });
   bSaveColl('health',BS.health);
+  window._hcImportPending=null;
   closeModalForce();
   showToast(added+' added, '+updated+' updated','success');
   navTo('health-cards');
