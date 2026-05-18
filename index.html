@@ -10228,9 +10228,16 @@ function pHealthCards(){
   h+='<div class="bgrid-4" style="margin-bottom:16px">'+
     [['Total',BS.health.length,'var(--info)'],['Expired',exp,'#c0392b'],['Expiring Soon',soon,'#b45309'],['Valid',ok,'#00875a']]
     .map(function(x){return '<div class="bsc"><div class="bsc-lbl">'+x[0]+'</div><div class="bsc-val bmono" style="color:'+x[2]+'">'+x[1]+'</div></div>';}).join('')+'</div>';
-  h+='<div class="header-actions"><div></div><div style="display:flex;gap:8px">';
-  h+='<button class="btn" onclick="openBulkHealthModal()">\u{1F4CB} Bulk Add from Staff</button>';
-  h+='<button class="btn btn-primary" onclick="openBranchHealthModal(null)">+ Add Card</button>';
+  h+='<div class="header-actions"><div></div><div style="display:flex;gap:8px;flex-wrap:wrap">';
+  h+='<button class="btn" onclick="exportHealthCards()" style="display:flex;align-items:center;gap:6px">'+
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Export CSV</button>';
+  h+='<button class="btn" onclick="importHealthCardsClick()" style="display:flex;align-items:center;gap:6px">'+
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Import CSV</button>';
+  h+='<input type="file" id="hc-import-file" accept=".csv" style="display:none" onchange="handleHealthImport(this)">';
+  h+='<button class="btn" onclick="openBulkHealthModal()" style="display:flex;align-items:center;gap:6px">'+
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>Bulk Add from Staff</button>';
+  h+='<button class="btn btn-primary" onclick="openBranchHealthModal(null)" style="display:flex;align-items:center;gap:6px">'+
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Card</button>';
   h+='</div></div>';
   h+='<div class="btw"><div class="btw-s"><table class="btbl"><thead><tr><th>Employee</th><th>SAP #</th><th>Card #</th><th>Med Expiry</th><th>Med Left</th><th>Train Expiry</th><th>Train Left</th><th>Actions</th></tr></thead>'+
     '<tbody>'+(rows||'<tr><td colspan="8" style="text-align:center;color:var(--text-tertiary);padding:28px">\uD83D\uDCC4 No health cards yet \u2014 add one or bulk-import from staff list</td></tr>')+'</tbody></table></div></div>';
@@ -10284,6 +10291,132 @@ function saveBranchHealth(id){
   bSaveColl('health',BS.health);closeModalForce();showToast('Health card saved','success');navTo('health-cards');
 }
 function delBranchHealth(id){if(!confirm('Delete this health card?'))return;BS.health=BS.health.filter(function(x){return x.id!==id;});bSaveColl('health',BS.health);showToast('Deleted');navTo('health-cards');}
+
+// ── Health Cards Export ──────────────────────────────
+function exportHealthCards(){
+  var rows=BS.health;
+  if(!rows.length){showToast('No health cards to export','error');return;}
+  var headers=['Name','SAP','Card No','Medical Expiry','Training Expiry'];
+  var csv=headers.join(',')+'\n';
+  rows.forEach(function(h2){
+    csv+=[
+      '"'+(h2.name||'').replace(/"/g,'""')+'"',
+      '"'+(h2.sap||'').replace(/"/g,'""')+'"',
+      '"'+(h2.cardNo||'').replace(/"/g,'""')+'"',
+      '"'+(h2.medExp||'').replace(/"/g,'""')+'"',
+      '"'+(h2.trainExp||'').replace(/"/g,'""')+'"'
+    ].join(',')+'\n';
+  });
+  var blob=new Blob([csv],{type:'text/csv'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');
+  var s=NX.session||{};
+  var bname=(s.branchName||s.branchId||'branch').replace(/\s+/g,'_');
+  a.href=url;a.download='health_cards_'+bname+'_'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click();URL.revokeObjectURL(url);
+  showToast('Exported '+rows.length+' cards','success');
+}
+
+function importHealthCardsClick(){
+  var el=document.getElementById('hc-import-file');
+  if(el){el.value='';el.click();}
+}
+
+function handleHealthImport(input){
+  var file=input.files[0];
+  if(!file)return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var text=e.target.result;
+    var lines=text.split(/\r?\n/).filter(function(l){return l.trim();});
+    if(!lines.length){showToast('Empty file','error');return;}
+    // Parse CSV header
+    var header=lines[0].split(',').map(function(h2){return h2.replace(/^"|"$/g,'').trim().toLowerCase();});
+    var iName=header.indexOf('name');
+    var iSap=header.findIndex(function(h2){return h2==='sap'||h2==='sap #'||h2==='sap#';});
+    var iCard=header.findIndex(function(h2){return h2==='card no'||h2==='card#'||h2==='cardno'||h2==='card number';});
+    var iMed=header.findIndex(function(h2){return h2==='medical expiry'||h2==='med expiry'||h2==='medexp'||h2==='med exp';});
+    var iTrain=header.findIndex(function(h2){return h2==='training expiry'||h2==='train expiry'||h2==='trainexp'||h2==='train exp';});
+    if(iName<0||iMed<0){showToast('CSV must have Name and Medical Expiry columns','error');return;}
+    var added=0,updated=0,skipped=0,errors=[];
+    function parseCsvLine(line){
+      var result=[],cur='',inQ=false;
+      for(var i=0;i<line.length;i++){
+        var ch=line[i];
+        if(ch==='"'){if(inQ&&line[i+1]==='"'){cur+='"';i++;}else inQ=!inQ;}
+        else if(ch===','&&!inQ){result.push(cur);cur='';}
+        else cur+=ch;
+      }
+      result.push(cur);return result;
+    }
+    var newCards=[];
+    for(var li=1;li<lines.length;li++){
+      var cols=parseCsvLine(lines[li]);
+      var name=(cols[iName]||'').replace(/^"|"$/g,'').trim();
+      if(!name)continue;
+      var medExp=(iMed>=0?(cols[iMed]||''):'').replace(/^"|"$/g,'').trim();
+      // Validate date format
+      if(medExp&&!/^\d{4}-\d{2}-\d{2}$/.test(medExp)){errors.push('Row '+(li+1)+': invalid date "'+medExp+'" — use YYYY-MM-DD');skipped++;continue;}
+      var sap=(iSap>=0?(cols[iSap]||''):'').replace(/^"|"$/g,'').trim();
+      var cardNo=(iCard>=0?(cols[iCard]||''):'').replace(/^"|"$/g,'').trim();
+      var trainExp=(iTrain>=0?(cols[iTrain]||''):'').replace(/^"|"$/g,'').trim();
+      newCards.push({name:name,sap:sap,cardNo:cardNo,medExp:medExp,trainExp:trainExp});
+    }
+    if(!newCards.length){showToast('No valid rows found in CSV','error');return;}
+    // Show preview modal before saving
+    var previewRows=newCards.slice(0,8).map(function(c){
+      var existing=BS.health.find(function(h2){return h2.name===c.name;});
+      var action=existing?'<span style="color:#b45309;font-size:10px;font-weight:700">UPDATE</span>':'<span style="color:#00875a;font-size:10px;font-weight:700">NEW</span>';
+      return '<tr><td>'+bxe(c.name)+'</td><td class="bmono" style="font-size:11px">'+bxe(c.sap||'—')+'</td>'+
+        '<td class="bmono" style="font-size:11px">'+bxe(c.cardNo||'—')+'</td>'+
+        '<td class="bmono" style="font-size:11px">'+bxe(c.medExp||'—')+'</td>'+
+        '<td class="bmono" style="font-size:11px">'+bxe(c.trainExp||'—')+'</td>'+
+        '<td>'+action+'</td></tr>';
+    }).join('');
+    var moreMsg=newCards.length>8?'<div style="font-size:11px;color:var(--text-tertiary);margin-top:6px">…and '+(newCards.length-8)+' more rows</div>':'';
+    var errMsg=errors.length?'<div style="background:rgba(192,57,43,.08);border:1px solid rgba(192,57,43,.2);border-radius:8px;padding:10px;margin-top:10px;font-size:11px;color:#c0392b">'+errors.join('<br>')+'</div>':'';
+    openModal(
+      '<div class="modal-head"><h2>'+
+        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:6px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>'+
+        'Import Preview — '+newCards.length+' rows</h2>'+
+        '<button class="modal-close" onclick="closeModalForce()">&#x2715;</button></div>'+
+      '<div style="font-size:12px;color:var(--text-secondary);margin-bottom:10px">Review before saving. Existing records with same name will be updated.</div>'+
+      '<div style="overflow-x:auto;max-height:260px;overflow-y:auto"><table class="btbl"><thead><tr><th>Name</th><th>SAP</th><th>Card No</th><th>Med Expiry</th><th>Train Expiry</th><th>Action</th></tr></thead><tbody>'+previewRows+'</tbody></table></div>'+
+      moreMsg+errMsg+
+      '<div style="display:flex;gap:8px;margin-top:14px">'+
+        '<button class="btn" style="flex:1" onclick="closeModalForce()">Cancel</button>'+
+        '<button class="btn btn-primary" style="flex:2" onclick="confirmHealthImport('+JSON.stringify(newCards).replace(/</g,'\\u003c')+')">'+
+          '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:5px"><polyline points="20 6 9 17 4 12"/></svg>'+
+          'Confirm Import ('+newCards.length+' rows)</button>'+
+      '</div>'
+    );
+  };
+  reader.readAsText(file);
+}
+
+function confirmHealthImport(newCards){
+  var added=0,updated=0;
+  newCards.forEach(function(c){
+    var idx=BS.health.findIndex(function(h2){return h2.name===c.name;});
+    if(idx>=0){
+      // Update existing — preserve id, update fields
+      BS.health[idx]=Object.assign({},BS.health[idx],{
+        sap:c.sap||BS.health[idx].sap,
+        cardNo:c.cardNo||BS.health[idx].cardNo,
+        medExp:c.medExp||BS.health[idx].medExp,
+        trainExp:c.trainExp||BS.health[idx].trainExp
+      });
+      updated++;
+    } else {
+      BS.health.push({id:buid(),name:c.name,sap:c.sap||'',cardNo:c.cardNo||'',medExp:c.medExp||'',trainExp:c.trainExp||''});
+      added++;
+    }
+  });
+  bSaveColl('health',BS.health);
+  closeModalForce();
+  showToast(added+' added, '+updated+' updated','success');
+  navTo('health-cards');
+}
 
 // ── Hijri ↔ Gregorian converter ──────────────────────
 function hijriToGregorian(hy,hm,hd){
