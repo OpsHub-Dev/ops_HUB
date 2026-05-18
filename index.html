@@ -14700,12 +14700,25 @@ function pHrfPayroll(){
         m._branchId=b.id;
         var pay=payData[m.id]||{};
         m._payStatus=pay.status||'draft';
-        m._basic=parseFloat(pay.basicSalary||m.salary||m.basicSalary||0);
-        m._allow=parseFloat(pay.allowances||0);
-        m._ded=parseFloat(pay.deductions||0);
-        m._net=m._basic+m._allow-m._ded;
+        // Basic
+        m._basic   = parseFloat(pay.basicSalary||m.basicSalary||m.salary||0);
+        // Allowances — from payroll record first, fallback to HR record
+        m._housing  = parseFloat(pay.housingAllowance  !==undefined ? pay.housingAllowance  : m.housingAllowance||0);
+        m._transport= parseFloat(pay.transportAllowance!==undefined ? pay.transportAllowance: m.transportAllowance||0);
+        m._other    = parseFloat(pay.otherAllowances   !==undefined ? pay.otherAllowances   : m.otherAllowances||0);
+        m._gross    = m._basic + m._housing + m._transport + m._other;
+        // GOSI: 9% of basic (employer share) — only if enrolled
+        var gosiYes = (m.gosiEnrolled||pay.gosiEnrolled||'yes')!=='no';
+        m._gosi     = gosiYes ? Math.round(m._basic * 0.09) : 0;
+        // Saned: 1% of basic — Saudi nationals only (check nationality or flag)
+        var isSaudi = (m.nationality||'').toLowerCase().indexOf('saudi')>=0;
+        m._saned    = (isSaudi && gosiYes) ? Math.round(m._basic * 0.01) : 0;
+        // Other deductions (absence, manual)
+        m._otherDed = parseFloat(pay.deductions||0);
+        m._totalDed = m._gosi + m._saned + m._otherDed;
+        m._net      = m._gross - m._totalDed;
         allStaff.push(m);
-        grandTotal+=m._net;
+        grandTotal += m._net;
         deptTotals[m.dept||'Other']=(deptTotals[m.dept||'Other']||0)+m._net;
         branchTotals[m._branchName]=(branchTotals[m._branchName]||0)+m._net;
         if(m._payStatus==='pending_finance'||m._payStatus==='pending_hr')pendingCount++;
@@ -14753,16 +14766,21 @@ function pHrfPayroll(){
           '<td><strong>'+hxe(m.name)+'</strong><div style="font-size:10px;color:var(--text-tertiary)">'+hxe(m._branchName)+'</div></td>'+
           '<td>'+hxe(m.dept||'\u2014')+'</td>'+
           '<td class="mono">'+hfsar(m._basic)+'</td>'+
-          '<td class="mono" style="color:#b45309">+'+hfsar(m._allow)+'</td>'+
-          '<td class="mono" style="color:#c0392b">-'+hfsar(m._ded)+'</td>'+
-          '<td class="mono" style="font-weight:700;color:var(--payroll-color)">'+hfsar(m._net)+'</td>'+
+          '<td class="mono" style="color:#0057ff">'+hfsar(m._housing||0)+'</td>'+
+          '<td class="mono" style="color:#0057ff">'+hfsar(m._transport||0)+'</td>'+
+          '<td class="mono" style="color:#0057ff">'+hfsar(m._other||0)+'</td>'+
+          '<td class="mono" style="font-weight:700;color:#006666">'+hfsar(m._gross||m._basic)+'</td>'+
+          '<td class="mono" style="color:#c0392b">'+hfsar(m._gosi||0)+'</td>'+
+          '<td class="mono" style="color:#b45309">'+hfsar(m._saned||0)+'</td>'+
+          '<td class="mono" style="color:#c0392b">'+hfsar(m._otherDed||0)+'</td>'+
+          '<td class="mono" style="font-weight:800;color:var(--payroll-color)">'+hfsar(m._net)+'</td>'+
           '<td><span style="font-size:11px;font-weight:600;color:'+sc+'">'+m._payStatus.replace(/_/g,' ')+'</span></td>'+
           '<td><button class="btn btn-sm" onclick="hrfEditPayRow(\''+hxe(m._branchId)+'\',\''+hxe(m.id)+'\',\''+payMonth+'\')">Edit</button></td>'+
         '</tr>';
       });
     h+='<div class="hrf-section" style="margin-top:20px">';
     h+='<div style="font-size:13px;font-weight:700;margin-bottom:12px">Staff Payroll Detail</div>';
-    if(rows)h+=hrfTable(['Name','Dept','Basic','Allowances','Deductions','Net','Status',''],rows);
+    if(rows)h+=hrfTable(['Name','Dept','Basic','Housing','Transport','Other Allow','Gross','GOSI 9%','Saned 1%','Other Ded','Net Pay','Status',''],rows);
     else h+='<div class="empty-state"><div class="es-icon">&#x1F4B8;</div><h3>No payroll data for '+payMonth+'</h3><p>Click \u201cProcess All\u201d to generate from staff salary records</p></div>';
     h+='</div>';
     return h;
@@ -14779,17 +14797,39 @@ function hrfRunPayroll(month){
   var branches=hrfBranches();var count=0;
   branches.forEach(function(b){
     (HRF.staff[b.id]||[]).forEach(function(m){
-      var sal=parseFloat(m.salary||m.basicSalary||0);if(!sal)return;
+      var basic=parseFloat(m.basicSalary||m.salary||0);if(!basic)return;
+      var housing  =parseFloat(m.housingAllowance||0);
+      var transport=parseFloat(m.transportAllowance||0);
+      var other    =parseFloat(m.otherAllowances||0);
+      var gross    =basic+housing+transport+other;
+      var gosiYes  =(m.gosiEnrolled||'yes')!=='no';
+      var gosi     =gosiYes?Math.round(basic*0.09):0;
+      var isSaudi  =(m.nationality||'').toLowerCase().indexOf('saudi')>=0;
+      var saned    =(isSaudi&&gosiYes)?Math.round(basic*0.01):0;
       var path='branches/'+b.id+'/payroll/'+month+'/'+m.id;
       db.ref(path).once('value',function(snap){
-        if(!snap.val()){
-          db.ref(path).set({basicSalary:sal,allowances:0,deductions:0,status:'pending_hr',processedAt:Date.now()});
-          count++;
+        var existing=snap.val();
+        if(!existing){
+          db.ref(path).set({
+            basicSalary:basic,housingAllowance:housing,transportAllowance:transport,
+            otherAllowances:other,gross:gross,gosi:gosi,saned:saned,
+            deductions:0,net:gross-gosi-saned,
+            gosiEnrolled:m.gosiEnrolled||'yes',
+            status:'pending_hr',processedAt:Date.now()
+          });count++;
+        } else {
+          // Re-run: update allowances from HR but keep manual deductions/status
+          db.ref(path).update({
+            basicSalary:basic,housingAllowance:housing,transportAllowance:transport,
+            otherAllowances:other,gross:gross,gosi:gosi,saned:saned,
+            net:gross-gosi-saned-(parseFloat(existing.deductions)||0),
+            updatedAt:Date.now()
+          });
         }
       });
     });
   });
-  setTimeout(function(){showToast('Payroll processed','success');navTo('hrf-payroll');},900);
+  setTimeout(function(){showToast('Payroll processed — all salary & deductions updated','success');navTo('hrf-payroll');},900);
 }
 
 function hrfEditPayRow(branchId,empId,month){
@@ -14797,28 +14837,73 @@ function hrfEditPayRow(branchId,empId,month){
   db.ref('branches/'+branchId+'/payroll/'+month+'/'+empId).once('value',function(snap){
     var pay=snap.val()||{};
     var staff=(HRF.staff[branchId]||[]).find(function(m){return m.id===empId;})||{};
-    openModal('<div class="modal-head"><h2>Edit Payroll \u2014 '+hxe(staff.name||empId)+'</h2><button class="modal-close" onclick="closeModalForce()">\u2715</button></div>'+
-      '<div class="form-row">'+
-        '<div class="form-group"><label class="form-label">Basic Salary (‫SAR ‬)</label><input class="form-input" type="number" id="hpe-basic" value="'+(pay.basicSalary||staff.salary||0)+'"></div>'+
-        '<div class="form-group"><label class="form-label">Allowances (‫SAR ‬)</label><input class="form-input" type="number" id="hpe-allow" value="'+(pay.allowances||0)+'"></div>'+
-      '</div>'+
-      '<div class="form-row">'+
-        '<div class="form-group"><label class="form-label">Deductions (‫SAR ‬)</label><input class="form-input" type="number" id="hpe-ded" value="'+(pay.deductions||0)+'"></div>'+
-        '<div class="form-group"><label class="form-label">Status</label><select class="form-input form-select" id="hpe-status">'+
-          ['draft','pending_hr','pending_finance','released'].map(function(s2){return '<option value="'+s2+'"'+(pay.status===s2?' selected':'')+'>'+s2.replace(/_/g,' ')+'</option>';}).join('')+
-        '</select></div>'+
-      '</div>'+
-      '<div class="form-group"><label class="form-label">Notes</label><input class="form-input" id="hpe-notes" value="'+hxe(pay.notes||'')+'"></div>'+
-      '<button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="hrfSavePayRow(\''+hxe(branchId)+'\',\''+hxe(empId)+'\',\''+hxe(month)+'\')">Save Changes</button>');
+    var basic2    =parseFloat(pay.basicSalary||staff.basicSalary||staff.salary||0);
+    var housing2  =parseFloat(pay.housingAllowance!==undefined?pay.housingAllowance:staff.housingAllowance||0);
+    var transport2=parseFloat(pay.transportAllowance!==undefined?pay.transportAllowance:staff.transportAllowance||0);
+    var other2    =parseFloat(pay.otherAllowances!==undefined?pay.otherAllowances:staff.otherAllowances||0);
+    var gosi2     =parseFloat(pay.gosi!==undefined?pay.gosi:Math.round(basic2*0.09));
+    var saned2    =parseFloat(pay.saned!==undefined?pay.saned:Math.round(basic2*0.01));
+    var ded2      =parseFloat(pay.deductions||0);
+    var statusOpts=['draft','pending_hr','pending_finance','released']
+      .map(function(s2){return '<option value="'+s2+'"'+(pay.status===s2?' selected':'')+'>'+s2.replace(/_/g,' ')+'</option>';}).join('');
+    var html='<div class="modal-head"><h2>Edit Payroll \u2014 '+hxe(staff.name||empId)+'</h2><button class="modal-close" onclick="closeModalForce()">\u00d7</button></div>';
+    html+='<div style="background:var(--surface-2);border-radius:9px;padding:10px 14px;margin-bottom:14px;font-size:11px;color:var(--text-secondary)">GOSI = 9% of basic (employer share) \u00b7 Saned = 1% of basic (Saudi nationals)</div>';
+    html+='<div class="form-row">';
+    html+='<div class="bfg"><label class="form-label">Basic Salary (SAR)</label><input class="form-input" type="number" id="hpe-basic" value="'+basic2+'" oninput="hrfPayCalc()"></div>';
+    html+='<div class="bfg"><label class="form-label">Housing Allowance</label><input class="form-input" type="number" id="hpe-housing" value="'+housing2+'" oninput="hrfPayCalc()"></div>';
+    html+='</div><div class="form-row">';
+    html+='<div class="bfg"><label class="form-label">Transport Allowance</label><input class="form-input" type="number" id="hpe-transport" value="'+transport2+'" oninput="hrfPayCalc()"></div>';
+    html+='<div class="bfg"><label class="form-label">Other Allowances</label><input class="form-input" type="number" id="hpe-other" value="'+other2+'" oninput="hrfPayCalc()"></div>';
+    html+='</div>';
+    html+='<div style="background:var(--surface-2);border-radius:9px;padding:12px;margin-bottom:12px">';
+    html+='<div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--text-tertiary);margin-bottom:8px">Deductions</div>';
+    html+='<div class="form-row">';
+    html+='<div class="bfg"><label class="form-label">GOSI \u2014 9% (SAR)</label><input class="form-input" type="number" id="hpe-gosi" value="'+gosi2+'" oninput="hrfPayCalc()"></div>';
+    html+='<div class="bfg"><label class="form-label">Saned \u2014 1% (SAR)</label><input class="form-input" type="number" id="hpe-saned" value="'+saned2+'" oninput="hrfPayCalc()"></div>';
+    html+='</div>';
+    html+='<div class="bfg"><label class="form-label">Other Deductions (absence, penalty)</label><input class="form-input" type="number" id="hpe-ded" value="'+ded2+'" oninput="hrfPayCalc()"></div>';
+    html+='</div>';
+    html+='<div style="display:flex;justify-content:space-between;align-items:center;background:rgba(0,102,102,.08);border-radius:9px;padding:12px 16px;margin-bottom:14px">';
+    html+='<span style="font-size:13px;font-weight:700">Net Pay</span>';
+    html+='<span style="font-size:22px;font-weight:800;font-family:var(--mono);color:#006666" id="hpe-net-display">SAR 0</span>';
+    html+='</div>';
+    html+='<div class="form-row">';
+    html+='<div class="bfg"><label class="form-label">Status</label><select class="form-input form-select" id="hpe-status">'+statusOpts+'</select></div>';
+    html+='<div class="bfg"><label class="form-label">Notes</label><input class="form-input" id="hpe-notes" value="'+hxe(pay.notes||'')+'"></div>';
+    html+='</div>';
+    html+='<button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="hrfSavePayRow(\''+hxe(branchId)+'\',\''+hxe(empId)+'\',\''+hxe(month)+'\')">Save Changes</button>';
+    openModal(html);
+    setTimeout(hrfPayCalc,50);
   });
 }
 
+
+function hrfPayCalc(){
+  var basic    =parseFloat(document.getElementById('hpe-basic').value)||0;
+  var housing  =parseFloat(document.getElementById('hpe-housing').value)||0;
+  var transport=parseFloat(document.getElementById('hpe-transport').value)||0;
+  var other    =parseFloat(document.getElementById('hpe-other').value)||0;
+  var gosi     =parseFloat(document.getElementById('hpe-gosi').value)||0;
+  var saned    =parseFloat(document.getElementById('hpe-saned').value)||0;
+  var ded      =parseFloat(document.getElementById('hpe-ded').value)||0;
+  var net      =basic+housing+transport+other-gosi-saned-ded;
+  var el=document.getElementById('hpe-net-display');
+  if(el)el.textContent='SAR '+net.toLocaleString('en-SA',{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+
 function hrfSavePayRow(branchId,empId,month){
-  var basic=parseFloat(document.getElementById('hpe-basic').value)||0;
-  var allow=parseFloat(document.getElementById('hpe-allow').value)||0;
-  var ded=parseFloat(document.getElementById('hpe-ded').value)||0;
+  var basic    =parseFloat(document.getElementById('hpe-basic').value)||0;
+  var housing  =parseFloat(document.getElementById('hpe-housing').value)||0;
+  var transport=parseFloat(document.getElementById('hpe-transport').value)||0;
+  var other    =parseFloat(document.getElementById('hpe-other').value)||0;
+  var gosi     =parseFloat(document.getElementById('hpe-gosi').value)||0;
+  var saned    =parseFloat(document.getElementById('hpe-saned').value)||0;
+  var ded      =parseFloat(document.getElementById('hpe-ded').value)||0;
+  var gross    =basic+housing+transport+other;
+  var net      =gross-gosi-saned-ded;
   db.ref('branches/'+branchId+'/payroll/'+month+'/'+empId).update({
-    basicSalary:basic,allowances:allow,deductions:ded,net:basic+allow-ded,
+    basicSalary:basic,housingAllowance:housing,transportAllowance:transport,
+    otherAllowances:other,gross:gross,gosi:gosi,saned:saned,deductions:ded,net:net,
     status:document.getElementById('hpe-status').value,
     notes:document.getElementById('hpe-notes').value,
     updatedAt:Date.now()
@@ -14829,18 +14914,28 @@ function hrfSavePayRow(branchId,empId,month){
 }
 
 function hrfExportPayroll(month){
-  var rows=[['Name','Branch','Dept','Role','Basic','Allowances','Deductions','Net','Status']];
+  var rows=[['Name','SAP','Branch','Dept','Role','Nationality','Basic Salary','Housing Allow','Transport Allow','Other Allow','Gross','GOSI (9%)','Saned (1%)','Other Deductions','Net Pay','Status','Notes']];
   hrfBranches().forEach(function(b){
+    var bname=(NX_BRANCHES[b.id]||{}).name||b.id;
     (HRF.staff[b.id]||[]).forEach(function(m){
       var pay=(HRF.payroll&&HRF.payroll[b.id]&&HRF.payroll[b.id][month]&&HRF.payroll[b.id][month][m.id])||{};
-      var basic=parseFloat(pay.basicSalary||m.salary||0);if(!basic)return;
-      var allow=parseFloat(pay.allowances||0),ded=parseFloat(pay.deductions||0);
-      rows.push([m.name,(NX_BRANCHES[b.id]||{}).name||b.id,m.dept||'',m.role||'',basic,allow,ded,basic+allow-ded,pay.status||'draft']);
+      var basic    =parseFloat(pay.basicSalary||m.basicSalary||m.salary||0);if(!basic)return;
+      var housing  =parseFloat(pay.housingAllowance!==undefined?pay.housingAllowance:m.housingAllowance||0);
+      var transport=parseFloat(pay.transportAllowance!==undefined?pay.transportAllowance:m.transportAllowance||0);
+      var other    =parseFloat(pay.otherAllowances!==undefined?pay.otherAllowances:m.otherAllowances||0);
+      var gross    =basic+housing+transport+other;
+      var gosi     =parseFloat(pay.gosi!==undefined?pay.gosi:Math.round(basic*0.09));
+      var saned    =parseFloat(pay.saned!==undefined?pay.saned:Math.round(basic*0.01));
+      var ded      =parseFloat(pay.deductions||0);
+      var net      =gross-gosi-saned-ded;
+      rows.push([m.name,m.sap||'',bname,m.dept||'',m.role||'',m.nationality||'',
+        basic,housing,transport,other,gross,gosi,saned,ded,net,
+        pay.status||'draft',pay.notes||'']);
     });
   });
   var csv=rows.map(function(r){return r.map(function(c){return '"'+String(c).replace(/"/g,'""')+'"';}).join(',');}).join('\n');
   var a=document.createElement('a');a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);a.download='payroll-'+month+'.csv';a.click();
-  showToast('CSV exported','success');
+  showToast('CSV exported — '+( rows.length-1)+' employees','success');
 }
 
 
