@@ -10296,6 +10296,14 @@ function delBranchHealth(id){if(!confirm('Delete this health card?'))return;BS.h
 function exportHealthCards(){
   var rows=BS.health;
   if(!rows.length){showToast('No health cards to export','error');return;}
+  function normD(val){
+    if(!val)return '';
+    val=String(val).trim();
+    if(/^\d{4}-\d{2}-\d{2}$/.test(val))return val;
+    var p=val.split('/');
+    if(p.length===3){var mo=parseInt(p[0],10),dy=parseInt(p[1],10),yr=parseInt(p[2],10);if(yr<100)yr+=2000;if(!isNaN(mo)&&!isNaN(dy)&&!isNaN(yr))return yr+'-'+String(mo).padStart(2,'0')+'-'+String(dy).padStart(2,'0');}
+    return val;
+  }
   var headers=['Name','SAP','Card No','Medical Expiry','Training Expiry'];
   var csv=headers.join(',')+'\n';
   rows.forEach(function(h2){
@@ -10303,8 +10311,8 @@ function exportHealthCards(){
       '"'+(h2.name||'').replace(/"/g,'""')+'"',
       '"'+(h2.sap||'').replace(/"/g,'""')+'"',
       '"'+(h2.cardNo||'').replace(/"/g,'""')+'"',
-      '"'+(h2.medExp||'').replace(/"/g,'""')+'"',
-      '"'+(h2.trainExp||'').replace(/"/g,'""')+'"'
+      '"'+normD(h2.medExp)+'"',
+      '"'+normD(h2.trainExp)+'"'
     ].join(',')+'\n';
   });
   var blob=new Blob([csv],{type:'text/csv'});
@@ -10338,6 +10346,28 @@ function handleHealthImport(input){
     var iMed=header.findIndex(function(h2){return h2==='medical expiry'||h2==='med expiry'||h2==='medexp'||h2==='med exp';});
     var iTrain=header.findIndex(function(h2){return h2==='training expiry'||h2==='train expiry'||h2==='trainexp'||h2==='train exp';});
     if(iName<0||iMed<0){showToast('CSV must have Name and Medical Expiry columns','error');return;}
+    function normalizeDate(val){
+      if(!val)return '';
+      val=val.trim();
+      // Already YYYY-MM-DD
+      if(/^\d{4}-\d{2}-\d{2}$/.test(val))return val;
+      // M/D/YYYY or MM/DD/YYYY or M/D/YY
+      var slashParts=val.split('/');
+      if(slashParts.length===3){
+        var mo=parseInt(slashParts[0],10),dy=parseInt(slashParts[1],10),yr=parseInt(slashParts[2],10);
+        if(yr<100)yr+=2000;
+        if(!isNaN(mo)&&!isNaN(dy)&&!isNaN(yr))
+          return yr+'-'+String(mo).padStart(2,'0')+'-'+String(dy).padStart(2,'0');
+      }
+      // D-M-YYYY or M-D-YYYY with dashes
+      var dashParts=val.split('-');
+      if(dashParts.length===3&&dashParts[0].length<=2){
+        var p0=parseInt(dashParts[0],10),p1=parseInt(dashParts[1],10),p2=parseInt(dashParts[2],10);
+        if(!isNaN(p0)&&!isNaN(p1)&&!isNaN(p2))
+          return p2+'-'+String(p0).padStart(2,'0')+'-'+String(p1).padStart(2,'0');
+      }
+      return val; // return as-is, let Firebase store it
+    }
     var added=0,updated=0,skipped=0,errors=[];
     function parseCsvLine(line){
       var result=[],cur='',inQ=false;
@@ -10354,12 +10384,12 @@ function handleHealthImport(input){
       var cols=parseCsvLine(lines[li]);
       var name=(cols[iName]||'').replace(/^"|"$/g,'').trim();
       if(!name)continue;
-      var medExp=(iMed>=0?(cols[iMed]||''):'').replace(/^"|"$/g,'').trim();
-      // Validate date format
-      if(medExp&&!/^\d{4}-\d{2}-\d{2}$/.test(medExp)){errors.push('Row '+(li+1)+': invalid date "'+medExp+'" — use YYYY-MM-DD');skipped++;continue;}
+      var medRaw=(iMed>=0?(cols[iMed]||''):'').replace(/^"|"$/g,'').trim();
+      var medExp=normalizeDate(medRaw);
+      var trainRaw=(iTrain>=0?(cols[iTrain]||''):'').replace(/^"|"$/g,'').trim();
+      var trainExp=normalizeDate(trainRaw);
       var sap=(iSap>=0?(cols[iSap]||''):'').replace(/^"|"$/g,'').trim();
       var cardNo=(iCard>=0?(cols[iCard]||''):'').replace(/^"|"$/g,'').trim();
-      var trainExp=(iTrain>=0?(cols[iTrain]||''):'').replace(/^"|"$/g,'').trim();
       newCards.push({name:name,sap:sap,cardNo:cardNo,medExp:medExp,trainExp:trainExp});
     }
     if(!newCards.length){showToast('No valid rows found in CSV','error');return;}
