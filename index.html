@@ -13309,73 +13309,231 @@ function pHrfHrDash() {
   function renderDash() {
     var allStaff=[],allLeaves=[],totPresent=0,totLate=0;
     var todayKey=(function(){var d=new Date(new Date().getTime()+3*3600000);return d.toISOString().slice(0,10);})();
+    var d=new Date(new Date().getTime()+3*3600000);
+    var payMonth=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+
     branches.forEach(function(b){
       var st=HRF.staff[b.id]||[]; allStaff=allStaff.concat(st);
       var lv=HRF.leaves[b.id]||[]; allLeaves=allLeaves.concat(lv);
       var dayAtt=(HRF.att[b.id]||{})[todayKey]||{};
       Object.values(dayAtt).forEach(function(a){ if(a.status==='present')totPresent++; else if(a.status==='late')totLate++; });
     });
-    var active=allStaff.filter(function(m){return (m.status||'Active')==='Active';});
-    var onLeave=allStaff.filter(function(m){return m.status==='On Leave';});
-    var pendLeaves=allLeaves.filter(function(l){return (l.status||'pending')==='pending';});
-    var h=hrfHeader('HR Dashboard','Live workforce data \u00b7 '+branches.length+' branch(es)',
-      '<button class="btn" onclick="navTo(\'hrf-approvals\')">&#x2705; Approvals'+(pendLeaves.length?' <span style="background:#b45309;color:#000;border-radius:10px;padding:1px 6px;font-size:10px;margin-left:4px">'+pendLeaves.length+'</span>':'')+'</button>'+
-      '<button class="btn btn-primary" onclick="navTo(\'hrf-employees\')">&#x1F465; All Staff</button>');
-    h+='<div class="hrf-kpi-grid">';
-    h+=hrfKpi('&#x1F465;','Total Headcount',allStaff.length,branches.length+' branches','var(--hr-color)');
-    h+=hrfKpi('&#x2705;','Active Staff',active.length,'Currently employed','var(--success)');
-    h+=hrfKpi('&#x1F3D6;&#xFE0F;','On Leave',onLeave.length,'Approved leave','var(--warning)');
-    h+=hrfKpi('&#x23F3;','Pending Leaves',pendLeaves.length,'Awaiting approval','var(--info)');
-    h+=hrfKpi('&#x1F7E2;','Present Today',totPresent,totLate+' late','#0057ff');
+
+    var active   = allStaff.filter(function(m){return (m.status||'Active')==='Active';});
+    var onLeave  = allStaff.filter(function(m){return m.status==='On Leave';});
+    var pendLeaves = allLeaves.filter(function(l){return (l.status||'pending')==='pending';});
+
+    // ── Sponsor breakdown ──────────────────────────────────────────────────
+    var alfaStaff    = allStaff.filter(function(m){return (m.workerType||'company')!=='3rdparty';});
+    var thirdStaff   = allStaff.filter(function(m){return m.workerType==='3rdparty';});
+    // Group 3rd party by company name
+    var byCompany = {};
+    thirdStaff.forEach(function(m){
+      var co = m.companyId || 'Unknown';
+      // Resolve if it's still a raw ID
+      if(HRF_COMPANIES && HRF_COMPANIES.length){
+        var found = HRF_COMPANIES.find(function(c){return c.id===co||c.name===co;});
+        if(found) co = found.name;
+      }
+      byCompany[co] = (byCompany[co]||[]);
+      byCompany[co].push(m);
+    });
+
+    // ── Payroll totals for current month ─────────────────────────────────
+    var payGross=0,payNet=0,payGosi=0,paySaned=0,payPending=0,payReleased=0;
+    branches.forEach(function(b){
+      var payData=(HRF.payroll&&HRF.payroll[b.id]&&HRF.payroll[b.id][payMonth])||{};
+      Object.values(payData).forEach(function(p){
+        payGross += parseFloat(p.gross||0);
+        payNet   += parseFloat(p.net||0);
+        payGosi  += parseFloat(p.gosi||0);
+        paySaned += parseFloat(p.saned||0);
+        if(p.status==='released') payReleased++;
+        else if((p.status||'').indexOf('pending')===0) payPending++;
+      });
+    });
+    // Estimate from staff if no payroll run yet
+    if(!payGross){
+      allStaff.forEach(function(m){
+        var basic=parseFloat(m.basicSalary||m.salary||0);
+        var gross=basic+parseFloat(m.housingAllowance||0)+parseFloat(m.transportAllowance||0)+parseFloat(m.otherAllowances||0);
+        payGross+=gross;
+        var gosiYes=(m.gosiEnrolled||'yes')!=='no';
+        var gosi=gosiYes?Math.round(basic*0.09):0;
+        var isSaudi=(m.nationality||'').toLowerCase().indexOf('saudi')>=0;
+        var saned=(isSaudi&&gosiYes)?Math.round(basic*0.01):0;
+        payNet+=gross-gosi-saned;
+        payGosi+=gosi; paySaned+=saned;
+      });
+    }
+
+    // ── Iqama expiry alerts ──────────────────────────────────────────────
+    var today30=new Date(new Date().getTime()+3*3600000);
+    today30.setDate(today30.getDate()+30);
+    var todayStr=new Date(new Date().getTime()+3*3600000).toISOString().slice(0,10);
+    var iqamaAlerts=allStaff.filter(function(m){
+      if(!m.iqamaExpiry)return false;
+      return m.iqamaExpiry>=todayStr&&m.iqamaExpiry<=today30.toISOString().slice(0,10);
+    }).sort(function(a,b){return a.iqamaExpiry.localeCompare(b.iqamaExpiry);});
+
+    var curMonth=HRF_MONTHS[d.getMonth()]+' '+d.getFullYear();
+
+    var h=hrfHeader('HR Dashboard','Live workforce · '+curMonth,
+      '<button class="btn" onclick="navTo(\'hrf-approvals\')">✅ Approvals'+(pendLeaves.length?' <span style="background:#b45309;color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-left:4px">'+pendLeaves.length+'</span>':'')+'</button>'+
+      '<button class="btn btn-primary" onclick="navTo(\'hrf-payroll\')">💸 Payroll</button>'+
+      '<button class="btn" onclick="navTo(\'hrf-employees\')">👥 All Staff</button>');
+
+    // ── Row 1: Workforce KPIs ─────────────────────────────────────────────
+    h+='<div style="margin-bottom:6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-tertiary)">Workforce</div>';
+    h+='<div class="hrf-kpi-grid" style="grid-template-columns:repeat(5,1fr);margin-bottom:20px">';
+    h+=hrfKpi('👥','Total Headcount',allStaff.length,branches.length+' branches','var(--hr-color)');
+    h+=hrfKpi('✅','Active',active.length,'Currently employed','var(--success)');
+    h+=hrfKpi('🏖️','On Leave',onLeave.length,'Approved leave','var(--warning)');
+    h+=hrfKpi('🟢','Present Today',totPresent,totLate+' late today','#0057ff');
+    h+=hrfKpi('⏳','Pending Leaves',pendLeaves.length,'Awaiting approval','var(--info)');
     h+='</div>';
+
+    // ── Row 2: Sponsor breakdown ──────────────────────────────────────────
+    h+='<div style="margin-bottom:6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-tertiary)">Workforce by Sponsor</div>';
+    h+='<div class="hrf-kpi-grid" style="margin-bottom:20px">';
+    // ALFA card
+    h+='<div class="hrf-kpi-card" style="border-left:3px solid #00875a;cursor:pointer" onclick="NX._hrfSponsorFilter=\'alfa\';navTo(\'hrf-employees\')">';
+    h+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">';
+    h+='<div style="width:38px;height:38px;border-radius:10px;background:rgba(0,135,90,.12);display:flex;align-items:center;justify-content:center;font-size:18px">🏢</div>';
+    h+='<div><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-tertiary)">ALFA Staff</div>';
+    h+='<div style="font-size:26px;font-weight:800;color:#00875a;font-family:var(--mono);line-height:1.1">'+alfaStaff.length+'</div></div></div>';
+    var alfaPct=allStaff.length?Math.round(alfaStaff.length/allStaff.length*100):0;
+    h+='<div style="height:4px;background:var(--surface-3);border-radius:2px"><div style="height:100%;width:'+alfaPct+'%;background:#00875a;border-radius:2px"></div></div>';
+    h+='<div style="font-size:10px;color:var(--text-tertiary);margin-top:6px">'+alfaPct+'% of total workforce</div>';
+    h+='</div>';
+    // 3rd party companies
+    Object.keys(byCompany).sort().forEach(function(co){
+      var coStaff=byCompany[co];
+      var pct=allStaff.length?Math.round(coStaff.length/allStaff.length*100):0;
+      var coActive=coStaff.filter(function(m){return (m.status||'Active')==='Active';}).length;
+      h+='<div class="hrf-kpi-card" style="border-left:3px solid #5b21b6;cursor:pointer" onclick="NX._hrfQ=\''+hxe(co)+'\';navTo(\'hrf-employees\')">';
+      h+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">';
+      h+='<div style="width:38px;height:38px;border-radius:10px;background:rgba(91,33,182,.1);display:flex;align-items:center;justify-content:center;font-size:18px">🤝</div>';
+      h+='<div style="min-width:0"><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#5b21b6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+hxe(co)+'</div>';
+      h+='<div style="font-size:26px;font-weight:800;color:#5b21b6;font-family:var(--mono);line-height:1.1">'+coStaff.length+'</div></div></div>';
+      h+='<div style="height:4px;background:var(--surface-3);border-radius:2px"><div style="height:100%;width:'+pct+'%;background:#5b21b6;border-radius:2px"></div></div>';
+      h+='<div style="font-size:10px;color:var(--text-tertiary);margin-top:6px">'+coActive+' active · '+pct+'% of workforce</div>';
+      h+='</div>';
+    });
+    if(!thirdStaff.length){
+      h+='<div class="hrf-kpi-card" style="opacity:.5"><div style="font-size:20px;margin-bottom:8px">🤝</div><div style="font-size:13px;color:var(--text-tertiary)">No 3rd party staff</div></div>';
+    }
+    h+='</div>';
+
+    // ── Row 3: Payroll Summary ────────────────────────────────────────────
+    h+='<div style="margin-bottom:6px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--text-tertiary)">Payroll — '+curMonth+(payGross&&payReleased+payPending===0?' (Estimated from HR Records)':'')+' <button class="btn btn-sm" onclick="navTo(\'hrf-payroll\')" style="margin-left:10px;font-size:10px">Open Payroll →</button></div>';
+    h+='<div class="hrf-kpi-grid" style="grid-template-columns:repeat(5,1fr);margin-bottom:20px">';
+    h+=hrfKpi('💰','Gross Payroll',hfsar(payGross),'All allowances included','var(--payroll-color)');
+    h+=hrfKpi('📤','Net Payroll',hfsar(payNet),'After all deductions','#00875a');
+    h+=hrfKpi('🏛️','GOSI Total',hfsar(payGosi),'9% employer share','#c0392b');
+    h+=hrfKpi('🛡️','Saned Total',hfsar(paySaned),'1% Saudi nationals','#b45309');
+    h+=hrfKpi('✅','Released',payReleased+' / '+(payReleased+payPending+(payGross&&payReleased+payPending===0?allStaff.filter(function(m){return parseFloat(m.basicSalary||m.salary||0)>0;}).length:0)),'Payments processed','var(--success)');
+    h+='</div>';
+
+    // ── Branch breakdown table ────────────────────────────────────────────
     var rows='';
     branches.forEach(function(b){
       var st=HRF.staff[b.id]||[];
       var act=st.filter(function(m){return (m.status||'Active')==='Active';}).length;
       var lv=st.filter(function(m){return m.status==='On Leave';}).length;
-      var res=st.filter(function(m){return m.status==='Resigned';}).length;
+      var alfa3=st.filter(function(m){return (m.workerType||'company')!=='3rdparty';}).length;
+      var third=st.filter(function(m){return m.workerType==='3rdparty';}).length;
+      var payData=(HRF.payroll&&HRF.payroll[b.id]&&HRF.payroll[b.id][payMonth])||{};
+      var bNet=0;
+      Object.values(payData).forEach(function(p){bNet+=parseFloat(p.net||0);});
+      if(!bNet) st.forEach(function(m){
+        var basic=parseFloat(m.basicSalary||m.salary||0);
+        var h2=parseFloat(m.housingAllowance||0),t2=parseFloat(m.transportAllowance||0),o2=parseFloat(m.otherAllowances||0);
+        var gross=basic+h2+t2+o2;
+        var gosiYes=(m.gosiEnrolled||'yes')!=='no';
+        var gosi=gosiYes?Math.round(basic*0.09):0;
+        var isSaudi=(m.nationality||'').toLowerCase().indexOf('saudi')>=0;
+        var saned=(isSaudi&&gosiYes)?Math.round(basic*0.01):0;
+        bNet+=gross-gosi-saned;
+      });
       rows+='<tr style="cursor:pointer" onclick="NX._hrfBranch=\''+hxe(b.id)+'\';navTo(\'hrf-employees\')">'+
-        '<td><strong>'+(b.icon||'\u{1F37D}\uFE0F')+' '+hxe(b.name)+'</strong></td>'+
-        '<td style="font-size:11px;color:var(--text-secondary)">'+hxe(b.brand||'—')+'</td>'+
+        '<td><strong>'+(b.icon||'🍽️')+' '+hxe(b.name)+'</strong></td>'+
         '<td style="text-align:center;font-family:var(--mono);color:var(--hr-color);font-weight:700">'+st.length+'</td>'+
-        '<td style="text-align:center;font-family:var(--mono);color:#b45309">'+act+'</td>'+
+        '<td style="text-align:center;font-family:var(--mono);color:#00875a">'+alfa3+'</td>'+
+        '<td style="text-align:center;font-family:var(--mono);color:#5b21b6">'+third+'</td>'+
+        '<td style="text-align:center;font-family:var(--mono);color:#00875a">'+act+'</td>'+
         '<td style="text-align:center;font-family:var(--mono);color:#b45309">'+lv+'</td>'+
-        '<td style="text-align:center;font-family:var(--mono);color:#c0392b">'+res+'</td></tr>';
+        '<td style="font-family:var(--mono);color:var(--payroll-color);font-weight:700">'+hfsar(bNet)+'</td></tr>';
     });
-    h+='<div class="hrf-section">'+
-      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">'+
-      '<span style="font-size:14px;font-weight:700">Headcount by Branch</span>'+
-      '<button class="btn btn-sm" onclick="navTo(\'hrf-employees\')">View All &rarr;</button></div>';
-    h+=hrfTable(['Branch','Brand','Total','Active','On Leave','Resigned'],rows)+'</div>';
+    h+='<div class="hrf-section">';
+    h+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">';
+    h+='<span style="font-size:14px;font-weight:700">Branch Summary</span>';
+    h+='<button class="btn btn-sm" onclick="navTo(\'hrf-employees\')">View All →</button></div>';
+    h+=hrfTable(['Branch','Total','ALFA','3rd Party','Active','On Leave','Est. Net Pay'],rows);
+    h+='</div>';
+
+    // ── Iqama expiry alerts ───────────────────────────────────────────────
+    if(iqamaAlerts.length){
+      h+='<div class="hrf-section">';
+      h+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">';
+      h+='<span style="font-size:14px;font-weight:700">⚠️ Iqama Expiring Within 30 Days</span>';
+      h+='<span style="font-size:11px;font-weight:700;background:#fef3f2;color:#b42318;padding:3px 10px;border-radius:10px">'+iqamaAlerts.length+' staff</span></div>';
+      var irows='';
+      iqamaAlerts.slice(0,8).forEach(function(m){
+        var daysLeft=Math.ceil((new Date(m.iqamaExpiry)-new Date(todayStr))/(1000*60*60*24));
+        var col=daysLeft<=7?'#b42318':daysLeft<=14?'#b45309':'#92400e';
+        irows+='<tr>'+
+          '<td><strong>'+hxe(m.name)+'</strong></td>'+
+          '<td>'+hxe(m.dept||'—')+'</td>'+
+          '<td>'+hxe(m.iqama||'—')+'</td>'+
+          '<td style="font-family:var(--mono)">'+hxe(m.iqamaExpiry)+'</td>'+
+          '<td style="font-weight:700;color:'+col+'">'+daysLeft+' days</td>'+
+          '<td><button class="btn btn-sm" onclick="NX._hrfQ=\''+hxe(m.sap||m.id||'')+'\';navTo(\'hrf-employees\')">View</button></td>'+
+        '</tr>';
+      });
+      h+=hrfTable(['Name','Dept','Iqama #','Expiry','Days Left',''],irows);
+      h+='</div>';
+    }
+
+    // ── Pending leaves ────────────────────────────────────────────────────
     if(pendLeaves.length){
-      h+='<div class="hrf-section"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px"><span style="font-size:14px;font-weight:700">&#x23F3; Pending Leaves</span><button class="btn btn-sm" onclick="navTo(\'hrf-leave\')">View All &rarr;</button></div>';
+      h+='<div class="hrf-section"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px"><span style="font-size:14px;font-weight:700">⏳ Pending Leave Requests</span><button class="btn btn-sm" onclick="navTo(\'hrf-leave\')">View All →</button></div>';
       pendLeaves.slice(0,5).forEach(function(lv){
         h+='<div class="hrf-approval-card">'+
-          '<div style="width:40px;height:40px;border-radius:10px;background:rgba(96,165,250,.15);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">&#x1F3D6;&#xFE0F;</div>'+
+          '<div style="width:40px;height:40px;border-radius:10px;background:rgba(96,165,250,.15);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">🏖️</div>'+
           '<div style="flex:1"><div style="font-size:13px;font-weight:700;color:var(--text-primary);margin-bottom:3px">'+hxe(lv.empName||lv.name||'Staff Member')+'</div>'+
-          '<div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px">'+hxe(lv.type||'Leave')+' \u00b7 '+hxe(lv.from||'')+' &rarr; '+hxe(lv.to||'')+(lv.days?' ('+lv.days+' days)':'')+'</div>'+
+          '<div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px">'+hxe(lv.type||'Leave')+' · '+hxe(lv.from||'')+' → '+hxe(lv.to||'')+(lv.days?' ('+lv.days+' days)':'')+'</div>'+
           '<div style="display:flex;gap:6px">'+
-          '<button class="btn btn-sm" style="background:rgba(52,211,153,.15);border-color:rgba(52,211,153,.3);color:#b45309" onclick="hrfApproveLeave(\''+hxe(lv._branchId)+'\',\''+hxe(lv._key||lv.id||'')+'\')">&#x2713; Approve</button>'+
-          '<button class="btn btn-sm" style="background:rgba(248,113,113,.1);border-color:rgba(248,113,113,.25);color:#c0392b" onclick="hrfRejectLeave(\''+hxe(lv._branchId)+'\',\''+hxe(lv._key||lv.id||'')+'\')">&#x2715; Reject</button>'+
+          '<button class="btn btn-sm" style="background:rgba(52,211,153,.15);border-color:rgba(52,211,153,.3);color:#065f46" onclick="hrfApproveLeave(\''+hxe(lv._branchId)+'\',\''+hxe(lv._key||lv.id||'')+'\')">✓ Approve</button>'+
+          '<button class="btn btn-sm" style="background:rgba(248,113,113,.1);border-color:rgba(248,113,113,.25);color:#c0392b" onclick="hrfRejectLeave(\''+hxe(lv._branchId)+'\',\''+hxe(lv._key||lv.id||'')+'\')">✕ Reject</button>'+
           '</div></div></div>';
       });
       h+='</div>';
     }
+
+    // ── Charts ────────────────────────────────────────────────────────────
     h+='<div class="hrf-grid-2">'+
       '<div class="hrf-chart-card"><div style="font-size:14px;font-weight:700;margin-bottom:16px">Staff by Department</div><div style="height:220px"><canvas id="hrf-chart-dept"></canvas></div></div>'+
       '<div class="hrf-chart-card"><div style="font-size:14px;font-weight:700;margin-bottom:16px">Attendance (Last 7 Days)</div><div style="height:220px"><canvas id="hrf-chart-att-trend"></canvas></div></div></div>';
+
     NX._hrfAllStaff=allStaff; NX._hrfAllAtt=HRF.att;
     var area=document.getElementById('page-area');
     if(area){area.innerHTML=h;setTimeout(function(){initPageCharts('hrf-hr-dash');},80);}
   }
+
   var cached=branches.filter(function(b){return HRF.staff[b.id];});
-  if(cached.length===branches.length&&branches.length>0){setTimeout(renderDash,0);return hrfLoading('Refreshing\u2026');}
+  if(cached.length===branches.length&&branches.length>0){setTimeout(renderDash,0);return hrfLoading('Refreshing…');}
   var done=0;
-  function check(){done++;if(done>=3)renderDash();}
+  function check(){done++;if(done>=4)renderDash();}
   hrfLoadAll('staff','staff',check);
   hrfLoadAll('tsLeaves','leaves',function(){branches.forEach(function(b){(HRF.leaves[b.id]||[]).forEach(function(l){l._branchId=b.id;});});check();});
   hrfLoadAll('tsAtt','att',function(){hrfLoadAll('tsEmps','tsEmps',check);});
-  return hrfLoading('Loading HR data\u2026');
+  // Load payroll for current month
+  var d2=new Date(new Date().getTime()+3*3600000);
+  var pm=d2.getFullYear()+'-'+String(d2.getMonth()+1).padStart(2,'0');
+  if(!HRF.payroll)HRF.payroll={};
+  if(branches.length){var pdone=0;branches.forEach(function(b){db.ref('branches/'+b.id+'/payroll/'+pm).once('value',function(snap){if(!HRF.payroll[b.id])HRF.payroll[b.id]={};HRF.payroll[b.id][pm]=snap.val()||{};pdone++;if(pdone===branches.length)check();});});}else{check();}
+  return hrfLoading('Loading HR data…');
 }
 
 // ── FINANCE DASHBOARD ──
