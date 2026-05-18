@@ -13481,6 +13481,7 @@ function pHrfEmployees(){
     var INP='padding:7px 10px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;color:var(--text-primary);font-family:var(--font);font-size:13px;outline:none';
     var h=hrfHeader('Employee Directory',filtered.length+' of '+allStaff.length+' staff',
       '<button class="btn" onclick="openHrfBranchAccessMgr()">\uD83D\uDD11 Branch Access</button>'+
+      '<button class="btn" onclick="hrfMigrateCompanyIds()" title="Fix 3rd party company names in existing records" style="background:rgba(91,33,182,.08);color:#5b21b6;border:1px solid rgba(91,33,182,.2)">🔧 Fix Companies</button>'+
       '<button class="btn" onclick="hrfExportEmployees()">&#x2B07; Export CSV</button>'+
       '<button class="btn" onclick="hrfOpenImportModal()">&#x2B06; Import CSV</button>'+
       '<button class="btn btn-primary" onclick="openHrfEmpModal(null,null)">+ Add Employee</button>'+
@@ -13496,13 +13497,11 @@ function pHrfEmployees(){
       // Resolve 3rd party company name (use name not raw id)
       var sponsorCompanyName = '';
       if (m.workerType === '3rdparty' && m.companyId) {
-        // companyId now stores the name directly; fallback: lookup in HRF_COMPANIES
         var matchedCo = HRF_COMPANIES.find(function(c){ return c.name === m.companyId || c.id === m.companyId; });
         sponsorCompanyName = matchedCo ? matchedCo.name : m.companyId;
       }
       var sponsorLabel=m.workerType==='3rdparty'?
-        ('<span style="font-size:10px;color:#5b21b6;background:rgba(167,139,250,.12);padding:2px 7px;border-radius:10px;font-weight:600">'
-          +hxe(sponsorCompanyName||'3rd Party')+'</span>'):
+        ('<span style="font-size:10px;color:#5b21b6;background:rgba(167,139,250,.12);padding:2px 7px;border-radius:10px;font-weight:600">'+hxe(sponsorCompanyName||'3rd Party')+'</span>'):
         '<span style="font-size:10px;color:#00875a;background:rgba(0,102,102,.1);padding:2px 7px;border-radius:10px;font-weight:600">ALFA</span>';
       rows+='<tr data-name="'+hxe((m.name||'').toLowerCase())+'" data-sap="'+hxe((m.sap||'').toLowerCase())+'" data-branch="'+hxe(m._branchId||'')+'" data-dept="'+hxe(m.dept||'')+'"><td><div style="display:flex;align-items:center;gap:10px"><div class="hrf-emp-avatar" style="width:32px;height:32px;font-size:11px">'+hini(m.name)+'</div>'+
         '<div><div style="font-weight:600;color:var(--text-primary)">'+hxe(m.name)+'</div>'+
@@ -14032,6 +14031,51 @@ function hrfLoadBranchPerms(cb){
   if(!db){if(cb)cb();return;}
   db.ref('admin/branchPermissions').once('value',function(snap){HRF_BRANCH_PERMS=snap.val()||{};if(cb)cb();});
 }
+
+// ── One-time migration: replace raw companyId keys with company names ──────
+function hrfMigrateCompanyIds(){
+  if(!db){showToast('Not connected','error');return;}
+  if(!HRF_COMPANIES.length){showToast('Companies not loaded yet','error');return;}
+  var branches=hrfBranches();
+  var fixed=0,total=0;
+  var pending=branches.length;
+  if(!pending){showToast('No branches to migrate','info');return;}
+  branches.forEach(function(b){
+    db.ref('branches/'+b.id+'/staff').once('value',function(snap){
+      var raw=snap.val();
+      if(!raw){pending--;if(!pending)showToast('Migration done. Fixed '+fixed+' of '+total+' staff','success');return;}
+      var arr=Array.isArray(raw)?raw.filter(Boolean):Object.values(raw).filter(Boolean);
+      var changed=false;
+      arr.forEach(function(m){
+        if(!m||m.workerType!=='3rdparty'||!m.companyId)return;
+        total++;
+        // Check if companyId is already a name (exists in HRF_COMPANIES by name)
+        var alreadyName=HRF_COMPANIES.find(function(c){return c.name===m.companyId;});
+        if(alreadyName)return; // already correct
+        // Find by id
+        var byId=HRF_COMPANIES.find(function(c){return c.id===m.companyId;});
+        if(byId){m.companyId=byId.name;fixed++;changed=true;}
+      });
+      if(changed){
+        // Rebuild keyed object same as toObj
+        var obj={};
+        arr.forEach(function(item){
+          if(!item)return;
+          var k=String(item.id||'').replace(/[.#$\[\]\/]/g,'_')||'item_'+Math.random().toString(36).slice(2);
+          obj[k]=item;
+        });
+        db.ref('branches/'+b.id+'/staff').set(obj);
+        HRF.staff[b.id]=arr;
+      }
+      pending--;
+      if(!pending){
+        showToast('Migration done. Fixed '+fixed+'/'+total+' 3rd party staff','success');
+        navTo('hrf-employees');
+      }
+    });
+  });
+}
+
 function openHrfBranchAccessMgr(){
   hrfLoadBranchPerms(function(){
     var branches=hrfBranches();
