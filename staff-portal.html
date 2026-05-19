@@ -199,6 +199,60 @@ textarea.fi{resize:vertical;min-height:80px}
 .qab:active{box-shadow:var(--inset-sm);transform:none}
 .qaico{width:40px;height:40px;border-radius:12px;background:var(--base);box-shadow:var(--flat);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
 
+/* CHECK-IN */
+.ci-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px}
+.ci-btn{border:none;border-radius:18px;padding:18px 8px;cursor:pointer;font-family:var(--font);font-size:11px;font-weight:700;letter-spacing:.04em;transition:all .15s;display:flex;flex-direction:column;align-items:center;gap:6px}
+.ci-btn:active{transform:scale(.96)}
+.ci-btn.in{background:var(--success);color:#fff;box-shadow:4px 4px 14px rgba(0,166,61,.45),-2px -2px 6px rgba(255,255,255,.5)}
+.ci-btn.brk{background:var(--warning);color:#fff;box-shadow:4px 4px 14px rgba(254,153,0,.45),-2px -2px 6px rgba(255,255,255,.5)}
+.ci-btn.out{background:var(--danger);color:#fff;box-shadow:4px 4px 14px rgba(255,33,87,.45),-2px -2px 6px rgba(255,255,255,.5)}
+.ci-btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+.ci-btn .ci-ico{font-size:24px}
+.ci-log-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(0,0,0,.05)}
+.ci-log-row:last-child{border:none}
+.loc-bar{display:flex;align-items:center;gap:8px;background:rgba(0,102,102,.08);border-radius:12px;padding:9px 14px;margin-bottom:14px;font-size:11px;color:var(--primary);font-family:var(--mono);border:1px solid rgba(0,102,102,.15)}
+
+/* QUIZ */
+.q-wrap{animation:pIn .2s ease}
+.q-card{background:var(--base);border-radius:16px;box-shadow:var(--raise-sm);padding:16px;margin-bottom:10px}
+.q-num{font-size:9px;font-weight:700;color:var(--text3);font-family:var(--mono);letter-spacing:.1em;margin-bottom:6px}
+.q-text{font-size:13px;font-weight:700;color:var(--text);margin-bottom:12px;line-height:1.5}
+.q-opt{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:var(--base);box-shadow:var(--raise-sm);margin-bottom:6px;cursor:pointer;font-size:12px;transition:all .15s;border:none;width:100%;text-align:left;font-family:var(--font)}
+.q-opt:hover{box-shadow:var(--raise);transform:translateY(-1px)}
+.q-opt.selected{box-shadow:var(--inset-sm);color:var(--primary);font-weight:700}
+.q-opt.correct{box-shadow:var(--inset-sm);color:var(--success);font-weight:700}
+.q-opt.wrong{box-shadow:var(--inset-sm);color:var(--danger);font-weight:700}
+.q-circle{width:18px;height:18px;border-radius:50%;border:2px solid var(--text3);flex-shrink:0;transition:all .15s;display:flex;align-items:center;justify-content:center;font-size:10px}
+.q-opt.selected .q-circle{border-color:var(--primary);background:var(--primary)}
+.q-opt.correct .q-circle{border-color:var(--success);background:var(--success);color:#fff}
+.q-opt.wrong .q-circle{border-color:var(--danger);background:var(--danger);color:#fff}
+.prog-bar{height:6px;border-radius:3px;background:var(--base);box-shadow:var(--inset-sm);margin-bottom:14px;overflow:hidden}
+.prog-bar-f{height:100%;border-radius:3px;background:var(--primary);transition:width .4s ease}
+.score-ring-wrap{text-align:center;padding:20px 0}
+.score-ring-svg{transform:rotate(-90deg)}
+
+/* BUILD TRAINING TABS */
+.bt-tabs{display:flex;gap:6px;margin-bottom:16px;background:var(--base);border-radius:14px;padding:5px;box-shadow:var(--inset-sm)}
+.bt-tab{flex:1;padding:8px;border:none;border-radius:10px;font-family:var(--font);font-size:10px;font-weight:700;cursor:pointer;background:none;color:var(--text3);transition:all .2s;letter-spacing:.04em}
+.bt-tab.active{background:var(--base);box-shadow:var(--raise-sm);color:var(--primary)}
+.q-builder-card{background:var(--base);border-radius:16px;box-shadow:var(--raise-sm);padding:14px;margin-bottom:10px}
+.q-opt-row{display:flex;gap:6px;margin-bottom:6px;align-items:center}
+.q-opt-row input{flex:1}
+.opt-mark{background:var(--base);border:none;border-radius:8px;padding:6px 10px;font-size:11px;cursor:pointer;box-shadow:var(--raise-sm);color:var(--text3);font-family:var(--mono);transition:all .12s}
+.opt-mark.correct-ans{box-shadow:var(--inset-sm);color:var(--success);font-weight:700}
+.opt-del{background:var(--base);border:none;border-radius:8px;padding:6px 10px;font-size:11px;cursor:pointer;box-shadow:var(--raise-sm);color:var(--danger);font-family:var(--mono)}
+
+/* NOTIFICATIONS */
+.notif-item{display:flex;align-items:flex-start;gap:10px;padding:12px 0;border-bottom:1px solid rgba(0,0,0,.05)}
+.notif-item:last-child{border:none}
+.notif-ico{width:34px;height:34px;border-radius:11px;background:var(--base);box-shadow:var(--flat);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
+.notif-body{flex:1}
+.notif-name{font-size:12px;font-weight:700;margin-bottom:2px}
+.notif-msg{font-size:10px;color:var(--text2)}
+.notif-loc{font-size:9px;color:var(--text3);font-family:var(--mono);margin-top:2px}
+.notif-time{font-size:9px;color:var(--text3);font-family:var(--mono);white-space:nowrap;flex-shrink:0}
+.notif-badge-dot{width:8px;height:8px;border-radius:50%;background:var(--danger);box-shadow:0 0 5px rgba(255,33,87,.5);flex-shrink:0;margin-top:4px}
+
 /* CAPTAIN */
 .sfbar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
 .sfb{background:var(--base);border:none;border-radius:10px;box-shadow:var(--raise-sm);padding:7px 12px;font-size:10px;font-weight:700;font-family:var(--font);cursor:pointer;color:var(--text2);transition:all .12s}
@@ -309,6 +363,7 @@ textarea.fi{resize:vertical;min-height:80px}
     <div class="sidebar hidden" id="sidebar">
       <div class="sb-sec">My Workspace</div>
       <button class="sb-item active" onclick="showPage('dashboard')" id="si-dashboard"><span class="si">📊</span>Dashboard</button>
+      <button class="sb-item" onclick="showPage('checkin')" id="si-checkin"><span class="si">📍</span>Check-In</button>
       <button class="sb-item" onclick="showPage('schedule')" id="si-schedule"><span class="si">📅</span>My Schedule</button>
       <button class="sb-item" onclick="showPage('payslip')" id="si-payslip"><span class="si">💵</span>Pay Slips</button>
       <button class="sb-item" onclick="showPage('history')" id="si-history"><span class="si">📂</span>History File</button>
@@ -319,6 +374,7 @@ textarea.fi{resize:vertical;min-height:80px}
       <div class="sb-sec" id="cap-sec" style="display:none">Captain Tools</div>
       <button class="sb-item" onclick="showPage('cap-staff')" id="si-cap-staff" style="display:none"><span class="si">👥</span>Staff Overview</button>
       <button class="sb-item" onclick="showPage('cap-training')" id="si-cap-training" style="display:none"><span class="si">🎓</span>Build Training</button>
+      <button class="sb-item" onclick="showPage('cap-notifs')" id="si-cap-notifs" style="display:none;position:relative"><span class="si">🔔</span>Notifications<span id="notif-sb-badge" style="display:none;position:absolute;top:6px;right:8px;background:var(--danger);color:#fff;border-radius:8px;font-size:8px;padding:1px 5px;font-family:var(--mono);font-weight:700"></span></button>
     </div>
 
     <div class="main-content">
@@ -424,12 +480,46 @@ textarea.fi{resize:vertical;min-height:80px}
         </div>
       </div>
 
+      <!-- CHECK-IN -->
+      <div class="page" id="page-checkin">
+        <div style="padding:20px 0 0">
+          <div class="sechdr">
+            <div><h2>My Check-In</h2><div class="sechdr-sub" id="ci-date-sub">TODAY</div></div>
+            <span class="badge" id="ci-status-badge" style="margin-left:auto;background:rgba(0,0,0,.08);color:var(--text2)">NOT CHECKED IN</span>
+          </div>
+          <div class="loc-bar" id="ci-loc-bar">
+            <span>📍</span><span id="ci-loc-text">Tap IN to verify your location</span>
+          </div>
+          <div class="card">
+            <div class="ctitle"><div class="cdot" style="background:var(--success)"></div>Attendance</div>
+            <div class="ci-grid">
+              <button class="ci-btn in" id="btn-ci-in" onclick="doPortalCheckIn()">
+                <span class="ci-ico">✅</span>IN
+              </button>
+              <button class="ci-btn brk" id="btn-ci-brk" onclick="doPortalBreak()" disabled>
+                <span class="ci-ico">☕</span>BREAK
+              </button>
+              <button class="ci-btn out" id="btn-ci-out" onclick="doPortalCheckOut()" disabled>
+                <span class="ci-ico">🚪</span>OUT
+              </button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="ctitle"><div class="cdot"></div>Today's Log</div>
+            <div id="ci-log-list"><div style="text-align:center;padding:20px;color:var(--text3);font-size:12px;font-family:var(--mono)">No activity recorded yet</div></div>
+          </div>
+        </div>
+      </div>
+
       <!-- TRAINING -->
       <div class="page" id="page-training">
-        <div style="padding:20px 0 0">
+        <div style="padding:20px 0 0" id="training-list-view">
           <div class="sechdr"><div><h2>Training Modules</h2><div class="sechdr-sub">LEARN & CERTIFY</div></div></div>
           <div class="g2" style="margin-bottom:14px" id="training-kpi"></div>
           <div class="card"><div class="ctitle"><div class="cdot"></div>My Modules</div><div id="training-modules"></div></div>
+        </div>
+        <div style="padding:20px 0 0;display:none" id="training-quiz-view">
+          <!-- populated by startQuiz() -->
         </div>
       </div>
 
@@ -463,19 +553,94 @@ textarea.fi{resize:vertical;min-height:80px}
             <div><h2>Build Training</h2><div class="sechdr-sub">CREATE MODULES FOR YOUR TEAM</div></div>
             <span class="badge bg-p" style="margin-left:auto">⭐ CAPTAIN</span>
           </div>
-          <div class="card">
-            <div class="ctitle"><div class="cdot" style="background:var(--captain)"></div>New Training Module</div>
-            <div class="fg"><label class="fl">Module Title</label><input class="fi" type="text" id="tm-title" placeholder="e.g. Food Safety Basics"></div>
-            <div class="g2">
-              <div class="fg"><label class="fl">Category</label><select class="fi" id="tm-cat"><option>Safety &amp; Compliance</option><option>Customer Service</option><option>Operations</option><option>Leadership</option><option>Product Knowledge</option></select></div>
-              <div class="fg"><label class="fl">Duration (mins)</label><input class="fi" type="number" id="tm-dur" placeholder="30"></div>
-            </div>
-            <div class="fg"><label class="fl">Assign To</label><select class="fi" id="tm-assign"><option>All Branch Staff</option><option>New Joiners Only</option><option>Specific Role</option><option>Selected Employees</option></select></div>
-            <div class="fg"><label class="fl">Content / Instructions</label><textarea class="fi" id="tm-content" rows="5" placeholder="Describe training content, key points, and learning objectives…"></textarea></div>
-            <div class="fg"><label class="fl">Passing Score (%)</label><input class="fi" type="number" id="tm-score" value="80"></div>
-            <button class="btnp" onclick="publishModule()">Publish Module to Team</button>
+          <div class="bt-tabs">
+            <button class="bt-tab active" id="btt-details" onclick="switchBuildTab('details')">1 · Details</button>
+            <button class="bt-tab" id="btt-questions" onclick="switchBuildTab('questions')">2 · Questions</button>
+            <button class="bt-tab" id="btt-published" onclick="switchBuildTab('published')">3 · Published</button>
           </div>
-          <div class="card"><div class="ctitle"><div class="cdot" style="background:var(--captain)"></div>Published Modules</div><div id="cap-modules"></div></div>
+
+          <!-- Tab: Details -->
+          <div id="bt-details">
+            <div class="card">
+              <div class="ctitle"><div class="cdot" style="background:var(--captain)"></div>Module Details</div>
+              <div class="fg"><label class="fl">Module Title *</label><input class="fi" type="text" id="tm-title" placeholder="e.g. Food Safety Basics — Level 1"></div>
+              <div class="g2">
+                <div class="fg"><label class="fl">Category</label>
+                  <select class="fi" id="tm-cat">
+                    <option>Safety &amp; Compliance</option><option>Customer Service</option>
+                    <option>Operations</option><option>Product Knowledge</option>
+                    <option>Leadership</option><option>Hygiene &amp; Sanitation</option>
+                    <option>Fire Safety</option><option>Allergen Awareness</option>
+                  </select>
+                </div>
+                <div class="fg"><label class="fl">Duration (mins)</label><input class="fi" type="number" id="tm-dur" placeholder="30" value="30"></div>
+              </div>
+              <div class="g2">
+                <div class="fg"><label class="fl">Assign To</label>
+                  <select class="fi" id="tm-assign">
+                    <option>All Branch Staff</option><option>New Joiners Only</option>
+                    <option>FOH Only</option><option>Kitchen Only</option><option>Captains Only</option>
+                  </select>
+                </div>
+                <div class="fg"><label class="fl">Passing Score (%)</label><input class="fi" type="number" id="tm-score" value="80"></div>
+              </div>
+              <div class="g2">
+                <div class="fg"><label class="fl">Deadline</label><input class="fi" type="date" id="tm-deadline"></div>
+                <div class="fg"><label class="fl">Mandatory</label>
+                  <select class="fi" id="tm-mandatory"><option value="yes">Yes — Required</option><option value="no">No — Optional</option></select>
+                </div>
+              </div>
+              <div class="fg"><label class="fl">Content / Instructions</label>
+                <textarea class="fi" id="tm-content" rows="5" placeholder="Describe training content, key points, and learning objectives…"></textarea>
+              </div>
+            </div>
+            <div class="card" style="background:rgba(0,102,102,.04);box-shadow:var(--flat);border:1px dashed rgba(0,102,102,.2)">
+              <div style="font-size:9px;font-weight:700;color:var(--primary);margin-bottom:6px;font-family:var(--mono);letter-spacing:.1em">💡 TIPS</div>
+              <div style="font-size:10px;color:var(--text2);line-height:1.8">
+                • Add 5–10 questions for a meaningful assessment<br>
+                • Set passing score ≥ 75% for compliance modules<br>
+                • Mark Allergen Awareness &amp; Fire Safety as mandatory annual recerts<br>
+                • Module appears in staff Training tab immediately on publish
+              </div>
+            </div>
+            <button class="btnp" onclick="buildTabNext()">Next: Add Questions →</button>
+          </div>
+
+          <!-- Tab: Questions -->
+          <div id="bt-questions" style="display:none">
+            <div class="card">
+              <div class="ctitle"><div class="cdot" style="background:var(--captain)"></div>Questions Builder <span id="q-count-label" style="margin-left:auto;font-size:10px;color:var(--primary)"></span></div>
+              <div id="q-builder-list"></div>
+              <button class="btns" onclick="addBuilderQuestion()" style="margin-top:4px">+ Add Question</button>
+            </div>
+            <div style="display:flex;gap:10px">
+              <button class="btns" onclick="switchBuildTab('details')" style="flex:1">← Back</button>
+              <button class="btnp" onclick="publishModule()" style="flex:2">🚀 Publish to Team</button>
+            </div>
+          </div>
+
+          <!-- Tab: Published -->
+          <div id="bt-published" style="display:none">
+            <div class="card"><div class="ctitle"><div class="cdot" style="background:var(--captain)"></div>Published Modules</div><div id="cap-modules"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CAPTAIN: NOTIFICATIONS -->
+      <div class="page" id="page-cap-notifs">
+        <div style="padding:20px 0 0">
+          <div class="sechdr">
+            <div><h2>Notifications</h2><div class="sechdr-sub">BRANCH MANAGER ALERTS</div></div>
+            <span class="badge bg-r" id="notif-count-badge" style="margin-left:auto;display:none"></span>
+          </div>
+          <div class="card">
+            <div class="ctitle"><div class="cdot" style="background:var(--success)"></div>Attendance · Today</div>
+            <div id="notif-att-list"><div style="text-align:center;padding:20px;color:var(--text3);font-size:12px;font-family:var(--mono)">No check-ins yet today</div></div>
+          </div>
+          <div class="card">
+            <div class="ctitle"><div class="cdot" style="background:var(--warning)"></div>Training Alerts</div>
+            <div id="notif-training-list"><div style="text-align:center;padding:20px;color:var(--text3);font-size:12px;font-family:var(--mono)">No training alerts</div></div>
+          </div>
         </div>
       </div>
 
@@ -859,6 +1024,7 @@ function launchPortal(sap, staffData) {
     document.getElementById('cap-sec').style.display = '';
     document.getElementById('si-cap-staff').style.display = '';
     document.getElementById('si-cap-training').style.display = '';
+    document.getElementById('si-cap-notifs').style.display = '';
   }
 
   startClock();
@@ -924,10 +1090,12 @@ function launchPortal(sap, staffData) {
             document.getElementById('hdr-name').textContent = CU.name;
             db.ref('staff/sessions/' + CU.sap).update({ name: CU.name, dept: CU.dept, salary: CU.salary, joinDate: CU.joinDate, staffId: CU.staffId });
           }
-          renderDashboard(); renderSchedule(); renderPayslip(); renderHistory(); renderLeave(); renderTraining();
+          renderDashboard(); renderSchedule(); renderPayslip(); renderHistory(); renderLeave(); renderTraining(); renderCheckIn();
+          if (CU.role === 'captain' || CU.role === 'branch_mgr') { renderCapStaff(); renderCapTraining(); startNotifListener(); }
         });
       } else {
-        renderDashboard(); renderSchedule(); renderPayslip(); renderHistory(); renderLeave(); renderTraining();
+        renderDashboard(); renderSchedule(); renderPayslip(); renderHistory(); renderLeave(); renderTraining(); renderCheckIn();
+        if (CU.role === 'captain' || CU.role === 'branch_mgr') { renderCapStaff(); renderCapTraining(); startNotifListener(); }
       }
     });
   } else {
@@ -937,7 +1105,8 @@ function launchPortal(sap, staffData) {
     renderHistory();
     renderLeave();
     renderTraining();
-    if (CU.role === 'captain' || CU.role === 'branch_mgr') { renderCapStaff(); renderCapTraining(); }
+    renderCheckIn();
+    if (CU.role === 'captain' || CU.role === 'branch_mgr') { renderCapStaff(); renderCapTraining(); startNotifListener(); }
   }
 
   // Set incident datetime
@@ -979,6 +1148,12 @@ function showPage(id) {
   var si = document.getElementById('si-' + id); if (si) si.classList.add('active');
   document.querySelectorAll('.mni').forEach(function(i) { i.classList.remove('active'); });
   var mn = document.getElementById('mn-' + id); if (mn) mn.classList.add('active');
+  // Page-specific on-navigate renders
+  if (id === 'checkin') renderCheckIn();
+  if (id === 'training') renderTraining();
+  if (id === 'cap-training') renderCapTraining();
+  if (id === 'cap-notifs') renderCapNotifs();
+  if (id === 'cap-staff') renderCapStaff();
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -1569,52 +1744,499 @@ function submitLeave() {
 });
 
 /* ═══════════════════════════════════════════════════════
+   CHECK-IN — Firebase: branches/{branchId}/tsAtt/{staffId}/{monthKey}
+   Notifications → branches/{branchId}/notifications/{pushId}
+═══════════════════════════════════════════════════════ */
+var _ciState = 'out'; // 'out' | 'in' | 'break'
+var _ciLog = [];
+var _ciTodayRec = null;
+
+function renderCheckIn() {
+  var u = CU; if (!u) return;
+  var now = new Date();
+  var todayStr = now.toFullDateStr ? now.toFullDateStr() : (now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0'));
+  var dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  var monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('ci-date-sub').textContent = dayNames[now.getDay()].toUpperCase() + ' · ' + now.getDate() + ' ' + monthNames[now.getMonth()].toUpperCase();
+
+  if (!u.branchId || !u.staffId) {
+    document.getElementById('ci-loc-bar').style.display = 'none';
+    document.getElementById('ci-log-list').innerHTML = '<div style="text-align:center;padding:20px;color:var(--text3);font-size:12px;font-family:var(--mono)">Branch not linked — contact HR</div>';
+    return;
+  }
+  var monthKey = todayStr.slice(0,7);
+  db.ref('branches/' + u.branchId + '/tsAtt/' + u.staffId + '/' + monthKey).once('value', function(snap) {
+    var arr = snap.val();
+    if (!Array.isArray(arr)) arr = arr ? Object.values(arr).filter(Boolean) : [];
+    _ciTodayRec = arr.find(function(r) { return r && r.date === todayStr; }) || null;
+    _ciLog = _ciTodayRec && _ciTodayRec.log ? _ciTodayRec.log : [];
+    _ciState = _ciTodayRec ? (_ciTodayRec.co ? 'out' : (_ciTodayRec.ci ? 'in' : 'out')) : 'out';
+    updateCIButtons();
+    renderCILog();
+    updateCIBadge();
+  });
+}
+
+function ciNowTime() {
+  var n = new Date();
+  return String(n.getHours()).padStart(2,'0') + ':' + String(n.getMinutes()).padStart(2,'0');
+}
+function ciTodayStr() {
+  var n = new Date();
+  return n.getFullYear() + '-' + String(n.getMonth()+1).padStart(2,'0') + '-' + String(n.getDate()).padStart(2,'0');
+}
+
+function updateCIButtons() {
+  var btnIn  = document.getElementById('btn-ci-in');
+  var btnBrk = document.getElementById('btn-ci-brk');
+  var btnOut = document.getElementById('btn-ci-out');
+  if (!btnIn) return;
+  if (_ciState === 'out' && !(_ciTodayRec && _ciTodayRec.co)) {
+    btnIn.disabled  = false; btnBrk.disabled = true; btnOut.disabled = true;
+  } else if (_ciState === 'in') {
+    btnIn.disabled  = true;  btnBrk.disabled = false; btnOut.disabled = false;
+  } else {
+    btnIn.disabled  = true;  btnBrk.disabled = true; btnOut.disabled = true;
+  }
+}
+
+function updateCIBadge() {
+  var badge = document.getElementById('ci-status-badge');
+  if (!badge) return;
+  if (_ciState === 'in') {
+    badge.textContent = '✅ CHECKED IN';
+    badge.style.background = 'rgba(0,166,61,.12)'; badge.style.color = 'var(--success)';
+  } else if (_ciTodayRec && _ciTodayRec.co) {
+    badge.textContent = '🚪 CHECKED OUT';
+    badge.style.background = 'rgba(255,33,87,.12)'; badge.style.color = 'var(--danger)';
+  } else {
+    badge.textContent = 'NOT CHECKED IN';
+    badge.style.background = 'rgba(0,0,0,.08)'; badge.style.color = 'var(--text2)';
+  }
+}
+
+function renderCILog() {
+  var el = document.getElementById('ci-log-list');
+  if (!el) return;
+  if (!_ciLog || !_ciLog.length) {
+    el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text3);font-size:12px;font-family:var(--mono)">No activity recorded yet</div>';
+    return;
+  }
+  var icons = { in: '✅', break: '☕', resume: '▶️', out: '🚪' };
+  var labels = { in: 'Checked In', break: 'Break Started', resume: 'Resumed', out: 'Checked Out' };
+  el.innerHTML = _ciLog.map(function(l) {
+    return '<div class="ci-log-row">' +
+      '<span style="font-size:18px">' + (icons[l.type]||'📍') + '</span>' +
+      '<div style="flex:1"><div style="font-size:12px;font-weight:700">' + (labels[l.type]||l.type) + '</div>' +
+      '<div style="font-size:9px;color:var(--text3);font-family:var(--mono)">' + (l.loc||'—') + '</div></div>' +
+      '<span style="font-size:12px;font-weight:700;color:var(--primary);font-family:var(--mono)">' + l.time + '</span></div>';
+  }).join('');
+}
+
+function ciWriteRecord(newLog, ci, co, status) {
+  var u = CU; if (!u || !u.branchId || !u.staffId) return;
+  var today = ciTodayStr();
+  var monthKey = today.slice(0,7);
+  var path = 'branches/' + u.branchId + '/tsAtt/' + u.staffId + '/' + monthKey;
+  db.ref(path).once('value', function(snap) {
+    var arr = snap.val();
+    if (!Array.isArray(arr)) arr = arr ? Object.values(arr).filter(Boolean) : [];
+    var idx = arr.findIndex(function(r) { return r && r.date === today; });
+    var rec = { date: today, ci: ci, co: co || null, st: status, log: newLog };
+    if (idx >= 0) arr[idx] = rec; else arr.push(rec);
+    db.ref(path).set(arr);
+    _ciTodayRec = rec;
+  });
+}
+
+function ciGetLocation(cb) {
+  var locEl = document.getElementById('ci-loc-text');
+  if (!navigator.geolocation) { if(locEl) locEl.textContent = 'Location not available'; cb('Location unavailable'); return; }
+  if(locEl) locEl.textContent = '📡 Detecting location…';
+  navigator.geolocation.getCurrentPosition(function(pos) {
+    var lat = pos.coords.latitude.toFixed(4);
+    var lng = pos.coords.longitude.toFixed(4);
+    var locStr = (CU.branch || 'Branch') + ' · ' + lat + ', ' + lng;
+    if(locEl) locEl.textContent = '📍 ' + locStr;
+    cb(locStr);
+  }, function() {
+    var fallback = (CU.branch || 'Branch') + ' · GPS unavailable';
+    if(locEl) locEl.textContent = '📍 ' + fallback;
+    cb(fallback);
+  }, { timeout: 8000 });
+}
+
+function doPortalCheckIn() {
+  ciGetLocation(function(loc) {
+    var t = ciNowTime();
+    _ciLog = [{ type: 'in', time: t, loc: loc }];
+    _ciState = 'in';
+    ciWriteRecord(_ciLog, t, null, 'present');
+    updateCIButtons(); renderCILog(); updateCIBadge();
+    showToast('Checked in at ' + t + ' ✅', 'success');
+    ciSendNotification('in', t, loc);
+  });
+}
+
+function doPortalBreak() {
+  var t = ciNowTime();
+  _ciLog.push({ type: 'break', time: t, loc: CU.branch || '' });
+  _ciState = 'in';
+  var ci = _ciTodayRec && _ciTodayRec.ci ? _ciTodayRec.ci : t;
+  ciWriteRecord(_ciLog, ci, null, 'present');
+  updateCIButtons(); renderCILog();
+  showToast('Break started at ' + t + ' ☕', 'success');
+  ciSendNotification('break', t, CU.branch || '');
+}
+
+function doPortalCheckOut() {
+  ciGetLocation(function(loc) {
+    var t = ciNowTime();
+    _ciLog.push({ type: 'out', time: t, loc: loc });
+    _ciState = 'out';
+    var ci = _ciTodayRec && _ciTodayRec.ci ? _ciTodayRec.ci : t;
+    ciWriteRecord(_ciLog, ci, t, 'present');
+    updateCIButtons(); renderCILog(); updateCIBadge();
+    showToast('Checked out at ' + t + ' 👋', 'success');
+    ciSendNotification('out', t, loc);
+  });
+}
+
+function ciSendNotification(type, time, loc) {
+  var u = CU; if (!u || !u.branchId) return;
+  var msgs = { in: 'Checked in at ' + time, break: 'Break started at ' + time, out: 'Checked out at ' + time };
+  var record = {
+    type: type,
+    staffName: u.name,
+    staffSAP: u.sap,
+    staffId: u.staffId || '',
+    message: msgs[type] || type,
+    location: loc,
+    branchId: u.branchId,
+    branch: u.branch || '',
+    ts: Date.now(),
+    date: ciTodayStr(),
+    time: time,
+    read: false
+  };
+  db.ref('branches/' + u.branchId + '/notifications').push().set(record);
+}
+
+/* ═══════════════════════════════════════════════════════
+   CAPTAIN: NOTIFICATIONS — Firebase branches/{branchId}/notifications
+═══════════════════════════════════════════════════════ */
+var _notifListener = null;
+
+function renderCapNotifs() {
+  var u = CU; if (!u || !u.branchId) return;
+  var today = ciTodayStr();
+
+  // Attendance notifications
+  db.ref('branches/' + u.branchId + '/notifications').orderByChild('date').equalTo(today).once('value', function(snap) {
+    var all = [];
+    snap.forEach(function(c) { all.unshift(Object.assign({ _key: c.key }, c.val())); });
+    var attList = document.getElementById('notif-att-list');
+    if (!attList) return;
+    if (!all.length) {
+      attList.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text3);font-size:12px;font-family:var(--mono)">No check-ins yet today</div>';
+      return;
+    }
+    var typeIco = { in: '✅', break: '☕', out: '🚪' };
+    var typeCol = { in: 'rgba(0,166,61,.12)', break: 'rgba(254,153,0,.12)', out: 'rgba(255,33,87,.12)' };
+    attList.innerHTML = all.map(function(n) {
+      return '<div class="notif-item">' +
+        '<div class="notif-ico" style="background:' + (typeCol[n.type]||'rgba(0,0,0,.06)') + '">' + (typeIco[n.type]||'📍') + '</div>' +
+        '<div class="notif-body">' +
+          '<div class="notif-name">' + (n.staffName||'Staff') + '</div>' +
+          '<div class="notif-msg">' + (n.message||'') + '</div>' +
+          '<div class="notif-loc">📍 ' + (n.location||'—') + '</div>' +
+        '</div>' +
+        '<div class="notif-time">' + (n.time||'') + '</div>' +
+        '</div>';
+    }).join('');
+
+    // Update badge count
+    var unread = all.filter(function(n) { return !n.read; }).length;
+    var badge = document.getElementById('notif-count-badge');
+    var sbBadge = document.getElementById('notif-sb-badge');
+    if (badge) { badge.textContent = unread + ' NEW'; badge.style.display = unread ? '' : 'none'; }
+    if (sbBadge) { sbBadge.textContent = unread; sbBadge.style.display = unread ? '' : 'none'; }
+
+    // Mark all as read
+    all.forEach(function(n) {
+      if (!n.read) db.ref('branches/' + u.branchId + '/notifications/' + n._key + '/read').set(true);
+    });
+  });
+
+  // Training alerts: find overdue modules
+  db.ref('staff/modules/' + u.branchId).once('value', function(snap) {
+    var mods = [];
+    snap.forEach(function(c) { mods.push(Object.assign({ _key: c.key }, c.val())); });
+    var trainingEl = document.getElementById('notif-training-list');
+    if (!trainingEl) return;
+    if (!mods.length) {
+      trainingEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text3);font-size:12px;font-family:var(--mono)">No training alerts</div>';
+      return;
+    }
+    var now = Date.now();
+    trainingEl.innerHTML = mods.map(function(m) {
+      var isOverdue = m.deadline && new Date(m.deadline) < new Date();
+      return '<div class="notif-item">' +
+        '<div class="notif-ico" style="background:' + (isOverdue ? 'rgba(255,33,87,.1)' : 'rgba(0,117,204,.1)') + '">' + (isOverdue ? '⏰' : '📚') + '</div>' +
+        '<div class="notif-body">' +
+          '<div class="notif-name">' + (m.title||'Module') + '</div>' +
+          '<div class="notif-msg">' + (m.category||'') + ' · Assign: ' + (m.assign||'All') + (isOverdue ? ' · ⚠️ OVERDUE' : '') + '</div>' +
+          '<div class="notif-loc">Pass: ' + (m.score||80) + '% · By: ' + (m.author||'Captain') + '</div>' +
+        '</div>' +
+        '<span class="badge ' + (isOverdue ? 'bg-r' : 'bg-b') + '">' + (isOverdue ? 'Overdue' : 'Live') + '</span>' +
+        '</div>';
+    }).join('');
+  });
+}
+
+function startNotifListener() {
+  var u = CU; if (!u || !u.branchId) return;
+  if (_notifListener) return;
+  _notifListener = db.ref('branches/' + u.branchId + '/notifications').orderByChild('read').equalTo(false);
+  _notifListener.on('value', function(snap) {
+    var count = 0; snap.forEach(function() { count++; });
+    var sbBadge = document.getElementById('notif-sb-badge');
+    if (sbBadge) { sbBadge.textContent = count; sbBadge.style.display = count ? '' : 'none'; }
+  });
+}
+
+/* ═══════════════════════════════════════════════════════
    TRAINING — Firebase: staff/training/{sap} + staff/modules/{branchId}
+   Full quiz engine with questions stored per module
 ═══════════════════════════════════════════════════════ */
 var BASE_MODULES = [
-  {id:'tm1',title:'Food Safety Level 1',cat:'Safety & Compliance',dur:45,ico:'🍽️'},
-  {id:'tm2',title:'Customer Excellence',cat:'Customer Service',dur:30,ico:'⭐'},
-  {id:'tm3',title:'Emergency Procedures',cat:'Safety & Compliance',dur:60,ico:'🚨'},
-  {id:'tm4',title:'POS System Training',cat:'Operations',dur:25,ico:'💻'},
+  { id:'tm1', title:'Food Safety Level 1', cat:'Safety & Compliance', dur:45, ico:'🍽️',
+    questions:[
+      { q:'What is the food danger zone temperature range?', opts:['0°C – 5°C','5°C – 60°C','60°C – 80°C','Below 0°C'], correct:1 },
+      { q:'How long should you wash hands before food handling?', opts:['5 seconds','10 seconds','20 seconds','30 seconds'], correct:2 },
+      { q:'Which colour chopping board is used for raw meat?', opts:['Green','Blue','Red','Yellow'], correct:2 },
+      { q:'Food should not be left in the danger zone for more than:', opts:['30 minutes','2 hours','4 hours','8 hours'], correct:1 },
+    ]
+  },
+  { id:'tm2', title:'Customer Excellence', cat:'Customer Service', dur:30, ico:'⭐',
+    questions:[
+      { q:'What is the correct way to greet a guest?', opts:['Nod and smile','Eye contact, smile, verbal greeting','Wave from across the room','Wait for the guest to speak first'], correct:1 },
+      { q:'A guest complains about their food. What is your first step?', opts:['Argue','Apologise sincerely and listen','Ignore and walk away','Blame the kitchen'], correct:1 },
+      { q:'How quickly should a guest be acknowledged after being seated?', opts:['10 minutes','5 minutes','Immediately within 1–2 min','When convenient'], correct:2 },
+    ]
+  },
+  { id:'tm3', title:'Emergency Procedures', cat:'Safety & Compliance', dur:60, ico:'🚨',
+    questions:[
+      { q:'What is the first action during a fire evacuation?', opts:['Collect personal belongings','Alert others and activate alarm','Call family','Continue working'], correct:1 },
+      { q:'Where is the muster point located?', opts:['Inside the kitchen','At the car park entrance','Basement','Rooftop'], correct:1 },
+      { q:'Who should you report a fire hazard to?', opts:['A colleague','Your direct manager immediately','HR department','No one'], correct:1 },
+    ]
+  },
+  { id:'tm4', title:'POS System Training', cat:'Operations', dur:25, ico:'💻',
+    questions:[
+      { q:'What should you do if the POS freezes during an order?', opts:['Restart the entire system','Contact your captain and use manual bill','Ignore it','Ask the customer to wait indefinitely'], correct:1 },
+      { q:'Discount codes should be entered:', opts:['By any staff','Only by manager or captain','Automatically','Never'], correct:1 },
+    ]
+  },
 ];
+
+var _quizState = null; // { mod, questions, answers, submitted }
+
 function renderTraining() {
   var u = CU; if (!u) return;
+  showTrainingList();
   db.ref('staff/training/' + u.sap).once('value', function(snap) {
     var progress = snap.val() || {};
     var branchRef = u.branchId ? db.ref('staff/modules/' + u.branchId) : null;
     function render(capMods) {
       var allMods = BASE_MODULES.concat((capMods || []).map(function(m, i) {
-        return { id: 'cap' + i, title: m.title, cat: m.category, dur: m.duration, ico: '📋' };
+        return { id: 'cap_' + (m._key || i), title: m.title, cat: m.category||m.cat, dur: m.duration||m.dur, ico: '📋', questions: m.questions || [], passScore: m.score || 80, content: m.content || '' };
       }));
       var done = 0, inProg = 0;
       allMods.forEach(function(m) { var p = progress[m.id] || {}; if (p.status === 'completed') done++; else if (p.status === 'in-progress') inProg++; });
       document.getElementById('training-kpi').innerHTML =
         '<div class="kpi" style="--kc:var(--success)"><div class="kpi-l">Completed</div><div class="kpi-v">' + done + '</div><div class="kpi-s">of ' + allMods.length + ' modules</div></div>' +
         '<div class="kpi" style="--kc:var(--warning)"><div class="kpi-l">In Progress</div><div class="kpi-v">' + inProg + '</div><div class="kpi-s">modules</div></div>';
-      var sc = { completed: 'bg-g', 'in-progress': 'bg-a', 'not-started': 'bg-b' };
-      var sl = { completed: 'Completed', 'in-progress': 'In Progress', 'not-started': 'Not Started' };
-      document.getElementById('training-modules').innerHTML = allMods.map(function(m) {
-        var p = progress[m.id] || { status: 'not-started', progress: 0 };
+      var sc = { completed:'bg-g', 'in-progress':'bg-a', 'not-started':'bg-b' };
+      var sl = { completed:'Completed ✅', 'in-progress':'In Progress', 'not-started':'Start →' };
+      document.getElementById('training-modules').innerHTML = allMods.length ? allMods.map(function(m) {
+        var p = progress[m.id] || { status:'not-started', progress:0 };
+        var isCompleted = p.status === 'completed';
         return '<div class="mcard" onclick="openModule(\'' + m.id + '\')">' +
-          '<div class="mico">' + m.ico + '</div>' +
+          '<div class="mico">' + (m.ico||'📋') + '</div>' +
           '<div style="flex:1"><div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:3px">' + m.title + '</div>' +
-          '<div style="font-size:9px;color:var(--text3);font-family:var(--mono)">' + m.cat + ' · ' + m.dur + ' min' + (p.score ? ' · Score: ' + p.score + '%' : '') + '</div>' +
+          '<div style="font-size:9px;color:var(--text3);font-family:var(--mono)">' + (m.cat||'') + ' · ' + (m.dur||0) + ' min' + (p.score ? ' · Score: ' + p.score + '%' : '') + '</div>' +
           '<div class="mbar"><div class="mbar-f" style="width:' + (p.progress||0) + '%"></div></div></div>' +
-          '<span class="badge ' + (sc[p.status]||'bg-b') + '">' + (sl[p.status]||'Not Started') + '</span></div>';
-      }).join('');
+          '<span class="badge ' + (sc[p.status]||'bg-b') + '">' + (sl[p.status]||'Start →') + '</span></div>';
+      }).join('') : '<div style="text-align:center;padding:30px;color:var(--text3);font-size:12px;font-family:var(--mono)">No modules assigned yet.<br>Your captain will publish modules for your branch.</div>';
     }
     if (branchRef) {
       branchRef.once('value', function(ms) {
-        var capMods = ms.val() ? Object.values(ms.val()) : [];
+        var raw = ms.val() || {};
+        var capMods = Object.keys(raw).map(function(k) { return Object.assign({ _key: k }, raw[k]); });
         render(capMods);
       });
     } else { render([]); }
   });
 }
+
+function showTrainingList() {
+  document.getElementById('training-list-view').style.display = '';
+  document.getElementById('training-quiz-view').style.display = 'none';
+}
+function showQuizView() {
+  document.getElementById('training-list-view').style.display = 'none';
+  document.getElementById('training-quiz-view').style.display = '';
+}
+
 function openModule(id) {
-  showToast('Opening module… (link training content in Firebase)', 'success');
-  // Mark as in-progress in Firebase
-  db.ref('staff/training/' + CU.sap + '/' + id).update({ status: 'in-progress', startedAt: Date.now() });
+  // Find module from base or cap list
+  var allMods = BASE_MODULES;
+  // Also search already-rendered cap mods via the training-modules div data — simpler to just reload
+  var found = allMods.find(function(m) { return m.id === id; });
+  if (found) {
+    startQuiz(found);
+    return;
+  }
+  // Captain module — reload from Firebase
+  var u = CU; if (!u || !u.branchId) return;
+  db.ref('staff/modules/' + u.branchId).once('value', function(snap) {
+    var raw = snap.val() || {};
+    var capKey = id.replace('cap_', '');
+    var m = raw[capKey];
+    if (!m) { showToast('Module not found', 'error'); return; }
+    startQuiz({ id: id, title: m.title, cat: m.category, dur: m.duration, ico: '📋', questions: m.questions || [], passScore: m.score || 80, content: m.content || '' });
+  });
+}
+
+function startQuiz(mod) {
+  var u = CU; if (!u) return;
+  _quizState = { mod: mod, answers: {}, submitted: false };
+  // Mark in-progress
+  db.ref('staff/training/' + u.sap + '/' + mod.id).update({ status: 'in-progress', startedAt: Date.now(), progress: 10 });
+
+  var qs = mod.questions || [];
+  showQuizView();
+  var qv = document.getElementById('training-quiz-view');
+  var contentBlock = mod.content ? '<div class="card" style="margin-bottom:10px"><div class="ctitle"><div class="cdot"></div>Content</div><div style="font-size:12px;color:var(--text2);line-height:1.7;white-space:pre-wrap">' + mod.content + '</div></div>' : '';
+
+  if (!qs.length) {
+    // No questions — just mark complete as read-only
+    qv.innerHTML = '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">' +
+      '<button class="btns" style="width:auto;padding:8px 14px;font-size:11px" onclick="showTrainingList();renderTraining()">← Back</button>' +
+      '<div><div style="font-size:16px;font-weight:700">' + mod.title + '</div><div style="font-size:9px;color:var(--text3);font-family:var(--mono)">' + (mod.cat||'') + ' · ' + (mod.dur||0) + ' min</div></div></div>' +
+      contentBlock +
+      '<div class="card" style="text-align:center;padding:30px">' +
+        '<div style="font-size:36px;margin-bottom:10px">📚</div>' +
+        '<div style="font-size:14px;font-weight:700;margin-bottom:8px">Read the content above</div>' +
+        '<div style="font-size:11px;color:var(--text3);margin-bottom:20px">No quiz for this module. Mark as complete when done.</div>' +
+        '<button class="btnp" onclick="markModuleComplete(\'' + mod.id + '\')">Mark as Complete ✅</button>' +
+      '</div>';
+    return;
+  }
+
+  qv.innerHTML = '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">' +
+    '<button class="btns" style="width:auto;padding:8px 14px;font-size:11px" onclick="showTrainingList();renderTraining()">← Back</button>' +
+    '<div><div style="font-size:16px;font-weight:700">' + mod.title + '</div><div style="font-size:9px;color:var(--text3);font-family:var(--mono)">' + (mod.cat||'') + ' · ' + qs.length + ' questions</div></div></div>' +
+    '<div class="prog-bar"><div class="prog-bar-f" id="quiz-prog" style="width:0%"></div></div>' +
+    contentBlock +
+    '<div class="q-wrap" id="quiz-questions">' +
+    qs.map(function(q, qi) {
+      return '<div class="q-card">' +
+        '<div class="q-num">Q' + (qi+1) + ' of ' + qs.length + '</div>' +
+        '<div class="q-text">' + q.q + '</div>' +
+        q.opts.map(function(o, oi) {
+          return '<button class="q-opt" id="qopt-' + qi + '-' + oi + '" onclick="selectAnswer(' + qi + ',' + oi + ',' + q.correct + ')">' +
+            '<div class="q-circle" id="qcirc-' + qi + '-' + oi + '"></div><span>' + o + '</span></button>';
+        }).join('') +
+      '</div>';
+    }).join('') +
+    '</div>' +
+    '<button class="btnp" id="quiz-submit-btn" onclick="submitQuiz()" style="margin-top:4px" disabled>Submit Quiz</button>';
+}
+
+function selectAnswer(qi, oi, correct) {
+  if (_quizState && _quizState.submitted) return;
+  // Deselect all for this question
+  var qs = _quizState.mod.questions;
+  if (!qs[qi]) return;
+  for (var i = 0; i < qs[qi].opts.length; i++) {
+    var opt = document.getElementById('qopt-' + qi + '-' + i);
+    var circ = document.getElementById('qcirc-' + qi + '-' + i);
+    if (opt) { opt.classList.remove('selected'); }
+    if (circ) circ.textContent = '';
+  }
+  var selOpt = document.getElementById('qopt-' + qi + '-' + oi);
+  var selCirc = document.getElementById('qcirc-' + qi + '-' + oi);
+  if (selOpt) selOpt.classList.add('selected');
+  if (selCirc) { selCirc.textContent = String.fromCharCode(65 + oi); selCirc.style.color = '#fff'; }
+  _quizState.answers[qi] = oi;
+  // Update progress bar
+  var answered = Object.keys(_quizState.answers).length;
+  var total = _quizState.mod.questions.length;
+  var progEl = document.getElementById('quiz-prog');
+  if (progEl) progEl.style.width = Math.round(answered / total * 100) + '%';
+  // Enable submit if all answered
+  var submitBtn = document.getElementById('quiz-submit-btn');
+  if (submitBtn) submitBtn.disabled = answered < total;
+}
+
+function submitQuiz() {
+  if (!_quizState || _quizState.submitted) return;
+  _quizState.submitted = true;
+  var qs = _quizState.mod.questions;
+  var correct = 0;
+  qs.forEach(function(q, qi) {
+    var chosen = _quizState.answers[qi];
+    var isCorrect = chosen === q.correct;
+    if (isCorrect) correct++;
+    for (var i = 0; i < q.opts.length; i++) {
+      var opt = document.getElementById('qopt-' + qi + '-' + i);
+      var circ = document.getElementById('qcirc-' + qi + '-' + i);
+      if (!opt) continue;
+      opt.classList.remove('selected');
+      if (i === q.correct) { opt.classList.add('correct'); if(circ) { circ.textContent = '✓'; circ.style.color = '#fff'; } }
+      else if (i === chosen && !isCorrect) { opt.classList.add('wrong'); if(circ) { circ.textContent = '✗'; circ.style.color = '#fff'; } }
+    }
+  });
+  var score = Math.round(correct / qs.length * 100);
+  var passScore = _quizState.mod.passScore || 80;
+  var passed = score >= passScore;
+  var u = CU;
+  if (u) {
+    db.ref('staff/training/' + u.sap + '/' + _quizState.mod.id).set({
+      status: passed ? 'completed' : 'in-progress',
+      progress: passed ? 100 : score,
+      score: score,
+      passed: passed,
+      completedAt: passed ? Date.now() : null,
+      attempts: firebase.database.ServerValue.increment ? (firebase.database.ServerValue.increment(1)) : 1
+    });
+  }
+  // Show result below questions
+  var submitBtn = document.getElementById('quiz-submit-btn');
+  if (submitBtn) submitBtn.style.display = 'none';
+  var progEl = document.getElementById('quiz-prog');
+  if (progEl) progEl.style.width = '100%';
+  var resultHtml = '<div class="card" style="text-align:center;padding:28px;margin-top:10px">' +
+    '<div style="font-size:40px;margin-bottom:12px">' + (passed ? '🎉' : '📝') + '</div>' +
+    '<div style="font-size:22px;font-weight:700;color:' + (passed ? 'var(--success)' : 'var(--warning)') + ';margin-bottom:4px">' + score + '%</div>' +
+    '<div style="font-size:13px;font-weight:700;margin-bottom:4px">' + (passed ? 'Passed! Well done.' : 'Not passed — review and retry') + '</div>' +
+    '<div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:20px">' + correct + ' / ' + qs.length + ' correct · Pass mark: ' + passScore + '%</div>' +
+    '<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">' +
+    (passed ? '' : '<button class="btns" style="width:auto;padding:10px 20px" onclick="startQuiz(_quizState.mod)">Retry Quiz</button>') +
+    '<button class="btnp" style="width:auto;padding:10px 24px" onclick="showTrainingList();renderTraining()">Back to Modules</button>' +
+    '</div></div>';
+  var qv = document.getElementById('training-quiz-view');
+  if (qv) qv.insertAdjacentHTML('beforeend', resultHtml);
+}
+
+function markModuleComplete(id) {
+  var u = CU; if (!u) return;
+  db.ref('staff/training/' + u.sap + '/' + id).set({ status: 'completed', progress: 100, score: 100, completedAt: Date.now() });
+  showTrainingList();
+  renderTraining();
+  showToast('Module marked as complete ✅', 'success');
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -1653,45 +2275,137 @@ function drawStaffTable() {
 }
 
 /* ═══════════════════════════════════════════════════════
-   CAPTAIN: BUILD TRAINING — Firebase staff/modules/{branchId}
+   CAPTAIN: BUILD TRAINING — tabs + questions builder
 ═══════════════════════════════════════════════════════ */
+var _builderQuestions = []; // [{text, opts:['...'], correct:0}]
+var _builderQCount = 0;
+
+function switchBuildTab(tab) {
+  ['details','questions','published'].forEach(function(t) {
+    document.getElementById('bt-' + t).style.display = t === tab ? '' : 'none';
+    document.getElementById('btt-' + t).classList.toggle('active', t === tab);
+  });
+  if (tab === 'published') renderCapTraining();
+}
+
+function buildTabNext() {
+  var title = (document.getElementById('tm-title') || {}).value || '';
+  if (!title.trim()) { showToast('Enter a module title', 'error'); document.getElementById('tm-title').focus(); return; }
+  switchBuildTab('questions');
+  if (!_builderQuestions.length) addBuilderQuestion();
+  renderBuilderQuestions();
+}
+
+function addBuilderQuestion() {
+  _builderQCount++;
+  _builderQuestions.push({ text: '', opts: ['', '', '', ''], correct: 0 });
+  renderBuilderQuestions();
+}
+
+function renderBuilderQuestions() {
+  var container = document.getElementById('q-builder-list');
+  if (!container) return;
+  var ql = document.getElementById('q-count-label');
+  if (ql) ql.textContent = _builderQuestions.length + ' question(s)';
+  container.innerHTML = _builderQuestions.map(function(q, qi) {
+    return '<div class="q-builder-card">' +
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">' +
+        '<div style="font-size:9px;font-weight:700;color:var(--text3);font-family:var(--mono)">Q' + (qi+1) + '</div>' +
+        '<button class="opt-del" onclick="removeBuilderQ(' + qi + ')" style="margin-left:auto;font-size:10px">✕ Remove</button>' +
+      '</div>' +
+      '<div class="fg"><input class="fi" placeholder="Question text…" value="' + q.text.replace(/"/g,'&quot;') + '" oninput="_builderQuestions[' + qi + '].text=this.value"></div>' +
+      '<div style="font-size:9px;font-weight:700;color:var(--text3);font-family:var(--mono);margin-bottom:6px;letter-spacing:.1em">OPTIONS — ✓ tap to mark correct answer</div>' +
+      q.opts.map(function(opt, oi) {
+        var isCorrect = q.correct === oi;
+        return '<div class="q-opt-row">' +
+          '<span style="font-size:10px;font-family:var(--mono);color:var(--text3);min-width:16px">' + String.fromCharCode(65+oi) + '</span>' +
+          '<input class="fi" placeholder="Option ' + String.fromCharCode(65+oi) + '…" value="' + opt.replace(/"/g,'&quot;') + '" oninput="_builderQuestions[' + qi + '].opts[' + oi + ']=this.value">' +
+          '<button class="opt-mark ' + (isCorrect ? 'correct-ans' : '') + '" onclick="setCorrect(' + qi + ',' + oi + ')" title="Mark as correct answer">' + (isCorrect ? '✓' : '○') + '</button>' +
+        '</div>';
+      }).join('') +
+    '</div>';
+  }).join('');
+}
+
+function setCorrect(qi, oi) {
+  _builderQuestions[qi].correct = oi;
+  renderBuilderQuestions();
+}
+
+function removeBuilderQ(qi) {
+  _builderQuestions.splice(qi, 1);
+  renderBuilderQuestions();
+}
+
 function publishModule() {
-  var title   = document.getElementById('tm-title').value.trim();
-  var content = document.getElementById('tm-content').value.trim();
-  if (!title || !content) { showToast('Fill title and content', 'error'); return; }
-  if (!CU.branchId) { showToast('No branch ID found', 'error'); return; }
+  var title   = (document.getElementById('tm-title') || {}).value || '';
+  var content = (document.getElementById('tm-content') || {}).value || '';
+  title = title.trim();
+  if (!title) { showToast('Fill the module title', 'error'); switchBuildTab('details'); return; }
+  if (!CU || !CU.branchId) { showToast('No branch ID found', 'error'); return; }
+
+  // Validate questions
+  var validQs = _builderQuestions.filter(function(q) {
+    return q.text.trim() && q.opts.filter(function(o) { return o.trim(); }).length >= 2;
+  });
+
   var record = {
     title: title,
-    category: document.getElementById('tm-cat').value,
-    duration: parseInt(document.getElementById('tm-dur').value||30),
-    assign: document.getElementById('tm-assign').value,
+    category: (document.getElementById('tm-cat') || {}).value || 'Operations',
+    duration: parseInt((document.getElementById('tm-dur') || {}).value || 30),
+    assign: (document.getElementById('tm-assign') || {}).value || 'All Branch Staff',
     content: content,
-    score: parseInt(document.getElementById('tm-score').value||80),
+    score: parseInt((document.getElementById('tm-score') || {}).value || 80),
+    mandatory: (document.getElementById('tm-mandatory') || {}).value || 'yes',
+    deadline: (document.getElementById('tm-deadline') || {}).value || null,
+    questions: validQs,
+    questionCount: validQs.length,
     author: CU.name,
     authorSAP: CU.sap,
     branchId: CU.branchId,
     date: new Date().toISOString()
   };
+
   db.ref('staff/modules/' + CU.branchId).push().set(record, function(err) {
     if (err) { showToast('Error publishing module', 'error'); return; }
+    // Send notification to branch notifications feed
+    db.ref('branches/' + CU.branchId + '/notifications').push().set({
+      type: 'training_published',
+      staffName: CU.name,
+      message: 'New training module published: ' + title,
+      location: CU.branch || '',
+      branchId: CU.branchId,
+      ts: Date.now(),
+      date: ciTodayStr(),
+      time: (function(){ var n=new Date(); return String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0'); })(),
+      read: false
+    });
+    // Reset form
     document.getElementById('tm-title').value = '';
     document.getElementById('tm-content').value = '';
-    renderCapTraining();
+    _builderQuestions = [];
+    renderBuilderQuestions();
+    switchBuildTab('published');
     showToast('Module published to branch team! 🎓', 'success');
   });
 }
+
 function renderCapTraining() {
   var u = CU; if (!u || !u.branchId) return;
   db.ref('staff/modules/' + u.branchId).orderByChild('date').once('value', function(snap) {
     var mods = [];
-    snap.forEach(function(c) { mods.unshift(c.val()); });
+    snap.forEach(function(c) { mods.unshift(Object.assign({ _key: c.key }, c.val())); });
     document.getElementById('cap-modules').innerHTML = mods.length ? mods.map(function(m) {
-      return '<div class="mcard"><div class="mico">📋</div>' +
-        '<div style="flex:1"><div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:3px">' + (m.title||'') + '</div>' +
-        '<div style="font-size:9px;color:var(--text3);font-family:var(--mono)">' + (m.category||'') + ' · ' + (m.duration||0) + ' min · Assigned: ' + (m.assign||'') + '</div>' +
-        '<div style="font-size:9px;color:var(--text3);font-family:var(--mono);margin-top:2px">Pass: ' + (m.score||80) + '% · By: ' + (m.author||'') + ' · ' + new Date(m.date).toLocaleDateString() + '</div></div>' +
+      var qCount = (m.questions && m.questions.length) || m.questionCount || 0;
+      return '<div class="mcard">' +
+        '<div class="mico">📋</div>' +
+        '<div style="flex:1">' +
+          '<div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:3px">' + (m.title||'') + '</div>' +
+          '<div style="font-size:9px;color:var(--text3);font-family:var(--mono)">' + (m.category||'') + ' · ' + (m.duration||0) + ' min · ' + (m.assign||'All') + '</div>' +
+          '<div style="font-size:9px;color:var(--text3);font-family:var(--mono);margin-top:2px">' + qCount + ' questions · Pass: ' + (m.score||80) + '% · ' + (m.mandatory==='yes'?'Mandatory':'Optional') + '</div>' +
+        '</div>' +
         '<span class="badge bg-p">Live</span></div>';
-    }).join('') : '<div style="text-align:center;padding:20px;color:var(--text3);font-size:12px">No modules published yet</div>';
+    }).join('') : '<div style="text-align:center;padding:20px;color:var(--text3);font-size:12px;font-family:var(--mono)">No modules published yet</div>';
   });
 }
 
