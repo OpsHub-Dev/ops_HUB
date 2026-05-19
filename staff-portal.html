@@ -209,6 +209,7 @@ textarea.fi{resize:vertical;min-height:80px}
 .ci-btn.in{background:var(--success);color:#fff;box-shadow:4px 4px 14px rgba(0,166,61,.45),-2px -2px 6px rgba(255,255,255,.5)}
 .ci-btn.brk{background:var(--warning);color:#fff;box-shadow:4px 4px 14px rgba(254,153,0,.45),-2px -2px 6px rgba(255,255,255,.5)}
 .ci-btn.out{background:var(--danger);color:#fff;box-shadow:4px 4px 14px rgba(255,33,87,.45),-2px -2px 6px rgba(255,255,255,.5)}
+.ci-btn.end-brk{background:#c0392b;color:#fff;box-shadow:4px 4px 14px rgba(192,57,43,.5),-2px -2px 6px rgba(255,255,255,.4)}
 .ci-btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
 .ci-btn .ci-ico{font-size:24px}
 .ci-log-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid rgba(0,0,0,.05)}
@@ -508,12 +509,16 @@ textarea.fi{resize:vertical;min-height:80px}
                 <span class="ci-ico">✅</span>IN
               </button>
               <button class="ci-btn brk" id="btn-ci-brk" onclick="doPortalBreak()">
-                <span class="ci-ico">☕</span>BREAK
+                <span class="ci-ico" id="brk-ico">☕</span><span id="brk-lbl">BREAK</span>
               </button>
               <button class="ci-btn out" id="btn-ci-out" onclick="doPortalCheckOut()">
                 <span class="ci-ico">🚪</span>OUT
               </button>
             </div>
+          </div>
+          <div class="card" id="ci-summary-card" style="display:none">
+            <div class="ctitle"><div class="cdot" style="background:var(--warning)"></div>Break Summary</div>
+            <div style="display:flex;gap:12px;flex-wrap:wrap" id="ci-summary-kpis"></div>
           </div>
           <div class="card">
             <div class="ctitle"><div class="cdot"></div>Today's Log</div>
@@ -1772,15 +1777,19 @@ function submitLeave() {
    CHECK-IN — Firebase: branches/{branchId}/tsAtt/{staffId}/{monthKey}
    Notifications → branches/{branchId}/notifications/{pushId}
 ═══════════════════════════════════════════════════════ */
-var _ciState = 'out'; // 'out' | 'in' | 'break'
+var _ciState = 'out'; // 'out' | 'in' | 'on-break' | 'done'
 var _ciLog = [];
 var _ciTodayRec = null;
+var _ciAttKey = null; // which Firebase key has this staff's attendance
+var _ciBreakStart = null; // ISO time string when current break started
+var _ciBreakLogs = []; // [{start, end, mins}]
 
 function renderCheckIn() {
   var u = CU; if (!u) return;
 
-  // Always reset state before any async read — prevents stale lock
+  // Always hard-reset state first — prevents any stale lock from previous renders
   _ciTodayRec = null; _ciLog = []; _ciState = 'out';
+  _ciAttKey = null;
   updateCIButtons(); renderCILog(); updateCIBadge();
 
   var now = new Date();
@@ -1789,24 +1798,48 @@ function renderCheckIn() {
   var monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   document.getElementById('ci-date-sub').textContent = dayNames[now.getDay()].toUpperCase() + ' · ' + now.getDate() + ' ' + monthNames[now.getMonth()].toUpperCase();
 
-  var attKey = u.staffId || u.sap;
-  if (!u.branchId || !attKey) return; // no branch yet — buttons already unlocked above
+  if (!u.branchId) return; // no branch — buttons unlocked above, ready to use
 
   var monthKey = todayStr.slice(0,7);
-  db.ref('branches/' + u.branchId + '/tsAtt/' + attKey + '/' + monthKey).once('value', function(snap) {
-    var arr = snap.val();
-    if (!Array.isArray(arr)) arr = arr ? Object.values(arr).filter(Boolean) : [];
-    // Strict today-only match
-    var rec = null;
-    for (var i = 0; i < arr.length; i++) {
-      if (arr[i] && arr[i].date === todayStr) { rec = arr[i]; break; }
-    }
-    _ciTodayRec = rec;
-    _ciLog = rec && rec.log ? rec.log : [];
-    // State: no record = out (not yet), has ci but no co = in, has both = done for today
-    _ciState = rec ? (rec.co ? 'done' : (rec.ci ? 'in' : 'out')) : 'out';
-    updateCIButtons(); renderCILog(); updateCIBadge();
-  });
+
+  // Try BOTH possible keys: staffId (numeric) and sap — whichever has today's record wins
+  // This handles legacy records written under sap vs new records under staffId
+  var keys = [];
+  if (u.staffId && String(u.staffId) !== String(u.sap)) keys.push(String(u.staffId));
+  if (u.sap) keys.push(String(u.sap));
+  if (!keys.length) return;
+
+  var found = false;
+  var checked = 0;
+
+  function tryKey(key) {
+    db.ref('branches/' + u.branchId + '/tsAtt/' + key + '/' + monthKey).once('value', function(snap) {
+      checked++;
+      if (found) return; // another key already found a record
+      var arr = snap.val();
+      if (!Array.isArray(arr)) arr = arr ? Object.values(arr).filter(Boolean) : [];
+      var rec = null;
+      for (var i = 0; i < arr.length; i++) {
+        if (arr[i] && arr[i].date === todayStr) { rec = arr[i]; break; }
+      }
+      if (rec) {
+        found = true;
+        _ciAttKey = key; // remember which key has the real record
+        _ciTodayRec = rec;
+        _ciLog = rec.log || [];
+        _ciState = rec.co ? 'done' : (rec.ci ? 'in' : 'out');
+        updateCIButtons(); renderCILog(); updateCIBadge();
+      } else if (checked === keys.length && !found) {
+        // All keys checked, nothing found today — fresh start
+        _ciAttKey = keys[keys.length - 1]; // default write key = sap
+        _ciTodayRec = null; _ciLog = []; _ciState = 'out';
+        _ciBreakLogs = []; _ciBreakStart = null;
+        updateCIButtons(); renderCILog(); updateCIBadge(); updateSummaryCard();
+      }
+    });
+  }
+
+  keys.forEach(function(k) { tryKey(k); });
 }
 function ciNowTime() {
   var n = new Date();
@@ -1821,19 +1854,38 @@ function updateCIButtons() {
   var btnIn  = document.getElementById('btn-ci-in');
   var btnBrk = document.getElementById('btn-ci-brk');
   var btnOut = document.getElementById('btn-ci-out');
+  var brkIco = document.getElementById('brk-ico');
+  var brkLbl = document.getElementById('brk-lbl');
   if (!btnIn) return;
+
   if (_ciState === 'in') {
-    // Checked in — can break or check out
-    btnIn.disabled = true; btnBrk.disabled = false; btnOut.disabled = false;
+    btnIn.disabled = true;  btnBrk.disabled = false; btnOut.disabled = false;
     btnIn.style.opacity = '0.4'; btnBrk.style.opacity = '1'; btnOut.style.opacity = '1';
+    btnBrk.className = 'ci-btn brk';
+    if (brkIco) brkIco.textContent = '☕';
+    if (brkLbl) brkLbl.textContent = 'BREAK';
+
+  } else if (_ciState === 'on-break') {
+    btnIn.disabled = true;  btnBrk.disabled = false; btnOut.disabled = true;
+    btnIn.style.opacity = '0.4'; btnBrk.style.opacity = '1'; btnOut.style.opacity = '0.4';
+    btnBrk.className = 'ci-btn end-brk';
+    if (brkIco) brkIco.textContent = '⏹️';
+    if (brkLbl) brkLbl.textContent = 'END BREAK';
+
   } else if (_ciState === 'done') {
-    // Fully checked out today — all locked
-    btnIn.disabled = true; btnBrk.disabled = true; btnOut.disabled = true;
+    btnIn.disabled = true;  btnBrk.disabled = true;  btnOut.disabled = true;
     btnIn.style.opacity = '0.4'; btnBrk.style.opacity = '0.4'; btnOut.style.opacity = '0.4';
+    btnBrk.className = 'ci-btn brk';
+    if (brkIco) brkIco.textContent = '☕';
+    if (brkLbl) brkLbl.textContent = 'BREAK';
+
   } else {
-    // 'out' = not yet checked in — only IN available
-    btnIn.disabled = false; btnBrk.disabled = true; btnOut.disabled = true;
+    // 'out' — not yet checked in
+    btnIn.disabled = false; btnBrk.disabled = true;  btnOut.disabled = true;
     btnIn.style.opacity = '1'; btnBrk.style.opacity = '0.4'; btnOut.style.opacity = '0.4';
+    btnBrk.className = 'ci-btn brk';
+    if (brkIco) brkIco.textContent = '☕';
+    if (brkLbl) brkLbl.textContent = 'BREAK';
   }
 }
 
@@ -1843,6 +1895,9 @@ function updateCIBadge() {
   if (_ciState === 'in') {
     badge.textContent = '✅ CHECKED IN';
     badge.style.background = 'rgba(0,166,61,.12)'; badge.style.color = 'var(--success)';
+  } else if (_ciState === 'on-break') {
+    badge.textContent = '☕ ON BREAK';
+    badge.style.background = 'rgba(254,153,0,.15)'; badge.style.color = 'var(--warning)';
   } else if (_ciState === 'done') {
     badge.textContent = '🚪 CHECKED OUT';
     badge.style.background = 'rgba(255,33,87,.12)'; badge.style.color = 'var(--danger)';
@@ -1859,32 +1914,89 @@ function renderCILog() {
     el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text3);font-size:12px;font-family:var(--mono)">No activity recorded yet</div>';
     return;
   }
-  var icons = { in: '✅', break: '☕', resume: '▶️', out: '🚪' };
-  var labels = { in: 'Checked In', break: 'Break Started', resume: 'Resumed', out: 'Checked Out' };
+  var icons  = { 'in':'✅', 'break-start':'☕', 'break-end':'▶️', 'out':'🚪' };
+  var labels = { 'in':'Checked In', 'break-start':'Break Started', 'break-end':'Break Ended', 'out':'Checked Out' };
+  var colors = { 'in':'var(--success)', 'break-start':'var(--warning)', 'break-end':'var(--info)', 'out':'var(--danger)' };
   el.innerHTML = _ciLog.map(function(l) {
+    var dur = l.mins != null ? '<span style="font-size:9px;background:rgba(0,117,204,.1);color:var(--info);border-radius:5px;padding:2px 6px;font-family:var(--mono);margin-left:6px">' + l.mins + ' min</span>' : '';
     return '<div class="ci-log-row">' +
       '<span style="font-size:18px">' + (icons[l.type]||'📍') + '</span>' +
-      '<div style="flex:1"><div style="font-size:12px;font-weight:700">' + (labels[l.type]||l.type) + '</div>' +
-      '<div style="font-size:9px;color:var(--text3);font-family:var(--mono)">' + (l.loc||'—') + '</div></div>' +
-      '<span style="font-size:12px;font-weight:700;color:var(--primary);font-family:var(--mono)">' + l.time + '</span></div>';
+      '<div style="flex:1">' +
+        '<div style="font-size:12px;font-weight:700;color:' + (colors[l.type]||'var(--text)') + '">' + (labels[l.type]||l.type) + dur + '</div>' +
+        (l.loc ? '<div style="font-size:9px;color:var(--text3);font-family:var(--mono)">📍 ' + l.loc + '</div>' : '') +
+      '</div>' +
+      '<span style="font-size:12px;font-weight:700;color:var(--primary);font-family:var(--mono)">' + l.time + '</span>' +
+    '</div>';
   }).join('');
 }
 
-function ciWriteRecord(newLog, ci, co, status) {
-  var u = CU; if (!u || !u.branchId || !u.staffId) return;
+function updateSummaryCard() {
+  var card = document.getElementById('ci-summary-card');
+  var kpis = document.getElementById('ci-summary-kpis');
+  if (!card || !kpis) return;
+  var totalBrk = _ciBreakLogs.reduce(function(s, b) { return s + b.mins; }, 0);
+  var ciStr = _ciTodayRec && _ciTodayRec.ci ? _ciTodayRec.ci : null;
+  var coStr = _ciTodayRec && _ciTodayRec.co ? _ciTodayRec.co : null;
+  var workedMins = coStr && ciStr ? Math.max(0, ciTimeToMins(coStr) - ciTimeToMins(ciStr) - totalBrk) : null;
+  var onBreakNow = _ciState === 'on-break';
+
+  if (!ciStr && !totalBrk) { card.style.display = 'none'; return; }
+  card.style.display = '';
+
+  var html = '';
+  if (ciStr) html += kpiMini('Check-In', ciStr, 'var(--success)');
+  if (onBreakNow && _ciBreakStart) html += kpiMini('Break Since', _ciBreakStart, 'var(--warning)');
+  if (totalBrk) html += kpiMini('Total Break', minsToHHMM(totalBrk), 'var(--warning)');
+  if (workedMins != null) html += kpiMini('Worked', minsToHHMM(workedMins), 'var(--primary)');
+  if (coStr) html += kpiMini('Check-Out', coStr, 'var(--danger)');
+  kpis.innerHTML = html;
+}
+
+function kpiMini(label, val, color) {
+  return '<div style="background:var(--base);border-radius:12px;box-shadow:var(--raise-sm);padding:10px 14px;flex:1;min-width:80px">' +
+    '<div style="font-size:8px;font-weight:700;color:var(--text3);font-family:var(--mono);letter-spacing:.1em;margin-bottom:4px">' + label + '</div>' +
+    '<div style="font-size:16px;font-weight:700;color:' + color + ';font-family:var(--mono)">' + val + '</div>' +
+  '</div>';
+}
+
+function ciWriteRecord(newLog, ci, co, status, brkMins, brkLogs, workedMins) {
+  var u = CU; if (!u || !u.branchId) return;
   var today = ciTodayStr();
   var monthKey = today.slice(0,7);
-  var attKey = u.staffId || u.sap;
+  var attKey = _ciAttKey || u.sap || u.staffId;
+  if (!attKey) return;
   var path = 'branches/' + u.branchId + '/tsAtt/' + attKey + '/' + monthKey;
+  var totalBrk = brkMins || 0;
+  var rec = {
+    date: today,
+    ci: ci,
+    co: co || null,
+    st: status,
+    log: newLog,
+    brkMins: totalBrk,
+    brkLogs: brkLogs || [],
+    workedMins: workedMins != null ? workedMins : null,
+    workedHrs: workedMins != null ? minsToHHMM(workedMins) : null
+  };
   db.ref(path).once('value', function(snap) {
     var arr = snap.val();
     if (!Array.isArray(arr)) arr = arr ? Object.values(arr).filter(Boolean) : [];
     var idx = arr.findIndex(function(r) { return r && r.date === today; });
-    var rec = { date: today, ci: ci, co: co || null, st: status, log: newLog };
     if (idx >= 0) arr[idx] = rec; else arr.push(rec);
     db.ref(path).set(arr);
     _ciTodayRec = rec;
   });
+}
+
+function ciTimeToMins(t) {
+  if (!t) return 0;
+  var p = t.split(':');
+  return parseInt(p[0] || 0) * 60 + parseInt(p[1] || 0);
+}
+
+function minsToHHMM(m) {
+  m = Math.max(0, Math.round(m));
+  return String(Math.floor(m / 60)).padStart(2,'0') + ':' + String(m % 60).padStart(2,'0');
 }
 
 function ciGetLocation(cb) {
@@ -1918,24 +2030,50 @@ function doPortalCheckIn() {
 
 function doPortalBreak() {
   var t = ciNowTime();
-  _ciLog.push({ type: 'break', time: t, loc: CU.branch || '' });
-  _ciState = 'in';
-  var ci = _ciTodayRec && _ciTodayRec.ci ? _ciTodayRec.ci : t;
-  ciWriteRecord(_ciLog, ci, null, 'present');
-  updateCIButtons(); renderCILog();
-  showToast('Break started at ' + t + ' ☕', 'success');
-  ciSendNotification('break', t, CU.branch || '');
+  if (_ciState !== 'on-break') {
+    // START BREAK
+    _ciBreakStart = t;
+    _ciState = 'on-break';
+    _ciLog.push({ type: 'break-start', time: t, loc: CU.branch || '' });
+    var ci = _ciTodayRec && _ciTodayRec.ci ? _ciTodayRec.ci : t;
+    ciWriteRecord(_ciLog, ci, null, 'present');
+    updateCIButtons(); renderCILog(); updateCIBadge(); updateSummaryCard();
+    showToast('Break started at ' + t + ' ☕', 'success');
+    ciSendNotification('break-start', t, CU.branch || '');
+  } else {
+    // END BREAK
+    var endT = t;
+    var startMins = ciTimeToMins(_ciBreakStart);
+    var endMins = ciTimeToMins(endT);
+    var brkDur = Math.max(0, endMins - startMins);
+    _ciBreakLogs.push({ start: _ciBreakStart, end: endT, mins: brkDur });
+    _ciBreakStart = null;
+    _ciState = 'in';
+    _ciLog.push({ type: 'break-end', time: endT, mins: brkDur });
+    var ci2 = _ciTodayRec && _ciTodayRec.ci ? _ciTodayRec.ci : endT;
+    var totalBrkMins = _ciBreakLogs.reduce(function(s, b) { return s + b.mins; }, 0);
+    ciWriteRecord(_ciLog, ci2, null, 'present', totalBrkMins, _ciBreakLogs);
+    updateCIButtons(); renderCILog(); updateCIBadge(); updateSummaryCard();
+    showToast('Break ended · ' + brkDur + ' min ✅', 'success');
+    ciSendNotification('break-end', endT, CU.branch || '');
+  }
 }
 
 function doPortalCheckOut() {
+  if (_ciState === 'on-break') { showToast('End your break before checking out', 'error'); return; }
   ciGetLocation(function(loc) {
     var t = ciNowTime();
     _ciLog.push({ type: 'out', time: t, loc: loc });
     _ciState = 'done';
     var ci = _ciTodayRec && _ciTodayRec.ci ? _ciTodayRec.ci : t;
-    ciWriteRecord(_ciLog, ci, t, 'present');
-    updateCIButtons(); renderCILog(); updateCIBadge();
-    showToast('Checked out at ' + t + ' 👋', 'success');
+    var totalBrkMins = _ciBreakLogs.reduce(function(s, b) { return s + b.mins; }, 0);
+    // Calculate total worked hours
+    var ciMins = ciTimeToMins(ci);
+    var coMins = ciTimeToMins(t);
+    var workedMins = Math.max(0, coMins - ciMins - totalBrkMins);
+    ciWriteRecord(_ciLog, ci, t, 'present', totalBrkMins, _ciBreakLogs, workedMins);
+    updateCIButtons(); renderCILog(); updateCIBadge(); updateSummaryCard();
+    showToast('Checked out at ' + t + ' · Worked ' + minsToHHMM(workedMins) + ' 👋', 'success');
     ciSendNotification('out', t, loc);
   });
 }
@@ -1947,7 +2085,7 @@ function ciSendNotification(type, time, loc) {
     type: type,
     staffName: u.name,
     staffSAP: u.sap,
-    staffId: u.staffId || u.sap || '',
+    staffId: _ciAttKey || u.sap || '',
     message: msgs[type] || type,
     location: loc,
     branchId: u.branchId,
