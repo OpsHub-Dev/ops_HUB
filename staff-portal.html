@@ -8,6 +8,9 @@
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<!-- PDF.js for local PDF text extraction -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>if(typeof pdfjsLib!=='undefined')pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
 <style>
 /* ═══ ALFA.CO Staff Portal · Neumorphism · #E7E5E4 · #006666 ═══ */
 :root{
@@ -608,6 +611,18 @@ textarea.fi{resize:vertical;min-height:80px}
 
           <!-- Tab: Questions -->
           <div id="bt-questions" style="display:none">
+            <!-- PDF AI Generator -->
+            <div class="card" id="pdf-drop-card" style="border:2px dashed rgba(0,102,102,.25);background:rgba(0,102,102,.03);box-shadow:none;text-align:center;padding:22px;margin-bottom:12px;cursor:pointer;transition:all .2s"
+              ondragover="event.preventDefault();this.style.borderColor='var(--primary)';this.style.background='rgba(0,102,102,.08)'"
+              ondragleave="this.style.borderColor='rgba(0,102,102,.25)';this.style.background='rgba(0,102,102,.03)'"
+              ondrop="handlePDFDrop(event)"
+              onclick="document.getElementById('pdf-file-inp').click()">
+              <input type="file" id="pdf-file-inp" accept=".pdf" style="display:none" onchange="handlePDFFile(this.files[0])">
+              <div style="font-size:28px;margin-bottom:8px">📄</div>
+              <div style="font-size:12px;font-weight:700;color:var(--primary);margin-bottom:4px">Drop PDF or tap to upload</div>
+              <div style="font-size:10px;color:var(--text3);font-family:var(--mono)">Questions auto-generated locally from your PDF text</div>
+            </div>
+            <div id="pdf-status" style="display:none;margin-bottom:12px"></div>
             <div class="card">
               <div class="ctitle"><div class="cdot" style="background:var(--captain)"></div>Questions Builder <span id="q-count-label" style="margin-left:auto;font-size:10px;color:var(--primary)"></span></div>
               <div id="q-builder-list"></div>
@@ -1754,29 +1769,26 @@ var _ciTodayRec = null;
 function renderCheckIn() {
   var u = CU; if (!u) return;
   var now = new Date();
-  var todayStr = now.toFullDateStr ? now.toFullDateStr() : (now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0'));
+  var todayStr = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
   var dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   document.getElementById('ci-date-sub').textContent = dayNames[now.getDay()].toUpperCase() + ' · ' + now.getDate() + ' ' + monthNames[now.getMonth()].toUpperCase();
-
-  if (!u.branchId || !u.staffId) {
-    document.getElementById('ci-loc-bar').style.display = 'none';
-    document.getElementById('ci-log-list').innerHTML = '<div style="text-align:center;padding:20px;color:var(--text3);font-size:12px;font-family:var(--mono)">Branch not linked — contact HR</div>';
+  var attKey = u.staffId || u.sap;
+  if (!u.branchId || !attKey) {
+    _ciTodayRec = null; _ciLog = []; _ciState = 'out';
+    updateCIButtons(); renderCILog(); updateCIBadge();
     return;
   }
   var monthKey = todayStr.slice(0,7);
-  db.ref('branches/' + u.branchId + '/tsAtt/' + u.staffId + '/' + monthKey).once('value', function(snap) {
+  db.ref('branches/' + u.branchId + '/tsAtt/' + attKey + '/' + monthKey).once('value', function(snap) {
     var arr = snap.val();
     if (!Array.isArray(arr)) arr = arr ? Object.values(arr).filter(Boolean) : [];
     _ciTodayRec = arr.find(function(r) { return r && r.date === todayStr; }) || null;
     _ciLog = _ciTodayRec && _ciTodayRec.log ? _ciTodayRec.log : [];
     _ciState = _ciTodayRec ? (_ciTodayRec.co ? 'out' : (_ciTodayRec.ci ? 'in' : 'out')) : 'out';
-    updateCIButtons();
-    renderCILog();
-    updateCIBadge();
+    updateCIButtons(); renderCILog(); updateCIBadge();
   });
 }
-
 function ciNowTime() {
   var n = new Date();
   return String(n.getHours()).padStart(2,'0') + ':' + String(n.getMinutes()).padStart(2,'0');
@@ -1837,7 +1849,8 @@ function ciWriteRecord(newLog, ci, co, status) {
   var u = CU; if (!u || !u.branchId || !u.staffId) return;
   var today = ciTodayStr();
   var monthKey = today.slice(0,7);
-  var path = 'branches/' + u.branchId + '/tsAtt/' + u.staffId + '/' + monthKey;
+  var attKey = u.staffId || u.sap;
+  var path = 'branches/' + u.branchId + '/tsAtt/' + attKey + '/' + monthKey;
   db.ref(path).once('value', function(snap) {
     var arr = snap.val();
     if (!Array.isArray(arr)) arr = arr ? Object.values(arr).filter(Boolean) : [];
@@ -1909,7 +1922,7 @@ function ciSendNotification(type, time, loc) {
     type: type,
     staffName: u.name,
     staffSAP: u.sap,
-    staffId: u.staffId || '',
+    staffId: u.staffId || u.sap || '',
     message: msgs[type] || type,
     location: loc,
     branchId: u.branchId,
@@ -2407,6 +2420,213 @@ function renderCapTraining() {
         '<span class="badge bg-p">Live</span></div>';
     }).join('') : '<div style="text-align:center;padding:20px;color:var(--text3);font-size:12px;font-family:var(--mono)">No modules published yet</div>';
   });
+}
+
+/* ═══════════════════════════════════════════════════════
+   LOCAL PDF → QUESTION GENERATOR  (no AI, fully offline)
+   Uses PDF.js to extract text, then pattern-matches sentences
+   to build multiple-choice questions automatically.
+═══════════════════════════════════════════════════════ */
+function handlePDFDrop(event) {
+  event.preventDefault();
+  var card = document.getElementById('pdf-drop-card');
+  if (card) { card.style.borderColor = 'rgba(0,102,102,.25)'; card.style.background = 'rgba(0,102,102,.03)'; }
+  var file = event.dataTransfer.files[0];
+  if (file && file.type === 'application/pdf') handlePDFFile(file);
+  else showToast('Please drop a PDF file', 'error');
+}
+
+function handlePDFFile(file) {
+  if (!file) return;
+  if (typeof pdfjsLib === 'undefined') { showToast('PDF reader not loaded yet — try again', 'error'); return; }
+  var statusEl = document.getElementById('pdf-status');
+  statusEl.style.display = '';
+  statusEl.innerHTML = '<div class="card" style="box-shadow:var(--flat);text-align:center;padding:14px">' +
+    '<div style="font-size:11px;font-weight:700;color:var(--primary);font-family:var(--mono)">📄 Reading PDF… ' + file.name + '</div>' +
+    '<div class="mbar" style="margin-top:8px"><div class="mbar-f" id="pdf-prog" style="width:10%;transition:width .3s"></div></div>' +
+  '</div>';
+
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var typedArray = new Uint8Array(e.target.result);
+    var loadingTask = pdfjsLib.getDocument({ data: typedArray });
+    loadingTask.promise.then(function(pdf) {
+      var totalPages = pdf.numPages;
+      var pageTexts = [];
+      var pagesLoaded = 0;
+      function loadPage(pageNum) {
+        pdf.getPage(pageNum).then(function(page) {
+          page.getTextContent().then(function(tc) {
+            var text = tc.items.map(function(i) { return i.str; }).join(' ');
+            pageTexts.push(text);
+            pagesLoaded++;
+            var pct = Math.round(pagesLoaded / totalPages * 80) + 10;
+            var prog = document.getElementById('pdf-prog');
+            if (prog) prog.style.width = pct + '%';
+            if (pagesLoaded === totalPages) {
+              var fullText = pageTexts.join(' ');
+              generateQuestionsFromText(fullText, file.name);
+            } else {
+              loadPage(pageNum + 1);
+            }
+          });
+        });
+      }
+      loadPage(1);
+    }, function(err) {
+      statusEl.innerHTML = '<div class="card" style="box-shadow:var(--flat);color:var(--danger);font-size:11px;padding:12px">❌ Could not read PDF: ' + err.message + '</div>';
+    });
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function generateQuestionsFromText(text, filename) {
+  var statusEl = document.getElementById('pdf-status');
+  var prog = document.getElementById('pdf-prog');
+  if (prog) prog.style.width = '95%';
+
+  // Clean text
+  text = text.replace(/\s+/g, ' ').replace(/[^\x20-\x7E\u00A0-\uFFFF]/g, ' ').trim();
+
+  // Split into sentences
+  var rawSents = text.match(/[^.!?]+[.!?]+/g) || [];
+  var sentences = rawSents.map(function(s) { return s.trim(); }).filter(function(s) {
+    return s.length > 40 && s.length < 280 && s.split(' ').length > 6;
+  });
+
+  if (sentences.length < 3) {
+    statusEl.innerHTML = '<div class="card" style="box-shadow:var(--flat);color:var(--warning);font-size:11px;padding:12px">⚠️ Not enough readable text found in this PDF to generate questions. Try a text-based PDF.</div>';
+    return;
+  }
+
+  var generated = [];
+
+  // PATTERN 1: "X must / should / shall Y" → "What must/should X do regarding Y?"
+  sentences.forEach(function(s) {
+    if (generated.length >= 12) return;
+    var m = s.match(/^(.{10,60}?)\s+(must|should|shall|is required to|are required to)\s+(.{10,80})/i);
+    if (m) {
+      var subject = m[1].trim();
+      var verb = m[2];
+      var action = m[3].replace(/[.!?]+$/, '').trim();
+      var q = 'According to the document, what ' + verb + ' ' + capFirst(subject) + ' do?';
+      var correct = capFirst(action);
+      if (correct.length > 5 && correct.length < 100) {
+        generated.push(buildQ(q, correct, sentences, s));
+      }
+    }
+  });
+
+  // PATTERN 2: "X is/are defined as Y" → "How is X defined?"
+  sentences.forEach(function(s) {
+    if (generated.length >= 12) return;
+    var m = s.match(/^(.{5,50}?)\s+(is|are)\s+(defined as|described as|referred to as|known as)\s+(.{10,100})/i);
+    if (m) {
+      var term = m[1].trim();
+      var defn = m[4].replace(/[.!?]+$/, '').trim();
+      var q = 'How is "' + capFirst(term) + '" defined in the document?';
+      if (defn.length > 5 && defn.length < 100) {
+        generated.push(buildQ(q, capFirst(defn), sentences, s));
+      }
+    }
+  });
+
+  // PATTERN 3: Sentences with a number/value → "What is the [number context]?"
+  sentences.forEach(function(s) {
+    if (generated.length >= 12) return;
+    var m = s.match(/(.{10,60}?)\s+(\d+[\d.,]*\s*(?:days?|hours?|minutes?|degrees?|percent|%|years?|months?|kg|°C|°F|SAR|USD|AED))\s+(.{5,60})/i);
+    if (m) {
+      var before = m[1].trim();
+      var value = m[2].trim();
+      var after = m[3].replace(/[.!?]+$/, '').trim();
+      var q = 'What is the specified ' + extractNoun(before) + ' mentioned in the document?';
+      if (value.length < 30 && q.length > 20) {
+        generated.push(buildQ(q, value, sentences, s));
+      }
+    }
+  });
+
+  // PATTERN 4: "The [noun] is/are [short answer]" → direct factual Q
+  sentences.forEach(function(s) {
+    if (generated.length >= 12) return;
+    var m = s.match(/^The\s+(\w[\w\s]{3,40}?)\s+(?:is|are)\s+([^,\.]{10,80})/i);
+    if (m) {
+      var noun = m[1].trim();
+      var answer = m[2].replace(/[.!?]+$/, '').trim();
+      var q = 'According to the document, what is the ' + noun.toLowerCase() + '?';
+      if (answer.length > 5 && answer.length < 100 && !/\bthe\b/i.test(answer.slice(0,4))) {
+        generated.push(buildQ(q, capFirst(answer), sentences, s));
+      }
+    }
+  });
+
+  // Deduplicate and limit
+  var seen = {};
+  generated = generated.filter(function(q) {
+    if (!q || seen[q.q]) return false;
+    seen[q.q] = true;
+    return true;
+  }).slice(0, 10);
+
+  if (generated.length === 0) {
+    statusEl.innerHTML = '<div class="card" style="box-shadow:var(--flat);color:var(--warning);font-size:11px;padding:12px">⚠️ Could not match question patterns in this PDF. Try adding questions manually.</div>';
+    return;
+  }
+
+  // Merge into builder
+  generated.forEach(function(q) { _builderQuestions.push(q); });
+  renderBuilderQuestions();
+
+  if (prog) prog.style.width = '100%';
+  statusEl.innerHTML = '<div class="card" style="box-shadow:var(--flat);background:rgba(0,166,61,.07);padding:12px;display:flex;align-items:center;gap:10px">' +
+    '<span style="font-size:20px">✅</span>' +
+    '<div><div style="font-size:11px;font-weight:700;color:var(--success)">' + generated.length + ' questions generated from ' + filename + '</div>' +
+    '<div style="font-size:9px;color:var(--text3);font-family:var(--mono)">Review each question and mark the correct answer before publishing</div></div>' +
+    '<button class="btns" style="margin-left:auto;width:auto;padding:6px 10px;font-size:9px" onclick="document.getElementById(\'pdf-status\').style.display=\'none\'">✕</button>' +
+  '</div>';
+}
+
+// Build a Q with 3 plausible wrong answers drawn from other sentences
+function buildQ(question, correctAns, allSentences, sourceSent) {
+  var distractors = [];
+  // Pull short noun phrases from other sentences as distractors
+  allSentences.forEach(function(s) {
+    if (distractors.length >= 3) return;
+    if (s === sourceSent) return;
+    var m = s.match(/(?:is|are|means?|equals?|requires?)\s+([A-Z]?[a-z][\w\s,]{5,60}?)(?:[.!?,]|$)/);
+    if (m) {
+      var d = m[1].trim().replace(/[.!?]+$/, '');
+      if (d !== correctAns && d.length > 3 && d.length < 80 && !distractors.includes(d)) {
+        distractors.push(capFirst(d));
+      }
+    }
+  });
+  // Pad distractors with generic fallbacks if needed
+  var fallbacks = ['Not specified in this document', 'As determined by the manager', 'Subject to local regulations', 'None of the above'];
+  var fi = 0;
+  while (distractors.length < 3 && fi < fallbacks.length) {
+    if (!distractors.includes(fallbacks[fi])) distractors.push(fallbacks[fi]);
+    fi++;
+  }
+  distractors = distractors.slice(0, 3);
+  // Insert correct answer at position 0, shuffle
+  var opts = [correctAns].concat(distractors);
+  opts = shuffleArr(opts);
+  var correct = opts.indexOf(correctAns);
+  return { text: question, opts: opts, correct: correct };
+}
+
+function capFirst(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+function extractNoun(s) {
+  var words = s.trim().split(/\s+/);
+  return words.slice(-2).join(' ').toLowerCase().replace(/[^a-z\s]/g, '') || 'value';
+}
+function shuffleArr(arr) {
+  for (var i = arr.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var tmp = arr[i]; arr[i] = arr[j]; arr[j] = tmp;
+  }
+  return arr;
 }
 
 /* ═══════════════════════════════════════════════════════
