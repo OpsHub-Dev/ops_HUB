@@ -1095,7 +1095,6 @@ function launchPortal(sap, staffData) {
       renderPayslip();
       renderHistory();
       renderLeave();
-      renderTraining();
       if (CU.role === 'captain' || CU.role === 'branch_mgr') { renderCapStaff(); renderCapTraining(); }
     });
   } else if (CU.branchId && CU.sap) {
@@ -1118,11 +1117,11 @@ function launchPortal(sap, staffData) {
             document.getElementById('hdr-name').textContent = CU.name;
             db.ref('staff/sessions/' + CU.sap).update({ name: CU.name, dept: CU.dept, salary: CU.salary, joinDate: CU.joinDate, staffId: CU.staffId });
           }
-          renderDashboard(); renderSchedule(); renderPayslip(); renderHistory(); renderLeave(); renderTraining(); renderCheckIn();
+          renderDashboard(); renderSchedule(); renderPayslip(); renderHistory(); renderLeave();
           if (CU.role === 'captain' || CU.role === 'branch_mgr') { renderCapStaff(); renderCapTraining(); startNotifListener(); }
         });
       } else {
-        renderDashboard(); renderSchedule(); renderPayslip(); renderHistory(); renderLeave(); renderTraining(); renderCheckIn();
+        renderDashboard(); renderSchedule(); renderPayslip(); renderHistory(); renderLeave();
         if (CU.role === 'captain' || CU.role === 'branch_mgr') { renderCapStaff(); renderCapTraining(); startNotifListener(); }
       }
     });
@@ -1132,8 +1131,6 @@ function launchPortal(sap, staffData) {
     renderPayslip();
     renderHistory();
     renderLeave();
-    renderTraining();
-    renderCheckIn();
     if (CU.role === 'captain' || CU.role === 'branch_mgr') { renderCapStaff(); renderCapTraining(); startNotifListener(); }
   }
 
@@ -2050,37 +2047,7 @@ function startNotifListener() {
    TRAINING — Firebase: staff/training/{sap} + staff/modules/{branchId}
    Full quiz engine with questions stored per module
 ═══════════════════════════════════════════════════════ */
-var BASE_MODULES = [
-  { id:'tm1', title:'Food Safety Level 1', cat:'Safety & Compliance', dur:45, ico:'🍽️',
-    questions:[
-      { q:'What is the food danger zone temperature range?', opts:['0°C – 5°C','5°C – 60°C','60°C – 80°C','Below 0°C'], correct:1 },
-      { q:'How long should you wash hands before food handling?', opts:['5 seconds','10 seconds','20 seconds','30 seconds'], correct:2 },
-      { q:'Which colour chopping board is used for raw meat?', opts:['Green','Blue','Red','Yellow'], correct:2 },
-      { q:'Food should not be left in the danger zone for more than:', opts:['30 minutes','2 hours','4 hours','8 hours'], correct:1 },
-    ]
-  },
-  { id:'tm2', title:'Customer Excellence', cat:'Customer Service', dur:30, ico:'⭐',
-    questions:[
-      { q:'What is the correct way to greet a guest?', opts:['Nod and smile','Eye contact, smile, verbal greeting','Wave from across the room','Wait for the guest to speak first'], correct:1 },
-      { q:'A guest complains about their food. What is your first step?', opts:['Argue','Apologise sincerely and listen','Ignore and walk away','Blame the kitchen'], correct:1 },
-      { q:'How quickly should a guest be acknowledged after being seated?', opts:['10 minutes','5 minutes','Immediately within 1–2 min','When convenient'], correct:2 },
-    ]
-  },
-  { id:'tm3', title:'Emergency Procedures', cat:'Safety & Compliance', dur:60, ico:'🚨',
-    questions:[
-      { q:'What is the first action during a fire evacuation?', opts:['Collect personal belongings','Alert others and activate alarm','Call family','Continue working'], correct:1 },
-      { q:'Where is the muster point located?', opts:['Inside the kitchen','At the car park entrance','Basement','Rooftop'], correct:1 },
-      { q:'Who should you report a fire hazard to?', opts:['A colleague','Your direct manager immediately','HR department','No one'], correct:1 },
-    ]
-  },
-  { id:'tm4', title:'POS System Training', cat:'Operations', dur:25, ico:'💻',
-    questions:[
-      { q:'What should you do if the POS freezes during an order?', opts:['Restart the entire system','Contact your captain and use manual bill','Ignore it','Ask the customer to wait indefinitely'], correct:1 },
-      { q:'Discount codes should be entered:', opts:['By any staff','Only by manager or captain','Automatically','Never'], correct:1 },
-    ]
-  },
-];
-
+var BASE_MODULES = []; // No default modules — captain publishes all training
 var _quizState = null; // { mod, questions, answers, submitted }
 
 function renderTraining() {
@@ -2099,9 +2066,9 @@ function renderTraining() {
                  (u2.staffId && (a.id === u2.staffId || a.id === String(u2.staffId)));
         });
       });
-      var allMods = BASE_MODULES.concat(filteredCap.map(function(m, i) {
+      var allMods = filteredCap.map(function(m, i) {
         return { id: 'cap_' + (m._key || i), title: m.title, cat: m.category||m.cat, dur: m.duration||m.dur, ico: '📋', questions: m.questions || [], passScore: m.score || 80, content: m.content || '' };
-      }));
+      });
       var done = 0, inProg = 0;
       allMods.forEach(function(m) { var p = progress[m.id] || {}; if (p.status === 'completed') done++; else if (p.status === 'in-progress') inProg++; });
       document.getElementById('training-kpi').innerHTML =
@@ -2141,7 +2108,7 @@ function showQuizView() {
 
 function openModule(id) {
   // Find module from base or cap list
-  var allMods = BASE_MODULES;
+  var allMods = [];
   // Also search already-rendered cap mods via the training-modules div data — simpler to just reload
   var found = allMods.find(function(m) { return m.id === id; });
   if (found) {
