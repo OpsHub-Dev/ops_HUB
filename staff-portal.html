@@ -258,6 +258,14 @@ textarea.fi{resize:vertical;min-height:80px}
 
 /* CAPTAIN */
 .sfbar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap}
+/* STAFF PICKER */
+.sp-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:10px;cursor:pointer;transition:all .12s;margin-bottom:4px;background:var(--base);box-shadow:var(--raise-sm)}
+.sp-item:hover{box-shadow:var(--raise)}
+.sp-item.picked{box-shadow:var(--inset-sm)}
+.sp-chk{width:18px;height:18px;border-radius:5px;border:2px solid var(--text3);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;transition:all .15s}
+.sp-item.picked .sp-chk{background:var(--primary);border-color:var(--primary);color:#fff}
+.sp-name{font-size:12px;font-weight:700;flex:1}
+.sp-meta{font-size:9px;color:var(--text3);font-family:var(--mono)}
 .sfb{background:var(--base);border:none;border-radius:10px;box-shadow:var(--raise-sm);padding:7px 12px;font-size:10px;font-weight:700;font-family:var(--font);cursor:pointer;color:var(--text2);transition:all .12s}
 .sfb.active{box-shadow:var(--inset-sm);color:var(--primary)}
 
@@ -578,14 +586,19 @@ textarea.fi{resize:vertical;min-height:80px}
                 </div>
                 <div class="fg"><label class="fl">Duration (mins)</label><input class="fi" type="number" id="tm-dur" placeholder="30" value="30"></div>
               </div>
-              <div class="g2">
-                <div class="fg"><label class="fl">Assign To</label>
-                  <select class="fi" id="tm-assign">
-                    <option>All Branch Staff</option><option>New Joiners Only</option>
-                    <option>FOH Only</option><option>Kitchen Only</option><option>Captains Only</option>
-                  </select>
+              <div class="fg"><label class="fl">Passing Score (%)</label><input class="fi" type="number" id="tm-score" value="80"></div>
+              <div class="fg">
+                <label class="fl">Assign To</label>
+                <div style="display:flex;gap:8px;margin-bottom:8px">
+                  <button class="sfb active" id="assign-toggle-all" onclick="setAssignMode(this,'all')">All Branch Staff</button>
+                  <button class="sfb" id="assign-toggle-sel" onclick="setAssignMode(this,'select')">Select Staff</button>
                 </div>
-                <div class="fg"><label class="fl">Passing Score (%)</label><input class="fi" type="number" id="tm-score" value="80"></div>
+                <div id="assign-all-note" style="font-size:10px;color:var(--text3);font-family:var(--mono);padding:8px 0">Module will appear for every staff member in this branch.</div>
+                <div id="assign-staff-picker" style="display:none">
+                  <div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-bottom:8px">Loading branch staff…</div>
+                  <div id="assign-staff-list" style="max-height:220px;overflow-y:auto;border-radius:12px;box-shadow:var(--inset-sm);padding:8px;background:var(--base)"></div>
+                  <div id="assign-selected-count" style="font-size:9px;color:var(--primary);font-family:var(--mono);font-weight:700;margin-top:6px;text-align:right"></div>
+                </div>
               </div>
               <div class="g2">
                 <div class="fg"><label class="fl">Deadline</label><input class="fi" type="date" id="tm-deadline"></div>
@@ -2062,7 +2075,16 @@ function renderTraining() {
     var progress = snap.val() || {};
     var branchRef = u.branchId ? db.ref('staff/modules/' + u.branchId) : null;
     function render(capMods) {
-      var allMods = BASE_MODULES.concat((capMods || []).map(function(m, i) {
+      var u2 = CU;
+      // Filter captain modules: show if assignMode='all' OR staff's sap/id is in assignedTo
+      var filteredCap = (capMods || []).filter(function(m) {
+        if (!m.assignMode || m.assignMode === 'all' || !m.assignedTo) return true;
+        return m.assignedTo.some(function(a) {
+          return (u2.sap && a.sap === u2.sap) ||
+                 (u2.staffId && (a.id === u2.staffId || a.id === String(u2.staffId)));
+        });
+      });
+      var allMods = BASE_MODULES.concat(filteredCap.map(function(m, i) {
         return { id: 'cap_' + (m._key || i), title: m.title, cat: m.category||m.cat, dur: m.duration||m.dur, ico: '📋', questions: m.questions || [], passScore: m.score || 80, content: m.content || '' };
       }));
       var done = 0, inProg = 0;
@@ -2288,10 +2310,13 @@ function drawStaffTable() {
 }
 
 /* ═══════════════════════════════════════════════════════
-   CAPTAIN: BUILD TRAINING — tabs + questions builder
+   CAPTAIN: BUILD TRAINING — tabs + questions builder + staff picker
 ═══════════════════════════════════════════════════════ */
-var _builderQuestions = []; // [{text, opts:['...'], correct:0}]
+var _builderQuestions = [];
 var _builderQCount = 0;
+var _assignMode = 'all';        // 'all' | 'select'
+var _assignedStaff = [];        // [{sap, id, name, dept, role}] when select mode
+var _pickerStaffList = [];      // loaded from Firebase
 
 function switchBuildTab(tab) {
   ['details','questions','published'].forEach(function(t) {
@@ -2299,11 +2324,74 @@ function switchBuildTab(tab) {
     document.getElementById('btt-' + t).classList.toggle('active', t === tab);
   });
   if (tab === 'published') renderCapTraining();
+  if (tab === 'questions' && _assignMode === 'select' && !_builderQuestions.length) addBuilderQuestion();
+}
+
+function setAssignMode(btn, mode) {
+  _assignMode = mode;
+  document.querySelectorAll('#assign-toggle-all,#assign-toggle-sel').forEach(function(b) { b.classList.remove('active'); });
+  btn.classList.add('active');
+  var allNote = document.getElementById('assign-all-note');
+  var picker  = document.getElementById('assign-staff-picker');
+  if (mode === 'all') {
+    allNote.style.display = ''; picker.style.display = 'none';
+    _assignedStaff = [];
+  } else {
+    allNote.style.display = 'none'; picker.style.display = '';
+    loadAssignStaffPicker();
+  }
+}
+
+function loadAssignStaffPicker() {
+  var u = CU; if (!u || !u.branchId) return;
+  if (_pickerStaffList.length) { renderStaffPicker(); return; }
+  var listEl = document.getElementById('assign-staff-list');
+  listEl.innerHTML = '<div style="text-align:center;padding:12px;color:var(--text3);font-size:10px;font-family:var(--mono)">⏳ Loading…</div>';
+  db.ref('branches/' + u.branchId + '/staff').once('value', function(snap) {
+    var raw = snap.val() || {};
+    _pickerStaffList = Object.keys(raw).map(function(k) {
+      return Object.assign({ _fbKey: k }, raw[k]);
+    }).filter(function(s) { return s.name && s.status !== 'Resigned'; })
+      .sort(function(a,b) { return (a.name||'').localeCompare(b.name||''); });
+    renderStaffPicker();
+  });
+}
+
+function renderStaffPicker() {
+  var listEl = document.getElementById('assign-staff-list');
+  if (!listEl) return;
+  if (!_pickerStaffList.length) {
+    listEl.innerHTML = '<div style="text-align:center;padding:12px;color:var(--text3);font-size:10px">No staff found</div>';
+    return;
+  }
+  listEl.innerHTML = _pickerStaffList.map(function(s) {
+    var isPicked = _assignedStaff.some(function(a) { return (a.sap && a.sap === s.sap) || (a._fbKey && a._fbKey === s._fbKey); });
+    return '<div class="sp-item' + (isPicked ? ' picked' : '') + '" onclick="toggleStaffPick(\'' + (s.sap||s._fbKey) + '\')" data-sap="' + (s.sap||'') + '" data-key="' + (s._fbKey||'') + '">' +
+      '<div class="sp-chk">' + (isPicked ? '✓' : '') + '</div>' +
+      '<div><div class="sp-name">' + (s.name||'—') + '</div><div class="sp-meta">' + (s.dept||'') + (s.role ? ' · ' + s.role : '') + (s.sap ? ' · ' + s.sap : '') + '</div></div>' +
+      '</div>';
+  }).join('');
+  updatePickerCount();
+}
+
+function toggleStaffPick(sapOrKey) {
+  var staff = _pickerStaffList.find(function(s) { return s.sap === sapOrKey || s._fbKey === sapOrKey; });
+  if (!staff) return;
+  var idx = _assignedStaff.findIndex(function(a) { return a.sap === staff.sap || a._fbKey === staff._fbKey; });
+  if (idx >= 0) _assignedStaff.splice(idx, 1);
+  else _assignedStaff.push({ sap: staff.sap||'', id: staff.id||staff._fbKey||'', name: staff.name||'', dept: staff.dept||'', role: staff.role||'' });
+  renderStaffPicker();
+}
+
+function updatePickerCount() {
+  var el = document.getElementById('assign-selected-count');
+  if (el) el.textContent = _assignedStaff.length ? _assignedStaff.length + ' staff selected' : 'None selected — tap to pick';
 }
 
 function buildTabNext() {
   var title = (document.getElementById('tm-title') || {}).value || '';
   if (!title.trim()) { showToast('Enter a module title', 'error'); document.getElementById('tm-title').focus(); return; }
+  if (_assignMode === 'select' && _assignedStaff.length === 0) { showToast('Select at least one staff member', 'error'); return; }
   switchBuildTab('questions');
   if (!_builderQuestions.length) addBuilderQuestion();
   renderBuilderQuestions();
@@ -2351,23 +2439,28 @@ function removeBuilderQ(qi) {
 }
 
 function publishModule() {
-  var title   = (document.getElementById('tm-title') || {}).value || '';
-  var content = (document.getElementById('tm-content') || {}).value || '';
+  var title = (document.getElementById('tm-title') || {}).value || '';
   title = title.trim();
   if (!title) { showToast('Fill the module title', 'error'); switchBuildTab('details'); return; }
   if (!CU || !CU.branchId) { showToast('No branch ID found', 'error'); return; }
+  if (_assignMode === 'select' && _assignedStaff.length === 0) { showToast('Select at least one staff member to assign', 'error'); switchBuildTab('details'); return; }
 
-  // Validate questions
   var validQs = _builderQuestions.filter(function(q) {
     return q.text.trim() && q.opts.filter(function(o) { return o.trim(); }).length >= 2;
   });
+
+  // assignedTo: null = all branch staff, array of {sap,id,name} = specific staff
+  var assignedTo = _assignMode === 'select' ? _assignedStaff.map(function(s) {
+    return { sap: s.sap, id: s.id, name: s.name };
+  }) : null;
 
   var record = {
     title: title,
     category: (document.getElementById('tm-cat') || {}).value || 'Operations',
     duration: parseInt((document.getElementById('tm-dur') || {}).value || 30),
-    assign: (document.getElementById('tm-assign') || {}).value || 'All Branch Staff',
-    content: content,
+    assignMode: _assignMode,
+    assignedTo: assignedTo,          // null = all, array = specific
+    content: (document.getElementById('tm-content') || {}).value || '',
     score: parseInt((document.getElementById('tm-score') || {}).value || 80),
     mandatory: (document.getElementById('tm-mandatory') || {}).value || 'yes',
     deadline: (document.getElementById('tm-deadline') || {}).value || null,
@@ -2381,11 +2474,11 @@ function publishModule() {
 
   db.ref('staff/modules/' + CU.branchId).push().set(record, function(err) {
     if (err) { showToast('Error publishing module', 'error'); return; }
-    // Send notification to branch notifications feed
+    // Push notification
     db.ref('branches/' + CU.branchId + '/notifications').push().set({
       type: 'training_published',
       staffName: CU.name,
-      message: 'New training module published: ' + title,
+      message: 'New training module published: ' + title + (_assignMode === 'select' ? ' (assigned to ' + _assignedStaff.length + ' staff)' : ' (all staff)'),
       location: CU.branch || '',
       branchId: CU.branchId,
       ts: Date.now(),
@@ -2393,13 +2486,21 @@ function publishModule() {
       time: (function(){ var n=new Date(); return String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0'); })(),
       read: false
     });
-    // Reset form
+    // Reset
     document.getElementById('tm-title').value = '';
     document.getElementById('tm-content').value = '';
-    _builderQuestions = [];
+    _builderQuestions = []; _assignedStaff = []; _assignMode = 'all'; _pickerStaffList = [];
+    var allBtn = document.getElementById('assign-toggle-all');
+    var selBtn = document.getElementById('assign-toggle-sel');
+    if (allBtn) { allBtn.classList.add('active'); }
+    if (selBtn) { selBtn.classList.remove('active'); }
+    var allNote = document.getElementById('assign-all-note');
+    var picker  = document.getElementById('assign-staff-picker');
+    if (allNote) allNote.style.display = '';
+    if (picker)  picker.style.display = 'none';
     renderBuilderQuestions();
     switchBuildTab('published');
-    showToast('Module published to branch team! 🎓', 'success');
+    showToast('Module published! 🎓', 'success');
   });
 }
 
@@ -2410,18 +2511,20 @@ function renderCapTraining() {
     snap.forEach(function(c) { mods.unshift(Object.assign({ _key: c.key }, c.val())); });
     document.getElementById('cap-modules').innerHTML = mods.length ? mods.map(function(m) {
       var qCount = (m.questions && m.questions.length) || m.questionCount || 0;
+      var assignLabel = m.assignMode === 'select' && m.assignedTo
+        ? m.assignedTo.length + ' staff'
+        : 'All Branch Staff';
       return '<div class="mcard">' +
         '<div class="mico">📋</div>' +
         '<div style="flex:1">' +
           '<div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:3px">' + (m.title||'') + '</div>' +
-          '<div style="font-size:9px;color:var(--text3);font-family:var(--mono)">' + (m.category||'') + ' · ' + (m.duration||0) + ' min · ' + (m.assign||'All') + '</div>' +
+          '<div style="font-size:9px;color:var(--text3);font-family:var(--mono)">' + (m.category||'') + ' · ' + (m.duration||0) + ' min · Assigned: ' + assignLabel + '</div>' +
           '<div style="font-size:9px;color:var(--text3);font-family:var(--mono);margin-top:2px">' + qCount + ' questions · Pass: ' + (m.score||80) + '% · ' + (m.mandatory==='yes'?'Mandatory':'Optional') + '</div>' +
         '</div>' +
         '<span class="badge bg-p">Live</span></div>';
     }).join('') : '<div style="text-align:center;padding:20px;color:var(--text3);font-size:12px;font-family:var(--mono)">No modules published yet</div>';
   });
 }
-
 /* ═══════════════════════════════════════════════════════
    LOCAL PDF → QUESTION GENERATOR  (no AI, fully offline)
    Uses PDF.js to extract text, then pattern-matches sentences
