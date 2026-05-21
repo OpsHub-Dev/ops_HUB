@@ -2080,7 +2080,12 @@ function doPortalCheckOut() {
 
 function ciSendNotification(type, time, loc) {
   var u = CU; if (!u || !u.branchId) return;
-  var msgs = { in: 'Checked in at ' + time, break: 'Break started at ' + time, out: 'Checked out at ' + time };
+  var msgs = {
+    'in':          'Checked in at ' + time,
+    'out':         'Checked out at ' + time,
+    'break-start': 'Break started at ' + time,
+    'break-end':   'Break ended at ' + time
+  };
   var record = {
     type: type,
     staffName: u.name,

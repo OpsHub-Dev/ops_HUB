@@ -7452,6 +7452,25 @@ function attachBranchListeners() {
 
   db.ref(bPath('sch')).on('value', function(snap){ BS.sch=snap.val()||{}; });
   db.ref(bPath('tsAtt')).on('value', function(snap){ BS.tsAtt=snap.val()||{}; });
+
+  // Staff Portal Check-In Notifications -> branch manager bell
+  db.ref(bPath('notifications')).on('child_added', function(snap) {
+    var n = snap.val(); if (!n) return;
+    var labels = { 'in':'Checked In', 'out':'Checked Out', 'break-start':'Break Started', 'break-end':'Break Ended', 'training_published':'Module Published' };
+    var colors = { 'in':'success', 'out':'warning', 'break-start':'info', 'break-end':'info', 'training_published':'info' };
+    var icons  = { 'in':'\u2705', 'out':'\ud83d\udeaa', 'break-start':'\u2615', 'break-end':'\u25b6', 'training_published':'\ud83d\udcda' };
+    var notif = {
+      id: snap.key, dedupId: 'ci_' + snap.key,
+      type:  colors[n.type]  || 'info',
+      icon:  icons[n.type]   || '\ud83d\udccd',
+      title: (n.staffName || 'Staff') + ' -- ' + (labels[n.type] || n.type),
+      body:  (n.time || '') + (n.location ? ' | ' + n.location : ''),
+      ts: n.ts || Date.now(), read: false, page: 'timesheet'
+    };
+    var todayStart = new Date(); todayStart.setHours(0,0,0,0);
+    if ((n.ts || 0) >= todayStart.getTime() && typeof push === 'function') push(notif);
+    if (!n.read) snap.ref.update({ read: true });
+  });
   db.ref(bPath('config')).on('value', function(snap){ BS._branchConfig=snap.val()||{}; });
   db.ref(bPath('pcBudget')).once('value', function(snap){ BS.pcBudget=snap.val()||0; });
   db.ref('admin/branchPermissions/'+NX.session.branchId).once('value', function(snap){ BS._branchPerms=snap.val()||{}; });
