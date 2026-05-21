@@ -11851,7 +11851,14 @@ function dsrUpdDenom(k,v){
 function dsrSave(){var D=_dsrD();var activeDate=_dsrActiveDate();if(db&&NX.session&&NX.session.branchId){db.ref(dsrFbPath(activeDate)).set(D,function(err){if(err)showToast('Save failed','error');else showToast('DSR saved to Firebase ✓','success');});}else{try{localStorage.setItem('dsr_nexus_'+activeDate,JSON.stringify(D));showToast('DSR saved locally ✓','success');}catch(e){showToast('Save failed','error');}}}
 function dsrClear(){
   var activeDate=_dsrActiveDate();
-  if(!confirm('Clear DSR data for '+activeDate+'?\n\nThis will reset all tabs EXCEPT Master File.\nAll Master File data (cash counts, petty cash, safe items) will be preserved.'))return;
+  openModal('<div class="modal-head"><h2>⊗ Clear DSR</h2><button class="modal-close" onclick="closeModalForce()">&#x2715;</button></div>'+
+    '<p style="margin-bottom:16px;color:var(--text-secondary);font-size:13px">Clear all DSR data for <strong>'+activeDate+'</strong>?<br><br>This resets all tabs <u>except Master File</u>. Cash counts, petty cash and safe items are preserved.</p>'+
+    '<div style="display:flex;gap:10px"><button class="btn" style="flex:1" onclick="closeModalForce()">Cancel</button>'+
+    '<button class="btn btn-danger" style="flex:1;background:#ef4444;color:#fff;border-color:#ef4444" onclick="closeModalForce();dsrClearConfirmed()">Clear DSR</button></div>');
+}
+function dsrClearConfirmed(){
+  var activeDate=_dsrActiveDate();
+  {
   var s=NX.session||{};
   var current=BS.dsrState[activeDate]||{};
   // Preserve ALL Master File data — mfCompany, all denoms (mfh_*/mfc_*), closedPetty, ongoingPetty, safeItems
@@ -11882,11 +11889,19 @@ function dsrClear(){
     });
   }
   navTo('dsr');
+  }
 }
 function dsrEndShift(){
   var activeDate=_dsrActiveDate();
+  openModal('<div class="modal-head"><h2>🌙 End Shift</h2><button class="modal-close" onclick="closeModalForce()">&#x2715;</button></div>'+
+    '<p style="margin-bottom:16px;color:var(--text-secondary);font-size:13px">End shift for <strong>'+activeDate+'</strong>?<br><br>This will save the DSR, mark shift closed, and advance to the next day. No data will be deleted.</p>'+
+    '<div style="display:flex;gap:10px"><button class="btn" style="flex:1" onclick="closeModalForce()">Cancel</button>'+
+    '<button class="btn" style="flex:1;background:#b45309;color:#fff;border-color:#b45309;font-weight:700" onclick="closeModalForce();dsrEndShiftConfirmed()">End Shift</button></div>');
+}
+function dsrEndShiftConfirmed(){
+  var activeDate=_dsrActiveDate();
   var D=BS.dsrState[activeDate]||{};
-  if(!confirm('End shift for '+activeDate+'?\n\nThis will:\n• Save current DSR to Firebase\n• Mark shift as closed\n• Advance the active date to the next day\n• Carry forward Master File data\n\nNo data will be deleted.'))return;
+  {
   // Mark shift as closed
   D.shiftClosed=true;
   D.shiftClosedAt=new Date().toISOString();
@@ -11925,6 +11940,7 @@ function dsrEndShift(){
     });
   } else {
     showToast('Firebase not connected','error');
+  }
   }
 }
 function dsrPrintFull(){var D=_dsrD();var food=parseFloat(D.food)||0,bev=parseFloat(D.bev)||0,misc=parseFloat(D.misc)||0,vat=parseFloat(D.vat)||0;var totalDisc=(D.discounts||[]).reduce(function(a,d){return a+(parseFloat(d.amount)||0);},0);var netSales=(food+bev+misc)-totalDisc;var totalSales=netSales+vat;var serverCash=(D.servers||[]).reduce(function(a,s){return a+(parseFloat(s.cashSales)||0);},0);var approvedTips=(D.servers||[]).reduce(function(a,s){return a+(s.tips||[]).filter(function(t){return t.status==='approved';}).reduce(function(b,t){return b+(parseFloat(t.amount)||0);},0);},0);var toDeposit=serverCash-approvedTips;var guests=parseInt(D.guests)||0;var checkAvg=guests>0?netSales/guests:0;var dateStr=new Date(D.date+'T00:00:00').toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'});var payRows=(D.payments||[]).map(function(p){return '<tr><td>'+bxe(p.method)+'</td><td style="text-align:right">'+(parseFloat(p.amount||0)).toFixed(2)+'</td></tr>';}).join('');var delivRows=(D.delivery||[]).map(function(d){return '<tr><td>'+bxe(d.platform||'—')+'</td><td>'+(d.orders||0)+' orders</td><td style="text-align:right">'+(parseFloat(d.amount||0)).toFixed(2)+'</td></tr>';}).join('');var discRows=(D.discounts||[]).map(function(d){return '<tr><td>'+bxe(d.type||'—')+'</td><td style="text-align:right">'+(parseFloat(d.amount||0)).toFixed(2)+'</td></tr>';}).join('');var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>DSR - '+(D.restName||'')+'</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;padding:20px;color:#111;font-size:11px}@page{size:A4;margin:8mm}@media print{button{display:none!important}}h2{font-size:18px;font-weight:800;color:#1a2340}table{width:100%;border-collapse:collapse;margin-bottom:10px}th{background:#1a2340;color:#fff;padding:6px 8px;text-align:left;font-size:9px;text-transform:uppercase}td{padding:6px 8px;border-bottom:1px solid #eee}.amt{text-align:right;font-family:monospace;font-weight:600}.sig-row{display:grid;grid-template-columns:repeat(3,1fr);gap:30px;margin-top:24px}.sig-box{border-top:1px solid #333;padding-top:4px;text-align:center;font-size:9px;color:#666}</style></head><body>';html+='<div style="display:flex;justify-content:space-between;border-bottom:3px solid #1a2340;padding-bottom:10px;margin-bottom:16px"><div><img src="https://i.imgur.com/jeqtcE2.png" alt="ALFA.CO" style="height:44px;width:auto;display:block"><div style="font-size:11px;color:#888">'+bxe(D.restName||'')+'</div></div><div style="text-align:right"><div style="font-size:16px;font-weight:800;color:#1a2340">DAILY SALES REPORT</div><div style="font-size:10px;color:#666">'+dateStr+'</div></div></div>';html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:14px"><table><thead><tr><th colspan="2">Sales Summary</th></tr></thead><tbody><tr><td>Food + Bev + MISC</td><td class="amt">'+(food+bev+misc).toFixed(2)+'</td></tr><tr><td>(-) Discounts</td><td class="amt">('+totalDisc.toFixed(2)+')</td></tr><tr style="font-weight:700;background:#f5f5f5"><td>= Net Sales</td><td class="amt">'+netSales.toFixed(2)+'</td></tr><tr><td>+ System VAT</td><td class="amt">'+vat.toFixed(2)+'</td></tr><tr style="font-weight:700;background:#e8f0fe"><td>= Total Sales</td><td class="amt">'+totalSales.toFixed(2)+'</td></tr></tbody></table>';html+='<table><thead><tr><th colspan="2">Cash Reconciliation</th></tr></thead><tbody><tr><td>Guest Count</td><td class="amt">'+guests+'</td></tr><tr><td>Check Average</td><td class="amt">'+checkAvg.toFixed(2)+'</td></tr><tr><td>Server Cash Total</td><td class="amt">'+serverCash.toFixed(2)+'</td></tr><tr><td>(-) Credit Tips Paid</td><td class="amt">('+approvedTips.toFixed(2)+')</td></tr><tr style="font-weight:700;background:#e8f5e9"><td>Amount to Deposit</td><td class="amt">'+toDeposit.toFixed(2)+'</td></tr></tbody></table></div>';html+='<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:14px"><table><thead><tr><th colspan="2">Payment Methods</th></tr></thead><tbody>'+(payRows||'<tr><td colspan="2">None</td></tr>')+'</tbody></table><table><thead><tr><th colspan="3">Delivery</th></tr></thead><tbody>'+(delivRows||'<tr><td colspan="3">None</td></tr>')+'</tbody></table><table><thead><tr><th colspan="2">Discounts</th></tr></thead><tbody>'+(discRows||'<tr><td colspan="2">None</td></tr>')+'</tbody></table></div>';html+='<div class="sig-row"><div class="sig-box">Manager</div><div class="sig-box">Cashier / Supervisor</div><div class="sig-box">Date & Stamp</div></div>';html+='<div style="text-align:center;margin-top:16px"><button onclick="window.print()" style="background:#1a2340;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:13px;font-weight:700;cursor:pointer">Print / Save PDF</button></div></body></html>';var w=window.open('','_blank','width=900,height=700');if(w){w.document.write(html);w.document.close();}else showToast('Allow pop-ups to print','error');}
