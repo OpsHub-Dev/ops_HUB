@@ -753,19 +753,7 @@ input, textarea, select { font-family: var(--font); }
 
 <!-- LOADING -->
 <div id="loading">
-  <div class="ld-logo" style="width:auto;height:auto;background:none;box-shadow:none;padding:0">
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 90" width="220" height="62" role="img" aria-label="ALFA.CO">
-      <!-- ALFA.CO text -->
-      <text x="0" y="62" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="58" fill="#1a5c37" letter-spacing="-1">ALFA</text>
-      <text x="178" y="62" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="58" fill="#1a5c37" letter-spacing="-1">.CO</text>
-      <!-- Dot swirl mark -->
-      <circle cx="168" cy="18" r="7" fill="#e63b2e"/>
-      <circle cx="183" cy="10" r="5" fill="#f7941d"/>
-      <!-- Leaf arcs -->
-      <path d="M155 50 Q170 10 195 28 Q175 40 155 50Z" fill="#7ab648" opacity=".9"/>
-      <path d="M155 50 Q185 55 195 28 Q172 50 155 50Z" fill="#f7941d" opacity=".85"/>
-    </svg>
-  </div>
+  <div class="ld-logo" style="width:auto;height:auto;background:none;box-shadow:none;padding:0"><img src="https://i.imgur.com/jeqtcE2.png" alt="ALFA.CO" style="height:52px;width:auto"></div>
   <div class="ld-sub" style="font-size:11px;letter-spacing:.5px;text-transform:uppercase;font-weight:700">Operations Platform</div>
   <div class="spinner"></div>
 </div>
@@ -773,16 +761,7 @@ input, textarea, select { font-family: var(--font); }
 <!-- BRANCH SCREEN -->
 <div id="branch-screen" class="gone">
   <div class="bs-card">
-    <div class="bs-logo" style="background:none;box-shadow:none;width:auto;height:auto;padding:0;margin-bottom:8px">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 90" width="170" height="48" role="img" aria-label="ALFA.CO">
-        <text x="0" y="62" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="58" fill="#1a5c37" letter-spacing="-1">ALFA</text>
-        <text x="178" y="62" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="58" fill="#1a5c37" letter-spacing="-1">.CO</text>
-        <circle cx="168" cy="18" r="7" fill="#e63b2e"/>
-        <circle cx="183" cy="10" r="5" fill="#f7941d"/>
-        <path d="M155 50 Q170 10 195 28 Q175 40 155 50Z" fill="#7ab648" opacity=".9"/>
-        <path d="M155 50 Q185 55 195 28 Q172 50 155 50Z" fill="#f7941d" opacity=".85"/>
-      </svg>
-    </div>
+    <div class="bs-logo" style="background:none;box-shadow:none;width:auto;height:auto;padding:0;margin-bottom:8px"><img src="https://i.imgur.com/jeqtcE2.png" alt="ALFA.CO" style="height:44px;width:auto"></div>
     <div class="bs-title">Operations Checklists</div>
     <div class="bs-sub">ALFA.CO · Select your branch</div>
     <div id="branch-list-step">
@@ -844,16 +823,7 @@ input, textarea, select { font-family: var(--font); }
     <!-- AUTH OVERLAY -->
     <div id="cl-auth-overlay">
       <div class="auth-card">
-        <div class="auth-icon" style="font-size:initial;margin-bottom:16px">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 90" width="190" height="54" role="img" aria-label="ALFA.CO">
-            <text x="0" y="62" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="58" fill="#1a5c37" letter-spacing="-1">ALFA</text>
-            <text x="178" y="62" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="58" fill="#1a5c37" letter-spacing="-1">.CO</text>
-            <circle cx="168" cy="18" r="7" fill="#e63b2e"/>
-            <circle cx="183" cy="10" r="5" fill="#f7941d"/>
-            <path d="M155 50 Q170 10 195 28 Q175 40 155 50Z" fill="#7ab648" opacity=".9"/>
-            <path d="M155 50 Q185 55 195 28 Q172 50 155 50Z" fill="#f7941d" opacity=".85"/>
-          </svg>
-        </div>
+        <div class="auth-icon" style="font-size:initial;margin-bottom:16px"><img src="https://i.imgur.com/jeqtcE2.png" alt="ALFA.CO" style="height:56px;width:auto"></div>
         <div class="auth-title">Welcome to OpsHub</div>
         <div class="auth-sub">Select your role to continue</div>
         <div class="role-grid">
@@ -2095,7 +2065,7 @@ function buildTempForm(title,range,units,branch,today){
     rows+='<td><input class="fi" type="text" placeholder="Notes"></td>';
     rows+='<td><input class="fi" type="text" placeholder="Sign"></td></tr>';
   });
-  var alfaLogo='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 90" width="100" height="28"><text x="0" y="62" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="58" fill="#1a5c37" letter-spacing="-1">ALFA</text><text x="178" y="62" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="58" fill="#1a5c37" letter-spacing="-1">.CO</text><circle cx="168" cy="18" r="7" fill="#e63b2e"/><circle cx="183" cy="10" r="5" fill="#f7941d"/><path d="M155 50 Q170 10 195 28 Q175 40 155 50Z" fill="#7ab648" opacity=".9"/><path d="M155 50 Q185 55 195 28 Q172 50 155 50Z" fill="#f7941d" opacity=".85"/></svg>';
+  var alfaLogo='<div style="line-height:1;margin-bottom:6px"><img src=\"https://i.imgur.com/jeqtcE2.png\" alt=\"ALFA.CO\" style=\"height:44px;width:auto\"></div>';
   return _formStyle()
     +'<div class="hdr"><div>'+alfaLogo+'<h1 style="margin-top:4px">'+title+'</h1><div class="sub">Acceptable Range: '+range+' &nbsp;|&nbsp; Branch: '+branch+' &nbsp;|&nbsp; Date: '+today+'</div></div>'
     +'<div style="font-size:10px;color:#64748b;text-align:right">ALFA.CO Operations<br>HACCP Control Form</div></div>'
@@ -2124,7 +2094,7 @@ function buildCoolingForm(branch,today){
       +'<td><input class="fi" type="text" placeholder="Sign"></td>'
       +'</tr>';
   }
-  var alfaLogo='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 90" width="100" height="28"><text x="0" y="62" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="58" fill="#1a5c37" letter-spacing="-1">ALFA</text><text x="178" y="62" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="58" fill="#1a5c37" letter-spacing="-1">.CO</text><circle cx="168" cy="18" r="7" fill="#e63b2e"/><circle cx="183" cy="10" r="5" fill="#f7941d"/><path d="M155 50 Q170 10 195 28 Q175 40 155 50Z" fill="#7ab648" opacity=".9"/><path d="M155 50 Q185 55 195 28 Q172 50 155 50Z" fill="#f7941d" opacity=".85"/></svg>';
+  var alfaLogo='<div style="line-height:1;margin-bottom:6px"><img src=\"https://i.imgur.com/jeqtcE2.png\" alt=\"ALFA.CO\" style=\"height:44px;width:auto\"></div>';
   return _formStyle()
     +'<div class="hdr"><div>'+alfaLogo+'<h1 style="margin-top:4px">COOLING LOG</h1><div class="sub">Food must cool from 60°C → 21°C within 2 hrs, then 21°C → 5°C within 4 hrs &nbsp;|&nbsp; Branch: '+branch+' &nbsp;|&nbsp; Date: '+today+'</div></div>'
     +'<div style="font-size:10px;color:#64748b;text-align:right">ALFA.CO Operations<br>HACCP Control Form</div></div>'
@@ -2149,7 +2119,7 @@ function buildWasteForm(branch,today){
       +'<td><input class="fi" type="text" placeholder="Sign"></td>'
       +'</tr>';
   }
-  var alfaLogo='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 90" width="100" height="28"><text x="0" y="62" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="58" fill="#1a5c37" letter-spacing="-1">ALFA</text><text x="178" y="62" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="58" fill="#1a5c37" letter-spacing="-1">.CO</text><circle cx="168" cy="18" r="7" fill="#e63b2e"/><circle cx="183" cy="10" r="5" fill="#f7941d"/><path d="M155 50 Q170 10 195 28 Q175 40 155 50Z" fill="#7ab648" opacity=".9"/><path d="M155 50 Q185 55 195 28 Q172 50 155 50Z" fill="#f7941d" opacity=".85"/></svg>';
+  var alfaLogo='<div style="line-height:1;margin-bottom:6px"><img src=\"https://i.imgur.com/jeqtcE2.png\" alt=\"ALFA.CO\" style=\"height:44px;width:auto\"></div>';
   return _formStyle()
     +'<div class="hdr"><div>'+alfaLogo+'<h1 style="margin-top:4px">DAILY WASTE CONTROL LOG</h1><div class="sub">Branch: '+branch+' &nbsp;|&nbsp; Date: '+today+'</div></div>'
     +'<div style="font-size:10px;color:#64748b;text-align:right">ALFA.CO Operations<br>Waste Control Form</div></div>'
@@ -2180,7 +2150,7 @@ function buildReceivingForm(branch,today){
       +'<td><input class="fi" type="text" placeholder="Sign"></td>'
       +'</tr>';
   }
-  var alfaLogo='<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 90" width="100" height="28"><text x="0" y="62" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="58" fill="#1a5c37" letter-spacing="-1">ALFA</text><text x="178" y="62" font-family="Arial Black,Arial,sans-serif" font-weight="900" font-size="58" fill="#1a5c37" letter-spacing="-1">.CO</text><circle cx="168" cy="18" r="7" fill="#e63b2e"/><circle cx="183" cy="10" r="5" fill="#f7941d"/><path d="M155 50 Q170 10 195 28 Q175 40 155 50Z" fill="#7ab648" opacity=".9"/><path d="M155 50 Q185 55 195 28 Q172 50 155 50Z" fill="#f7941d" opacity=".85"/></svg>';
+  var alfaLogo='<div style="line-height:1;margin-bottom:6px"><img src=\"https://i.imgur.com/jeqtcE2.png\" alt=\"ALFA.CO\" style=\"height:44px;width:auto\"></div>';
   return _formStyle()
     +'<div class="hdr"><div>'+alfaLogo+'<h1 style="margin-top:4px">RECEIVING / GOODS IN LOG</h1><div class="sub">Branch: '+branch+' &nbsp;|&nbsp; Date: '+today+' &nbsp;|&nbsp; All items must be checked before storage</div></div>'
     +'<div style="font-size:10px;color:#64748b;text-align:right">ALFA.CO Operations<br>Receiving Control Form</div></div>'
