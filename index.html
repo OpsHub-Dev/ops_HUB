@@ -11362,14 +11362,16 @@ function pDSR(){
   if(!isToday)datePicker+='<span style="font-size:11px;font-weight:700;color:#b45309;padding:2px 10px;background:rgba(245,158,11,.12);border-radius:20px">Viewing: '+today+'</span>';
   datePicker+='<button onclick="dsrChangeDate(\''+TODAY_BS+'\')" style="padding:5px 12px;border-radius:7px;border:1px solid var(--border);background:var(--surface-2);color:var(--text-secondary);font-size:11px;cursor:pointer;font-family:var(--font)">Today</button>';
   datePicker+='</div>';
-  var tabBar='<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:18px;border-bottom:1px solid var(--border);padding-bottom:12px">';
+  var tabBar='<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:10px">';
+  tabBar+='<button onclick="dsrSave()" style="padding:6px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);color:var(--text-secondary);font-size:11px;cursor:pointer">💾 Save</button>';
+  tabBar+='<button onclick="dsrEndShift()" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(245,158,11,.5);background:rgba(245,158,11,.1);color:#b45309;font-size:11px;font-weight:700;cursor:pointer">🌙 End Shift</button>';
+  tabBar+='<button onclick="dsrClear()" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(239,68,68,.4);background:rgba(239,68,68,.06);color:var(--danger);font-size:11px;font-weight:600;cursor:pointer">⊗ Clear</button>';
+  tabBar+='</div>';
+  tabBar+='<div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:18px;border-bottom:1px solid var(--border);padding-bottom:12px">';
   tabs.forEach(function(t){
     var act=D.tab===t[0];
     tabBar+='<button onclick="dsrNav(\''+t[0]+'\')" style="padding:6px 14px;border-radius:8px;border:1px solid '+(act?'var(--accent)':'var(--border)')+';background:'+(act?'var(--accent)':'transparent')+';color:'+(act?'#000':'var(--text-secondary)')+';font-size:11px;font-weight:'+(act?'700':'500')+';cursor:pointer;font-family:var(--font)">'+t[1]+'</button>';
   });
-  tabBar+='<button onclick="dsrSave()" style="margin-left:auto;padding:6px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);color:var(--text-secondary);font-size:11px;cursor:pointer">💾 Save</button>';
-  tabBar+='<button onclick="dsrEndShift()" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(245,158,11,.4);background:rgba(245,158,11,.08);color:#b45309;font-size:11px;font-weight:700;cursor:pointer">🌙 End Shift</button>';
-  tabBar+='<button onclick="dsrClear()" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(248,113,113,.3);background:transparent;color:var(--danger);font-size:11px;cursor:pointer">⊗ Clear</button>';
   tabBar+='</div>';
 
   var body='';
