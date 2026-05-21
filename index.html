@@ -2683,6 +2683,507 @@ body { font-size: 13px !important; color: var(--text-primary) !important; }
 
 </style>
 
+
+<style>
+/* ╔══════════════════════════════════════════════════════════════════════╗
+   ║  ALFA.CO — COLOURFUL DASHBOARD ENHANCEMENT                          ║
+   ║  Built on: Neumorphism Skill + Icon Design Skill                    ║
+   ║  Philosophy: Colour lives in accents, icons, KPI bands & gradients  ║
+   ║  Surface stays #E7E5E4 (neumorphic) — colour pops from within       ║
+   ╚══════════════════════════════════════════════════════════════════════╝ */
+
+:root {
+  /* ── Extended colour palette ── */
+  --c-teal:     #006666;
+  --c-teal-lt:  #00A3A3;
+  --c-teal-pale:#E0F5F5;
+  --c-amber:    #D97706;
+  --c-amber-lt: #F59E0B;
+  --c-amber-pale:#FEF3C7;
+  --c-violet:   #5B21B6;
+  --c-violet-lt:#7C3AED;
+  --c-violet-pale:#EDE9FE;
+  --c-emerald:  #065F46;
+  --c-emerald-lt:#059669;
+  --c-emerald-pale:#D1FAE5;
+  --c-rose:     #9F1239;
+  --c-rose-lt:  #E11D48;
+  --c-rose-pale:#FFE4E6;
+  --c-sky:      #0369A1;
+  --c-sky-lt:   #0EA5E9;
+  --c-sky-pale: #E0F2FE;
+  --c-orange:   #C2410C;
+  --c-orange-lt:#EA580C;
+  --c-orange-pale:#FFEDD5;
+  --c-indigo:   #3730A3;
+  --c-indigo-lt:#4F46E5;
+  --c-indigo-pale:#E0E7FF;
+
+  /* ── KPI colour map (used as CSS custom props per card) ── */
+  --kpi-1: var(--c-teal);
+  --kpi-2: var(--c-amber);
+  --kpi-3: var(--c-violet);
+  --kpi-4: var(--c-emerald);
+  --kpi-5: var(--c-rose);
+  --kpi-6: var(--c-sky);
+  --kpi-7: var(--c-orange);
+  --kpi-8: var(--c-indigo);
+}
+
+/* ══════════════════════════════════════════════════════════
+   KPI CARDS — Colourful left-border accent system
+   Each nth-child gets a distinct brand colour
+   ══════════════════════════════════════════════════════════ */
+.kpi-card {
+  position: relative !important;
+  overflow: hidden !important;
+  border-left: 4px solid transparent !important;
+  transition: all 0.25s cubic-bezier(.4,0,.2,1) !important;
+}
+/* Remove old ::before circle */
+.kpi-card::before { display: none !important; }
+
+/* Colour band top-edge glow + left accent per position */
+.kpi-card:nth-child(1)  { border-left-color: var(--c-teal) !important; }
+.kpi-card:nth-child(2)  { border-left-color: var(--c-amber) !important; }
+.kpi-card:nth-child(3)  { border-left-color: var(--c-violet) !important; }
+.kpi-card:nth-child(4)  { border-left-color: var(--c-emerald) !important; }
+.kpi-card:nth-child(5)  { border-left-color: var(--c-rose) !important; }
+.kpi-card:nth-child(6)  { border-left-color: var(--c-sky) !important; }
+.kpi-card:nth-child(7)  { border-left-color: var(--c-orange) !important; }
+.kpi-card:nth-child(8)  { border-left-color: var(--c-indigo) !important; }
+.kpi-card:nth-child(9)  { border-left-color: var(--c-teal) !important; }
+.kpi-card:nth-child(10) { border-left-color: var(--c-amber) !important; }
+
+/* Subtle tinted top gradient per card */
+.kpi-card:nth-child(1)::after  { background: linear-gradient(135deg, var(--c-teal-pale) 0%, transparent 60%); }
+.kpi-card:nth-child(2)::after  { background: linear-gradient(135deg, var(--c-amber-pale) 0%, transparent 60%); }
+.kpi-card:nth-child(3)::after  { background: linear-gradient(135deg, var(--c-violet-pale) 0%, transparent 60%); }
+.kpi-card:nth-child(4)::after  { background: linear-gradient(135deg, var(--c-emerald-pale) 0%, transparent 60%); }
+.kpi-card:nth-child(5)::after  { background: linear-gradient(135deg, var(--c-rose-pale) 0%, transparent 60%); }
+.kpi-card:nth-child(6)::after  { background: linear-gradient(135deg, var(--c-sky-pale) 0%, transparent 60%); }
+.kpi-card:nth-child(7)::after  { background: linear-gradient(135deg, var(--c-orange-pale) 0%, transparent 60%); }
+.kpi-card:nth-child(8)::after  { background: linear-gradient(135deg, var(--c-indigo-pale) 0%, transparent 60%); }
+.kpi-card:nth-child(9)::after  { background: linear-gradient(135deg, var(--c-teal-pale) 0%, transparent 60%); }
+.kpi-card:nth-child(10)::after { background: linear-gradient(135deg, var(--c-amber-pale) 0%, transparent 60%); }
+
+.kpi-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.55;
+  z-index: 0;
+}
+.kpi-card > * { position: relative; z-index: 1; }
+
+/* Icon colours per position */
+.kpi-card:nth-child(1) .kpi-icon  { color: var(--c-teal) !important; }
+.kpi-card:nth-child(2) .kpi-icon  { color: var(--c-amber) !important; }
+.kpi-card:nth-child(3) .kpi-icon  { color: var(--c-violet) !important; }
+.kpi-card:nth-child(4) .kpi-icon  { color: var(--c-emerald) !important; }
+.kpi-card:nth-child(5) .kpi-icon  { color: var(--c-rose) !important; }
+.kpi-card:nth-child(6) .kpi-icon  { color: var(--c-sky) !important; }
+.kpi-card:nth-child(7) .kpi-icon  { color: var(--c-orange) !important; }
+.kpi-card:nth-child(8) .kpi-icon  { color: var(--c-indigo) !important; }
+
+/* KPI value colour matches accent */
+.kpi-card:nth-child(1) .kpi-value  { color: var(--c-teal) !important; }
+.kpi-card:nth-child(2) .kpi-value  { color: var(--c-amber) !important; }
+.kpi-card:nth-child(3) .kpi-value  { color: var(--c-violet) !important; }
+.kpi-card:nth-child(4) .kpi-value  { color: var(--c-emerald) !important; }
+.kpi-card:nth-child(5) .kpi-value  { color: var(--c-rose) !important; }
+.kpi-card:nth-child(6) .kpi-value  { color: var(--c-sky) !important; }
+.kpi-card:nth-child(7) .kpi-value  { color: var(--c-orange) !important; }
+.kpi-card:nth-child(8) .kpi-value  { color: var(--c-indigo) !important; }
+
+/* KPI icon background matches accent pale */
+.kpi-card:nth-child(1) .kpi-icon  { background: var(--c-teal-pale) !important; box-shadow: inset 2px 2px 5px rgba(0,102,102,.18), inset -2px -2px 5px rgba(255,255,255,.85) !important; }
+.kpi-card:nth-child(2) .kpi-icon  { background: var(--c-amber-pale) !important; box-shadow: inset 2px 2px 5px rgba(217,119,6,.15), inset -2px -2px 5px rgba(255,255,255,.85) !important; }
+.kpi-card:nth-child(3) .kpi-icon  { background: var(--c-violet-pale) !important; box-shadow: inset 2px 2px 5px rgba(91,33,182,.15), inset -2px -2px 5px rgba(255,255,255,.85) !important; }
+.kpi-card:nth-child(4) .kpi-icon  { background: var(--c-emerald-pale) !important; box-shadow: inset 2px 2px 5px rgba(6,95,70,.15), inset -2px -2px 5px rgba(255,255,255,.85) !important; }
+.kpi-card:nth-child(5) .kpi-icon  { background: var(--c-rose-pale) !important; box-shadow: inset 2px 2px 5px rgba(159,18,57,.15), inset -2px -2px 5px rgba(255,255,255,.85) !important; }
+.kpi-card:nth-child(6) .kpi-icon  { background: var(--c-sky-pale) !important; box-shadow: inset 2px 2px 5px rgba(3,105,161,.15), inset -2px -2px 5px rgba(255,255,255,.85) !important; }
+.kpi-card:nth-child(7) .kpi-icon  { background: var(--c-orange-pale) !important; box-shadow: inset 2px 2px 5px rgba(194,65,12,.15), inset -2px -2px 5px rgba(255,255,255,.85) !important; }
+.kpi-card:nth-child(8) .kpi-icon  { background: var(--c-indigo-pale) !important; box-shadow: inset 2px 2px 5px rgba(55,48,163,.15), inset -2px -2px 5px rgba(255,255,255,.85) !important; }
+
+/* ══════════════════════════════════════════════════════════
+   HRF KPI CARDS — same colour system
+   ══════════════════════════════════════════════════════════ */
+.hrf-kpi-card { position: relative !important; overflow: hidden !important; }
+.hrf-kpi-card::before { display: none !important; }
+.hrf-kpi-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.45;
+  z-index: 0;
+}
+.hrf-kpi-card > * { position: relative; z-index: 1; }
+.hrf-kpi-card:nth-child(1)::after { background: linear-gradient(135deg, var(--c-violet-pale) 0%, transparent 60%); }
+.hrf-kpi-card:nth-child(2)::after { background: linear-gradient(135deg, var(--c-teal-pale) 0%, transparent 60%); }
+.hrf-kpi-card:nth-child(3)::after { background: linear-gradient(135deg, var(--c-amber-pale) 0%, transparent 60%); }
+.hrf-kpi-card:nth-child(4)::after { background: linear-gradient(135deg, var(--c-emerald-pale) 0%, transparent 60%); }
+.hrf-kpi-card:nth-child(5)::after { background: linear-gradient(135deg, var(--c-sky-pale) 0%, transparent 60%); }
+.hrf-kpi-card:nth-child(6)::after { background: linear-gradient(135deg, var(--c-rose-pale) 0%, transparent 60%); }
+.hrf-kpi-card { border-left: 4px solid transparent !important; }
+.hrf-kpi-card:nth-child(1) { border-left-color: var(--c-violet) !important; }
+.hrf-kpi-card:nth-child(2) { border-left-color: var(--c-teal) !important; }
+.hrf-kpi-card:nth-child(3) { border-left-color: var(--c-amber) !important; }
+.hrf-kpi-card:nth-child(4) { border-left-color: var(--c-emerald) !important; }
+.hrf-kpi-card:nth-child(5) { border-left-color: var(--c-sky) !important; }
+.hrf-kpi-card:nth-child(6) { border-left-color: var(--c-rose) !important; }
+
+/* ══════════════════════════════════════════════════════════
+   STAT CARDS (.bsc) — Colourful band
+   ══════════════════════════════════════════════════════════ */
+.bsc {
+  position: relative !important;
+  overflow: hidden !important;
+  border-top: 3px solid transparent !important;
+  transition: all 0.2s !important;
+}
+.bsc::before { display: none !important; }
+.bsc:nth-child(1) { border-top-color: var(--c-teal) !important; }
+.bsc:nth-child(2) { border-top-color: var(--c-amber) !important; }
+.bsc:nth-child(3) { border-top-color: var(--c-violet) !important; }
+.bsc:nth-child(4) { border-top-color: var(--c-emerald) !important; }
+.bsc:nth-child(5) { border-top-color: var(--c-rose) !important; }
+.bsc:nth-child(6) { border-top-color: var(--c-sky) !important; }
+.bsc:nth-child(1) .bsc-val { color: var(--c-teal) !important; }
+.bsc:nth-child(2) .bsc-val { color: var(--c-amber) !important; }
+.bsc:nth-child(3) .bsc-val { color: var(--c-violet) !important; }
+.bsc:nth-child(4) .bsc-val { color: var(--c-emerald) !important; }
+.bsc:nth-child(5) .bsc-val { color: var(--c-rose) !important; }
+.bsc:nth-child(6) .bsc-val { color: var(--c-sky) !important; }
+
+/* ══════════════════════════════════════════════════════════
+   PAGE HEADER — Colourful gradient underline
+   ══════════════════════════════════════════════════════════ */
+.page-header {
+  border-bottom: none !important;
+  padding-bottom: 16px !important;
+  position: relative !important;
+}
+.page-header::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0;
+  width: 60px; height: 3px;
+  background: linear-gradient(90deg, var(--c-teal), var(--c-teal-lt), var(--c-sky-lt));
+  border-radius: 2px;
+  box-shadow: 0 1px 6px rgba(0,166,163,.35);
+}
+.page-header h1 {
+  background: linear-gradient(135deg, var(--text-primary) 0%, var(--c-teal) 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+}
+
+/* ══════════════════════════════════════════════════════════
+   TOPBAR — colourful brand accent on logo
+   ══════════════════════════════════════════════════════════ */
+.topbar {
+  background: linear-gradient(to right, #E7E5E4 0%, #EAE8E6 100%) !important;
+  border-bottom: none !important;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.09), 0 1px 0 rgba(255,255,255,.9) !important;
+}
+.topbar::before {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--c-teal), var(--c-teal-lt), var(--c-sky-lt), var(--c-violet-lt));
+  opacity: 0.7;
+}
+.topbar { position: relative !important; }
+
+/* ══════════════════════════════════════════════════════════
+   SIDEBAR — Elegant coloured role section
+   ══════════════════════════════════════════════════════════ */
+.sb-head {
+  background: linear-gradient(160deg, rgba(0,102,102,.07) 0%, transparent 100%) !important;
+  border-bottom: 1px solid rgba(0,0,0,0.05) !important;
+  box-shadow: 0 1px 0 rgba(255,255,255,.8) !important;
+}
+.sb-logo-mark {
+  font-size: 22px !important;
+}
+.sb-logo-mark span { color: var(--c-teal) !important; }
+
+/* Active nav item — tinted pill */
+.nav-item.active {
+  background: linear-gradient(135deg, var(--c-teal-pale), rgba(0,163,163,.08)) !important;
+  box-shadow: inset 2px 2px 6px rgba(0,102,102,.12), inset -2px -2px 5px rgba(255,255,255,.8) !important;
+  color: var(--c-teal) !important;
+  border-left: 3px solid var(--c-teal) !important;
+  padding-left: 11px !important;
+}
+.nav-item.hr-active {
+  background: linear-gradient(135deg, var(--c-violet-pale), rgba(91,33,182,.06)) !important;
+  box-shadow: inset 2px 2px 6px rgba(91,33,182,.10), inset -2px -2px 5px rgba(255,255,255,.8) !important;
+  color: var(--c-violet) !important;
+  border-left: 3px solid var(--c-violet) !important;
+  padding-left: 11px !important;
+}
+.nav-item.fin-active {
+  background: linear-gradient(135deg, var(--c-emerald-pale), rgba(6,95,70,.06)) !important;
+  box-shadow: inset 2px 2px 6px rgba(6,95,70,.10), inset -2px -2px 5px rgba(255,255,255,.8) !important;
+  color: var(--c-emerald) !important;
+  border-left: 3px solid var(--c-emerald) !important;
+  padding-left: 11px !important;
+}
+
+/* Role badge colour by role */
+.role-badge { border-radius: 8px !important; }
+
+/* ══════════════════════════════════════════════════════════
+   CHART CARDS — Accent header strip
+   ══════════════════════════════════════════════════════════ */
+.chart-card {
+  border-top: 3px solid var(--c-teal) !important;
+  border-radius: 18px !important;
+}
+.chart-card:nth-child(2) { border-top-color: var(--c-violet) !important; }
+.chart-card:nth-child(3) { border-top-color: var(--c-amber) !important; }
+.chart-card .chart-title { color: var(--c-teal) !important; }
+
+/* HRF chart card */
+.hrf-chart-card {
+  border-top: 3px solid var(--c-violet) !important;
+}
+
+/* ══════════════════════════════════════════════════════════
+   CARD BASE — Warmer shadow, coloured hover ring
+   ══════════════════════════════════════════════════════════ */
+.card {
+  border-top: 3px solid transparent !important;
+  transition: all 0.25s cubic-bezier(.4,0,.2,1) !important;
+}
+.card:hover {
+  border-top-color: var(--c-teal) !important;
+  box-shadow:
+    8px 8px 22px rgba(0,0,0,0.13),
+    -4px -4px 14px rgba(255,255,255,.92),
+    0 0 0 1px rgba(0,102,102,.08) !important;
+}
+
+/* ══════════════════════════════════════════════════════════
+   TABS — Colourful active indicator
+   ══════════════════════════════════════════════════════════ */
+.tab-btn.active {
+  color: var(--c-teal) !important;
+  border-bottom-color: var(--c-teal) !important;
+  font-weight: 700 !important;
+}
+.tab-btn:hover { color: var(--c-teal-lt) !important; }
+
+.hrf-tab-btn.active { box-shadow: 3px 3px 8px rgba(0,0,0,.10), -2px -2px 6px rgba(255,255,255,.85) !important; }
+.hrf-tab-btn.hr-tab.active  { color: var(--c-violet) !important; }
+.hrf-tab-btn.fin-tab.active { color: var(--c-emerald) !important; }
+
+/* ══════════════════════════════════════════════════════════
+   STATUS BADGES — Richer colours with glow
+   ══════════════════════════════════════════════════════════ */
+.badge-green {
+  background: var(--c-emerald-pale) !important;
+  color: var(--c-emerald) !important;
+  border: 1px solid rgba(6,95,70,.18) !important;
+  box-shadow: 0 1px 4px rgba(6,95,70,.12) !important;
+}
+.badge-amber {
+  background: var(--c-amber-pale) !important;
+  color: var(--c-amber) !important;
+  border: 1px solid rgba(217,119,6,.18) !important;
+  box-shadow: 0 1px 4px rgba(217,119,6,.12) !important;
+}
+.badge-red {
+  background: var(--c-rose-pale) !important;
+  color: var(--c-rose) !important;
+  border: 1px solid rgba(159,18,57,.18) !important;
+  box-shadow: 0 1px 4px rgba(159,18,57,.12) !important;
+}
+.badge-blue {
+  background: var(--c-sky-pale) !important;
+  color: var(--c-sky) !important;
+  border: 1px solid rgba(3,105,161,.18) !important;
+  box-shadow: 0 1px 4px rgba(3,105,161,.12) !important;
+}
+.badge-purple {
+  background: var(--c-violet-pale) !important;
+  color: var(--c-violet) !important;
+  border: 1px solid rgba(91,33,182,.18) !important;
+  box-shadow: 0 1px 4px rgba(91,33,182,.12) !important;
+}
+
+/* ══════════════════════════════════════════════════════════
+   PROGRESS BARS — Colourful fills
+   ══════════════════════════════════════════════════════════ */
+.progress-fill {
+  background: linear-gradient(90deg, var(--c-teal), var(--c-teal-lt)) !important;
+  box-shadow: 0 1px 4px rgba(0,102,102,.3) !important;
+}
+
+/* ══════════════════════════════════════════════════════════
+   BUTTONS — Enhanced colour
+   ══════════════════════════════════════════════════════════ */
+.btn-primary, button.btn-primary, [class*="btn"][class*="primary"] {
+  background: linear-gradient(135deg, var(--c-teal) 0%, var(--c-teal-lt) 100%) !important;
+  color: #fff !important;
+  box-shadow: 3px 3px 10px rgba(0,102,102,.35), -1px -1px 4px rgba(255,255,255,.5) !important;
+  border: none !important;
+  border-radius: 12px !important;
+}
+.btn-primary:hover {
+  background: linear-gradient(135deg, var(--c-teal-lt) 0%, var(--c-teal) 100%) !important;
+  box-shadow: 5px 5px 15px rgba(0,102,102,.45), -2px -2px 6px rgba(255,255,255,.6) !important;
+  transform: translateY(-1px) !important;
+}
+.login-btn {
+  background: linear-gradient(135deg, var(--c-teal) 0%, var(--c-teal-lt) 100%) !important;
+  box-shadow: 4px 4px 14px rgba(0,102,102,.4), -2px -2px 6px rgba(255,255,255,.5) !important;
+}
+
+/* ══════════════════════════════════════════════════════════
+   DELTA / TREND — Vivid colours
+   ══════════════════════════════════════════════════════════ */
+.delta-pos, .trend-up { color: var(--c-emerald-lt) !important; font-weight: 700 !important; }
+.delta-neg, .trend-down { color: var(--c-rose-lt) !important; font-weight: 700 !important; }
+
+/* ══════════════════════════════════════════════════════════
+   TOAST — Coloured left border + icon tint
+   ══════════════════════════════════════════════════════════ */
+.toast-success { border-left: 4px solid var(--c-emerald-lt) !important; }
+.toast-error   { border-left: 4px solid var(--c-rose-lt) !important; }
+.toast-info    { border-left: 4px solid var(--c-sky-lt) !important; }
+.toast.success { border-left: 4px solid var(--c-emerald-lt) !important; }
+.toast.error   { border-left: 4px solid var(--c-rose-lt) !important; }
+.toast.warning { border-left: 4px solid var(--c-amber-lt) !important; }
+.toast.info    { border-left: 4px solid var(--c-sky-lt) !important; }
+
+/* ══════════════════════════════════════════════════════════
+   HRF TIMELINE DOTS — Colour coded
+   ══════════════════════════════════════════════════════════ */
+.hrf-timeline-dot {
+  border: 2px solid var(--c-violet) !important;
+  background: var(--c-violet-pale) !important;
+  color: var(--c-violet) !important;
+}
+
+/* ══════════════════════════════════════════════════════════
+   BRAND CARDS (.bc-icon) — Vivid icon backgrounds
+   ══════════════════════════════════════════════════════════ */
+.bc-icon {
+  background: linear-gradient(135deg, var(--c-teal-pale), var(--c-sky-pale)) !important;
+  box-shadow: inset 2px 2px 5px rgba(0,102,102,.15), inset -2px -2px 5px rgba(255,255,255,.85) !important;
+}
+
+/* ══════════════════════════════════════════════════════════
+   DATA TABLE — Alternating row tint for readability
+   ══════════════════════════════════════════════════════════ */
+.data-table tbody tr:nth-child(even) td {
+  background: rgba(0,102,102,.025) !important;
+}
+.data-table tbody tr:hover td {
+  background: var(--c-teal-pale) !important;
+  color: var(--c-teal) !important;
+}
+
+/* ══════════════════════════════════════════════════════════
+   ALERT DOTS — Vivid semantic colours
+   ══════════════════════════════════════════════════════════ */
+.alert-dot { box-shadow: 0 0 0 3px rgba(currentColor,.2) !important; }
+
+/* ══════════════════════════════════════════════════════════
+   ICON SVG COLOURS — Enforce currentColor from icon skill
+   ══════════════════════════════════════════════════════════ */
+.kpi-icon svg, .kpi-icon .ni-icon { stroke: currentColor !important; fill: none !important; }
+.nav-item .ni-icon { transition: color .15s !important; }
+.nav-item:hover .ni-icon { color: var(--c-teal) !important; }
+.nav-item.active .ni-icon { color: var(--c-teal) !important; }
+
+/* ══════════════════════════════════════════════════════════
+   SPECIAL: Finance Director module — Amber theme
+   ══════════════════════════════════════════════════════════ */
+[data-module="finance"] .kpi-card:nth-child(1) { border-left-color: var(--c-amber) !important; }
+[data-module="finance"] .kpi-card:nth-child(1) .kpi-value { color: var(--c-amber) !important; }
+[data-module="finance"] .chart-card { border-top-color: var(--c-amber) !important; }
+
+/* ══════════════════════════════════════════════════════════
+   SPECIAL: CEO / Area Manager dashboard header hero
+   ══════════════════════════════════════════════════════════ */
+.ceo-hero, .dashboard-hero {
+  background: linear-gradient(135deg, var(--c-teal) 0%, var(--c-teal-lt) 50%, var(--c-sky-lt) 100%) !important;
+  color: #fff !important;
+  border-radius: 20px !important;
+  box-shadow: 6px 6px 20px rgba(0,102,102,.35), -3px -3px 10px rgba(255,255,255,.5) !important;
+}
+
+/* ══════════════════════════════════════════════════════════
+   SPARKLINE bars — Colour from brand
+   ══════════════════════════════════════════════════════════ */
+.spark-bar { background: var(--c-teal) !important; opacity: 0.5; }
+.spark-bar:last-child { opacity: 1 !important; }
+
+/* ══════════════════════════════════════════════════════════
+   CONNECTION STATUS — Vivid glows
+   ══════════════════════════════════════════════════════════ */
+.conn-dot {
+  background: var(--c-emerald-lt) !important;
+  box-shadow: 0 0 0 3px rgba(5,150,105,.2), 0 0 8px rgba(5,150,105,.4) !important;
+}
+.conn-dot.offline {
+  background: var(--c-rose-lt) !important;
+  box-shadow: 0 0 0 3px rgba(225,29,72,.2), 0 0 8px rgba(225,29,72,.4) !important;
+}
+
+/* ══════════════════════════════════════════════════════════
+   MODAL HEADER — Accent gradient strip
+   ══════════════════════════════════════════════════════════ */
+.modal-head, .modal-head h2 { color: var(--c-teal) !important; }
+.modal-box { border-top: 3px solid var(--c-teal) !important; }
+
+/* ══════════════════════════════════════════════════════════
+   SECTION LABEL / NAV LABEL — Teal tint
+   ══════════════════════════════════════════════════════════ */
+.nav-section-label {
+  color: var(--c-teal) !important;
+  opacity: 0.7;
+  font-size: 9px !important;
+  letter-spacing: 0.18em !important;
+}
+
+/* ══════════════════════════════════════════════════════════
+   CHECKLIST / TABLE WRAP — Subtle tinted container
+   ══════════════════════════════════════════════════════════ */
+.table-wrap {
+  border: none !important;
+  box-shadow: 6px 6px 16px rgba(0,0,0,.10), -4px -4px 12px rgba(255,255,255,.88) !important;
+  border-radius: 18px !important;
+  overflow: hidden !important;
+}
+
+/* ══════════════════════════════════════════════════════════
+   COLOURFUL SCROLLBAR THUMB
+   ══════════════════════════════════════════════════════════ */
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, rgba(0,102,102,.25), rgba(0,163,163,.15)) !important;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, rgba(0,102,102,.4), rgba(0,163,163,.25)) !important;
+}
+
+/* ══════════════════════════════════════════════════════════
+   NOTIF PANEL — Colour coded notification icons
+   ══════════════════════════════════════════════════════════ */
+.notif-ni {
+  background: var(--c-teal-pale) !important;
+  color: var(--c-teal) !important;
+}
+
+</style>
 </head>
 <body>
 <!-- ═══════════════════════════════════════════════
