@@ -4326,23 +4326,33 @@ function destroyChart(id) {
 }
 
 function chartDefaults() {
+  // Read actual CSS variables so charts work on both light and dark themes
+  var cs = getComputedStyle(document.documentElement);
+  var isDark = (cs.getPropertyValue('--body-bg').trim() || '').indexOf('0,0') !== -1 || document.documentElement.classList.contains('dark');
+  var tickCol = isDark ? 'rgba(255,255,255,.45)' : 'rgba(8,12,28,.50)';
+  var gridCol = isDark ? 'rgba(255,255,255,.06)' : 'rgba(8,12,28,.06)';
+  var legendCol = isDark ? 'rgba(255,255,255,.65)' : 'rgba(8,12,28,.75)';
+  var tooltipBg = isDark ? 'rgba(10,12,20,.95)' : 'rgba(255,255,255,.97)';
+  var tooltipBorder = isDark ? 'rgba(255,255,255,.15)' : 'rgba(8,12,28,.12)';
+  var tooltipTitle = isDark ? 'rgba(255,255,255,.9)' : 'rgba(8,12,28,.9)';
+  var tooltipBody = isDark ? 'rgba(255,255,255,.6)' : 'rgba(8,12,28,.65)';
   return {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
       legend: {
         labels: {
-          color: 'rgba(255,255,255,.55)',
+          color: legendCol,
           font: { family:'DM Sans', size:12 },
           boxWidth: 10, boxHeight:10, borderRadius:3
         }
       },
       tooltip: {
-        backgroundColor: 'rgba(10,12,20,.95)',
-        borderColor: 'rgba(255,255,255,.15)',
+        backgroundColor: tooltipBg,
+        borderColor: tooltipBorder,
         borderWidth: 1,
-        titleColor: 'rgba(255,255,255,.9)',
-        bodyColor: 'rgba(255,255,255,.6)',
+        titleColor: tooltipTitle,
+        bodyColor: tooltipBody,
         padding: 12,
         titleFont: { family:'Syne', size:13, weight:'700' },
         bodyFont: { family:'DM Sans', size:12 }
@@ -4350,12 +4360,12 @@ function chartDefaults() {
     },
     scales: {
       x: {
-        grid: { color:'rgba(255,255,255,.04)' },
-        ticks: { color:'rgba(255,255,255,.35)', font:{ family:'DM Sans', size:11 } }
+        grid: { color: gridCol },
+        ticks: { color: tickCol, font:{ family:'DM Sans', size:11 } }
       },
       y: {
-        grid: { color:'rgba(255,255,255,.04)' },
-        ticks: { color:'rgba(255,255,255,.35)', font:{ family:'DM Sans', size:11 } }
+        grid: { color: gridCol },
+        ticks: { color: tickCol, font:{ family:'DM Sans', size:11 } }
       }
     }
   };
