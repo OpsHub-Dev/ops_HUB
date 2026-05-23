@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>OpsHub — ALFA.CO Operations</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <style>
@@ -24,9 +24,9 @@
   --text3:    #667085;
   --text4:    #98A2B3;
 
-  --primary:  #006666;
-  --primary2: #008080;
-  --primary3: #E6F2F2;
+  --primary:  #4F46E5;
+  --primary2: #4338CA;
+  --primary3: #EEF2FF;
 
   /* STATUS COLORS */
   --done:     #12B76A;
@@ -52,7 +52,7 @@
   --neutral-bg:  #F2F4F7;
   --neutral-txt: #344054;
 
-  --font: 'Inter', -apple-system, sans-serif;
+  --font: 'Plus Jakarta Sans', system-ui, sans-serif;
   --mono: 'JetBrains Mono', monospace;
 
   --radius:   12px;
@@ -83,7 +83,7 @@ input, textarea, select { font-family: var(--font); }
   width: 64px; height: 64px; border-radius: 18px;
   background: linear-gradient(135deg, var(--primary), var(--primary2));
   display: flex; align-items: center; justify-content: center;
-  font-size: 28px; box-shadow: 0 8px 24px rgba(0,102,102,.3);
+  font-size: 28px; box-shadow: 0 8px 24px rgba(79,70,229,.3);
 }
 .ld-title { font-size: 22px; font-weight: 800; color: var(--text); }
 .ld-sub   { font-size: 13px; color: var(--text3); }
@@ -107,7 +107,7 @@ input, textarea, select { font-family: var(--font); }
   width: 56px; height: 56px; border-radius: 16px;
   background: linear-gradient(135deg, var(--primary), var(--primary2));
   display: flex; align-items: center; justify-content: center;
-  font-size: 24px; margin: 0 auto 16px; box-shadow: 0 8px 20px rgba(0,102,102,.25);
+  font-size: 24px; margin: 0 auto 16px; box-shadow: 0 8px 20px rgba(79,70,229,.25);
 }
 .bs-title { font-size: 22px; font-weight: 800; color: var(--text); text-align: center; }
 .bs-sub   { font-size: 13px; color: var(--text3); text-align: center; margin: 4px 0 24px; }
@@ -138,9 +138,9 @@ input, textarea, select { font-family: var(--font); }
   width: 100%; padding: 15px; border-radius: var(--radius);
   background: var(--primary); color: #fff; border: none;
   font-size: 15px; font-weight: 700; cursor: pointer; transition: all .15s;
-  box-shadow: 0 4px 12px rgba(0,102,102,.3);
+  box-shadow: 0 4px 12px rgba(79,70,229,.3);
 }
-.pin-submit:hover { background: var(--primary2); box-shadow: 0 6px 16px rgba(0,102,102,.4); }
+.pin-submit:hover { background: var(--primary2); box-shadow: 0 6px 16px rgba(79,70,229,.4); }
 
 /* ══ APP SHELL ══ */
 #app { display: none; flex-direction: column; height: 100dvh; min-height: 100vh; overflow: hidden; }
@@ -595,7 +595,7 @@ input, textarea, select { font-family: var(--font); }
   width: 100%; padding: 16px; border-radius: var(--radius);
   background: var(--primary); color: #fff; border: none;
   font-size: 15px; font-weight: 800; cursor: pointer; transition: all .15s;
-  box-shadow: 0 4px 12px rgba(0,102,102,.3);
+  box-shadow: 0 4px 12px rgba(79,70,229,.3);
 }
 .auth-submit:hover:not(:disabled) { background: var(--primary2); }
 .auth-submit:disabled { opacity: .4; cursor: not-allowed; box-shadow: none; }
@@ -646,8 +646,8 @@ input, textarea, select { font-family: var(--font); }
   padding: 10px 18px; border-radius: 10px; border: none;
   font-size: 13px; font-weight: 700; cursor: pointer; transition: all .15s;
 }
-.btn-primary { background: var(--primary); color: #fff; box-shadow: 0 2px 8px rgba(0,102,102,.25); }
-.btn-primary:hover { background: var(--primary2); box-shadow: 0 4px 12px rgba(0,102,102,.35); }
+.btn-primary { background: var(--primary); color: #fff; box-shadow: 0 2px 8px rgba(79,70,229,.25); }
+.btn-primary:hover { background: var(--primary2); box-shadow: 0 4px 12px rgba(79,70,229,.35); }
 .btn-secondary { background: var(--surface); color: var(--text2); border: 1.5px solid var(--border); }
 .btn-secondary:hover { background: var(--surface2); border-color: var(--border2); }
 .btn-danger { background: var(--pend-bg); color: var(--pend-txt); border: 1.5px solid var(--pend-bd); }
@@ -2007,7 +2007,7 @@ function openFormOverlay(html){
   bar.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:#1a2340;color:#fff;flex-shrink:0';
   bar.innerHTML='<span style="font-weight:700;font-size:14px">📋 ALFA.CO Control Form</span>'
     +'<div style="display:flex;gap:10px">'
-    +'<button onclick="document.getElementById(\'form-iframe\').contentWindow.print()" style="background:#006666;color:#fff;border:none;border-radius:8px;padding:8px 18px;font-weight:700;font-size:13px;cursor:pointer">🖨 Print / Save PDF</button>'
+    +'<button onclick="document.getElementById(\'form-iframe\').contentWindow.print()" style="background:#4F46E5;color:#fff;border:none;border-radius:8px;padding:8px 18px;font-weight:700;font-size:13px;cursor:pointer">🖨 Print / Save PDF</button>'
     +'<button onclick="document.getElementById(\'form-overlay\').remove()" style="background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-weight:700;font-size:13px;cursor:pointer">✕ Close</button>'
     +'</div>';
   ov.appendChild(bar);
