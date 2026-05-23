@@ -1500,42 +1500,73 @@ function noSchMsg(msg) {
 
 function renderSchTable(sch, sb, dept) {
   var days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  var dayFull = { Sun:'Sunday', Mon:'Monday', Tue:'Tuesday', Wed:'Wednesday', Thu:'Thursday', Fri:'Friday', Sat:'Saturday' };
 
   // Figure out today's day name to highlight it
-  var todayIdx = new Date().getDay();
+  var now = new Date();
+  var todayIdx = now.getDay();
   var todayName = days[todayIdx];
 
-  sb.innerHTML = days.map(function(d) {
+  // Get the actual calendar date for each day this week
+  // Sunday = start of week (getDay() === 0)
+  function getWeekDate(dayName) {
+    var dayIdx = days.indexOf(dayName);
+    var diff = dayIdx - todayIdx;
+    var d = new Date(now);
+    d.setDate(now.getDate() + diff);
+    return d;
+  }
+
+  // Shift bar legend
+  var legend = '<div style="display:flex;align-items:center;gap:6px;padding:8px 14px 4px;font-size:10px;color:var(--text3);font-family:var(--mono)">' +
+    '<div style="width:40px;height:4px;border-radius:2px;background:var(--primary);opacity:.5"></div>' +
+    '<span>Bar = shift start time (left = morning, right = evening)</span>' +
+    '</div>';
+
+  sb.innerHTML = legend + days.map(function(d) {
     var raw = (sch[d] || '').toString().trim();
     var isToday = d === todayName;
+    var dayDate = getWeekDate(d);
+    var dayNum = dayDate.getDate();
+    var dayMonthShort = dayDate.toLocaleDateString('en-GB', {day:'2-digit', month:'short'});
 
     // Detect OFF / Day Off / empty
     var upper = raw.toUpperCase();
     var off = !raw || upper === 'OFF' || upper === 'DAY OFF' || upper === 'DAYOFF' || upper === 'REST';
 
-    // Progress bar width — estimate from shift label
-    // e.g. "8 AM" → morning shift ~40%, "5 PM" → afternoon ~75%, "2 PM" ~60%
-    var barPct = 65;
+    // Shift bar: represents start time position across the work window (6 AM–midnight = 18hrs)
+    // e.g. "8 AM" starts at 8:00 → position = (8-6)/18 = 11%, width ~40% typical shift
+    var barLeft = 10; // default
+    var barWidth = 55; // default width
     if (!off && raw) {
       var hour = parseInt(raw);
       if (!isNaN(hour)) {
-        if (raw.toUpperCase().includes('AM')) barPct = Math.max(20, Math.min(50, (hour / 12) * 50));
-        else if (raw.toUpperCase().includes('PM')) barPct = Math.max(55, Math.min(95, 50 + (hour / 12) * 45));
+        if (raw.toUpperCase().includes('AM')) {
+          barLeft = Math.max(0, Math.min(45, ((hour - 6) / 18) * 100));
+          barWidth = 40;
+        } else if (raw.toUpperCase().includes('PM')) {
+          var h24 = hour === 12 ? 12 : hour + 12;
+          barLeft = Math.max(0, Math.min(65, ((h24 - 6) / 18) * 100));
+          barWidth = 35;
+        }
       }
     }
 
     return '<div class="srow" style="' + (isToday ? 'box-shadow:var(--raise);border-left:3px solid var(--primary)' : '') + '">' +
-      '<div style="width:36px;flex-shrink:0">' +
-        '<div style="font-size:10px;font-weight:700;color:' + (isToday ? 'var(--primary)' : 'var(--text2)') + ';font-family:var(--mono)">' + d + '</div>' +
-        (isToday ? '<div style="font-size:7px;color:var(--primary);font-family:var(--mono);letter-spacing:.06em">TODAY</div>' : '') +
+      '<div style="width:48px;flex-shrink:0">' +
+        '<div style="font-size:11px;font-weight:700;color:' + (isToday ? 'var(--primary)' : 'var(--text2)') + ';font-family:var(--mono)">' + d + '</div>' +
+        '<div style="font-size:10px;color:' + (isToday ? 'var(--primary)' : 'var(--text3)') + ';font-family:var(--mono);margin-top:1px">' + dayMonthShort + '</div>' +
+        (isToday ? '<div style="font-size:7px;color:var(--primary);font-family:var(--mono);letter-spacing:.06em;margin-top:1px">TODAY</div>' : '') +
       '</div>' +
       '<div style="flex:1">' +
         '<div style="font-size:13px;font-weight:700;color:' + (off ? 'var(--text3)' : isToday ? 'var(--primary)' : 'var(--text)') + '">' +
           (off ? '🌙 Day Off' : raw) +
         '</div>' +
         '<div style="font-size:10px;color:var(--text3);margin-top:1px">' + (off ? 'Rest Day' : (dept || 'Operations') + ' Shift') + '</div>' +
-        (off ? '' : '<div class="sbar" style="margin-top:6px"><div class="sbar-f" style="width:' + barPct + '%"></div></div>') +
+        (off ? '' :
+          '<div style="position:relative;height:5px;border-radius:3px;background:rgba(0,102,102,.1);margin-top:7px;overflow:hidden">' +
+            '<div style="position:absolute;top:0;left:' + barLeft + '%;width:' + barWidth + '%;height:100%;border-radius:3px;background:var(--primary);opacity:' + (isToday ? '1' : '0.55') + '"></div>' +
+          '</div>'
+        ) +
       '</div>' +
       (off ? '<span class="badge bg-a">OFF</span>' : '<span class="badge bg-g" style="' + (isToday ? '' : 'opacity:.6') + '">SHIFT</span>') +
     '</div>';
@@ -2086,6 +2117,8 @@ function ciSendNotification(type, time, loc) {
     'break-start': 'Break started at ' + time,
     'break-end':   'Break ended at ' + time
   };
+  // Extract lat/lng from location string e.g. "Branch · 24.6877, 46.7219"
+  var coordM = (loc || '').match(/([\-\d\.]+),\s*([\-\d\.]+)/);
   var record = {
     type: type,
     staffName: u.name,
@@ -2093,6 +2126,9 @@ function ciSendNotification(type, time, loc) {
     staffId: _ciAttKey || u.sap || '',
     message: msgs[type] || type,
     location: loc,
+    lat: coordM ? parseFloat(coordM[1]) : null,
+    lng: coordM ? parseFloat(coordM[2]) : null,
+    mapsUrl: coordM ? 'https://www.google.com/maps?q=' + coordM[1] + ',' + coordM[2] : null,
     branchId: u.branchId,
     branch: u.branch || '',
     ts: Date.now(),

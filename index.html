@@ -1066,7 +1066,7 @@ body{
   color:var(--text-secondary);cursor:pointer;transition:all .15s;
 }
 .date-pill:hover{border-color:var(--border-strong);color:var(--text-primary)}
-.date-pill.active{background:var(--text-primary);color:var(--body-bg);border-color:var(--text-primary)}
+.date-pill.active{background:var(--text-primary);color:#fff;border-color:var(--text-primary)}
 
 /* ── Login User Manager ── */
 .lum-key{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.11);color:#fff;border-radius:9px;padding:12px 0;font-size:17px;font-weight:600;cursor:pointer;transition:background .12s;width:100%}
@@ -4142,12 +4142,26 @@ function renderNotifItem(n) {
   } else {
     ago = n.time || '';
   }
+  // Exact timestamp
+  var exactTs = '';
+  if (n.ts) {
+    var tsD = new Date(n.ts);
+    exactTs = tsD.toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'}) + ' · ' + tsD.toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'numeric'});
+  }
+  // Google Maps link from location string containing lat,lng
+  var mapsBtn = '';
+  if (n.mapsLink) {
+    mapsBtn = ' <a href="' + n.mapsLink + '" target="_blank" onclick="event.stopPropagation()" style="display:inline-flex;align-items:center;gap:3px;color:#0EA5E9;font-size:10px;font-weight:700;text-decoration:none;background:rgba(14,165,233,.12);padding:2px 7px;border-radius:10px;margin-left:4px">📍 View Map</a>';
+  } else if (n.msg && n.msg.match && n.msg.match(/([\-\d\.]+),\s*([\-\d\.]+)/)) {
+    var cm = n.msg.match(/([\-\d\.]+),\s*([\-\d\.]+)/);
+    mapsBtn = ' <a href="https://www.google.com/maps?q=' + cm[1] + ',' + cm[2] + '" target="_blank" onclick="event.stopPropagation()" style="display:inline-flex;align-items:center;gap:3px;color:#0EA5E9;font-size:10px;font-weight:700;text-decoration:none;background:rgba(14,165,233,.12);padding:2px 7px;border-radius:10px;margin-left:4px">📍 View Map</a>';
+  }
   return '<div class="notif-item ' + (n.read ? '' : 'unread') + '" onclick="notifClick(' + n.id + ')" style="cursor:pointer">' +
     '<div class="notif-ni" style="background:' + bg + ';color:' + col + '">' + (n.icon || '🔔') + '</div>' +
     '<div class="notif-body">' +
       '<div class="notif-title">' + xe(n.title) + '</div>' +
-      '<div class="notif-msg">' + xe(n.msg) + '</div>' +
-      '<div class="notif-time">' + xe(n.branch || '') + (n.branch ? ' · ' : '') + ago + '</div>' +
+      '<div class="notif-msg" style="display:flex;align-items:center;gap:2px;flex-wrap:wrap">' + (n.msg ? xe(n.msg) : '') + mapsBtn + '</div>' +
+      '<div class="notif-time">' + (exactTs || ago) + (n.branch ? ' · ' + xe(n.branch) : '') + '</div>' +
     '</div>' +
   '</div>';
 }
@@ -4326,23 +4340,33 @@ function destroyChart(id) {
 }
 
 function chartDefaults() {
+  // Read actual CSS variables so charts work on both light and dark themes
+  var cs = getComputedStyle(document.documentElement);
+  var isDark = (cs.getPropertyValue('--body-bg').trim() || '').indexOf('0,0') !== -1 || document.documentElement.classList.contains('dark');
+  var tickCol = isDark ? 'rgba(255,255,255,.45)' : 'rgba(8,12,28,.50)';
+  var gridCol = isDark ? 'rgba(255,255,255,.06)' : 'rgba(8,12,28,.06)';
+  var legendCol = isDark ? 'rgba(255,255,255,.65)' : 'rgba(8,12,28,.75)';
+  var tooltipBg = isDark ? 'rgba(10,12,20,.95)' : 'rgba(255,255,255,.97)';
+  var tooltipBorder = isDark ? 'rgba(255,255,255,.15)' : 'rgba(8,12,28,.12)';
+  var tooltipTitle = isDark ? 'rgba(255,255,255,.9)' : 'rgba(8,12,28,.9)';
+  var tooltipBody = isDark ? 'rgba(255,255,255,.6)' : 'rgba(8,12,28,.65)';
   return {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
       legend: {
         labels: {
-          color: 'rgba(255,255,255,.55)',
+          color: legendCol,
           font: { family:'DM Sans', size:12 },
           boxWidth: 10, boxHeight:10, borderRadius:3
         }
       },
       tooltip: {
-        backgroundColor: 'rgba(10,12,20,.95)',
-        borderColor: 'rgba(255,255,255,.15)',
+        backgroundColor: tooltipBg,
+        borderColor: tooltipBorder,
         borderWidth: 1,
-        titleColor: 'rgba(255,255,255,.9)',
-        bodyColor: 'rgba(255,255,255,.6)',
+        titleColor: tooltipTitle,
+        bodyColor: tooltipBody,
         padding: 12,
         titleFont: { family:'Syne', size:13, weight:'700' },
         bodyFont: { family:'DM Sans', size:12 }
@@ -4350,12 +4374,12 @@ function chartDefaults() {
     },
     scales: {
       x: {
-        grid: { color:'rgba(255,255,255,.04)' },
-        ticks: { color:'rgba(255,255,255,.35)', font:{ family:'DM Sans', size:11 } }
+        grid: { color: gridCol },
+        ticks: { color: tickCol, font:{ family:'DM Sans', size:11 } }
       },
       y: {
-        grid: { color:'rgba(255,255,255,.04)' },
-        ticks: { color:'rgba(255,255,255,.35)', font:{ family:'DM Sans', size:11 } }
+        grid: { color: gridCol },
+        ticks: { color: tickCol, font:{ family:'DM Sans', size:11 } }
       }
     }
   };
@@ -7960,11 +7984,28 @@ function attachBranchListeners() {
     var labels = { 'in':'Checked In', 'out':'Checked Out', 'break-start':'Break Started', 'break-end':'Break Ended', 'training_published':'Module Published' };
     var colors = { 'in':'success', 'out':'warning', 'break-start':'info', 'break-end':'info', 'training_published':'info' };
     var icons  = { 'in':'\u2705', 'out':'\ud83d\udeaa', 'break-start':'\u2615', 'break-end':'\u25b6', 'training_published':'\ud83d\udcda' };
+    // Build Maps link — use stored mapsUrl if available, else parse from location string
+    var mapsLink = n.mapsUrl || '';
+    var locStr = n.location || '';
+    if (!mapsLink) {
+      var coordMatch = locStr.match(/([\-\d\.]+),\s*([\-\d\.]+)/);
+      if (coordMatch) mapsLink = 'https://www.google.com/maps?q=' + coordMatch[1] + ',' + coordMatch[2];
+    }
+    // Format exact time from ts
+    var exactTime = '';
+    if (n.ts) {
+      var d = new Date(n.ts);
+      exactTime = d.toLocaleTimeString('en-GB', {hour:'2-digit',minute:'2-digit'});
+    } else if (n.time) {
+      exactTime = n.time;
+    }
     var notif = {
       id: snap.key, dedupId: 'ci_' + snap.key,
       type:  colors[n.type]  || 'info',
       icon:  icons[n.type]   || '\ud83d\udccd',
-      title: (n.staffName || 'Staff') + ' -- ' + (labels[n.type] || n.type),
+      title: (n.staffName || 'Staff') + ' — ' + (labels[n.type] || n.type),
+      msg:   exactTime + (locStr ? '  📍 ' + locStr : ''),
+      mapsLink: mapsLink,
       body:  (n.time || '') + (n.location ? ' | ' + n.location : ''),
       ts: n.ts || Date.now(), read: false, page: 'timesheet'
     };
@@ -8098,7 +8139,7 @@ function renderPage_(pageId) {
     '.bfg label{display:block;font-size:11px;color:var(--text-secondary);margin-bottom:5px}',
     '.bttb{padding:12px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-bottom:1px solid var(--border);background:var(--surface-2)}',
     '.bfbt{padding:5px 12px;border-radius:20px;border:1px solid var(--border);background:none;color:var(--text-secondary);font-size:12px;cursor:pointer;transition:all .15s}',
-    '.bfbt.on,.bfbt:hover{background:var(--text-primary);color:var(--body-bg);border-color:var(--text-primary)}',
+    '.bfbt.on,.bfbt:hover{background:var(--text-primary);color:#fff;border-color:var(--text-primary)}',
     '.bwnav{display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap}',
     '.bswrap{overflow-x:auto;border:1px solid var(--border);border-radius:10px}',
     '.bstbl{width:100%;border-collapse:collapse;font-size:12px;min-width:700px}',
@@ -11156,23 +11197,52 @@ function pSales() {
   h+='</div></div>';
   h+='</div>';
 
-  // ── Entries table ──
+  // -- Delivery KPI row --
+  var totDel=0;
+  BS.sales.forEach(function(e){if(e.date&&e.date.indexOf(tm)===0){totDel+=(+e.delivery||0);}});
+  var totDinein=tA-totDel;
+  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">';
+  h+='<div class="card" style="border-left:3px solid #f97316"><div class="bsc-lbl">DELIVERY MTD</div><div class="bsc-val" style="font-size:22px;font-weight:300;color:#f97316">'+bfsar(totDel)+'</div><div class="bsc-sub">'+(tA>0?(totDel/tA*100).toFixed(1)+'% of total sales':'No sales yet')+'</div></div>';
+  h+='<div class="card" style="border-left:3px solid var(--ceo)"><div class="bsc-lbl">DINE-IN MTD</div><div class="bsc-val" style="font-size:22px;font-weight:300;color:var(--ceo)">'+bfsar(totDinein)+'</div><div class="bsc-sub">'+(tA>0?(totDinein/tA*100).toFixed(1)+'% of total sales':'No sales yet')+'</div></div>';
+  h+='</div>';
+
+  // -- Entries table --
   var rows=BS.sales.slice().sort(function(a,b){return(b.date||'').localeCompare(a.date||'');}).map(function(e){
     var df=(+e.actual||0)-(+e.target||0);var dfc=df>=0?'#00875a':'#c0392b';var p=e.target>0?((+e.actual||0)/(+e.target||0)*100).toFixed(1)+'%':'\u2014';
+    var del=+e.delivery||0;var delTxt=del>0?'<span style="color:#f97316;font-family:var(--mono)">'+bfsar(del)+'</span>':'<span style="color:var(--text-tertiary)">\u2014</span>';
     return '<tr><td class="bmono" style="color:var(--text-tertiary);font-size:11px">'+bfdate(e.date)+'</td>'
       +'<td class="bmono" style="font-weight:700;color:var(--ceo)">'+bfsar(e.actual)+'</td>'
       +'<td class="bmono" style="color:var(--text-secondary)">'+bfsar(e.target)+'</td>'
+      +'<td>'+delTxt+'</td>'
       +'<td class="bmono"><span style="color:'+dfc+' !important;font-weight:700">'+(df>=0?'+':'')+bfsar(df)+'</span></td>'
       +'<td class="bmono"><span style="color:'+dfc+' !important;font-weight:700">'+bxe(p)+'</span></td>'
       +'<td><div style="display:flex;gap:4px"><button class="btn btn-sm" onclick="openBranchSalesModal(\''+bxe(e.id)+'\')">Edit</button><button class="btn btn-sm" style="color:var(--danger)" onclick="delBranchSales(\''+bxe(e.id)+'\')">Del</button></div></td></tr>';
   }).join('');
   h+='<div style="font-size:11px;font-weight:700;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.08em;font-family:var(--mono);margin-bottom:6px">All Entries</div>';
-  h+='<div class="btw"><div class="btw-s"><table class="btbl"><thead><tr><th>Date</th><th>Actual</th><th>Target</th><th>Variance</th><th>Achievement</th><th></th></tr></thead>';
-  h+='<tbody>'+(rows||'<tr><td colspan="6" style="text-align:center;color:var(--text-tertiary);padding:24px">No entries yet</td></tr>')+'</tbody></table></div></div>';
+  h+='<div class="btw"><div class="btw-s"><table class="btbl"><thead><tr><th>Date</th><th>Actual</th><th>Target</th><th style="color:#f97316">Delivery</th><th>Variance</th><th>Achievement</th><th></th></tr></thead>';
+  h+='<tbody>'+(rows||'<tr><td colspan="7" style="text-align:center;color:var(--text-tertiary);padding:24px">No entries yet</td></tr>')+'</tbody></table></div></div>';
   return h;
 }
 
-function openBranchSalesModal(id){var e=id?BS.sales.find(function(x){return x.id===id;}):null;var html='<div class="modal-head"><h2>'+(e?'Edit Sales Entry':'Add Sales Entry')+'</h2><button class="modal-close" onclick="closeModalForce()">&#x2715;</button></div><div class="bfg"><label class="form-label">Date *</label><input class="form-input" type="date" id="bsl-date" value="'+(e?e.date:TODAY_BS)+'"></div><div class="form-row"><div class="bfg"><label class="form-label">Actual Sales (‫SAR ‬) *</label><input class="form-input" type="number" step="0.01" id="bsl-actual" value="'+(e?e.actual:'')+'" placeholder="0.00"></div><div class="bfg"><label class="form-label">Sales Target (‫SAR ‬) *</label><input class="form-input" type="number" step="0.01" id="bsl-target" value="'+(e?e.target:'')+'" placeholder="0.00"></div></div><button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="saveBranchSales(\''+bxe(id||'')+'\')">Save Entry</button>';openModal(html);}
+function openBranchSalesModal(id){
+  var e=id?BS.sales.find(function(x){return x.id===id;}):null;
+  var html='<div class="modal-head"><h2>'+(e?'Edit Sales Entry':'Add Sales Entry')+'</h2>'
+    +'<button class="modal-close" onclick="closeModalForce()">&#x2715;</button></div>'
+    +'<div class="bfg"><label class="form-label">Date *</label>'
+    +'<input class="form-input" type="date" id="bsl-date" value="'+(e?e.date:TODAY_BS)+'"></div>'
+    +'<div class="form-row">'
+    +'<div class="bfg"><label class="form-label">Actual Sales (SAR) *</label>'
+    +'<input class="form-input" type="number" step="0.01" id="bsl-actual" value="'+(e?e.actual:'')+"" +' placeholder="0.00"></div>'
+    +'<div class="bfg"><label class="form-label">Sales Target (SAR) *</label>'
+    +'<input class="form-input" type="number" step="0.01" id="bsl-target" value="'+(e?e.target:'')+"" +' placeholder="0.00"></div></div>'
+    +'<div class="bfg"><label class="form-label">Delivery Sales (SAR) '
+    +'<span style="color:var(--text-tertiary);font-weight:400;font-size:10px">optional · auto-filled from DSR</span></label>'
+    +'<input class="form-input" type="number" step="0.01" id="bsl-delivery" value="'+(e&&e.delivery?e.delivery:'')+"" +' placeholder="0.00"></div>'
+    +'<button class="btn btn-primary" style="width:100%;margin-top:8px"'
+    +' onclick="saveBranchSales(\''+bxe(id||'')+'\')">' +'Save Entry</button>';
+  openModal(html);
+}
+
 function openSalesBulkModal(){
   var html='<div class="modal-head"><h2>📥 Bulk Sales Import</h2><button class="modal-close" onclick="closeModalForce()">✕</button></div>';
   html+='<p style="font-size:11px;color:var(--text-secondary);margin-bottom:12px">Drag & drop a CSV file or paste data below. Format: <code style="background:var(--surface-2);padding:1px 5px;border-radius:4px">Date, Actual, Target</code> — one row per day.</p>';
@@ -11282,7 +11352,24 @@ function confirmSalesImport(){
   navTo('sales');
 }
 
-function saveBranchSales(id){var dt=bgv('bsl-date'),a=bgv('bsl-actual'),t=bgv('bsl-target');if(!dt||!a||!t){showToast('All fields required','error');return;}if(id){var i=BS.sales.findIndex(function(x){return x.id===id;});if(i>=0){BS.sales[i].date=dt;BS.sales[i].actual=parseFloat(a);BS.sales[i].target=parseFloat(t);}}else{BS.sales=BS.sales.filter(function(s2){return s2.date!==dt;});BS.sales.push({id:buid(),date:dt,actual:parseFloat(a),target:parseFloat(t)});}bSaveColl('sales',BS.sales);closeModalForce();showToast('Sales saved','success');navTo('sales');}
+function saveBranchSales(id){
+  var dt=bgv('bsl-date'),a=bgv('bsl-actual'),t=bgv('bsl-target');
+  if(!dt||!a||!t){showToast('All fields required','error');return;}
+  var del=parseFloat(bgv('bsl-delivery')||0)||0;
+  if(id){
+    var i=BS.sales.findIndex(function(x){return x.id===id;});
+    if(i>=0){
+      BS.sales[i].date=dt;BS.sales[i].actual=parseFloat(a);BS.sales[i].target=parseFloat(t);
+      if(del>0)BS.sales[i].delivery=del;else delete BS.sales[i].delivery;
+    }
+  }else{
+    BS.sales=BS.sales.filter(function(s2){return s2.date!==dt;});
+    var entry={id:buid(),date:dt,actual:parseFloat(a),target:parseFloat(t)};
+    if(del>0)entry.delivery=del;
+    BS.sales.push(entry);
+  }
+  bSaveColl('sales',BS.sales);closeModalForce();showToast('Sales saved','success');navTo('sales');
+}
 function delBranchSales(id){if(!confirm('Delete this sales entry?'))return;BS.sales=BS.sales.filter(function(x){return x.id!==id;});bSaveColl('sales',BS.sales);showToast('Deleted');navTo('sales');}
 
 // ── Petty Cash ────────────────────────────────────────
@@ -12431,6 +12518,24 @@ function dsrEndShiftConfirmed(){
   if(db&&NX.session&&NX.session.branchId){
     db.ref(dsrFbPath(activeDate)).set(D,function(err){
       if(err){showToast('End shift save failed: '+err.message,'error');return;}
+      // Sync delivery+cash+card into sales collection for Finance/CEO
+      var _dd=(D.delivery||[]).reduce(function(s,d){return s+(parseFloat(d.amount)||0);},0);
+      var _dc=(D.servers||[]).reduce(function(s,sv){return s+(parseFloat(sv.cashSales)||0);},0);
+      var _dcard=(D.payments||[]).filter(function(p){var m=(p.method||'').toLowerCase();return m!=='cash';}).reduce(function(s,p){return s+(parseFloat(p.amount)||0);},0);
+      if((_dd>0||_dc>0||_dcard>0)&&db&&NX.session&&NX.session.branchId){
+        (function(){var _sr=db.ref('branches/'+NX.session.branchId+'/sales');
+        _sr.once('value',function(snap){
+          var _raw=snap.val()||{},_arr=Array.isArray(_raw)?_raw:Object.values(_raw).filter(Boolean);
+          var _ex=_arr.find(function(e){return e&&e.date===activeDate;});
+          if(_ex&&_ex.id){
+            var _k=String(_ex.id).replace(/[.#$\[\]\/]/g,'_'),_u={};
+            if(_dd>0)_u.delivery=_dd;
+            if(_dc>0)_u.cash=_dc;
+            if(_dcard>0)_u.card=_dcard;
+            _sr.child(_k).update(_u);
+          }
+        });})();
+      }
       // Advance to next day
       var nextDate=new Date(activeDate+'T00:00:00');
       nextDate.setDate(nextDate.getDate()+1);
