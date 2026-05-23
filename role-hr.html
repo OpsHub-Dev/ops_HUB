@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OpsHub — HR Manager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="core.js"></script>
+</head>
+<body>
+<div id="app"></div>
+<script>
+injectCSS();
+var sess = requireSession(['hr_manager']);
+if (!sess) throw new Error('No session');
+
+var NAV_HR = [
+  { section:'PEOPLE', items:[
+    { id:'hrf-hr-dash',    label:'HR Dashboard',
+      icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>' },
+    { id:'hrf-employees',  label:'Employees',
+      icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>' },
+    { id:'hrf-attendance', label:'Attendance',
+      icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>' },
+    { id:'hrf-leave',      label:'Leave',
+      icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>' },
+    { id:'hrf-payroll',    label:'Payroll',
+      icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>' },
+    { id:'hrf-health',     label:'Health Cards',
+      icon:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>' }
+  ]}
+];
+
+/* ── State ── */
+var HRF = { staff:{}, att:{}, leaves:{}, sch:{}, health:{} };
+var NX_BRANCHES_HR = {};
+var _loaded = false;
+
+function loadHRData(cb){
+  if(_loaded){if(cb)cb();return;}
+  if(!db){setTimeout(function(){loadHRData(cb);},500);return;}
+
+  db.ref('admin/branches').once('value',function(s){
+    NX_BRANCHES_HR={};
+    Object.values(s.val()||{}).filter(Boolean).forEach(function(b){if(b.id)NX_BRANCHES_HR[b.id]=b;});
+
+    var ids = sess.branchIds && sess.branchIds.length ? sess.branchIds : Object.keys(NX_BRANCHES_HR);
+    var n=ids.length, done=0;
+    if(!n){_loaded=true;if(cb)cb();return;}
+    function tick(){if(++done===n){_loaded=true;if(cb)cb();}}
+
+    ids.forEach(function(bid){
+      db.ref('branches/'+bid+'/staff').once('value',function(s){
+        HRF.staff[bid]=Object.values(s.val()||{}).filter(Boolean);
+        db.ref('branches/'+bid+'/tsLeaves').once('value',function(s2){
+          HRF.leaves[bid]=s2.val()||{};
+          db.ref('branches/'+bid+'/health').once('value',function(s3){
+            HRF.health[bid]=Object.values(s3.val()||{}).filter(Boolean);
+            tick();
+          });
+        });
+      });
+    });
+  });
+}
+
+function allStaff(){
+  var r=[];
+  Object.values(HRF.staff).forEach(function(a){a.forEach(function(s){r.push(s);});});
+  return r;
+}
+function allLeaves(){
+  var r=[];
+  Object.values(HRF.leaves).forEach(function(obj){
+    Object.values(obj).filter(Boolean).forEach(function(l){r.push(l);});
+  });
+  return r;
+}
+function allHealth(){
+  var r=[];
+  Object.values(HRF.health).forEach(function(a){a.forEach(function(h){r.push(h);});});
+  return r;
+}
+
+var PAGES={};
+
+PAGES['hrf-hr-dash']=function(){
+  var staff=allStaff(), leaves=allLeaves(), health=allHealth();
+  var active=staff.filter(function(s){return s.status==='Active'||!s.status;}).length;
+  var pendingL=leaves.filter(function(l){return l.status==='Pending';}).length;
+  var today30=new Date(); today30.setDate(today30.getDate()+30);
+  var expH=health.filter(function(h){return h.expiry&&new Date(h.expiry)<=today30;}).length;
+
+  return '<div class="page-header"><div><div class="page-title">HR Dashboard</div><div class="page-title-sub">All Branches</div></div></div>'+
+    '<div class="kpi-grid">'+
+    k('Total Staff',staff.length,active+' active')+
+    k('Branches',Object.keys(HRF.staff).length,'with staff')+
+    k('Pending Leave',pendingL,'requests')+
+    k('Health Expiring',expH,'within 30 days')+
+    '</div>'+
+    staffByBranchTable();
+};
+
+function k(l,v,s){
+  return '<div class="kpi"><div class="kpi-label">'+l+'</div><div class="kpi-value">'+v+'</div>'+(s?'<div class="kpi-sub">'+s+'</div>':'')+
+    '</div>';
+}
+
+function staffByBranchTable(){
+  return '<div class="card"><div class="card-title">Staff by Branch</div>'+
+    '<div class="tbl-wrap"><table><thead><tr><th>Branch</th><th>Total</th><th>Active</th></tr></thead><tbody>'+
+    Object.keys(HRF.staff).map(function(bid){
+      var s=HRF.staff[bid]||[];
+      var act=s.filter(function(x){return x.status==='Active'||!x.status;}).length;
+      return '<tr><td>'+xe((NX_BRANCHES_HR[bid]||{}).name||bid)+'</td><td style="font-weight:700">'+s.length+'</td><td style="color:var(--success)">'+act+'</td></tr>';
+    }).join('')+
+    '</tbody></table></div></div>';
+}
+
+PAGES['hrf-employees']=function(){
+  var staff=allStaff();
+  return '<div class="page-header"><div class="page-title">Employees</div></div>'+
+    k('Total',staff.length,'')+
+    '<div class="card"><div class="tbl-wrap"><table><thead><tr>'+
+    '<th>Name</th><th>SAP</th><th>Role</th><th>Dept</th><th>Branch</th><th>Status</th>'+
+    '</tr></thead><tbody>'+
+    (staff.length?staff.map(function(s){
+      var bid=s._branchId;
+      var sc=s.status==='Active'||!s.status?'chip-g':s.status==='On Leave'?'chip-y':'chip-n';
+      return '<tr>'+
+        '<td style="font-weight:700">'+xe(s.name||'—')+'</td>'+
+        '<td style="font-family:monospace;font-size:10px">'+xe(s.sap||s.sapNumber||'—')+'</td>'+
+        '<td>'+xe(s.role||'')+'</td>'+
+        '<td>'+xe(s.dept||s.department||'')+'</td>'+
+        '<td>'+xe((NX_BRANCHES_HR[s._branchId||bid]||{}).name||s._branchId||'')+'</td>'+
+        '<td><span class="chip '+sc+'">'+xe(s.status||'Active')+'</span></td>'+
+        '</tr>';
+    }).join(''):'<tr><td colspan="6" style="text-align:center;padding:30px;color:var(--text-3)">No employees found</td></tr>')+
+    '</tbody></table></div></div>';
+};
+
+PAGES['hrf-attendance']=function(){
+  return '<div class="page-header"><div class="page-title">Attendance</div></div>'+
+    '<div class="card"><div style="text-align:center;padding:40px;color:var(--text-3)">Attendance records from tsAtt — coming soon.</div></div>';
+};
+
+PAGES['hrf-leave']=function(){
+  var leaves=allLeaves();
+  return '<div class="page-header"><div class="page-title">Leave Requests</div></div>'+
+    '<div class="card"><div class="tbl-wrap"><table><thead><tr>'+
+    '<th>Staff</th><th>Type</th><th>From</th><th>To</th><th>Status</th>'+
+    '</tr></thead><tbody>'+
+    (leaves.length?leaves.map(function(l){
+      var sc=l.status==='Approved'?'chip-g':l.status==='Rejected'?'chip-r':'chip-y';
+      return '<tr>'+
+        '<td>'+xe(l.name||l.staffName||'—')+'</td>'+
+        '<td>'+xe(l.leaveType||l.type||'—')+'</td>'+
+        '<td>'+fmtDate(l.startDate||l.from)+'</td>'+
+        '<td>'+fmtDate(l.endDate||l.to)+'</td>'+
+        '<td><span class="chip '+sc+'">'+xe(l.status||'Pending')+'</span></td>'+
+        '</tr>';
+    }).join(''):'<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--text-3)">No leave records</td></tr>')+
+    '</tbody></table></div></div>';
+};
+
+PAGES['hrf-payroll']=function(){
+  var staff=allStaff();
+  var totalSalary=staff.reduce(function(t,s){return t+(parseFloat(s.salary||s.basicSalary||0));},0);
+  return '<div class="page-header"><div class="page-title">Payroll Overview</div></div>'+
+    '<div class="kpi-grid">'+k('Total Staff',staff.length,'')+k('Total Payroll',fmtSAR(totalSalary),'basic salaries')+
+    '</div>'+
+    '<div class="card"><div class="tbl-wrap"><table><thead><tr>'+
+    '<th>Name</th><th>SAP</th><th>Basic Salary</th><th>Branch</th>'+
+    '</tr></thead><tbody>'+
+    (staff.length?staff.map(function(s){
+      return '<tr>'+
+        '<td style="font-weight:700">'+xe(s.name||'—')+'</td>'+
+        '<td style="font-family:monospace;font-size:10px">'+xe(s.sap||'—')+'</td>'+
+        '<td style="color:var(--success);font-weight:700">'+fmtSAR(s.salary||s.basicSalary||0)+'</td>'+
+        '<td>'+xe((NX_BRANCHES_HR[s._branchId]||{}).name||s._branchId||'')+'</td>'+
+        '</tr>';
+    }).join(''):'<tr><td colspan="4" style="text-align:center;padding:30px;color:var(--text-3)">No payroll data</td></tr>')+
+    '</tbody></table></div></div>';
+};
+
+PAGES['hrf-health']=function(){
+  var health=allHealth();
+  var today30=new Date(); today30.setDate(today30.getDate()+30);
+  var expSoon=health.filter(function(h){return h.expiry&&new Date(h.expiry)<=today30;});
+  return '<div class="page-header"><div class="page-title">Health Cards</div></div>'+
+    '<div class="kpi-grid">'+k('Total Cards',health.length,'')+k('Expiring Soon',expSoon.length,'within 30 days')+
+    '</div>'+
+    '<div class="card"><div class="tbl-wrap"><table><thead><tr>'+
+    '<th>Name</th><th>Card No.</th><th>Expiry</th><th>Status</th>'+
+    '</tr></thead><tbody>'+
+    (health.length?health.map(function(h){
+      var exp=h.expiry?new Date(h.expiry):null;
+      var isExp=exp&&exp<new Date(), isSoon=exp&&!isExp&&exp<=today30;
+      var sc=isExp?'chip-r':isSoon?'chip-y':'chip-g';
+      return '<tr>'+
+        '<td style="font-weight:700">'+xe(h.name||'—')+'</td>'+
+        '<td style="font-family:monospace;font-size:10px">'+xe(h.cardNo||'—')+'</td>'+
+        '<td>'+fmtDate(h.expiry)+'</td>'+
+        '<td><span class="chip '+sc+'">'+(isExp?'EXPIRED':isSoon?'EXPIRING SOON':'VALID')+'</span></td>'+
+        '</tr>';
+    }).join(''):'<tr><td colspan="4" style="text-align:center;padding:30px;color:var(--text-3)">No records</td></tr>')+
+    '</tbody></table></div></div>';
+};
+
+function navTo(pageId){
+  NX.page=pageId;
+  setActiveSiItem(pageId);
+  var pa=document.getElementById('page-area');
+  if(!pa)return;
+  pa.innerHTML='<div style="text-align:center;padding:60px"><div class="spin" style="margin:0 auto 14px"></div></div>';
+  function render(){ var fn=PAGES[pageId]; pa.innerHTML=fn?fn():'<div class="empty">Page coming soon.</div>'; }
+  if(!_loaded){loadHRData(render);}else{render();}
+}
+
+window.onload=function(){
+  loadHRData(function(){ renderShell(NAV_HR,'hrf-hr-dash'); });
+};
+</script>
+</body>
+</html>

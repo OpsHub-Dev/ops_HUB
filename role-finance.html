@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>OpsHub — Finance</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet"/>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-database-compat.js"></script>
+<script src="core.js"></script>
+<style>
+  .fin-kpi-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:16px;margin-bottom:24px}
+  .fin-section{background:var(--surface);border-radius:16px;padding:20px;box-shadow:6px 6px 12px var(--shadow-dark),-6px -6px 12px var(--shadow-light);margin-bottom:24px}
+  .fin-section h3{font-family:'Space Mono',monospace;font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--primary);margin:0 0 16px}
+  .pl-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)}
+  .pl-row:last-child{border-bottom:none}
+  .pl-label{font-size:13px;color:var(--text-muted)}
+  .pl-val{font-family:'Space Mono',monospace;font-size:13px;font-weight:700}
+  .pl-row.total .pl-label,.pl-row.total .pl-val{font-size:14px;color:var(--text)}
+  .pl-row.subtotal .pl-val{color:var(--primary)}
+  .pl-row.negative .pl-val{color:#ef4444}
+  .pl-row.positive .pl-val{color:#22c55e}
+  .branch-card{background:var(--surface);border-radius:12px;padding:16px;box-shadow:4px 4px 8px var(--shadow-dark),-4px -4px 8px var(--shadow-light)}
+  .branch-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;margin-bottom:24px}
+  .bc-name{font-size:13px;font-weight:700;color:var(--primary);margin-bottom:8px;font-family:'Space Mono',monospace}
+  .bc-row{display:flex;justify-content:space-between;font-size:12px;padding:3px 0;color:var(--text-muted)}
+  .bc-val{font-family:'Space Mono',monospace;color:var(--text)}
+  .filter-row{display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;align-items:center}
+  .filter-row select,.filter-row input{padding:8px 12px;border-radius:8px;border:none;background:var(--surface);box-shadow:inset 3px 3px 6px var(--shadow-dark),inset -3px -3px 6px var(--shadow-light);font-family:'Space Mono',monospace;font-size:12px;color:var(--text);min-width:140px}
+  .amber{color:#d97706}
+  #fin-loading{display:flex;align-items:center;justify-content:center;height:200px;font-size:13px;color:var(--text-muted);font-family:'Space Mono',monospace}
+</style>
+</head>
+<body>
+<script>
+// ── Guard ──────────────────────────────────────────────────────────────────
+const SESS = requireSession(['finance_dir','super_admin']);
+const ROLE_COLOR = '#d97706';
+
+// ── Nav config ─────────────────────────────────────────────────────────────
+const NAV = [
+  { section: 'Overview' },
+  { id:'fin-dash',    label:'Dashboard',    icon:finIco('dashboard') },
+  { id:'fin-pl',      label:'P & L',        icon:finIco('pl') },
+  { section: 'Revenue' },
+  { id:'fin-sales',   label:'Sales',        icon:finIco('sales') },
+  { id:'fin-dsr',     label:'DSR',          icon:finIco('dsr') },
+  { section: 'Costs' },
+  { id:'fin-pc',      label:'Petty Cash',   icon:finIco('pc') },
+  { id:'fin-invoices',label:'Invoices',     icon:finIco('invoices') },
+  { id:'fin-waste',   label:'Food Cost',    icon:finIco('waste') },
+  { section: 'Compliance' },
+  { id:'fin-compliance',label:'Compliance', icon:finIco('compliance') },
+];
+
+function finIco(k){
+  const icons = {
+    dashboard:`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>`,
+    pl:`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`,
+    sales:`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`,
+    dsr:`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`,
+    pc:`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="6" width="20" height="14" rx="2"/><path d="M16 14a2 2 0 1 1-4 0 2 2 0 0 1 4 0z"/><path d="M22 10H2"/></svg>`,
+    invoices:`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>`,
+    waste:`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>`,
+    compliance:`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 12l2 2 4-4"/><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>`,
+  };
+  return icons[k]||icons.dashboard;
+}
+
+// ── State ──────────────────────────────────────────────────────────────────
+const FD = {
+  branches: {},   // {id: {name, ...}}
+  sales: {},      // {branchId: {records...}}
+  pc: {},         // {branchId: {cycles...}}
+  waste: {},      // {branchId: {records...}}
+  invoices: {},   // {branchId: {records...}}
+  compliance: {}, // {branchId: {records...}}
+  staff: {},      // {branchId: {records...}}
+  loaded: new Set(),
+};
+
+// ── Bootstrap ──────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  injectCSS();
+  renderShell(NAV, 'fin-dash', { title:'Finance', roleColor: ROLE_COLOR });
+
+  // Load branch list first
+  const snap = await FB.database().ref('admin/branches').once('value');
+  if(snap.val()) {
+    Object.entries(snap.val()).forEach(([id,b]) => {
+      if(b && b.name) FD.branches[id] = b;
+    });
+  }
+
+  navTo('fin-dash');
+  document.querySelectorAll('.si-item').forEach(el => {
+    el.addEventListener('click', () => navTo(el.dataset.page));
+  });
+});
+
+// ── Router ─────────────────────────────────────────────────────────────────
+async function navTo(pageId) {
+  setActiveSiItem(pageId);
+  const content = document.getElementById('page-content');
+  content.innerHTML = `<div id="fin-loading">Loading…</div>`;
+
+  // Ensure data loaded
+  await ensureLoaded(pageDeps(pageId));
+
+  const renderers = {
+    'fin-dash':       renderDash,
+    'fin-pl':         renderPL,
+    'fin-sales':      renderSales,
+    'fin-dsr':        renderDSR,
+    'fin-pc':         renderPC,
+    'fin-invoices':   renderInvoices,
+    'fin-waste':      renderFoodCost,
+    'fin-compliance': renderCompliance,
+  };
+  const fn = renderers[pageId];
+  content.innerHTML = fn ? fn() : `<p style="padding:24px;color:var(--text-muted)">Coming soon</p>`;
+}
+
+function pageDeps(pageId) {
+  const map = {
+    'fin-dash':       ['sales','pc','waste','staff'],
+    'fin-pl':         ['sales','pc','waste','invoices'],
+    'fin-sales':      ['sales'],
+    'fin-dsr':        ['sales','pc','waste'],
+    'fin-pc':         ['pc'],
+    'fin-invoices':   ['invoices'],
+    'fin-waste':      ['waste','sales'],
+    'fin-compliance': ['compliance'],
+  };
+  return map[pageId]||[];
+}
+
+async function ensureLoaded(keys) {
+  const needed = keys.filter(k => !FD.loaded.has(k));
+  if(!needed.length) return;
+  const branchIds = Object.keys(FD.branches);
+  await Promise.all(needed.map(k => loadAll(k, branchIds)));
+  needed.forEach(k => FD.loaded.add(k));
+}
+
+async function loadAll(key, branchIds) {
+  const fbKey = {
+    sales:'sales', pc:'petty_cash', waste:'wastage',
+    invoices:'invoices', compliance:'compliance_costs', staff:'staff'
+  }[key] || key;
+  FD[key] = {};
+  await Promise.all(branchIds.map(async bid => {
+    const snap = await FB.database().ref(`branches/${bid}/${fbKey}`).once('value');
+    FD[key][bid] = snap.val() || {};
+  }));
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function allRecords(collection) {
+  return Object.entries(FD[collection]).flatMap(([bid, recs]) =>
+    Object.entries(recs||{}).map(([id, r]) => ({...r, _bid: bid, _id: id}))
+  );
+}
+
+function branchName(bid) { return (FD.branches[bid]||{}).name || bid; }
+
+function totalSales(bid) {
+  return Object.values(FD.sales[bid]||{}).reduce((s,r) => s + (parseFloat(r.total)||0), 0);
+}
+function totalPC(bid) {
+  let t = 0;
+  Object.values(FD.pc[bid]||{}).forEach(cycle => {
+    Object.values(cycle.expenses||{}).forEach(e => t += parseFloat(e.amount)||0);
+  });
+  return t;
+}
+function totalWaste(bid) {
+  return Object.values(FD.waste[bid]||{}).reduce((s,r) => s + (parseFloat(r.cost)||0), 0);
+}
+function totalInvoices(bid) {
+  return Object.values(FD.invoices[bid]||{}).reduce((s,r) => s + (parseFloat(r.amount)||0), 0);
+}
+function kpiCard(label, value, sub='') {
+  return `<div class="kpi-card">
+    <div class="kpi-label">${label}</div>
+    <div class="kpi-value">${value}</div>
+    ${sub ? `<div class="kpi-sub">${sub}</div>` : ''}
+  </div>`;
+}
+
+// ── Pages ──────────────────────────────────────────────────────────────────
+
+function renderDash() {
+  const bids = Object.keys(FD.branches);
+  let totSales=0, totPC=0, totWaste=0, totStaff=0;
+  bids.forEach(bid => {
+    totSales  += totalSales(bid);
+    totPC     += totalPC(bid);
+    totWaste  += totalWaste(bid);
+    totStaff  += Object.keys(FD.staff[bid]||{}).length;
+  });
+  const grossProfit = totSales - totWaste - totPC;
+
+  let branchRows = bids.map(bid => {
+    const s = totalSales(bid);
+    const pc = totalPC(bid);
+    const w = totalWaste(bid);
+    const gp = s - pc - w;
+    return `<tr>
+      <td>${branchName(bid)}</td>
+      <td>${fmtSAR(s)}</td>
+      <td>${fmtSAR(pc)}</td>
+      <td>${fmtSAR(w)}</td>
+      <td style="color:${gp>=0?'#22c55e':'#ef4444'}">${fmtSAR(gp)}</td>
+    </tr>`;
+  }).join('');
+
+  return `
+    <div class="page-header"><h2>Finance Dashboard</h2></div>
+    <div class="fin-kpi-row">
+      ${kpiCard('Total Revenue', fmtSAR(totSales), 'All branches')}
+      ${kpiCard('Petty Cash Spend', fmtSAR(totPC), 'All branches')}
+      ${kpiCard('Food Cost', fmtSAR(totWaste), 'Wastage')}
+      ${kpiCard('Gross Profit', fmtSAR(grossProfit), `${totSales>0?((grossProfit/totSales)*100).toFixed(1):0}% margin`)}
+      ${kpiCard('Active Staff', totStaff, 'Headcount')}
+      ${kpiCard('Branches', bids.length, 'Reporting')}
+    </div>
+    <div class="fin-section">
+      <h3>Branch Performance</h3>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Branch</th><th>Revenue</th><th>Petty Cash</th><th>Food Cost</th><th>Gross Profit</th></tr></thead>
+          <tbody>${branchRows||'<tr><td colspan="5" style="text-align:center;color:var(--text-muted)">No data</td></tr>'}</tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function renderPL() {
+  const bids = Object.keys(FD.branches);
+  let revenue=0, foodCost=0, pettyCash=0, invoiceAmt=0;
+  bids.forEach(bid => {
+    revenue    += totalSales(bid);
+    foodCost   += totalWaste(bid);
+    pettyCash  += totalPC(bid);
+    invoiceAmt += totalInvoices(bid);
+  });
+  const grossProfit = revenue - foodCost;
+  const opex = pettyCash + invoiceAmt;
+  const netProfit = grossProfit - opex;
+  const gpPct = revenue > 0 ? ((grossProfit/revenue)*100).toFixed(1) : 0;
+  const npPct = revenue > 0 ? ((netProfit/revenue)*100).toFixed(1) : 0;
+
+  function plRow(label, val, cls='') {
+    const sign = val >= 0 ? '' : '';
+    return `<div class="pl-row ${cls}">
+      <span class="pl-label">${label}</span>
+      <span class="pl-val" style="color:${cls==='negative'?'#ef4444':cls==='positive'?'#22c55e':'var(--text)'}">${fmtSAR(Math.abs(val))}${val<0?' ('+fmtSAR(Math.abs(val))+'─)':''}</span>
+    </div>`;
+  }
+
+  return `
+    <div class="page-header"><h2>Profit & Loss Statement</h2></div>
+    <div style="max-width:600px">
+      <div class="fin-section">
+        <h3>Revenue</h3>
+        ${plRow('Total Sales', revenue)}
+        <div class="pl-row subtotal"><span class="pl-label" style="font-weight:700">Gross Revenue</span><span class="pl-val" style="color:var(--primary)">${fmtSAR(revenue)}</span></div>
+      </div>
+      <div class="fin-section">
+        <h3>Cost of Goods</h3>
+        ${plRow('Food Wastage / Cost', foodCost, 'negative')}
+        <div class="pl-row subtotal"><span class="pl-label" style="font-weight:700">Gross Profit</span><span class="pl-val" style="color:${grossProfit>=0?'#22c55e':'#ef4444'}">${fmtSAR(grossProfit)} <small style="font-size:11px;color:var(--text-muted)">(${gpPct}%)</small></span></div>
+      </div>
+      <div class="fin-section">
+        <h3>Operating Expenses</h3>
+        ${plRow('Petty Cash Expenses', pettyCash, 'negative')}
+        ${plRow('Invoices / Suppliers', invoiceAmt, 'negative')}
+        <div class="pl-row subtotal"><span class="pl-label" style="font-weight:700">Total OpEx</span><span class="pl-val" style="color:#ef4444">${fmtSAR(opex)}</span></div>
+      </div>
+      <div class="fin-section">
+        <h3>Net Result</h3>
+        <div class="pl-row total">
+          <span class="pl-label" style="font-size:15px;font-weight:700">NET PROFIT / LOSS</span>
+          <span class="pl-val" style="font-size:16px;color:${netProfit>=0?'#22c55e':'#ef4444'}">${fmtSAR(netProfit)} <small style="font-size:11px">(${npPct}%)</small></span>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderSales() {
+  const rows = allRecords('sales');
+  rows.sort((a,b) => (b.date||'').localeCompare(a.date||''));
+  const total = rows.reduce((s,r) => s+(parseFloat(r.total)||0),0);
+  return `
+    <div class="page-header"><h2>Sales — All Branches</h2>
+      <span style="font-family:'Space Mono',monospace;font-size:13px;color:var(--primary)">${fmtSAR(total)} total</span>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>Branch</th><th>Date</th><th>Shift</th><th>Revenue</th><th>Cash</th><th>Card</th><th>Covers</th></tr></thead>
+        <tbody>${rows.length ? rows.map(r=>`<tr>
+          <td>${branchName(r._bid)}</td>
+          <td>${r.date||'—'}</td>
+          <td>${r.shift||'—'}</td>
+          <td>${fmtSAR(r.total)}</td>
+          <td>${fmtSAR(r.cash)}</td>
+          <td>${fmtSAR(r.card)}</td>
+          <td>${r.covers||0}</td>
+        </tr>`).join('') : '<tr><td colspan="7" style="text-align:center;color:var(--text-muted)">No sales records</td></tr>'}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function renderDSR() {
+  // Aggregate by date across all branches
+  const byDate = {};
+  Object.entries(FD.sales).forEach(([bid, recs]) => {
+    Object.values(recs||{}).forEach(r => {
+      const d = r.date||'unknown';
+      if(!byDate[d]) byDate[d] = {sales:0, cash:0, card:0, covers:0};
+      byDate[d].sales   += parseFloat(r.total)||0;
+      byDate[d].cash    += parseFloat(r.cash)||0;
+      byDate[d].card    += parseFloat(r.card)||0;
+      byDate[d].covers  += parseInt(r.covers)||0;
+    });
+  });
+  const sorted = Object.entries(byDate).sort((a,b)=>b[0].localeCompare(a[0]));
+
+  // PC by date
+  const pcByDate = {};
+  Object.values(FD.pc).forEach(cycles => {
+    Object.values(cycles||{}).forEach(cycle => {
+      Object.values(cycle.expenses||{}).forEach(e => {
+        const d = e.date||'unknown';
+        pcByDate[d] = (pcByDate[d]||0) + (parseFloat(e.amount)||0);
+      });
+    });
+  });
+
+  return `
+    <div class="page-header"><h2>Daily Summary Report</h2></div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>Date</th><th>Revenue</th><th>Cash</th><th>Card</th><th>Covers</th><th>PC Spend</th><th>Net</th></tr></thead>
+        <tbody>${sorted.length ? sorted.map(([d,v])=>{
+          const pc = pcByDate[d]||0;
+          const net = v.sales - pc;
+          return `<tr>
+            <td>${d}</td>
+            <td>${fmtSAR(v.sales)}</td>
+            <td>${fmtSAR(v.cash)}</td>
+            <td>${fmtSAR(v.card)}</td>
+            <td>${v.covers}</td>
+            <td>${fmtSAR(pc)}</td>
+            <td style="color:${net>=0?'#22c55e':'#ef4444'}">${fmtSAR(net)}</td>
+          </tr>`;
+        }).join('') : '<tr><td colspan="7" style="text-align:center;color:var(--text-muted)">No data</td></tr>'}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function renderPC() {
+  const rows = [];
+  Object.entries(FD.pc).forEach(([bid, cycles]) => {
+    Object.entries(cycles||{}).forEach(([cid, cycle]) => {
+      Object.entries(cycle.expenses||{}).forEach(([eid, e]) => {
+        rows.push({...e, _bid: bid, cycle: cycle.label||cid});
+      });
+    });
+  });
+  rows.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const total = rows.reduce((s,r)=>s+(parseFloat(r.amount)||0),0);
+
+  return `
+    <div class="page-header"><h2>Petty Cash — All Branches</h2>
+      <span style="font-family:'Space Mono',monospace;font-size:13px;color:var(--primary)">${fmtSAR(total)} total</span>
+    </div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>Branch</th><th>Cycle</th><th>Date</th><th>Category</th><th>Description</th><th>Amount</th></tr></thead>
+        <tbody>${rows.length ? rows.map(r=>`<tr>
+          <td>${branchName(r._bid)}</td>
+          <td>${r.cycle}</td>
+          <td>${r.date||'—'}</td>
+          <td>${r.category||'—'}</td>
+          <td>${r.desc||r.description||'—'}</td>
+          <td>${fmtSAR(r.amount)}</td>
+        </tr>`).join('') : '<tr><td colspan="6" style="text-align:center;color:var(--text-muted)">No petty cash records</td></tr>'}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function renderInvoices() {
+  const rows = allRecords('invoices');
+  rows.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const total = rows.reduce((s,r)=>s+(parseFloat(r.amount)||0),0);
+  const pending = rows.filter(r=>r.status==='pending').reduce((s,r)=>s+(parseFloat(r.amount)||0),0);
+  const paid    = rows.filter(r=>r.status==='paid').reduce((s,r)=>s+(parseFloat(r.amount)||0),0);
+
+  return `
+    <div class="page-header"><h2>Invoices — All Branches</h2></div>
+    <div class="fin-kpi-row">
+      ${kpiCard('Total Invoiced', fmtSAR(total))}
+      ${kpiCard('Paid', fmtSAR(paid), 'Cleared')}
+      ${kpiCard('Pending', fmtSAR(pending), 'Outstanding')}
+    </div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>Branch</th><th>Date</th><th>Supplier</th><th>Ref</th><th>Amount</th><th>Status</th></tr></thead>
+        <tbody>${rows.length ? rows.map(r=>`<tr>
+          <td>${branchName(r._bid)}</td>
+          <td>${r.date||'—'}</td>
+          <td>${r.supplier||r.vendor||'—'}</td>
+          <td>${r.ref||r.invoice_no||'—'}</td>
+          <td>${fmtSAR(r.amount)}</td>
+          <td><span class="chip ${r.status==='paid'?'chip-green':r.status==='pending'?'chip-yellow':'chip-gray'}">${(r.status||'—').toUpperCase()}</span></td>
+        </tr>`).join('') : '<tr><td colspan="6" style="text-align:center;color:var(--text-muted)">No invoices</td></tr>'}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function renderFoodCost() {
+  const bids = Object.keys(FD.branches);
+  const cards = bids.map(bid => {
+    const sales = totalSales(bid);
+    const waste = totalWaste(bid);
+    const pct   = sales > 0 ? ((waste/sales)*100).toFixed(1) : 0;
+    const color = pct > 35 ? '#ef4444' : pct > 25 ? '#f59e0b' : '#22c55e';
+    return `<div class="branch-card">
+      <div class="bc-name">${branchName(bid)}</div>
+      <div class="bc-row"><span>Sales</span><span class="bc-val">${fmtSAR(sales)}</span></div>
+      <div class="bc-row"><span>Food Cost</span><span class="bc-val">${fmtSAR(waste)}</span></div>
+      <div class="bc-row"><span>Food Cost %</span><span class="bc-val" style="color:${color}">${pct}%</span></div>
+    </div>`;
+  }).join('');
+
+  const allWaste = allRecords('waste');
+  allWaste.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+
+  return `
+    <div class="page-header"><h2>Food Cost Analysis</h2></div>
+    <div class="branch-cards">${cards||'<p style="color:var(--text-muted)">No branches</p>'}</div>
+    <div class="fin-section">
+      <h3>Wastage Log</h3>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Branch</th><th>Date</th><th>Item</th><th>Qty</th><th>Unit</th><th>Cost</th><th>Reason</th></tr></thead>
+          <tbody>${allWaste.length ? allWaste.map(r=>`<tr>
+            <td>${branchName(r._bid)}</td>
+            <td>${r.date||'—'}</td>
+            <td>${r.item||r.itemName||'—'}</td>
+            <td>${r.qty||0}</td>
+            <td>${r.unit||'—'}</td>
+            <td>${fmtSAR(r.cost)}</td>
+            <td>${r.reason||'—'}</td>
+          </tr>`).join('') : '<tr><td colspan="7" style="text-align:center;color:var(--text-muted)">No wastage records</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+}
+
+function renderCompliance() {
+  const rows = allRecords('compliance');
+  rows.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+
+  return `
+    <div class="page-header"><h2>Compliance Costs</h2></div>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead><tr><th>Branch</th><th>Date</th><th>Type</th><th>Description</th><th>Amount</th><th>Status</th></tr></thead>
+        <tbody>${rows.length ? rows.map(r=>`<tr>
+          <td>${branchName(r._bid)}</td>
+          <td>${r.date||'—'}</td>
+          <td>${r.type||'—'}</td>
+          <td>${r.desc||r.description||'—'}</td>
+          <td>${fmtSAR(r.amount||r.cost)}</td>
+          <td><span class="chip ${r.status==='paid'?'chip-green':'chip-yellow'}">${(r.status||'pending').toUpperCase()}</span></td>
+        </tr>`).join('') : '<tr><td colspan="6" style="text-align:center;color:var(--text-muted)">No compliance records</td></tr>'}
+        </tbody>
+      </table>
+    </div>`;
+}
+</script>
+</body>
+</html>
