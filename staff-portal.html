@@ -1578,14 +1578,21 @@ function renderSchTable(sch, sb, dept) {
 ═══════════════════════════════════════════════════════ */
 function renderPayslip() {
   var u = CU; if (!u) return;
-  // Read salary DIRECTLY from branch staff record (the authoritative source)
-  function doRender(base) {
-    base = parseInt(base) || 0;
-    var housing = Math.round(base * 0.25);
-    var transport = Math.round(base * 0.10);
-    var gross = base + housing + transport;
-    var gosi = Math.round(gross * 0.09);
-    var net = gross - gosi;
+  // Read ALL salary fields from branch staff record (the authoritative source)
+  function doRender(staffRec) {
+    var base       = parseInt(staffRec.basicSalary || staffRec.salary || u.salary || 0);
+    var housing    = parseInt(staffRec.housingAllowance   || Math.round(base * 0.25));
+    var transport  = parseInt(staffRec.transportAllowance || Math.round(base * 0.10));
+    var otherAllow = parseInt(staffRec.otherAllowances || 0);
+    var gross = base + housing + transport + otherAllow;
+    // GOSI: 9% of basic salary (employee share) — only if enrolled
+    var gosiYes  = (staffRec.gosiEnrolled || 'yes') !== 'no';
+    var gosi     = gosiYes ? Math.round(base * 0.09) : 0;
+    // Saned: 1% of basic salary — only if explicitly enrolled
+    var sanedYes = staffRec.sanedEnrolled === 'yes';
+    var saned    = sanedYes ? Math.round(base * 0.01) : 0;
+    var totalDed = gosi + saned;
+    var net      = gross - totalDed;
     var month = document.getElementById('payslip-month')?.value || new Date().toISOString().slice(0,7);
     var mn = new Date(month + '-01').toLocaleDateString('en-US', {month:'long', year:'numeric'});
     var body = document.getElementById('payslip-body');
@@ -1600,9 +1607,15 @@ function renderPayslip() {
       '</div></div>' +
       (base === 0 ? '<div class="card" style="text-align:center;color:var(--text3);font-size:11px;font-family:var(--mono);padding:20px">⚠️ Salary not configured yet.<br>Contact HR to set your salary in the system.</div>' :
       '<div class="card"><div class="ctitle"><div class="cdot"></div>Earnings</div>' +
-      pr('Basic Salary','SAR ' + base.toLocaleString()) + pr('Housing Allowance','SAR ' + housing.toLocaleString()) + pr('Transport Allowance','SAR ' + transport.toLocaleString()) +
+      pr('Basic Salary','SAR ' + base.toLocaleString()) +
+      pr('Housing Allowance','SAR ' + housing.toLocaleString()) +
+      pr('Transport Allowance','SAR ' + transport.toLocaleString()) +
+      (otherAllow > 0 ? pr('Other Allowances','SAR ' + otherAllow.toLocaleString()) : '') +
       '<div class="prow" style="font-weight:700"><span>Gross Total</span><span>SAR ' + gross.toLocaleString() + '</span></div></div>' +
-      '<div class="card"><div class="ctitle"><div class="cdot" style="background:var(--danger)"></div>Deductions</div>' + pr('GOSI (9%)','− SAR ' + gosi.toLocaleString()) + pr('Salary Advance','− SAR 0') + '</div>' +
+      '<div class="card"><div class="ctitle"><div class="cdot" style="background:var(--danger)"></div>Deductions</div>' +
+      (gosiYes ? pr('GOSI Employee Share (9%)','− SAR ' + gosi.toLocaleString()) : pr('GOSI','Exempt')) +
+      (sanedYes ? pr('Saned (1%)','− SAR ' + saned.toLocaleString()) : '') +
+      '<div class="prow" style="color:var(--danger)"><span>Total Deductions</span><span>− SAR ' + totalDed.toLocaleString() + '</span></div></div>' +
       '<div class="net-box"><div class="netlbl">Net Salary — ' + mn + '</div><div class="net">SAR ' + net.toLocaleString('en-SA', {minimumFractionDigits:2}) + '</div>' +
       '<div style="font-size:10px;color:var(--text3);margin-top:8px;font-family:var(--mono)">✅ Paid to registered bank account</div></div>');
   }
@@ -1610,11 +1623,10 @@ function renderPayslip() {
   if (u.branchId && u.staffId) {
     db.ref('branches/' + u.branchId + '/staff/' + u.staffId).once('value', function(snap) {
       var m = snap.val() || {};
-      var base = parseInt(m.salary || m.basicSalary || u.salary || 0);
-      doRender(base);
+      doRender(m);
     });
   } else {
-    doRender(u.salary || 0);
+    doRender({ basicSalary: u.salary || 0, gosiEnrolled: 'yes', sanedEnrolled: 'no' });
   }
 }
 function renderPayslip_UNUSED_REMOVED() {
