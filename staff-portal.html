@@ -471,7 +471,7 @@ textarea.fi{resize:vertical;min-height:80px}
             <div class="ctitle"><div class="cdot"></div>Apply for Leave</div>
             <div class="fg"><label class="fl">Leave Type</label>
               <div class="ltg">
-                <button class="ltb selected" onclick="selLeave(this,'annual')"><div class="li">🏖️</div><span class="ll">Annual</span><span class="ld" id="lt-bal">21 left</span></button>
+                <button class="ltb selected" onclick="selLeave(this,'annual')"><div class="li">🏖️</div><span class="ll">Annual</span><span class="ld" id="lt-bal">— left</span></button>
                 <button class="ltb" onclick="selLeave(this,'sick')"><div class="li">🤒</div><span class="ll">Sick</span><span class="ld">As needed</span></button>
                 <button class="ltb" onclick="selLeave(this,'emergency')"><div class="li">🚨</div><span class="ll">Emergency</span><span class="ld">5/yr</span></button>
                 <button class="ltb" onclick="selLeave(this,'dayoff')"><div class="li">☀️</div><span class="ll">Day Off</span><span class="ld">Shift swap</span></button>
@@ -1815,31 +1815,59 @@ function renderLeave() {
   var lf = document.getElementById('lv-from'); var lt = document.getElementById('lv-to');
   if (lf && !lf.value) lf.value = today;
   if (lt && !lt.value) lt.value = today;
-  // Load from Firebase
-  db.ref('staff/leave/' + u.sap).once('value', function(snap) {
-    var leaves = [];
-    snap.forEach(function(c) { leaves.unshift(Object.assign({_key:c.key},c.val())); });
-    var taken = 0, pending = 0;
-    leaves.forEach(function(l) {
-      if (l.type === 'annual' && l.status !== 'rejected') taken += (l.days||0);
-      if (l.status === 'pending') pending++;
+
+  function doRenderLeave(quota) {
+    // Load leave history from Firebase
+    db.ref('staff/leave/' + u.sap).once('value', function(snap) {
+      var leaves = [];
+      snap.forEach(function(c) { leaves.unshift(Object.assign({_key:c.key},c.val())); });
+      var taken = 0, pending = 0;
+      leaves.forEach(function(l) {
+        if (l.type === 'annual' && l.status !== 'rejected') taken += (l.days||0);
+        if (l.status === 'pending') pending++;
+      });
+      var bal = quota - taken;
+      document.getElementById('leave-kpi').innerHTML =
+        '<div class="kpi" style="--kc:var(--primary)"><div class="kpi-l">Balance</div><div class="kpi-v">' + bal + '</div><div class="kpi-s">Annual days left</div></div>' +
+        '<div class="kpi" style="--kc:var(--warning)"><div class="kpi-l">Taken</div><div class="kpi-v">' + taken + '</div><div class="kpi-s">Days used</div></div>' +
+        '<div class="kpi" style="--kc:var(--success)"><div class="kpi-l">Pending</div><div class="kpi-v">' + pending + '</div><div class="kpi-s">Requests</div></div>';
+      var el = document.getElementById('lt-bal'); if (el) el.textContent = bal + ' left';
+      var sc = { approved: 'bg-g', pending: 'bg-a', rejected: 'bg-r' };
+      var ti = { annual: '🏖️', sick: '🤒', emergency: '🚨', dayoff: '☀️', unpaid: '📋', training: '📚' };
+      document.getElementById('lv-history').innerHTML = leaves.length ? leaves.map(function(l) {
+        return '<tr><td><span class="badge bg-t">' + (ti[l.type]||'📋') + ' ' + l.type + '</span></td>' +
+          '<td>' + new Date(l.from + 'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short'}) + '</td>' +
+          '<td>' + new Date(l.to + 'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short'}) + '</td>' +
+          '<td style="font-family:var(--mono)">' + l.days + 'd</td>' +
+          '<td><span class="badge ' + (sc[l.status]||'bg-a') + '">' + (l.status||'pending') + '</span></td></tr>';
+      }).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:16px">No leave requests yet</td></tr>';
     });
-    var bal = 21 - taken;
-    document.getElementById('leave-kpi').innerHTML =
-      '<div class="kpi" style="--kc:var(--primary)"><div class="kpi-l">Balance</div><div class="kpi-v">' + bal + '</div><div class="kpi-s">Annual days left</div></div>' +
-      '<div class="kpi" style="--kc:var(--warning)"><div class="kpi-l">Taken</div><div class="kpi-v">' + taken + '</div><div class="kpi-s">Days used</div></div>' +
-      '<div class="kpi" style="--kc:var(--success)"><div class="kpi-l">Pending</div><div class="kpi-v">' + pending + '</div><div class="kpi-s">Requests</div></div>';
-    var el = document.getElementById('lt-bal'); if (el) el.textContent = bal + ' left';
-    var sc = { approved: 'bg-g', pending: 'bg-a', rejected: 'bg-r' };
-    var ti = { annual: '🏖️', sick: '🤒', emergency: '🚨', dayoff: '☀️', unpaid: '📋', training: '📚' };
-    document.getElementById('lv-history').innerHTML = leaves.length ? leaves.map(function(l) {
-      return '<tr><td><span class="badge bg-t">' + (ti[l.type]||'📋') + ' ' + l.type + '</span></td>' +
-        '<td>' + new Date(l.from + 'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short'}) + '</td>' +
-        '<td>' + new Date(l.to + 'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short'}) + '</td>' +
-        '<td style="font-family:var(--mono)">' + l.days + 'd</td>' +
-        '<td><span class="badge ' + (sc[l.status]||'bg-a') + '">' + (l.status||'pending') + '</span></td></tr>';
-    }).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:16px">No leave requests yet</td></tr>';
-  });
+  }
+
+  // Fetch leave quota from staff record (same logic as dashboard)
+  if (u.branchId) {
+    db.ref('branches/' + u.branchId + '/staff').once('value', function(snap) {
+      var raw = snap.val() || {};
+      var emps = Array.isArray(raw) ? raw.filter(Boolean) : Object.values(raw).filter(Boolean);
+      var emp = emps.find(function(e) {
+        return e && (String(e.id) === String(u.staffId) || String(e.sap||'') === String(u.sap||''));
+      });
+      if (emp && (emp.leaveBalance != null || emp.annualLeave != null)) {
+        doRenderLeave(parseInt(emp.leaveBalance != null ? emp.leaveBalance : emp.annualLeave) || 21);
+      } else {
+        db.ref('branches/' + u.branchId + '/tsEmps').once('value', function(snap2) {
+          var raw2 = snap2.val() || {};
+          var emps2 = Array.isArray(raw2) ? raw2.filter(Boolean) : Object.values(raw2).filter(Boolean);
+          var emp2 = emps2.find(function(e) {
+            return e && (String(e.id) === String(u.staffId) || String(e.sap||'') === String(u.sap||''));
+          });
+          doRenderLeave(emp2 && emp2.leaveBalance != null ? parseInt(emp2.leaveBalance) || 21 : 21);
+        });
+      }
+    });
+  } else {
+    doRenderLeave(21);
+  }
 }
 function submitLeave() {
   var from = document.getElementById('lv-from').value;
