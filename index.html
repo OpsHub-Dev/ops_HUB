@@ -8200,7 +8200,6 @@ function pBranchDash() {
       {icon:'\ud83d\udcf1', label:'Check-In', sub:'Clock in / out', accent:'#00875a', href:'staff.html'},
       {icon:'\u2705', label:'Checklists', sub:'Today\'s tasks',  accent:'#0057ff', href:'checklists.html'},
       {icon:'\ud83d\udcb0', label:'Server Drop', sub:'Submit drops',  accent:'#b45309', href:'server-drop.html'},
-      {icon:'\ud83d\udcdd', label:'Leave Request', sub:'Submit / view', accent:'#5b21b6', href:'leave.html'}
     ];
     heroes.forEach(function(c){
       var _href = _bId ? c.href + '?branch=' + encodeURIComponent(_bId) : c.href;
@@ -8645,7 +8644,6 @@ function pBranchDash() {
   var _bid=encodeURIComponent(s.branchId||'');
   var _portals=[
     ['staff.html','📱','Check-In','staff.html'],
-    ['leave.html','📝','Leave Request','leave.html'],
     ['checklists.html','✅','Checklists','checklists.html'],
     ['server-drop.html','💰','Server Drop','server-drop.html']
   ];
@@ -10448,11 +10446,10 @@ function printBranchSched(dept){var wk=bweekKey(),dates=bweekDates(),sc=BS.sch[w
 function pTimesheet() {
   attachBranchListeners();
   BS.tsViewDate=BS.tsViewDate||TODAY_BS;
-  var bar='<div class="bstb">'+['att','report','leave','emps'].map(function(t){var l={att:'Attendance',report:'Reports',leave:'Leave',emps:'Employees'};return '<button class="'+(BS.tsTab===t?'on':'')+'" onclick="BS.tsTab=\''+t+'\';navTo(\'timesheet\')">'+l[t]+'</button>';}).join('')+'</div>';
+  var bar='<div class="bstb">'+['att','report'].map(function(t){var l={att:'Attendance',report:'Reports'};return '<button class="'+(BS.tsTab===t?'on':'')+'" onclick="BS.tsTab=\''+t+'\';navTo(\'timesheet\')">'+l[t]+'</button>';}).join('')+'</div>';
   if(BS.tsTab==='att')return bar+btsPgAtt();
   if(BS.tsTab==='report')return bar+btsPgReport();
-  if(BS.tsTab==='leave')return bar+btsPgLeave();
-  return bar+btsPgEmps();
+  return bar+btsPgAtt();
 }
 function btsPgAtt(){
   var vd=BS.tsViewDate||TODAY_BS;
