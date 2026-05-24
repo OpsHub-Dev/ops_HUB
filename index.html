@@ -15940,8 +15940,22 @@ function pHrfPayroll(){
         var pay=payData[m.id]||{};
         m._payStatus=pay.status||'draft';
         m._basic=parseFloat(pay.basicSalary||m.salary||m.basicSalary||0);
-        m._allow=parseFloat(pay.allowances||0);
-        m._ded=parseFloat(pay.deductions||0);
+        // If payroll record has explicit non-zero allowances/deductions, use them;
+        // otherwise compute from staff record fields (housing + transport + other allowances)
+        var hasExplicitAllow=pay.allowances&&parseFloat(pay.allowances)!==0;
+        var hasExplicitDed=pay.deductions&&parseFloat(pay.deductions)!==0;
+        if(hasExplicitAllow){
+          m._allow=parseFloat(pay.allowances);
+        } else {
+          m._allow=parseFloat(m.housingAllowance||0)+parseFloat(m.transportAllowance||0)+parseFloat(m.otherAllowances||0);
+        }
+        if(hasExplicitDed){
+          m._ded=parseFloat(pay.deductions);
+        } else {
+          var gosiYes=(m.gosiEnrolled||'yes')!=='no';
+          var sanedYes=m.sanedEnrolled==='yes';
+          m._ded=(gosiYes?Math.round(m._basic*0.09):0)+(sanedYes?Math.round(m._basic*0.01):0);
+        }
         m._net=m._basic+m._allow-m._ded;
         allStaff.push(m);
         grandTotal+=m._net;
@@ -16022,7 +16036,11 @@ function hrfRunPayroll(month){
       var path='branches/'+b.id+'/payroll/'+month+'/'+m.id;
       db.ref(path).once('value',function(snap){
         if(!snap.val()){
-          db.ref(path).set({basicSalary:sal,allowances:0,deductions:0,status:'pending_hr',processedAt:Date.now()});
+          var allow=parseFloat(m.housingAllowance||0)+parseFloat(m.transportAllowance||0)+parseFloat(m.otherAllowances||0);
+          var gosiYes=(m.gosiEnrolled||'yes')!=='no';
+          var sanedYes=m.sanedEnrolled==='yes';
+          var ded=(gosiYes?Math.round(sal*0.09):0)+(sanedYes?Math.round(sal*0.01):0);
+          db.ref(path).set({basicSalary:sal,allowances:allow,deductions:ded,status:'pending_hr',processedAt:Date.now()});
           count++;
         }
       });
