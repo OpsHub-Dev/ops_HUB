@@ -989,6 +989,23 @@ function updateDots(prefix, count) {
   }
 }
 
+// ── Keyboard support for PIN pads ──────────────────────
+document.addEventListener('keydown', function(e) {
+  // Only when no text input is focused
+  var tag = document.activeElement && document.activeElement.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+  // Detect which pin step is visible
+  var stepMap = { 'step-pin': 'pd', 'step-setup': 'ss', 'step-confirm': 'cf' };
+  var activeBuf = null;
+  for (var stepId in stepMap) {
+    var el = document.getElementById(stepId);
+    if (el && el.style.display !== 'none') { activeBuf = stepMap[stepId]; break; }
+  }
+  if (!activeBuf) return;
+  if (e.key >= '0' && e.key <= '9') { e.preventDefault(); pinKey(parseInt(e.key), activeBuf); }
+  else if (e.key === 'Backspace' || e.key === 'Delete') { e.preventDefault(); pinKey('del', activeBuf); }
+});
+
 function onSetupFull(pin) {
   loginSt.newPin = pin;
   document.getElementById('setup-err').textContent = '';
