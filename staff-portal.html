@@ -499,6 +499,28 @@ textarea.fi{resize:vertical;min-height:80px}
             <div><h2>My Check-In</h2><div class="sechdr-sub" id="ci-date-sub">TODAY</div></div>
             <span class="badge" id="ci-status-badge" style="margin-left:auto;background:rgba(0,0,0,.08);color:var(--text2)">NOT CHECKED IN</span>
           </div>
+          <!-- Scheduled shift info card -->
+          <div class="card" id="ci-schedule-card" style="display:none;margin-bottom:0">
+            <div class="ctitle"><div class="cdot" style="background:var(--primary)"></div>Today's Schedule</div>
+            <div id="ci-schedule-info" style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+              <div style="flex:1;min-width:120px">
+                <div style="font-size:9px;color:var(--text3);font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px">SHIFT</div>
+                <div style="font-size:16px;font-weight:700;color:var(--primary);font-family:var(--mono)" id="ci-sch-shift">—</div>
+              </div>
+              <div style="flex:1;min-width:80px">
+                <div style="font-size:9px;color:var(--text3);font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px">DUTY</div>
+                <div style="font-size:14px;font-weight:600;color:var(--text);font-family:var(--mono)" id="ci-sch-duty">—</div>
+              </div>
+              <div style="flex:1;min-width:80px">
+                <div style="font-size:9px;color:var(--text3);font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px">BREAK</div>
+                <div style="font-size:14px;font-weight:600;color:var(--warning);font-family:var(--mono)" id="ci-sch-break">—</div>
+              </div>
+              <div style="flex:1;min-width:80px" id="ci-ot-wrap" style="display:none">
+                <div style="font-size:9px;color:var(--text3);font-family:var(--mono);letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px">OVERTIME</div>
+                <div style="font-size:14px;font-weight:700;color:#b45309;font-family:var(--mono)" id="ci-ot-val">—</div>
+              </div>
+            </div>
+          </div>
           <div class="loc-bar" id="ci-loc-bar">
             <span>📍</span><span id="ci-loc-text">Tap IN to verify your location</span>
           </div>
@@ -989,23 +1011,6 @@ function updateDots(prefix, count) {
   }
 }
 
-// ── Keyboard support for PIN pads ──────────────────────
-document.addEventListener('keydown', function(e) {
-  // Only when no text input is focused
-  var tag = document.activeElement && document.activeElement.tagName;
-  if (tag === 'INPUT' || tag === 'TEXTAREA') return;
-  // Detect which pin step is visible
-  var stepMap = { 'step-pin': 'pd', 'step-setup': 'ss', 'step-confirm': 'cf' };
-  var activeBuf = null;
-  for (var stepId in stepMap) {
-    var el = document.getElementById(stepId);
-    if (el && el.style.display !== 'none') { activeBuf = stepMap[stepId]; break; }
-  }
-  if (!activeBuf) return;
-  if (e.key >= '0' && e.key <= '9') { e.preventDefault(); pinKey(parseInt(e.key), activeBuf); }
-  else if (e.key === 'Backspace' || e.key === 'Delete') { e.preventDefault(); pinKey('del', activeBuf); }
-});
-
 function onSetupFull(pin) {
   loginSt.newPin = pin;
   document.getElementById('setup-err').textContent = '';
@@ -1229,23 +1234,24 @@ function renderDashboard() {
   var now2 = new Date();
   var monthKey = now2.getFullYear() + '-' + String(now2.getMonth()+1).padStart(2,'0');
 
-  function renderKpiRow(present, late, sick, absent, leaveBal, incCount) {
+  function renderKpiRow(present, late, sick, absent, leaveBal, incCount, otMins) {
     var el = document.getElementById('kpi-row');
     if (!el) return;
+    var otDisp = otMins > 0 ? Math.floor(otMins/60) + 'h ' + (otMins%60) + 'm' : '—';
     el.innerHTML =
       '<div class="kpi" style="--kc:var(--success)"><div class="kpi-l">PRESENT</div><div class="kpi-v">' + present + '</div><div class="kpi-s">This month</div></div>' +
       '<div class="kpi" style="--kc:var(--warning)"><div class="kpi-l">LATE</div><div class="kpi-v">' + late + '</div><div class="kpi-s">Days</div></div>' +
       '<div class="kpi" style="--kc:#f97316"><div class="kpi-l">SICK LEAVE</div><div class="kpi-v">' + sick + '</div><div class="kpi-s">Days</div></div>' +
       '<div class="kpi" style="--kc:var(--danger)"><div class="kpi-l">ABSENT</div><div class="kpi-v">' + absent + '</div><div class="kpi-s">Days</div></div>' +
       '<div class="kpi" style="--kc:var(--primary)"><div class="kpi-l">LEAVE BALANCE</div><div class="kpi-v">' + leaveBal + '</div><div class="kpi-s">Days remaining</div></div>' +
-      '<div class="kpi" style="--kc:var(--success)"><div class="kpi-l">INCIDENTS FILED</div><div class="kpi-v">' + incCount + '</div><div class="kpi-s">Total reports</div></div>';
+      '<div class="kpi" style="--kc:#b45309"><div class="kpi-l">OVERTIME</div><div class="kpi-v" style="font-size:18px">' + otDisp + '</div><div class="kpi-s">This month</div></div>';
   }
 
   var attPresent=0, attLate=0, attSick=0, attAbsent=0;
-  var leaveBal=21, incCount=0;
+  var leaveBal=21, incCount=0, attOtMins=0;
   var pending=3;
 
-  function tryRender(){ pending--; if(pending<=0) renderKpiRow(attPresent,attLate,attSick,attAbsent,leaveBal,incCount); }
+  function tryRender(){ pending--; if(pending<=0) renderKpiRow(attPresent,attLate,attSick,attAbsent,leaveBal,incCount,attOtMins); }
 
   // 1. Attendance from tsAtt
   if (u.branchId && u.staffId) {
@@ -1259,6 +1265,7 @@ function renderDashboard() {
         else if (st === 'late') attLate++;
         else if (st === 'sick') attSick++;
         else if (st === 'absent') attAbsent++;
+        attOtMins += (r.overtimeMins || 0);
       });
       tryRender();
     });
@@ -1929,6 +1936,97 @@ var _ciAttKey = null; // which Firebase key has this staff's attendance
 var _ciBreakStart = null; // ISO time string when current break started
 var _ciBreakLogs = []; // [{start, end, mins}]
 
+
+// ── Shift text parser (mirrors index.html) ────────────────────────────────
+function parseShiftText(txt) {
+  if (!txt) return null;
+  var t = txt.trim().toUpperCase();
+  if (t === 'OFF' || t === 'DAY OFF' || t === 'REST' || t === 'HOLIDAY') return null;
+  var brkM = 0;
+  var brkMatch = t.match(/BRK?\s*(\d+)|(\d+)\s*BRK/);
+  if (!brkMatch) brkMatch = t.match(/BREAK\s*(\d+)|(\d+)\s*BREAK/);
+  if (brkMatch) brkM = parseInt(brkMatch[1] || brkMatch[2] || 0) * 60;
+  function parseTime(s) {
+    s = s.trim();
+    var ampm = s.match(/([AP])M?$/i);
+    var isPM = ampm && ampm[1].toUpperCase() === 'P';
+    var isAM = ampm && ampm[1].toUpperCase() === 'A';
+    s = s.replace(/[APM\s]+$/i, '').trim();
+    var parts = s.split(':');
+    var h = parseInt(parts[0]) || 0;
+    var m2 = parts[1] ? parseInt(parts[1]) : 0;
+    if (isPM && h !== 12) h += 12;
+    if (isAM && h === 12) h = 0;
+    return h * 60 + m2;
+  }
+  var parts = txt.split(/\s*[-–]\s*/);
+  if (parts.length < 2) return null;
+  var startStr = parts[0].replace(/\s*(break.*|brk.*)/i,'').trim();
+  var endStr   = parts[1].replace(/\s*(break.*|brk.*)/i,'').trim();
+  if (!startStr || !endStr) return null;
+  var sMins = parseTime(startStr);
+  var eMins = parseTime(endStr);
+  if (eMins <= sMins) eMins += 24 * 60;
+  var dutyMins = eMins - sMins;
+  if (!brkM && dutyMins >= 480) brkM = 60;
+  function fmtM(m) { m=m%(24*60); return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0'); }
+  return { start: fmtM(sMins), end: fmtM(eMins%(24*60)),
+    startMins: sMins, endMins: eMins,
+    dutyMins: dutyMins, breakMins: brkM,
+    label: fmtM(sMins)+' – '+fmtM(eMins%(24*60)) };
+}
+
+// Load and display today's schedule for the staff member
+var _ciScheduledShift = null; // cached shift for OT calculation
+
+function ciLoadSchedule() {
+  var u = CU; if (!u || !u.branchId) return;
+  var dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  var now = new Date();
+  var dayName = dayNames[now.getDay()];
+  // Week key: Mon-based ISO week
+  var d = new Date(now);
+  d.setHours(0,0,0,0);
+  d.setDate(d.getDate() - ((d.getDay()+6)%7)); // Monday
+  var wk = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+
+  // Try staffId then sap
+  var empId = u.staffId || u.sap;
+  db.ref('branches/'+u.branchId+'/sch/'+wk+'/'+empId).once('value', function(snap) {
+    var ms = snap.val() || {};
+    var rawSlot = ms[dayName] || '';
+    if (!rawSlot && empId !== u.sap) {
+      // try sap
+      db.ref('branches/'+u.branchId+'/sch/'+wk+'/'+u.sap).once('value', function(snap2) {
+        var ms2 = snap2.val() || {};
+        ciApplySchedule(ms2[dayName]||'', dayName);
+      });
+    } else {
+      ciApplySchedule(rawSlot, dayName);
+    }
+  });
+}
+
+function ciApplySchedule(rawSlot, dayName) {
+  var card = document.getElementById('ci-schedule-card');
+  var schShift = document.getElementById('ci-sch-shift');
+  var schDuty  = document.getElementById('ci-sch-duty');
+  var schBrk   = document.getElementById('ci-sch-break');
+  if (!card) return;
+  if (!rawSlot || rawSlot.toUpperCase()==='OFF'||rawSlot.toUpperCase()==='DAY OFF') {
+    card.style.display='none';
+    _ciScheduledShift=null;
+    return;
+  }
+  var parsed = parseShiftText(rawSlot);
+  _ciScheduledShift = parsed;
+  card.style.display='';
+  if (schShift) schShift.textContent = parsed ? parsed.label : rawSlot;
+  if (schDuty)  schDuty.textContent  = parsed ? Math.floor(parsed.dutyMins/60)+'h duty' : '—';
+  if (schBrk)   schBrk.textContent   = parsed ? Math.floor(parsed.breakMins/60)+'h break' : '—';
+}
+
+
 function renderCheckIn() {
   var u = CU; if (!u) return;
 
@@ -1942,6 +2040,9 @@ function renderCheckIn() {
   var dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   document.getElementById('ci-date-sub').textContent = dayNames[now.getDay()].toUpperCase() + ' · ' + now.getDate() + ' ' + monthNames[now.getMonth()].toUpperCase();
+
+  // Load today's schedule and display shift info
+  ciLoadSchedule();
 
   if (!u.branchId) return; // no branch — buttons unlocked above, ready to use
 
@@ -2094,6 +2195,8 @@ function updateSummaryCard() {
   if (totalBrk) html += kpiMini('Total Break', minsToHHMM(totalBrk), 'var(--warning)');
   if (workedMins != null) html += kpiMini('Worked', minsToHHMM(workedMins), 'var(--primary)');
   if (coStr) html += kpiMini('Check-Out', coStr, 'var(--danger)');
+  var recOT = _ciTodayRec && _ciTodayRec.overtimeMins ? _ciTodayRec.overtimeMins : 0;
+  if (recOT > 0) html += kpiMini('Overtime', '+' + Math.floor(recOT/60) + 'h ' + (recOT%60) + 'm', '#b45309');
   kpis.innerHTML = html;
 }
 
@@ -2104,7 +2207,7 @@ function kpiMini(label, val, color) {
   '</div>';
 }
 
-function ciWriteRecord(newLog, ci, co, status, brkMins, brkLogs, workedMins) {
+function ciWriteRecord(newLog, ci, co, status, brkMins, brkLogs, workedMins, overtimeMins, scheduledShift) {
   var u = CU; if (!u || !u.branchId) return;
   var today = ciTodayStr();
   var monthKey = today.slice(0,7);
@@ -2121,7 +2224,9 @@ function ciWriteRecord(newLog, ci, co, status, brkMins, brkLogs, workedMins) {
     brkMins: totalBrk,
     brkLogs: brkLogs || [],
     workedMins: workedMins != null ? workedMins : null,
-    workedHrs: workedMins != null ? minsToHHMM(workedMins) : null
+    workedHrs: workedMins != null ? minsToHHMM(workedMins) : null,
+    overtimeMins: overtimeMins || 0,
+    scheduledShift: scheduledShift || (_ciScheduledShift ? _ciScheduledShift.label : '')
   };
   db.ref(path).once('value', function(snap) {
     var arr = snap.val();
@@ -2216,9 +2321,27 @@ function doPortalCheckOut() {
     var ciMins = ciTimeToMins(ci);
     var coMins = ciTimeToMins(t);
     var workedMins = Math.max(0, coMins - ciMins - totalBrkMins);
-    ciWriteRecord(_ciLog, ci, t, 'present', totalBrkMins, _ciBreakLogs, workedMins);
+
+    // ── Overtime calculation vs schedule ──────────────────────────
+    var overtimeMins = 0;
+    var isLate = false;
+    if (_ciScheduledShift) {
+      var scheduledWorked = _ciScheduledShift.dutyMins - _ciScheduledShift.breakMins;
+      overtimeMins = Math.max(0, workedMins - scheduledWorked);
+      isLate = (ciMins - _ciScheduledShift.startMins) > 5;
+      // Show OT on card
+      var otWrap = document.getElementById('ci-ot-wrap');
+      var otVal  = document.getElementById('ci-ot-val');
+      if (otWrap && overtimeMins > 0) {
+        otWrap.style.display = '';
+        if (otVal) otVal.textContent = '+' + Math.floor(overtimeMins/60) + 'h ' + (overtimeMins%60) + 'm';
+      }
+    }
+
+    ciWriteRecord(_ciLog, ci, t, 'present', totalBrkMins, _ciBreakLogs, workedMins, overtimeMins, _ciScheduledShift ? _ciScheduledShift.label : '');
     updateCIButtons(); renderCILog(); updateCIBadge(); updateSummaryCard();
-    showToast('Checked out at ' + t + ' · Worked ' + minsToHHMM(workedMins) + ' 👋', 'success');
+    var otMsg = overtimeMins > 0 ? ' · OT +' + Math.floor(overtimeMins/60) + 'h' + (overtimeMins%60>0?overtimeMins%60+'m':'') : '';
+    showToast('Checked out at ' + t + ' · Worked ' + minsToHHMM(workedMins) + otMsg + ' 👋', 'success');
     ciSendNotification('out', t, loc);
   });
 }

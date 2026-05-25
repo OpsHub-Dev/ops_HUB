@@ -7729,6 +7729,82 @@ function bremBadge(days) {
   return bpl(days+'d left','#059669');
 }
 function bdc(d) { var dn=normalizeDept(d||''); return dn==='Management'?'#b45309':dn==='Kitchen'?'#0057ff':dn==='Bar'?'#5b21b6':dn==='Maintenance'?'#c0392b':'#00875a'; }
+
+// ── Shift text parser ─────────────────────────────────────────────────────
+// Accepts: "1 PM - 10 PM", "13:00-22:00", "1PM-10PM", "OFF", "DAY OFF"
+// Returns {start:'13:00', end:'22:00', startMins:780, endMins:1320,
+//          dutyMins:480, breakMins:60, label:'1 PM – 10 PM'}  or null
+function parseShiftText(txt) {
+  if (!txt) return null;
+  var t = txt.trim().toUpperCase();
+  if (t === 'OFF' || t === 'DAY OFF' || t === 'REST' || t === 'HOLIDAY') return null;
+
+  // Extract break hours from text: e.g. "break 1h" or "1 break"
+  var brkM = 0;
+  var brkMatch = t.match(/BRK?\s*(\d+)H?|(\d+)\s*H?\s*BRK/i);
+  if (!brkMatch) brkMatch = t.match(/BREAK\s*(\d+)|(\d+)\s*BREAK/i);
+  if (brkMatch) brkM = parseInt(brkMatch[1] || brkMatch[2] || 0) * 60;
+
+  // Time parser: handles 12h (1 PM, 1PM, 1:30PM) and 24h (13:00, 13)
+  function parseTime(s) {
+    s = s.trim();
+    var ampm = s.match(/([AP])M?$/i);
+    var isPM = ampm && ampm[1].toUpperCase() === 'P';
+    var isAM = ampm && ampm[1].toUpperCase() === 'A';
+    s = s.replace(/[APM\s]+$/i, '').trim();
+    var parts = s.split(':');
+    var h = parseInt(parts[0]) || 0;
+    var m = parts[1] ? parseInt(parts[1]) : 0;
+    if (isPM && h !== 12) h += 12;
+    if (isAM && h === 12) h = 0;
+    return h * 60 + m;
+  }
+
+  // Split on separator: " - ", "-", " to ", "–"
+  var sep = txt.match(/\s*[-–]\s*/g) || [];
+  var parts = txt.split(/\s*[-–]\s*/);
+  if (parts.length < 2) return null;
+
+  // take first two meaningful parts
+  var startStr = parts[0].replace(/\s*(break.*|brk.*)/i,'').trim();
+  var endStr   = parts[1].replace(/\s*(break.*|brk.*)/i,'').trim();
+  if (!startStr || !endStr) return null;
+
+  var sMins = parseTime(startStr);
+  var eMins = parseTime(endStr);
+  // Handle overnight: e.g. 10 PM - 6 AM
+  if (eMins <= sMins) eMins += 24 * 60;
+
+  var dutyMins = eMins - sMins;
+  // Default 1h break if shift ≥ 8h and no explicit break
+  if (!brkM && dutyMins >= 480) brkM = 60;
+
+  function fmtMins(m) {
+    m = m % (24*60);
+    return String(Math.floor(m/60)).padStart(2,'0') + ':' + String(m%60).padStart(2,'0');
+  }
+
+  return {
+    start: fmtMins(sMins), end: fmtMins(eMins),
+    startMins: sMins, endMins: eMins,
+    dutyMins: dutyMins,
+    breakMins: brkM,
+    label: fmtMins(sMins) + ' – ' + fmtMins(eMins % (24*60))
+  };
+}
+
+// Get today's shift for a staff member from BS.sch
+function getStaffTodayShift(empId) {
+  var dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  var today = new Date();
+  var dayName = dayNames[today.getDay()];
+  var wk = bweekKey();
+  var sc = BS.sch[wk] || {};
+  var ms = sc[empId] || {};
+  var slot = ms[dayName] || '';
+  return parseShiftText(slot) ? { shift: parseShiftText(slot), raw: slot } : null;
+}
+
 function btsHrs(a,b) { if(!a||!b)return '—';var x=a.split(':').map(Number),y=b.split(':').map(Number),d=(y[0]*60+y[1])-(x[0]*60+x[1]);if(d<0)d+=24*60;return d<=0?'—':Math.floor(d/60)+'h '+d%60+'m'; }
 function btsBadge(s) { var c=TS_ST_BRANCH[s]||TS_ST_BRANCH.absent;return bpl(c.l,c.c); }
 function bweekKey() {
@@ -10490,7 +10566,9 @@ function btsPgAtt(){
     var key=vd.slice(0,7),recs=(BS.tsAtt[e.id]&&BS.tsAtt[e.id][key])||[],r=null;
     for(var i=0;i<recs.length;i++)if(recs[i].date===vd){r=recs[i];break;}
     if(r){if(r.st==='present'||r.st==='late')pCt++;else if(r.st==='absent')aCt++;else oCt++;}
-    return '<tr><td><div style="display:flex;align-items:center;gap:8px"><div class="bav">'+bini(e.name)+'</div><strong style="font-size:12px">'+bxe(e.name)+'</strong></div></td><td>'+bpl(e.dept||'\u2014',bdc(e.dept||'FOH'))+'</td><td class="bmono" style="font-size:11px">'+(r&&r.ci||'\u2014')+'</td><td class="bmono" style="font-size:11px">'+(r&&r.co||'\u2014')+'</td><td class="bmono" style="font-size:11px;color:var(--info);font-weight:600">'+(r&&r.brk||'\u2014')+'</td><td class="bmono" style="font-size:11px">'+(r?btsHrs(r.ci,r.co):'\u2014')+'</td><td>'+(r?btsBadge(r.st):'<span style="color:var(--text-tertiary);font-size:10px;font-style:italic">Not recorded</span>')+'</td><td style="font-size:11px;color:var(--text-secondary)">'+(r&&r.note||'')+'</td></tr>';
+    var schLbl=r&&r.scheduledShift?'<span style="font-size:10px;color:var(--primary);font-family:var(--mono)">'+bxe(r.scheduledShift)+'</span>':'<span style="color:var(--text-tertiary);font-size:10px">—</span>';
+    var otLbl=r&&r.overtimeMins&&r.overtimeMins>0?'<span style="color:#b45309;font-weight:700;font-family:var(--mono);font-size:11px">+'+Math.floor(r.overtimeMins/60)+'h'+(r.overtimeMins%60>0?r.overtimeMins%60+'m':'')+'</span>':'<span style="color:var(--text-tertiary);font-size:10px">—</span>';
+    return '<tr><td><div style="display:flex;align-items:center;gap:8px"><div class="bav">'+bini(e.name)+'</div><strong style="font-size:12px">'+bxe(e.name)+'</strong></div></td><td>'+bpl(e.dept||'\u2014',bdc(e.dept||'FOH'))+'</td><td style="font-size:10px">'+schLbl+'</td><td class="bmono" style="font-size:11px">'+(r&&r.ci||'\u2014')+'</td><td class="bmono" style="font-size:11px">'+(r&&r.co||'\u2014')+'</td><td class="bmono" style="font-size:11px;color:var(--info);font-weight:600">'+(r&&r.brk||'\u2014')+'</td><td class="bmono" style="font-size:11px">'+(r?btsHrs(r.ci,r.co):'\u2014')+'</td><td>'+otLbl+'</td><td>'+(r?btsBadge(r.st):'<span style="color:var(--text-tertiary);font-size:10px;font-style:italic">Not recorded</span>')+'</td><td style="font-size:11px;color:var(--text-secondary)">'+(r&&r.note||'')+'</td></tr>';
   }).join('');
   var dateLbl=vd===TODAY_BS?'Today \u2014 '+TODAY_BS:new Date(vd+'T00:00:00').toLocaleDateString('en-GB',{weekday:'short',day:'2-digit',month:'short',year:'numeric'});
   var h='<div class="bcard" style="margin-bottom:16px">';
@@ -10502,8 +10580,10 @@ function btsPgAtt(){
   h+='<div class="bfg" style="margin-bottom:0"><label class="form-label">Check Out</label><input class="form-input" type="time" id="bts-out"></div>';
   h+='</div>';
   h+='<div style="display:grid;grid-template-columns:2fr 1fr auto auto;gap:10px;align-items:flex-end;margin-bottom:10px">';
+  h+='<div id="bts-shift-info" style="grid-column:1/-1;padding:6px 10px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;font-size:11px;display:none"></div>';
   h+='<div class="bfg" style="margin-bottom:0"><label class="form-label">Note</label><input class="form-input" id="bts-note" placeholder="Optional"></div>';
   h+='<div class="bfg" style="margin-bottom:0"><label class="form-label">Break Total</label><input class="form-input" id="bts-brk" placeholder="Auto-calculated" readonly style="background:var(--surface-2);color:var(--text-secondary)"></div>';
+  h+='<div class="bfg" style="margin-bottom:0"><label class="form-label">Overtime</label><input class="form-input" id="bts-ot" placeholder="0m" readonly style="background:rgba(245,158,11,.08);color:#b45309;font-weight:700;border-color:rgba(245,158,11,.3)"></div>';
   h+='<div style="display:flex;flex-direction:column;gap:4px">';
   h+='<label class="form-label">Break</label>';
   h+='<div style="display:flex;gap:6px">';
@@ -10528,7 +10608,7 @@ function btsPgAtt(){
   h+='<strong style="color:'+(vd===TODAY_BS?'var(--ceo)':'var(--brand-dir)')+'">'+bxe(dateLbl)+'</strong>';
   h+='<span class="bmono" style="font-size:10px;color:var(--text-tertiary)">'+pCt+' present \u00b7 '+aCt+' absent \u00b7 '+oCt+' other</span></div>';
   h+='<div style="display:flex;gap:5px;flex-wrap:wrap;padding:8px 14px;border-bottom:1px solid var(--border);background:var(--surface-2)">'+afBtns+'</div>';
-  h+='<div class="btw-s"><table class="btbl"><thead><tr><th>Name</th><th>Dept</th><th>In</th><th>Out</th><th>Break</th><th>Hours</th><th>Status</th><th>Note</th></tr></thead>';
+  h+='<div class="btw-s"><table class="btbl"><thead><tr><th>Name</th><th>Dept</th><th>Scheduled</th><th>In</th><th>Out</th><th>Break</th><th>Hours</th><th style="color:#b45309">OT</th><th>Status</th><th>Note</th></tr></thead>';
   h+='<tbody>'+(attRows||'<tr><td colspan="8" style="text-align:center;color:var(--text-tertiary);padding:24px">No records for this date</td></tr>')+'</tbody></table></div></div>';
 
   // Wire up status buttons and save button AFTER render via setTimeout
@@ -10574,12 +10654,41 @@ function saveBranchAttendance(){
   var co=(document.getElementById('bts-out')||{}).value||'';
   var brk=bgv('bts-brk'),note=bgv('bts-note'),st=BS.tsSt||'present';
   if(!eid){showToast('Select an employee','error');return;}
+
+  // ── Schedule-linked: OT, Late, Scheduled shift ────────────────
+  var dayNames=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  var selDate=new Date(dt+'T00:00:00');
+  var dayName=dayNames[selDate.getDay()];
+  var wk=bweekKey();
+  var rawSlot=((BS.sch[wk]||{})[eid]||{})[dayName]||'';
+  var schShift=rawSlot?parseShiftText(rawSlot):null;
+  var overtimeMins=0,lateMins=0,scheduledLabel='';
+  function tToMBts(t){if(!t)return 0;var p=t.split(':');return parseInt(p[0]||0)*60+parseInt(p[1]||0);}
+  if(schShift&&ci&&co){
+    var ciM=tToMBts(ci),coM=tToMBts(co);
+    if(coM<ciM)coM+=1440;
+    var brkM=0;if(brk){var brkParse=brk.match(/([0-9]+)m/);if(brkParse)brkM=parseInt(brkParse[1]);}
+    var actualWorked=coM-ciM-brkM;
+    var scheduledWorked=schShift.dutyMins-schShift.breakMins;
+    overtimeMins=Math.max(0,actualWorked-scheduledWorked);
+    scheduledLabel=schShift.label;
+    lateMins=Math.max(0,ciM-schShift.startMins);
+    if(lateMins>5&&(st==='present'||!st))st='late';
+    var otEl=document.getElementById('bts-ot');
+    if(otEl)otEl.value=overtimeMins>0?Math.floor(overtimeMins/60)+'h '+overtimeMins%60+'m':'—';
+  }
+
   var key=dt.slice(0,7);
   if(!BS.tsAtt[eid])BS.tsAtt[eid]={};
   if(!BS.tsAtt[eid][key])BS.tsAtt[eid][key]=[];
   var recs=BS.tsAtt[eid][key];
   var ex=recs.findIndex(function(r){return r.date===dt;});
-  var rec={date:dt,ci:ci,co:co,brk:brk,note:note,st:st,brkLogs:(_btsBreak?_btsBreak.logs||[]:[])};
+  var rec={date:dt,ci:ci,co:co,brk:brk,note:note,st:st,
+    brkLogs:(_btsBreak?_btsBreak.logs||[]:[])||[],
+    overtimeMins:overtimeMins||0,
+    scheduledShift:scheduledLabel||rawSlot||'',
+    lateMins:lateMins||0
+  };
   if(ex>=0)recs[ex]=rec;else recs.push(rec);
   // Save to Firebase using targeted path (not full set) to avoid overwriting other employees
   if(db){
@@ -10611,8 +10720,44 @@ var _btsBreak = { active:false, startMs:null, logs:[], timerInt:null };
 
 function btsOnEmpChange(eid, vd) {
   btsResetBreak();
-  if(!eid||!BS.tsAtt[eid]) return;
-  var key=vd.slice(0,7), recs=(BS.tsAtt[eid][key]||[]);
+  // Show scheduled shift info for this employee on this date
+  var shiftInfo = document.getElementById('bts-shift-info');
+  if (shiftInfo) {
+    var dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+    var selDate = new Date(vd + 'T00:00:00');
+    var dayName = dayNames[selDate.getDay()];
+    var wk = bweekKey();
+    var sc = BS.sch[wk] || {};
+    var ms = (sc[eid] || {});
+    var rawSlot = ms[dayName] || '';
+    var parsed = rawSlot ? parseShiftText(rawSlot) : null;
+    if (rawSlot && rawSlot.toUpperCase() !== 'OFF' && rawSlot.toUpperCase() !== 'DAY OFF') {
+      var lbl = parsed ? parsed.label + ' · Duty ' + Math.floor(parsed.dutyMins/60) + 'h · Break ' + Math.floor(parsed.breakMins/60) + 'h' : rawSlot;
+      shiftInfo.innerHTML = '<span style="color:var(--primary);font-weight:700">📅 Scheduled: </span><span style="font-family:var(--mono);font-size:11px">' + bxe(lbl) + '</span>';
+      shiftInfo.style.display = '';
+    } else if (rawSlot.toUpperCase() === 'OFF' || rawSlot.toUpperCase() === 'DAY OFF') {
+      shiftInfo.innerHTML = '<span style="color:#b45309;font-weight:700">🔴 Day Off / Not Scheduled</span>';
+      shiftInfo.style.display = '';
+    } else {
+      shiftInfo.innerHTML = '<span style="color:var(--text-tertiary);font-size:11px">No schedule found for ' + dayName + '</span>';
+      shiftInfo.style.display = '';
+    }
+    // Auto-fill CI/CO if no existing record
+    var existingRec = null;
+    if (BS.tsAtt[eid]) {
+      var key0 = vd.slice(0,7), recs0 = (BS.tsAtt[eid][key0]||[]);
+      existingRec = recs0.find(function(x){return x.date===vd;});
+    }
+    if (!existingRec && parsed) {
+      var ciEl = document.getElementById('bts-in');
+      var coEl = document.getElementById('bts-out');
+      if (ciEl && !ciEl.value) ciEl.value = parsed.start;
+      if (coEl && !coEl.value) coEl.value = parsed.end.length === 5 ? parsed.end : parsed.end.slice(0,5);
+    }
+  }
+
+  if(!eid) return;
+  var key=vd.slice(0,7), recs=(BS.tsAtt[eid]&&BS.tsAtt[eid][key])||[];
   var r=recs.find(function(x){return x.date===vd;});
   if(!r) return;
   var ci=document.getElementById('bts-in'), co=document.getElementById('bts-out');
@@ -10704,7 +10849,9 @@ function _refreshAttTable(vd){
     var key=vd.slice(0,7),recs=(BS.tsAtt[e.id]&&BS.tsAtt[e.id][key])||[],r=null;
     for(var i=0;i<recs.length;i++)if(recs[i].date===vd){r=recs[i];break;}
     if(r){if(r.st==='present'||r.st==='late')pCt++;else if(r.st==='absent')aCt++;else oCt++;}
-    return '<tr><td><div style="display:flex;align-items:center;gap:8px"><div class="bav">'+bini(e.name)+'</div><strong style="font-size:12px">'+bxe(e.name)+'</strong></div></td><td>'+bpl(e.dept||'\u2014',bdc(e.dept||'FOH'))+'</td><td class="bmono" style="font-size:11px">'+(r&&r.ci||'\u2014')+'</td><td class="bmono" style="font-size:11px">'+(r&&r.co||'\u2014')+'</td><td class="bmono" style="font-size:11px;color:var(--info);font-weight:600">'+(r&&r.brk||'\u2014')+'</td><td class="bmono" style="font-size:11px">'+(r?btsHrs(r.ci,r.co):'\u2014')+'</td><td>'+(r?btsBadge(r.st):'<span style="color:var(--text-tertiary);font-size:10px;font-style:italic">Not recorded</span>')+'</td><td style="font-size:11px;color:var(--text-secondary)">'+(r&&r.note||'')+'</td></tr>';
+    var schLbl2=r&&r.scheduledShift?'<span style="font-size:10px;color:var(--primary);font-family:var(--mono)">'+bxe(r.scheduledShift)+'</span>':'<span style="color:var(--text-tertiary);font-size:10px">—</span>';
+    var otLbl2=r&&r.overtimeMins&&r.overtimeMins>0?'<span style="color:#b45309;font-weight:700;font-family:var(--mono);font-size:11px">+'+Math.floor(r.overtimeMins/60)+'h'+(r.overtimeMins%60>0?r.overtimeMins%60+'m':'')+'</span>':'<span style="color:var(--text-tertiary);font-size:10px">—</span>';
+    return '<tr><td><div style="display:flex;align-items:center;gap:8px"><div class="bav">'+bini(e.name)+'</div><strong style="font-size:12px">'+bxe(e.name)+'</strong></div></td><td>'+bpl(e.dept||'\u2014',bdc(e.dept||'FOH'))+'</td><td style="font-size:10px">'+schLbl2+'</td><td class="bmono" style="font-size:11px">'+(r&&r.ci||'\u2014')+'</td><td class="bmono" style="font-size:11px">'+(r&&r.co||'\u2014')+'</td><td class="bmono" style="font-size:11px;color:var(--info);font-weight:600">'+(r&&r.brk||'\u2014')+'</td><td class="bmono" style="font-size:11px">'+(r?btsHrs(r.ci,r.co):'\u2014')+'</td><td>'+otLbl2+'</td><td>'+(r?btsBadge(r.st):'<span style="color:var(--text-tertiary);font-size:10px;font-style:italic">Not recorded</span>')+'</td><td style="font-size:11px;color:var(--text-secondary)">'+(r&&r.note||'')+'</td></tr>';
   }).join('');
   tbody.innerHTML=rows||'<tr><td colspan="8" style="text-align:center;color:var(--text-tertiary);padding:24px">No records for this date</td></tr>';
   // Update counter line
@@ -10757,7 +10904,7 @@ function runBranchTsReport(){var eid=bgv('bts-r-emp'),mo=parseInt(bgv('bts-r-mo'
     Object.keys(SC).map(function(k){return '<div style="display:flex;align-items:center;gap:6px"><span style="display:inline-block;width:18px;height:18px;line-height:18px;text-align:center;border-radius:4px;background:'+SC[k]+'25;color:'+SC[k]+';font-size:10px;font-weight:700">'+SLAB[k]+'</span> '+k.charAt(0).toUpperCase()+k.slice(1)+'</div>';}).join('')+'</div>';
   out.innerHTML=legend+'<div class="btw" style="overflow-x:auto"><table class="btbl" style="font-size:11px"><thead><tr><th style="position:sticky;left:0;background:var(--surface-2);z-index:2;min-width:160px">Employee</th>'+dayHdrs+'<th style="text-align:center;background:var(--surface-2);color:#b45309">P</th><th style="text-align:center;background:var(--surface-2);color:#b45309">L</th><th style="text-align:center;background:var(--surface-2);color:#c0392b">A</th></tr></thead><tbody>'+(matrixRows||'<tr><td colspan="'+(daysInMo+4)+'" style="text-align:center;color:var(--text-tertiary);padding:20px">No staff or no records</td></tr>')+'</tbody></table></div>';
   return;
-}var emp=BS.tsEmps.find(function(e){return e.id===eid;});if(!emp){out.innerHTML='<div style="color:var(--danger);padding:12px">Employee not found.</div>';return;}var recs=getRecs(emp.id),cnt=countSt(recs),tot=recs.length,worked=cnt.present+cnt.late,pct=tot?Math.round(worked/tot*100)+'%':'\u2014';if(pb)pb.style.display='';var rows=recs.map(function(r){return '<tr><td class="bmono">'+bxe(r.date)+'</td><td class="bmono" style="text-align:center">'+(r.ci||'\u2014')+'</td><td class="bmono" style="text-align:center">'+(r.co||'\u2014')+'</td><td class="bmono" style="text-align:center;color:var(--info);font-weight:600">'+(r.brk||'\u2014')+'</td><td class="bmono" style="text-align:center">'+btsHrs(r.ci,r.co)+'</td><td>'+btsBadge(r.st)+'</td><td style="font-size:11px;color:var(--text-secondary)">'+(r.note||'')+'</td></tr>';}).join('');out.innerHTML='<div class="bcard" style="margin-bottom:14px"><div style="font-size:15px;font-weight:700">'+bxe(emp.name)+'</div><div style="font-size:11px;color:var(--ceo);margin-top:3px">'+bxe(emp.dept||'')+' \u00b7 '+(mo===0?'Full Year':MONTHS_FULL[mo-1])+' '+yr+'</div></div><div class="bgrid-4" style="margin-bottom:14px">'+[['Total',tot,'var(--text-primary)'],['Present',cnt.present,'#00875a'],['Absent',cnt.absent,'#c0392b'],['Rate',pct,'#00875a']].map(function(x){return '<div style="text-align:center;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:12px"><div class="bmono" style="font-size:22px;font-weight:300;color:'+x[2]+'">'+bxe(String(x[1]))+'</div><div style="font-size:9px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:1px;margin-top:3px">'+x[0]+'</div></div>';}).join('')+'</div>'+(recs.length?'<div class="btw"><div class="btw-s"><table class="btbl"><thead><tr><th>Date</th><th style="text-align:center">In</th><th style="text-align:center">Out</th><th style="text-align:center">Break</th><th style="text-align:center">Hours</th><th>Status</th><th>Note</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>':'<div style="color:var(--text-tertiary);text-align:center;padding:28px;font-style:italic">No records for this period.</div>');}
+}var emp=BS.tsEmps.find(function(e){return e.id===eid;});if(!emp){out.innerHTML='<div style="color:var(--danger);padding:12px">Employee not found.</div>';return;}var recs=getRecs(emp.id),cnt=countSt(recs),tot=recs.length,worked=cnt.present+cnt.late,pct=tot?Math.round(worked/tot*100)+'%':'\u2014';if(pb)pb.style.display='';var rows=recs.map(function(r){var otCell=r.overtimeMins&&r.overtimeMins>0?'<span style="color:#b45309;font-weight:700">+'+Math.floor(r.overtimeMins/60)+'h'+(r.overtimeMins%60>0?r.overtimeMins%60+'m':'')+'</span>':'—';return '<tr><td class="bmono">'+bxe(r.date)+'</td><td style="font-size:10px;color:var(--primary)">'+(r.scheduledShift||'—')+'</td><td class="bmono" style="text-align:center">'+(r.ci||'\u2014')+'</td><td class="bmono" style="text-align:center">'+(r.co||'\u2014')+'</td><td class="bmono" style="text-align:center;color:var(--info);font-weight:600">'+(r.brk||'\u2014')+'</td><td class="bmono" style="text-align:center">'+btsHrs(r.ci,r.co)+'</td><td style="text-align:center">'+otCell+'</td><td>'+btsBadge(r.st)+'</td><td style="font-size:11px;color:var(--text-secondary)">'+(r.note||'')+'</td></tr>';}).join('');out.innerHTML='<div class="bcard" style="margin-bottom:14px"><div style="font-size:15px;font-weight:700">'+bxe(emp.name)+'</div><div style="font-size:11px;color:var(--ceo);margin-top:3px">'+bxe(emp.dept||'')+' \u00b7 '+(mo===0?'Full Year':MONTHS_FULL[mo-1])+' '+yr+'</div></div><div class="bgrid-4" style="margin-bottom:14px">'+[['Total',tot,'var(--text-primary)'],['Present',cnt.present,'#00875a'],['Absent',cnt.absent,'#c0392b'],['Rate',pct,'#00875a']].map(function(x){return '<div style="text-align:center;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:12px"><div class="bmono" style="font-size:22px;font-weight:300;color:'+x[2]+'">'+bxe(String(x[1]))+'</div><div style="font-size:9px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:1px;margin-top:3px">'+x[0]+'</div></div>';}).join('')+'</div>'+(recs.length?'<div class="btw"><div class="btw-s"><table class="btbl"><thead><tr><th>Date</th><th>Scheduled</th><th style="text-align:center">In</th><th style="text-align:center">Out</th><th style="text-align:center">Break</th><th style="text-align:center">Hours</th><th style="text-align:center;color:#b45309">OT</th><th>Status</th><th>Note</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>':'<div style="color:var(--text-tertiary);text-align:center;padding:28px;font-style:italic">No records for this period.</div>');}
 function printBranchTsReport(){var eid=bgv('bts-r-emp'),mo=parseInt(bgv('bts-r-mo')),yr=bgv('bts-r-yr');if(!eid){showToast('Select an employee first','error');return;}var emp=BS.tsEmps.find(function(e){return e.id===eid;});if(!emp)return;var recs=[];if(mo===0){for(var mi=1;mi<=12;mi++){var k=yr+'-'+(mi<10?'0':'')+mi;recs=recs.concat((BS.tsAtt[emp.id]&&BS.tsAtt[emp.id][k])||[]);}}else{var k=yr+'-'+(mo<10?'0':'')+mo;recs=(BS.tsAtt[emp.id]&&BS.tsAtt[emp.id][k])||[];}var cnt={present:0,late:0,absent:0,sick:0,holiday:0,dayoff:0};recs.forEach(function(r){if(cnt[r.st]!==undefined)cnt[r.st]++;});var tot=recs.length,worked=cnt.present+cnt.late,pct=tot?Math.round(worked/tot*100)+'%':'\u2014';var TC={present:'#00875a',late:'#b45309',absent:'#c0392b',sick:'#b45309',holiday:'#5b21b6',dayoff:'#b45309'};var TL={present:'Present',late:'Late',absent:'Absent',sick:'Sick Leave',holiday:'Holiday',dayoff:'OFF'};var rows=recs.map(function(r,i){var col=TC[r.st]||'#888';return '<tr style="background:'+(i%2===0?'#fff':'#f8fafc')+'"><td style="padding:7px 10px;font-family:monospace;font-size:11px;color:#64748b">'+bxe(r.date)+'</td><td style="padding:7px 10px;text-align:center;font-weight:600;font-family:monospace">'+(r.ci||'\u2014')+'</td><td style="padding:7px 10px;text-align:center;font-weight:600;font-family:monospace">'+(r.co||'\u2014')+'</td><td style="padding:7px 10px;text-align:center;font-weight:600;font-family:monospace;color:#0057ff">'+(r.brk||'\u2014')+'</td><td style="padding:7px 10px;text-align:center;font-weight:700;font-family:monospace">'+btsHrs(r.ci,r.co)+'</td><td style="padding:7px 10px;text-align:center"><span style="background:'+col+'20;color:'+col+';border:1px solid '+col+'40;border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700">'+(TL[r.st]||r.st)+'</span></td><td style="padding:7px 10px;font-size:11px;color:#64748b">'+(r.note||'')+'</td></tr>';}).join('');var s=NX.session||{};var moLabel=mo===0?'Full Year '+yr:MONTHS_FULL[mo-1]+' '+yr;var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Timesheet \u2014 '+bxe(emp.name)+'</title><style>@page{size:A4;margin:10mm}*{box-sizing:border-box;margin:0;padding:0;font-family:Arial,Helvetica,sans-serif}body{background:#fff;color:#111;font-size:12px}table{width:100%;border-collapse:collapse}th{background:#1a2340;color:#fff;padding:8px 10px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:1px}.c{text-align:center}.stats{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:16px}.stat{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 8px;text-align:center}.stat-n{font-size:22px;font-weight:300;font-family:monospace}.stat-l{font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-top:3px}.foot{margin-top:20px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:30px}.foot-cell{border-top:1px solid #333;padding-top:5px;text-align:center;font-size:9px;color:#64748b}@media print{.np{display:none!important}}</style></head><body>';html+='<div style="display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:10px;margin-bottom:16px;border-bottom:3px solid #1a2340"><div><img src="https://i.imgur.com/jeqtcE2.png" alt="ALFA.CO" style="height:44px;width:auto;display:block"><div style="font-size:10px;color:#64748b">'+bxe(s.branchName||s.entityName||'')+'</div></div><div style="text-align:center"><h1 style="font-size:16px;font-weight:800;color:#1a2340">Employee Timesheet</h1><p style="font-size:11px;color:#64748b">'+bxe(emp.name)+' \u00b7 '+bxe(emp.dept||'')+' \u00b7 '+bxe(moLabel)+'</p></div><div style="text-align:right;font-size:10px;color:#64748b"><div>Printed: '+new Date().toLocaleDateString('en-GB')+'</div><div>Work Rate: '+pct+'</div></div></div>';html+='<div class="stats"><div class="stat"><div class="stat-n" style="color:#1a2340">'+tot+'</div><div class="stat-l">Total</div></div><div class="stat"><div class="stat-n" style="color:#00875a">'+cnt.present+'</div><div class="stat-l">Present</div></div><div class="stat"><div class="stat-n" style="color:#b45309">'+cnt.late+'</div><div class="stat-l">Late</div></div><div class="stat"><div class="stat-n" style="color:#c0392b">'+cnt.absent+'</div><div class="stat-l">Absent</div></div><div class="stat"><div class="stat-n" style="color:#b45309">'+cnt.sick+'</div><div class="stat-l">Sick</div></div><div class="stat"><div class="stat-n" style="color:#00875a">'+pct+'</div><div class="stat-l">Rate</div></div></div>';html+=(recs.length?'<table><thead><tr><th>Date</th><th class="c">In</th><th class="c">Out</th><th class="c">Break</th><th class="c">Hours</th><th class="c">Status</th><th>Note</th></tr></thead><tbody>'+rows+'</tbody></table>':'<div style="text-align:center;padding:30px;color:#94a3b8;font-style:italic">No records.</div>');html+='<div class="foot"><div class="foot-cell">Employee Signature</div><div class="foot-cell">HR / Manager</div><div class="foot-cell">Date &amp; Stamp</div></div><div class="np" style="text-align:center;margin-top:20px"><button onclick="window.print()" style="background:#1a2340;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:13px;font-weight:700;cursor:pointer">Print / Save PDF</button></div></body></html>';var w=window.open('','_blank','width=900,height=700');if(w){w.document.write(html);w.document.close();}else showToast('Allow pop-ups to print','error');}
 function btsPgLeave(){var filt=BS.tsLTab==='all'?BS.tsLeaves:BS.tsLeaves.filter(function(l){return l.type===BS.tsLTab;});var pend=0,appr=0,rej=0;filt.forEach(function(l){if(l.status==='pending')pend++;else if(l.status==='approved')appr++;else rej++;});var eo='<option value="">Select</option>'+BS.tsEmps.slice().sort(function(a,b){return a.name.localeCompare(b.name);}).map(function(e){return '<option value="'+bxe(e.id)+'">'+bxe(e.name)+' ('+bxe(e.dept||'')+')</option>';}).join('');var lbar='<div style="display:flex;gap:6px;margin-bottom:16px">'+['all','sick','holiday','dayoff'].map(function(t){var l={all:'All',sick:'Sick',holiday:'Holiday',dayoff:'OFF'};return '<button class="bfbt'+(BS.tsLTab===t?' on':'')+'" onclick="BS.tsLTab=\''+t+'\';navTo(\'timesheet\')">'+l[t]+'</button>';}).join('')+'</div>';var rows=filt.slice().sort(function(a,b){return(b.start||'').localeCompare(a.start||'');}).map(function(l){var lt=TS_LT_BRANCH[l.type]||{l:l.type,c:'#888'};var emp=BS.tsEmps.find(function(e){return e.id===l.empId;});var sc=l.status==='approved'?'#00875a':l.status==='rejected'?'#c0392b':'#b45309';return '<tr><td style="font-weight:600;color:var(--text-primary)">'+bxe(emp?emp.name:'Unknown')+'</td><td>'+bpl(lt.l,lt.c)+'</td><td class="bmono">'+bxe(l.start)+'</td><td class="bmono">'+bxe(l.end)+'</td><td class="bmono" style="font-weight:600">'+bxe(l.days)+'d</td><td>'+bpl(l.status,sc)+'</td><td><div style="display:flex;gap:4px">'+(l.status==='pending'?'<button class="btn btn-sm" style="color:var(--success)" onclick="approveBranchLeave(\''+bxe(l.id)+'\')">Approve</button><button class="btn btn-sm" style="color:var(--danger)" onclick="rejectBranchLeave(\''+bxe(l.id)+'\')">Reject</button>':'')+'<button class="btn btn-sm" style="color:var(--danger)" onclick="delBranchLeave(\''+bxe(l.id)+'\')">Del</button></div></td></tr>';}).join('');var h='<div class="bcard" style="margin-bottom:16px"><div style="font-size:13px;font-weight:700;color:var(--ceo);margin-bottom:14px">New Leave Request</div><div class="bgrid-2" style="margin-bottom:12px"><div class="bfg" style="margin-bottom:0"><label class="form-label">Employee *</label><select class="form-input form-select" id="blf-emp">'+eo+'</select></div><div class="bfg" style="margin-bottom:0"><label class="form-label">Leave Type *</label><select class="form-input form-select" id="blf-type"><option value="sick">Sick Leave</option><option value="holiday">Annual Holiday</option><option value="dayoff">Day Off</option></select></div><div class="bfg" style="margin-bottom:0"><label class="form-label">Start Date *</label><input class="form-input" type="date" id="blf-start"></div><div class="bfg" style="margin-bottom:0"><label class="form-label">End Date *</label><input class="form-input" type="date" id="blf-end"></div></div><div class="bfg"><label class="form-label">Notes</label><input class="form-input" id="blf-note" placeholder="Optional reason"></div><button class="btn btn-primary" onclick="saveBranchLeave()">Submit Leave Request</button></div>'+lbar;h+='<div class="bgrid-4" style="margin-bottom:16px">'+[['Pending',pend,'#b45309'],['Approved',appr,'#00875a'],['Rejected',rej,'#c0392b'],['Total',filt.length,'var(--text-primary)']].map(function(x){return '<div style="text-align:center;background:var(--surface-2);border:1px solid '+x[2]+'30;border-radius:9px;padding:12px"><div class="bmono" style="font-size:24px;font-weight:300;color:'+x[2]+'">'+x[1]+'</div><div style="font-size:9px;color:var(--text-tertiary);margin-top:3px;text-transform:uppercase;letter-spacing:1px">'+x[0]+'</div></div>';}).join('')+'</div>';return h+'<div class="btw"><div class="btw-s"><table class="btbl"><thead><tr><th>Employee</th><th>Type</th><th>Start</th><th>End</th><th>Days</th><th>Status</th><th>Actions</th></tr></thead><tbody>'+(rows||'<tr><td colspan="7" style="text-align:center;color:var(--text-tertiary);padding:24px">No leave requests yet</td></tr>')+'</tbody></table></div></div>';}
 function saveBranchLeave(){var eid=bgv('blf-emp'),type=bgv('blf-type'),start=bgv('blf-start'),end=bgv('blf-end');if(!eid||!start||!end){showToast('Fill all required fields','error');return;}var days=Math.max(1,Math.ceil((new Date(end+'T00:00:00')-new Date(start+'T00:00:00'))/86400000)+1);BS.tsLeaves.push({id:buid(),empId:eid,type:type,start:start,end:end,days:days,note:bgv('blf-note'),status:'pending'});bSaveColl('tsLeaves',BS.tsLeaves);showToast('Leave request submitted','success');BS.tsTab='leave';navTo('timesheet');}
@@ -11268,12 +11415,12 @@ function openBranchSalesModal(id){
     +'<input class="form-input" type="date" id="bsl-date" value="'+(e?e.date:TODAY_BS)+'"></div>'
     +'<div class="form-row">'
     +'<div class="bfg"><label class="form-label">Actual Sales (SAR) *</label>'
-    +'<input class="form-input" type="number" step="0.01" id="bsl-actual" value="'+(e&&e.actual!=null?e.actual:'')+' placeholder="0.00"></div>'
+    +'<input class="form-input" type="number" step="0.01" id="bsl-actual" value="'+(e?e.actual:'')+"" +' placeholder="0.00"></div>'
     +'<div class="bfg"><label class="form-label">Sales Target (SAR) *</label>'
-    +'<input class="form-input" type="number" step="0.01" id="bsl-target" value="'+(e&&e.target!=null?e.target:'')+' placeholder="0.00"></div></div>'
+    +'<input class="form-input" type="number" step="0.01" id="bsl-target" value="'+(e?e.target:'')+"" +' placeholder="0.00"></div></div>'
     +'<div class="bfg"><label class="form-label">Delivery Sales (SAR) '
     +'<span style="color:var(--text-tertiary);font-weight:400;font-size:10px">optional · auto-filled from DSR</span></label>'
-    +'<input class="form-input" type="number" step="0.01" id="bsl-delivery" value="'+(e&&e.delivery!=null?e.delivery:'')+' placeholder="0.00"></div>'
+    +'<input class="form-input" type="number" step="0.01" id="bsl-delivery" value="'+(e&&e.delivery?e.delivery:'')+"" +' placeholder="0.00"></div>'
     +'<button class="btn btn-primary" style="width:100%;margin-top:8px"'
     +' onclick="saveBranchSales(\''+bxe(id||'')+'\')">' +'Save Entry</button>';
   openModal(html);
