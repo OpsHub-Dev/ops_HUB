@@ -10422,10 +10422,14 @@ function pSchedule() {
   dates.forEach(function(dt,i){var it=dt===TODAY_BS;th+='<th style="'+(it?'color:var(--ceo)':'')+';text-align:center">'+DAYS_WEEK[i]+'<br><span style="font-weight:400;font-size:9px;opacity:.7">'+new Date(dt+'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short'})+'</span></th>';});
   th+='</tr>';
   var tb='';
-  var schDepts=BS._schDept==='All'?DEPTS:DEPTS.filter(function(d){return d===BS._schDept;});
-  schDepts.forEach(function(dep){var mem=BS.staff.filter(function(m){return normalizeDept(m.dept)===dep;});if(!mem.length)return;tb+='<tr class="bdr"><td colspan="8">'+bxe(dep)+'</td></tr>';mem.forEach(function(m){var ms=(sc[m.id]||{});tb+='<tr><td><div style="display:flex;align-items:center;gap:8px"><div class="bav" style="width:24px;height:24px;font-size:9px">'+bini(m.name)+'</div><span style="font-size:12px;font-weight:500">'+bxe(m.name)+'</span>'+(m.sap?'<div style="font-size:9px;color:#94a3b8;font-family:monospace">'+bxe(m.sap)+'</div>':'')+' </div></div></td>';DAYS_WEEK.forEach(function(day){tb+='<td style="padding:4px"><input class="bsinp bsc-inp" data-id="'+bxe(m.id)+'" data-day="'+bxe(day)+'" value="'+bxe(ms[day]||'')+'" placeholder="\u2014"></td>';});tb+='</tr>';});});
+  var _schDs=BS._schDept==='All'?DEPTS:DEPTS.filter(function(d){return d===BS._schDept;});
+  _schDs.forEach(function(dep){var mem=BS.staff.filter(function(m){return normalizeDept(m.dept)===dep;});if(!mem.length)return;tb+='<tr class="bdr"><td colspan="8">'+bxe(dep)+'</td></tr>';mem.forEach(function(m){var ms=(sc[m.id]||{});tb+='<tr><td><div style="display:flex;align-items:center;gap:8px"><div class="bav" style="width:24px;height:24px;font-size:9px">'+bini(m.name)+'</div><span style="font-size:12px;font-weight:500">'+bxe(m.name)+'</span>'+(m.sap?'<div style="font-size:9px;color:#94a3b8;font-family:monospace">'+bxe(m.sap)+'</div>':'')+' </div></div></td>';DAYS_WEEK.forEach(function(day){tb+='<td style="padding:4px"><input class="bsinp bsc-inp" data-id="'+bxe(m.id)+'" data-day="'+bxe(day)+'" value="'+bxe(ms[day]||'')+'" placeholder="\u2014"></td>';});tb+='</tr>';});});
   var h='<div class="page-header"><h1>Weekly Schedule</h1></div>';
-  h+='<div class="bwnav"><button class="btn btn-sm" onclick="BS.wo=(BS.wo||0)-1;navTo(\'schedule\')">\u2190 Prev</button><span class="bmono" style="font-size:12px;color:var(--text-secondary)">'+bxe(wk)+' \u00b7 '+d0+' \u2014 '+d6+'</span><button class="btn btn-sm" onclick="BS.wo=(BS.wo||0)+1;navTo(\'schedule\')">Next \u2192</button><span style="margin-left:auto;font-size:11px;color:var(--success);opacity:.8">\u25cf Auto-saves</span><button class="btn btn-sm" onclick="printBranchSched(\'All\')">Print All</button><button class="btn btn-sm" onclick="printBranchSched(\'Management\')">Print Mgmt</button><button class="btn btn-sm" onclick="printBranchSched(\'Kitchen\')">Print Kitchen</button><button class="btn btn-sm" onclick="printBranchSched(\'FOH\')">Print FOH</button></div>';
+  h+='<div class="bwnav"><button class="btn btn-sm" onclick="BS.wo=(BS.wo||0)-1;navTo(\'schedule\')">\u2190 Prev</button><span class="bmono" style="font-size:12px;color:var(--text-secondary)">'+bxe(wk)+' \u00b7 '+d0+' \u2014 '+d6+'</span><button class="btn btn-sm" onclick="BS.wo=(BS.wo||0)+1;navTo(\'schedule\')">Next \u2192</button><span style="margin-left:auto;font-size:11px;color:var(--success);opacity:.8">\u25cf Auto-saves</span><button class="btn btn-sm" onclick="printBranchSched(\'All\')">Print All</button><button class="btn btn-sm" onclick="printBranchSched(\'Management\')">Print Mgmt</button><button class="btn btn-sm" onclick="printBranchSched(\'Kitchen\')">Print Kitchen</button><button class="btn btn-sm" onclick="printBranchSched(\'FOH\')">Print FOH</button></div>'+
+  '<div style="display:flex;align-items:center;gap:5px;margin-top:8px">'+
+  '<span style="font-size:10px;color:var(--text-tertiary);font-family:var(--mono);font-weight:700">VIEW:</span>'+
+  [['All','All'],['Manager','Manager'],['FOH','FOH'],['Kitchen','BOH']].map(function(dv){var on=BS._schDept===dv[0];return '<button class="btn btn-sm" style="'+(on?'background:var(--primary);color:#fff;border-color:var(--primary)':'')+'" onclick="BS._schDept=\''+dv[0]+'\';navTo(\'schedule\')">'+dv[1]+'</button>';}).join('')+
+  '</div>';
   h+='<div class="bswrap"><table class="bstbl"><thead>'+th+'</thead><tbody>'+tb+'</tbody></table></div>';
   setTimeout(function(){
     document.querySelectorAll('.bsc-inp').forEach(function(inp){
@@ -12003,6 +12007,7 @@ function pDSR(){
   datePicker+='</div>';
   var tabBar='<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:10px">';
   tabBar+='<button onclick="dsrSave()" style="padding:6px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);color:var(--text-secondary);font-size:11px;cursor:pointer">💾 Save</button>';
+  tabBar+='<span id="dsr-autosave-status" style="font-size:10px;color:var(--success);font-family:var(--mono);opacity:.8;align-self:center">● Auto-saves</span>';
   tabBar+='<button onclick="dsrEndShift()" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(245,158,11,.5);background:rgba(245,158,11,.1);color:#b45309;font-size:11px;font-weight:700;cursor:pointer">🌙 End Shift</button>';
   tabBar+='<button onclick="dsrClear()" style="padding:6px 14px;border-radius:8px;border:1px solid rgba(239,68,68,.4);background:rgba(239,68,68,.06);color:var(--danger);font-size:11px;font-weight:600;cursor:pointer">⊗ Clear</button>';
   tabBar+='</div>';
@@ -12350,7 +12355,7 @@ function pDSR(){
     body+='</div>';
 
   } else if(D.tab==='masterfile'){
-    var DENOMS_MF={have:[{v:'500',l:'500'},{v:'200',l:'200'},{v:'100',l:'100'},{v:'50',l:'50'},{v:'20',l:'20'},{v:'10',l:'10'},{v:'5',l:'5'},{v:'1',l:'1.00'},{v:'0.5',l:'0.50'},{v:'0.25',l:'0.25'}],change:[{v:'100',l:'100'},{v:'50',l:'50'},{v:'20',l:'20'},{v:'10',l:'10'},{v:'5',l:'5'},{v:'1',l:'1.00'}]};
+    var DENOMS_MF={have:[{v:'500',l:'500'},{v:'200',l:'200'},{v:'100',l:'100'},{v:'50',l:'50'},{v:'20',l:'20'},{v:'10',l:'10'},{v:'5',l:'5'},{v:'2',l:'2.00'},{v:'1',l:'1.00'},{v:'0.5',l:'0.50'},{v:'0.25',l:'0.25'}],change:[{v:'100',l:'100'},{v:'50',l:'50'},{v:'20',l:'20'},{v:'10',l:'10'},{v:'5',l:'5'},{v:'1',l:'1.00'}]};
     function denomGrid(type,denoms){
       var ht='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px">';
       denoms.forEach(function(d){var dk=type+'_'+d.v.replace('.','_');var qty=parseFloat((D.denoms||{})[dk])||0;var sub=qty*parseFloat(d.v);ht+='<div style="background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center"><div style="font-size:12px;color:var(--text-primary);margin-bottom:6px;font-weight:700">SAR '+d.l+'</div><input type="number" min="0" value="'+(qty||'')+'" placeholder="0" oninput="dsrUpdDenom(\''+dk+'\',this.value)" style="'+fi+'text-align:center;font-size:15px;font-weight:700;margin-bottom:5px"><div style="font-size:12px;color:var(--ceo);font-family:var(--mono);font-weight:700">='+sub.toFixed(2)+'</div></div>';});
@@ -12373,12 +12378,12 @@ function pDSR(){
     body+='<div style="'+card+'"><div style="'+secHdr+'">Company Float</div>';
     body+=grp('Company Provides (‫SAR ‬)','<input type="number" step="0.01" placeholder="e.g. 10000" value="'+(D.mfCompany||'')+'" oninput="dsrUp(\'mfCompany\',this.value)" style="'+fi+'font-size:18px;padding:9px 12px;color:var(--ceo)">');
     body+='<div style="background:var(--surface-2);border-radius:9px;padding:12px;margin-top:8px">';
-    function msl(l,v,c,bold){return '<div style="'+sline+(bold?'font-weight:700':'')+'"><span style="color:var(--text-secondary)">'+l+'</span><span style="font-family:var(--mono);color:'+(c||'var(--text-primary)')+'">'+v.toFixed(2)+'</span></div>';}
-    body+='<div style="'+sline+'"><span style="color:var(--text-secondary)">Cash</span><span id="mf-summary-cash" style="font-family:var(--mono);color:var(--text-primary)">'+haveTotal.toFixed(2)+'</span></div>';
-    body+='<div style="'+sline+'"><span style="color:var(--text-secondary)">Change in Safe</span><span id="mf-summary-change" style="font-family:var(--mono);color:var(--text-primary)">'+changeTotal.toFixed(2)+'</span></div>';
+    function msl(l,v,c,bold,id){return '<div style="'+sline+(bold?'font-weight:700':'')+'"><span style="color:var(--text-secondary)">'+l+'</span><span '+(id?'id="'+id+'" ':'')+' style="font-family:var(--mono);color:'+(c||'var(--text-primary)')+'">'+v.toFixed(2)+'</span></div>';}
+    body+=msl('Cash',haveTotal,'var(--text-primary)',false,'mf-sum-cash');
+    body+=msl('Change in Safe',changeTotal,'var(--text-primary)',false,'mf-sum-change');
     body+=msl('Closed Petty Cash',closedPC);body+=msl('Ongoing Petty Cash',ongoingPC);
-    body+='<div style="'+sline+'font-weight:700"><span style="color:var(--text-secondary)">Total I Account For</span><span id="mf-summary-total" style="font-family:var(--mono);color:var(--ceo)">'+mfTotal.toFixed(2)+'</span></div>';
-    body+='<div style="'+sline+'font-weight:700"><span style="color:var(--text-secondary)">Difference vs Company</span><span id="mf-summary-diff" style="font-family:var(--mono);color:'+(Math.abs(mfDiff)<0.01?'#00875a':mfDiff<0?'#c0392b':'#b45309')+'">'+mfDiff.toFixed(2)+'</span></div>';
+    body+=msl('Total I Account For',mfTotal,'var(--ceo)',true,'mf-sum-total');
+    body+=msl('Difference vs Company',mfDiff,Math.abs(mfDiff)<0.01?'#00875a':mfDiff<0?'#c0392b':'#b45309',true,'mf-sum-diff');
     body+='</div></div>';
     body+='<div style="'+card+'"><div style="'+secHdr+'">Cash</div>'+denomGrid('mfh',DENOMS_MF.have)+'<div id="mf-cash-total" style="font-size:11px;color:var(--ceo);font-family:var(--mono);margin-top:8px;font-weight:700">Total: '+bfsar(haveTotal)+'</div></div>';
     body+='</div>';
@@ -12410,7 +12415,7 @@ function _dsrD(){var today=_dsrActiveDate();if(!BS.dsrState)BS.dsrState={};if(!B
 function dsrChangeDate(val){if(!val)return;BS.dsrActiveDate=val;BS._dsrLoaded=false;dsrLoadFromFirebase(function(){navTo('dsr');});}
 function dsrFbPath(dateStr){return 'branches/'+(NX.session&&NX.session.branchId)+'/dsr/'+(dateStr||_dsrActiveDate());}
 function dsrNav(tab){var D=_dsrD();D.tab=tab;navTo('dsr');}
-function dsrUp(k,v){var D=_dsrD();D[k]=v;}
+function dsrUp(k,v){var D=_dsrD();D[k]=v;dsrAutoSave();}
 function dsrRecalc(si){
   // If si provided, update just that server card; otherwise update all
   var D=_dsrD();
@@ -12451,7 +12456,7 @@ function dsrRecalc(si){
     var fs=document.getElementById('srv-fs-'+i);if(fs){fs.textContent=dl;fs.style.color=dc;}
   });
 }
-function dsrUpdArr(arr,idx,key,val){var D=_dsrD();if(D[arr]&&D[arr][idx])D[arr][idx][key]=val;}
+function dsrUpdArr(arr,idx,key,val){var D=_dsrD();if(D[arr]&&D[arr][idx])D[arr][idx][key]=val;dsrAutoSave();}
 function dsrRmArr(arr,idx){var D=_dsrD();if(D[arr])D[arr].splice(idx,1);navTo('dsr');}
 function dsrAddArr(arr){var D=_dsrD();var defaults={closedPetty:{id:buid(),desc:'',amount:''},ongoingPetty:{id:buid(),desc:'',amount:''},safeItems:{id:buid(),item:'',remark:''}};D[arr].push(defaults[arr]||{id:buid()});navTo('dsr');}
 function dsrAddDisc(){var D=_dsrD();D.discounts.push({id:buid(),type:'',amount:''});navTo('dsr');}
@@ -12476,7 +12481,7 @@ function dsrUpdDenom(k,v){
   var D=_dsrD();
   if(!D.denoms)D.denoms={};
   D.denoms[k]=parseFloat(v)||0;
-  // Update this denom's subtotal in-place
+  // Per-cell subtotal
   var rawKey=k.replace(/^(dep_|mfh_|mfc_)/,'');
   var denomVal=parseFloat(rawKey.replace('_','.'))||0;
   var sub=D.denoms[k]*denomVal;
@@ -12484,43 +12489,41 @@ function dsrUpdDenom(k,v){
   if(subEl)subEl.textContent='='+sub.toFixed(2);
   // Deposit tab running total
   if(k.indexOf('dep_')===0){
-    var total=Object.keys(D.denoms).filter(function(dk){return dk.indexOf('dep_')===0;}).reduce(function(s,dk){
-      var dv=parseFloat(dk.replace('dep_','').replace('_','.'))||0;
-      return s+(D.denoms[dk]*dv);
-    },0);
+    var tot=Object.keys(D.denoms).filter(function(dk){return dk.indexOf('dep_')===0;}).reduce(function(s,dk){
+      var dv=parseFloat(dk.replace('dep_','').replace('_','.'))||0;return s+(D.denoms[dk]*dv);},0);
     var el=document.getElementById('denom-total');
-    if(el)el.textContent='SAR '+total.toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
+    if(el)el.textContent='SAR '+tot.toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
   }
-  // Master File live update — mfh_* = Cash, mfc_* = Change in Safe
+  dsrAutoSave();
+  // Master File — live update Cash / Change totals + summary
   if(k.indexOf('mfh_')===0||k.indexOf('mfc_')===0){
-    var haveTotal=Object.keys(D.denoms).filter(function(dk){return dk.indexOf('mfh_')===0;}).reduce(function(s,dk){
-      var dv=parseFloat(dk.replace('mfh_','').replace('_','.'))||0;
-      return s+(parseFloat(D.denoms[dk])||0)*dv;
-    },0);
-    var changeTotal=Object.keys(D.denoms).filter(function(dk){return dk.indexOf('mfc_')===0;}).reduce(function(s,dk){
-      var dv=parseFloat(dk.replace('mfc_','').replace('_','.'))||0;
-      return s+(parseFloat(D.denoms[dk])||0)*dv;
-    },0);
-    var ht=document.getElementById('mf-cash-total');
-    if(ht)ht.textContent='Total: SAR '+haveTotal.toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
-    var ct=document.getElementById('mf-change-total');
-    if(ct)ct.textContent='Total: SAR '+changeTotal.toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
-    var pcCurCycle=BS.pcCycleNo||1;
-    var pcCurTotal=(BS.pc||[]).filter(function(p){return (p.cycleNo||1)===pcCurCycle;}).reduce(function(s,p){return s+(+p.amount||0);},0);
-    var closedArchive=(BS.pcArchive||[]).filter(function(c){return c.status&&c.status!=='received';});
-    var closedPC=closedArchive.reduce(function(s,c){return s+(c.total||0);},0)||
+    var hT=Object.keys(D.denoms).filter(function(dk){return dk.indexOf('mfh_')===0;}).reduce(function(s,dk){
+      var dv=parseFloat(dk.replace('mfh_','').replace('_','.'))||0;return s+(parseFloat(D.denoms[dk])||0)*dv;},0);
+    var cT=Object.keys(D.denoms).filter(function(dk){return dk.indexOf('mfc_')===0;}).reduce(function(s,dk){
+      var dv=parseFloat(dk.replace('mfc_','').replace('_','.'))||0;return s+(parseFloat(D.denoms[dk])||0)*dv;},0);
+    var htEl=document.getElementById('mf-cash-total');
+    if(htEl)htEl.textContent='Total: SAR '+hT.toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
+    var ctEl=document.getElementById('mf-change-total');
+    if(ctEl)ctEl.textContent='Total: SAR '+cT.toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
+    var pcCyc=BS.pcCycleNo||1;
+    var ongPC=(BS.pc||[]).filter(function(p){return (p.cycleNo||1)===pcCyc;}).reduce(function(s,p){return s+(+p.amount||0);},0)||
+      (D.ongoingPetty||[]).reduce(function(a,p){return a+(parseFloat(p.amount)||0);},0);
+    var clArc=(BS.pcArchive||[]).filter(function(c){return c.status&&c.status!=='received';});
+    var clPC=clArc.reduce(function(s,c){return s+(c.total||0);},0)||
       (D.closedPetty||[]).reduce(function(a,p){return a+(parseFloat(p.amount)||0);},0);
-    var ongoingPC=pcCurTotal||(D.ongoingPetty||[]).reduce(function(a,p){return a+(parseFloat(p.amount)||0);},0);
-    var mfTotal=haveTotal+changeTotal+closedPC+ongoingPC;
-    var mfDiff=mfTotal-(parseFloat(D.mfCompany)||0);
-    var sc=document.getElementById('mf-summary-cash');if(sc)sc.textContent=haveTotal.toFixed(2);
-    var sch=document.getElementById('mf-summary-change');if(sch)sch.textContent=changeTotal.toFixed(2);
-    var st=document.getElementById('mf-summary-total');if(st)st.textContent=mfTotal.toFixed(2);
-    var sd=document.getElementById('mf-summary-diff');
-    if(sd){sd.textContent=mfDiff.toFixed(2);sd.style.color=Math.abs(mfDiff)<0.01?'#00875a':mfDiff<0?'#c0392b':'#b45309';}
+    var mfCo=parseFloat(D.mfCompany)||0;
+    var mfTot=hT+cT+clPC+ongPC;
+    var mfDif=mfTot-mfCo;
+    var sc=document.getElementById('mf-sum-cash');if(sc)sc.textContent=hT.toFixed(2);
+    var sch=document.getElementById('mf-sum-change');if(sch)sch.textContent=cT.toFixed(2);
+    var st=document.getElementById('mf-sum-total');if(st)st.textContent=mfTot.toFixed(2);
+    var sd=document.getElementById('mf-sum-diff');
+    if(sd){sd.textContent=mfDif.toFixed(2);sd.style.color=Math.abs(mfDif)<0.01?'#00875a':mfDif<0?'#c0392b':'#b45309';}
   }
 }
-function dsrSave(){var D=_dsrD();var activeDate=_dsrActiveDate();if(db&&NX.session&&NX.session.branchId){db.ref(dsrFbPath(activeDate)).set(D,function(err){if(err)showToast('Save failed','error');else showToast('DSR saved to Firebase ✓','success');});}else{try{localStorage.setItem('dsr_nexus_'+activeDate,JSON.stringify(D));showToast('DSR saved locally ✓','success');}catch(e){showToast('Save failed','error');}}}
+function dsrSave(){var D=_dsrD();var activeDate=_dsrActiveDate();if(db&&NX.session&&NX.session.branchId){db.ref(dsrFbPath(activeDate)).set(D,function(err){if(err)showToast('Save failed','error');else{showToast('DSR saved ✓','success');var si=document.getElementById('dsr-autosave-status');if(si)si.textContent='Saved '+new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});}});}else{try{localStorage.setItem('dsr_nexus_'+activeDate,JSON.stringify(D));var si=document.getElementById('dsr-autosave-status');if(si)si.textContent='Saved locally';}catch(e){showToast('Save failed','error');}}}
+var _dsrAutoTimer=null;
+function dsrAutoSave(){clearTimeout(_dsrAutoTimer);var si=document.getElementById('dsr-autosave-status');if(si)si.textContent='Saving…';_dsrAutoTimer=setTimeout(function(){dsrSave();},1500);}
 function dsrClear(){
   var activeDate=_dsrActiveDate();
   openModal('<div class="modal-head"><h2>⊗ Clear DSR</h2><button class="modal-close" onclick="closeModalForce()">&#x2715;</button></div>'+
