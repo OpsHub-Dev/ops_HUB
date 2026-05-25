@@ -308,7 +308,7 @@ textarea.fi{resize:vertical;min-height:80px}
         <div><div style="font-size:11px;font-weight:700" id="idx-name">Connected</div><div style="font-size:9px;color:var(--text3);font-family:var(--mono)" id="idx-sub">Session from ALFA.CO App</div></div>
       </div>
       <label class="flbl">Your SAP Number</label>
-      <input class="finp" id="sap-inp" type="text" inputmode="numeric" maxlength="12" placeholder="e.g. 10012345" autocomplete="off">
+      <input class="finp" id="sap-inp" type="tel" inputmode="numeric" maxlength="12" placeholder="e.g. 10012345" autocomplete="off">
       <div class="lerr" id="sap-err"></div>
       <button class="btnp" onclick="handleSAP()">Continue →</button>
     </div>
@@ -682,6 +682,7 @@ textarea.fi{resize:vertical;min-height:80px}
 
   <div id="mobnav">
     <button class="mni active" onclick="showPage('dashboard')" id="mn-dashboard"><div class="mnico">📊</div>Home</button>
+    <button class="mni" onclick="showPage('checkin')" id="mn-checkin"><div class="mnico">📍</div>Check-In</button>
     <button class="mni" onclick="showPage('schedule')" id="mn-schedule"><div class="mnico">📅</div>Schedule</button>
     <button class="mni" onclick="showPage('payslip')" id="mn-payslip"><div class="mnico">💵</div>Pay</button>
     <button class="mni" onclick="showPage('leave')" id="mn-leave"><div class="mnico">🏖️</div>Leave</button>
@@ -1176,6 +1177,8 @@ function showPage(id) {
   var el = document.getElementById('page-' + id); if (el) el.classList.add('active');
   document.querySelectorAll('.sb-item').forEach(function(i) { i.classList.remove('active'); });
   var si = document.getElementById('si-' + id); if (si) si.classList.add('active');
+  document.querySelectorAll('.mni').forEach(function(b) { b.classList.remove('active'); });
+  var mi = document.getElementById('mn-' + id); if (mi) mi.classList.add('active');
   document.querySelectorAll('.mni').forEach(function(i) { i.classList.remove('active'); });
   var mn = document.getElementById('mn-' + id); if (mn) mn.classList.add('active');
   // Page-specific on-navigate renders
