@@ -10426,9 +10426,9 @@ function pSchedule() {
   _schDs.forEach(function(dep){var mem=BS.staff.filter(function(m){return normalizeDept(m.dept)===dep;});if(!mem.length)return;tb+='<tr class="bdr"><td colspan="8">'+bxe(dep)+'</td></tr>';mem.forEach(function(m){var ms=(sc[m.id]||{});tb+='<tr><td><div style="display:flex;align-items:center;gap:8px"><div class="bav" style="width:24px;height:24px;font-size:9px">'+bini(m.name)+'</div><span style="font-size:12px;font-weight:500">'+bxe(m.name)+'</span>'+(m.sap?'<div style="font-size:9px;color:#94a3b8;font-family:monospace">'+bxe(m.sap)+'</div>':'')+' </div></div></td>';DAYS_WEEK.forEach(function(day){tb+='<td style="padding:4px"><input class="bsinp bsc-inp" data-id="'+bxe(m.id)+'" data-day="'+bxe(day)+'" value="'+bxe(ms[day]||'')+'" placeholder="\u2014"></td>';});tb+='</tr>';});});
   var h='<div class="page-header"><h1>Weekly Schedule</h1></div>';
   h+='<div class="bwnav"><button class="btn btn-sm" onclick="BS.wo=(BS.wo||0)-1;navTo(\'schedule\')">\u2190 Prev</button><span class="bmono" style="font-size:12px;color:var(--text-secondary)">'+bxe(wk)+' \u00b7 '+d0+' \u2014 '+d6+'</span><button class="btn btn-sm" onclick="BS.wo=(BS.wo||0)+1;navTo(\'schedule\')">Next \u2192</button><span style="margin-left:auto;font-size:11px;color:var(--success);opacity:.8">\u25cf Auto-saves</span><button class="btn btn-sm" onclick="printBranchSched(\'All\')">Print All</button><button class="btn btn-sm" onclick="printBranchSched(\'Management\')">Print Mgmt</button><button class="btn btn-sm" onclick="printBranchSched(\'Kitchen\')">Print Kitchen</button><button class="btn btn-sm" onclick="printBranchSched(\'FOH\')">Print FOH</button></div>'+
-  '<div style="display:flex;align-items:center;gap:5px;margin-top:8px">'+
-  '<span style="font-size:10px;color:var(--text-tertiary);font-family:var(--mono);font-weight:700">VIEW:</span>'+
-  [['All','All'],['Manager','Manager'],['FOH','FOH'],['Kitchen','BOH']].map(function(dv){var on=BS._schDept===dv[0];return '<button class="btn btn-sm" style="'+(on?'background:var(--primary);color:#fff;border-color:var(--primary)':'')+'" onclick="BS._schDept=\''+dv[0]+'\';navTo(\'schedule\')">'+dv[1]+'</button>';}).join('')+
+  '<div style="display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap">'+
+  '<span style="font-size:10px;color:var(--text-tertiary);font-family:var(--mono);font-weight:700;letter-spacing:.05em">VIEW:</span>'+
+  [['All','All'],['Management','Manager'],['FOH','FOH'],['Kitchen','BOH']].map(function(dv){var on=BS._schDept===dv[0];return '<button class="btn btn-sm" style="'+(on?'background:var(--primary);color:#fff;border-color:var(--primary)':'')+'" onclick="BS._schDept=\''+dv[0]+'\';navTo(\'schedule\')">'+dv[1]+'</button>';}).join('')+
   '</div>';
   h+='<div class="bswrap"><table class="bstbl"><thead>'+th+'</thead><tbody>'+tb+'</tbody></table></div>';
   setTimeout(function(){
@@ -12481,12 +12481,7 @@ function dsrUpdDenom(k,v){
   var D=_dsrD();
   if(!D.denoms)D.denoms={};
   D.denoms[k]=parseFloat(v)||0;
-  // Per-cell subtotal
-  var rawKey=k.replace(/^(dep_|mfh_|mfc_)/,'');
-  var denomVal=parseFloat(rawKey.replace('_','.'))||0;
-  var sub=D.denoms[k]*denomVal;
-  var subEl=document.getElementById('denom-sub-'+k);
-  if(subEl)subEl.textContent='='+sub.toFixed(2);
+  dsrAutoSave();
   // Deposit tab running total
   if(k.indexOf('dep_')===0){
     var tot=Object.keys(D.denoms).filter(function(dk){return dk.indexOf('dep_')===0;}).reduce(function(s,dk){
@@ -12494,8 +12489,7 @@ function dsrUpdDenom(k,v){
     var el=document.getElementById('denom-total');
     if(el)el.textContent='SAR '+tot.toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
   }
-  dsrAutoSave();
-  // Master File — live update Cash / Change totals + summary
+  // Master File live update
   if(k.indexOf('mfh_')===0||k.indexOf('mfc_')===0){
     var hT=Object.keys(D.denoms).filter(function(dk){return dk.indexOf('mfh_')===0;}).reduce(function(s,dk){
       var dv=parseFloat(dk.replace('mfh_','').replace('_','.'))||0;return s+(parseFloat(D.denoms[dk])||0)*dv;},0);
@@ -12506,10 +12500,9 @@ function dsrUpdDenom(k,v){
     var ctEl=document.getElementById('mf-change-total');
     if(ctEl)ctEl.textContent='Total: SAR '+cT.toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2});
     var pcCyc=BS.pcCycleNo||1;
-    var ongPC=(BS.pc||[]).filter(function(p){return (p.cycleNo||1)===pcCyc;}).reduce(function(s,p){return s+(+p.amount||0);},0)||
+    var ongPC=(BS.pc||[]).filter(function(p){return(p.cycleNo||1)===pcCyc;}).reduce(function(s,p){return s+(+p.amount||0);},0)||
       (D.ongoingPetty||[]).reduce(function(a,p){return a+(parseFloat(p.amount)||0);},0);
-    var clArc=(BS.pcArchive||[]).filter(function(c){return c.status&&c.status!=='received';});
-    var clPC=clArc.reduce(function(s,c){return s+(c.total||0);},0)||
+    var clPC=((BS.pcArchive||[]).filter(function(c){return c.status&&c.status!=='received';})).reduce(function(s,c){return s+(c.total||0);},0)||
       (D.closedPetty||[]).reduce(function(a,p){return a+(parseFloat(p.amount)||0);},0);
     var mfCo=parseFloat(D.mfCompany)||0;
     var mfTot=hT+cT+clPC+ongPC;
@@ -13949,6 +13942,12 @@ function showOfflineBanner() {
 // KEYBOARD SHORTCUTS
 // ══════════════════════════════════════════════════════
 document.addEventListener('keydown', function(e) {
+  // PIN pad keyboard support — when pin pad is visible, digits/backspace work
+  var pinPad = document.querySelector('.pin-pad');
+  if (pinPad && document.activeElement && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+    if (e.key >= '0' && e.key <= '9') { e.preventDefault(); pinDigit(parseInt(e.key)); return; }
+    if (e.key === 'Backspace' || e.key === 'Delete') { e.preventDefault(); pinBackspace(); return; }
+  }
   // Cmd/Ctrl+K → focus search
   if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
     e.preventDefault();
