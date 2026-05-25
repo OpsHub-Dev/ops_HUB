@@ -989,22 +989,6 @@ function updateDots(prefix, count) {
   }
 }
 
-// ── Keyboard support for all PIN screens ──────────────────────────────────
-document.addEventListener('keydown', function(e) {
-  var tag = document.activeElement && document.activeElement.tagName;
-  if (tag === 'INPUT' || tag === 'TEXTAREA') return;
-  // Detect which PIN step is currently visible
-  var stepMap = { 'step-pin': 'pd', 'step-setup': 'ss', 'step-confirm': 'cf' };
-  var activeBuf = null;
-  for (var stepId in stepMap) {
-    var el = document.getElementById(stepId);
-    if (el && el.style.display !== 'none') { activeBuf = stepMap[stepId]; break; }
-  }
-  if (!activeBuf) return;
-  if (e.key >= '0' && e.key <= '9') { e.preventDefault(); pinKey(parseInt(e.key), activeBuf); }
-  else if (e.key === 'Backspace' || e.key === 'Delete') { e.preventDefault(); pinKey('del', activeBuf); }
-});
-
 function onSetupFull(pin) {
   loginSt.newPin = pin;
   document.getElementById('setup-err').textContent = '';
@@ -1949,8 +1933,9 @@ function renderCheckIn() {
   // Try BOTH possible keys: staffId (numeric) and sap — whichever has today's record wins
   // This handles legacy records written under sap vs new records under staffId
   var keys = [];
-  if (u.staffId && String(u.staffId) !== String(u.sap)) keys.push(String(u.staffId));
-  if (u.sap) keys.push(String(u.sap));
+  // Try staffId first (matches BM e.id), then sap (legacy portal writes)
+  if (u.staffId) keys.push(String(u.staffId));
+  if (u.sap && String(u.sap) !== String(u.staffId)) keys.push(String(u.sap));
   if (!keys.length) return;
 
   var found = false;
@@ -1975,7 +1960,7 @@ function renderCheckIn() {
         updateCIButtons(); renderCILog(); updateCIBadge();
       } else if (checked === keys.length && !found) {
         // All keys checked, nothing found today — fresh start
-        _ciAttKey = keys[keys.length - 1]; // default write key = sap
+        _ciAttKey = u.staffId || keys[keys.length - 1]; // default write key = staffId (matches BM e.id)
         _ciTodayRec = null; _ciLog = []; _ciState = 'out';
         _ciBreakLogs = []; _ciBreakStart = null;
         updateCIButtons(); renderCILog(); updateCIBadge(); updateSummaryCard();
@@ -2107,7 +2092,7 @@ function ciWriteRecord(newLog, ci, co, status, brkMins, brkLogs, workedMins) {
   var u = CU; if (!u || !u.branchId) return;
   var today = ciTodayStr();
   var monthKey = today.slice(0,7);
-  var attKey = _ciAttKey || u.sap || u.staffId;
+  var attKey = _ciAttKey || u.staffId || u.sap;
   if (!attKey) return;
   var path = 'branches/' + u.branchId + '/tsAtt/' + attKey + '/' + monthKey;
   var totalBrk = brkMins || 0;
