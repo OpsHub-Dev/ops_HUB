@@ -2186,12 +2186,14 @@ function ciWriteRecord(newLog, ci, co, status, brkMins, brkLogs, workedMins, ove
   if (!attKey) return;
   var path = 'branches/' + u.branchId + '/tsAtt/' + attKey + '/' + monthKey;
   var totalBrk = brkMins || 0;
+  var _brkHHMM = totalBrk > 0 ? minsToHHMM(totalBrk) : '';
   var rec = {
     date: today,
     ci: ci,
     co: co || null,
     st: status,
     log: newLog,
+    brk: _brkHHMM,
     brkMins: totalBrk,
     brkLogs: brkLogs || [],
     workedMins: workedMins != null ? workedMins : null,
