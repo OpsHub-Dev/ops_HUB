@@ -12942,7 +12942,7 @@ function pBmBriefing() {
           return '<div style="padding:10px 0;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px">'+
             '<div class="bmono" style="font-size:13px;font-weight:700">'+d+'</div>'+
             '<div style="font-size:11px;color:var(--text-secondary)">'+count+' briefing'+(count!==1?'s':'')+' published</div>'+
-            '<button class="btn btn-sm" style="margin-left:auto" onclick="BS.briefingTab='today';BS.dsrActiveDate=''+bxe(d)+'';navTo('bm-briefing')">View</button></div>';
+            '<button class="btn btn-sm" style="margin-left:auto" data-d="'+bxe(d)+'" onclick="BS.briefingTab=\'today\';BS.dsrActiveDate=this.dataset.d;navTo(\'bm-briefing\')">View</button></div>';
         }).join('');
       });
     }
