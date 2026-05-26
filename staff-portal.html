@@ -988,6 +988,19 @@ function updateDots(prefix, count) {
     if (d) d.className = 'pin-dot' + (i < count ? ' filled' : '');
   }
 }
+document.addEventListener('keydown', function(e) {
+  var tag = document.activeElement && document.activeElement.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+  var stepMap = { 'step-pin': 'pd', 'step-setup': 'ss', 'step-confirm': 'cf' };
+  var activeBuf = null;
+  for (var stepId in stepMap) {
+    var el = document.getElementById(stepId);
+    if (el && el.style.display !== 'none') { activeBuf = stepMap[stepId]; break; }
+  }
+  if (!activeBuf) return;
+  if (e.key >= '0' && e.key <= '9') { e.preventDefault(); pinKey(parseInt(e.key), activeBuf); }
+  else if (e.key === 'Backspace' || e.key === 'Delete') { e.preventDefault(); pinKey('del', activeBuf); }
+});
 
 function onSetupFull(pin) {
   loginSt.newPin = pin;
@@ -1212,7 +1225,7 @@ function renderDashboard() {
   var now2 = new Date();
   var monthKey = now2.getFullYear() + '-' + String(now2.getMonth()+1).padStart(2,'0');
 
-  function renderKpiRow(present, late, sick, absent, leaveBal, incCount) {
+  function renderKpiRow(present, late, sick, absent, leaveBal, incCount, otMins) {
     var el = document.getElementById('kpi-row');
     if (!el) return;
     el.innerHTML =
@@ -1221,14 +1234,14 @@ function renderDashboard() {
       '<div class="kpi" style="--kc:#f97316"><div class="kpi-l">SICK LEAVE</div><div class="kpi-v">' + sick + '</div><div class="kpi-s">Days</div></div>' +
       '<div class="kpi" style="--kc:var(--danger)"><div class="kpi-l">ABSENT</div><div class="kpi-v">' + absent + '</div><div class="kpi-s">Days</div></div>' +
       '<div class="kpi" style="--kc:var(--primary)"><div class="kpi-l">LEAVE BALANCE</div><div class="kpi-v">' + leaveBal + '</div><div class="kpi-s">Days remaining</div></div>' +
-      '<div class="kpi" style="--kc:var(--success)"><div class="kpi-l">INCIDENTS FILED</div><div class="kpi-v">' + incCount + '</div><div class="kpi-s">Total reports</div></div>';
+      '<div class="kpi" style="--kc:#b45309"><div class="kpi-l">OVERTIME</div><div class="kpi-v" style="font-size:18px">' + (otMins>0?Math.floor(otMins/60)+'h'+(otMins%60?otMins%60+'m':''):'—') + '</div><div class="kpi-s">This month</div></div>';
   }
 
-  var attPresent=0, attLate=0, attSick=0, attAbsent=0;
+  var attPresent=0, attLate=0, attSick=0, attAbsent=0, attOtMins=0;
   var leaveBal=21, incCount=0;
   var pending=3;
 
-  function tryRender(){ pending--; if(pending<=0) renderKpiRow(attPresent,attLate,attSick,attAbsent,leaveBal,incCount); }
+  function tryRender(){ pending--; if(pending<=0) renderKpiRow(attPresent,attLate,attSick,attAbsent,leaveBal,incCount,attOtMins); }
 
   // 1. Attendance from tsAtt
   if (u.branchId && u.staffId) {
@@ -1242,6 +1255,7 @@ function renderDashboard() {
         else if (st === 'late') attLate++;
         else if (st === 'sick') attSick++;
         else if (st === 'absent') attAbsent++;
+        attOtMins+=(r.overtimeMins||0);
       });
       tryRender();
     });
@@ -1912,6 +1926,55 @@ var _ciAttKey = null; // which Firebase key has this staff's attendance
 var _ciBreakStart = null; // ISO time string when current break started
 var _ciBreakLogs = []; // [{start, end, mins}]
 
+
+function parseShiftText(txt){
+  if(!txt)return null;
+  var up=txt.trim().toUpperCase();
+  if(up==='OFF'||up==='DAY OFF'||up==='REST'||up==='HOLIDAY')return null;
+  var brkM=0,bm=up.match(/BREAK\s*(\d+)|(\d+)\s*BREAK/);
+  if(bm)brkM=parseInt(bm[1]||bm[2]||0)*60;
+  function pT(s){
+    s=s.trim();var ap=s.match(/([AP])M?$/i);
+    var isPM=ap&&ap[1].toUpperCase()==='P',isAM=ap&&ap[1].toUpperCase()==='A';
+    s=s.replace(/[APM\s]+$/i,'').trim();
+    var pts=s.split(':'),h=parseInt(pts[0])||0,m=pts[1]?parseInt(pts[1]):0;
+    if(isPM&&h!==12)h+=12;if(isAM&&h===12)h=0;return h*60+m;
+  }
+  var parts=txt.split(/\s*[-\u2013]\s*/);if(parts.length<2)return null;
+  var sS=parts[0].replace(/\s*(break.*|brk.*)/i,'').trim();
+  var eS=parts[1].replace(/\s*(break.*|brk.*)/i,'').trim();
+  if(!sS||!eS)return null;
+  var sM=pT(sS),eM=pT(eS);if(eM<=sM)eM+=1440;
+  var duty=eM-sM;if(!brkM&&duty>=480)brkM=60;
+  function fmt(m){m=m%1440;return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');}
+  return{start:fmt(sM),end:fmt(eM%1440),startMins:sM,endMins:eM,dutyMins:duty,breakMins:brkM,label:fmt(sM)+' – '+fmt(eM%1440)};
+}
+var _ciScheduledShift=null;
+function ciLoadSchedule(){
+  var u=CU;if(!u||!u.branchId)return;
+  var days=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  var now=new Date(),dayName=days[now.getDay()];
+  var d=new Date(now);d.setHours(0,0,0,0);d.setDate(d.getDate()-((d.getDay()+6)%7));
+  var wk=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  var empId=u.staffId||u.sap;
+  db.ref('branches/'+u.branchId+'/sch/'+wk+'/'+empId).once('value',function(snap){
+    var ms=snap.val()||{},raw=ms[dayName]||'';
+    if(!raw&&u.sap&&empId!==u.sap){
+      db.ref('branches/'+u.branchId+'/sch/'+wk+'/'+u.sap).once('value',function(s2){
+        ciApplySchedule((s2.val()||{})[dayName]||'');
+      });
+    }else{ciApplySchedule(raw);}
+  });
+}
+function ciApplySchedule(raw){
+  var card=document.getElementById('ci-schedule-card');if(!card)return;
+  if(!raw||raw.toUpperCase()==='OFF'||raw.toUpperCase()==='DAY OFF'){card.style.display='none';_ciScheduledShift=null;return;}
+  var parsed=parseShiftText(raw);_ciScheduledShift=parsed;card.style.display='';
+  var ss=document.getElementById('ci-sch-shift'),sd=document.getElementById('ci-sch-duty'),sb=document.getElementById('ci-sch-break');
+  if(ss)ss.textContent=parsed?parsed.label:raw;
+  if(sd)sd.textContent=parsed?Math.floor(parsed.dutyMins/60)+'h duty':'--';
+  if(sb)sb.textContent=parsed?Math.floor(parsed.breakMins/60)+'h break':'--';
+}
 function renderCheckIn() {
   var u = CU; if (!u) return;
 
@@ -1925,6 +1988,7 @@ function renderCheckIn() {
   var dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   document.getElementById('ci-date-sub').textContent = dayNames[now.getDay()].toUpperCase() + ' · ' + now.getDate() + ' ' + monthNames[now.getMonth()].toUpperCase();
+  ciLoadSchedule();
 
   if (!u.branchId) return; // no branch — buttons unlocked above, ready to use
 
@@ -2078,6 +2142,8 @@ function updateSummaryCard() {
   if (totalBrk) html += kpiMini('Total Break', minsToHHMM(totalBrk), 'var(--warning)');
   if (workedMins != null) html += kpiMini('Worked', minsToHHMM(workedMins), 'var(--primary)');
   if (coStr) html += kpiMini('Check-Out', coStr, 'var(--danger)');
+  var _rot=_ciTodayRec&&_ciTodayRec.overtimeMins?_ciTodayRec.overtimeMins:0;
+  if(_rot>0)html+=kpiMini('Overtime','+'+Math.floor(_rot/60)+'h'+(_rot%60?_rot%60+'m':''),'#b45309');
   kpis.innerHTML = html;
 }
 
@@ -2088,7 +2154,7 @@ function kpiMini(label, val, color) {
   '</div>';
 }
 
-function ciWriteRecord(newLog, ci, co, status, brkMins, brkLogs, workedMins) {
+function ciWriteRecord(newLog, ci, co, status, brkMins, brkLogs, workedMins, overtimeMins3, scheduledShift3) {
   var u = CU; if (!u || !u.branchId) return;
   var today = ciTodayStr();
   var monthKey = today.slice(0,7);
@@ -2105,7 +2171,9 @@ function ciWriteRecord(newLog, ci, co, status, brkMins, brkLogs, workedMins) {
     brkMins: totalBrk,
     brkLogs: brkLogs || [],
     workedMins: workedMins != null ? workedMins : null,
-    workedHrs: workedMins != null ? minsToHHMM(workedMins) : null
+    workedHrs: workedMins != null ? minsToHHMM(workedMins) : null,
+    overtimeMins: overtimeMins3||0,
+    scheduledShift: scheduledShift3||(_ciScheduledShift?_ciScheduledShift.label:'')
   };
   db.ref(path).once('value', function(snap) {
     var arr = snap.val();
@@ -2200,9 +2268,20 @@ function doPortalCheckOut() {
     var ciMins = ciTimeToMins(ci);
     var coMins = ciTimeToMins(t);
     var workedMins = Math.max(0, coMins - ciMins - totalBrkMins);
-    ciWriteRecord(_ciLog, ci, t, 'present', totalBrkMins, _ciBreakLogs, workedMins);
+    var _otMins=0;
+    if(_ciScheduledShift){
+      var _sw=_ciScheduledShift.dutyMins-_ciScheduledShift.breakMins;
+      _otMins=Math.max(0,workedMins-_sw);
+      if(_otMins>0){
+        var _ow=document.getElementById('ci-ot-wrap'),_ov=document.getElementById('ci-ot-val');
+        if(_ow)_ow.style.display='';
+        if(_ov)_ov.textContent='+'+Math.floor(_otMins/60)+'h'+(_otMins%60?_otMins%60+'m':'');
+      }
+    }
+    ciWriteRecord(_ciLog, ci, t, 'present', totalBrkMins, _ciBreakLogs, workedMins, _otMins, _ciScheduledShift?_ciScheduledShift.label:'');
     updateCIButtons(); renderCILog(); updateCIBadge(); updateSummaryCard();
-    showToast('Checked out at ' + t + ' · Worked ' + minsToHHMM(workedMins) + ' 👋', 'success');
+    var _otMsg=_otMins>0?' · OT +'+Math.floor(_otMins/60)+'h'+(_otMins%60?_otMins%60+'m':''):'';
+    showToast('Checked out at ' + t + ' · Worked ' + minsToHHMM(workedMins) + _otMsg + ' 👋', 'success');
     ciSendNotification('out', t, loc);
   });
 }
