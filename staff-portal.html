@@ -3103,6 +3103,14 @@ function showToast(msg, type) {
 }
 
 // ══════════════════════════════════════════════════════
+// SHARED UTILITIES
+// ══════════════════════════════════════════════════════
+function escH(s){
+  if(s===null||s===undefined)return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// ══════════════════════════════════════════════════════
 // BRIEFING & TASKS (Staff Portal)
 // ══════════════════════════════════════════════════════
 function renderBriefing(){
