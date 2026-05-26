@@ -12849,8 +12849,8 @@ function pBmBriefing() {
   var h = '<div class="page-header"><h1>📋 Briefing & Tasks</h1><p>'+xe(s.branchName||'Branch')+'</p></div>';
   h += '<div class="bstb">';
   ['today','history'].forEach(function(t){
-    var l={today:'Today's Briefing',history:'History'};
-    h += '<button class="'+(tab===t?'on':'')+'" onclick="BS.briefingTab=''+t+'';navTo('bm-briefing')">'+l[t]+'</button>';
+    var l={today:'Today\'s Briefing',history:'History'};
+    h += '<button class="'+(tab===t?'on':'')+'" onclick="BS.briefingTab=\''+t+'\';navTo(\'bm-briefing\')">'+l[t]+'</button>';
   });
   h += '</div>';
 
