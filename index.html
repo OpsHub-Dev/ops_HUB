@@ -12898,7 +12898,7 @@ function pBmBriefing() {
             '<span style="background:rgba(0,102,102,.1);color:var(--primary);border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700">'+xe(v.shift||'ALL')+'</span>'+
             '<span style="font-size:10px;color:var(--text-tertiary);font-family:var(--mono)">'+new Date(v.ts||0).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})+'</span>'+
             '<span style="font-size:11px;color:var(--text-secondary)">by '+xe(v.by||'Manager')+'</span>'+
-            '<button class="btn btn-sm" style="margin-left:auto;color:var(--danger)" onclick="bmBrfDelete(''+bxe(todayStr)+'',''+bxe(k)+'')">✕ Delete</button>'+
+            '<button class="btn btn-sm" style="margin-left:auto;color:var(--danger)" data-date="'+bxe(todayStr)+'" data-key="'+bxe(k)+'" onclick="bmBrfDelete(this.dataset.date,this.dataset.key)">✕ Delete</button>'+
             '</div>'+
             '<div style="font-size:12px;color:var(--text-primary);margin-bottom:6px">'+xe(v.msg||'')+'</div>'+
             (items86?'<div style="margin-bottom:4px">'+items86+'</div>':'')+

@@ -1332,24 +1332,7 @@ function renderDashboard() {
     tryRender();
   });
 
-  var actions = [
-    {ico:'🏖️',lbl:'Apply for Leave',sub:'Annual · Sick · Emergency',page:'leave'},
-    {ico:'📅',lbl:'View Schedule',sub:'This week & next',page:'schedule'},
-    {ico:'💵',lbl:'Pay Slips',sub:'Salary & deductions',page:'payslip'},
-    {ico:'📂',lbl:'History File',sub:'Employment record',page:'history'},
-    {ico:'⚠️',lbl:'Report Incident',sub:'Workplace safety',page:'incidents'},
-    {ico:'📚',lbl:'Training',sub:'Modules & certifications',page:'training'},
-  ];
-  if (u.role === 'captain' || u.role === 'branch_mgr') {
-    actions.push({ico:'👥',lbl:'Staff Overview',sub:'View your team',page:'cap-staff'});
-    actions.push({ico:'🎓',lbl:'Build Training',sub:'Create modules',page:'cap-training'});
-  }
-  document.getElementById('quick-actions').innerHTML = actions.map(function(a) {
-    return '<button class="qab" onclick="showPage(\'' + a.page + '\')">' +
-      '<div class="qaico">' + a.ico + '</div>' +
-      '<div><div style="font-size:13px;font-weight:700">' + a.lbl + '</div><div style="font-size:10px;color:var(--text3);margin-top:1px">' + a.sub + '</div></div>' +
-      '<div style="margin-left:auto;font-size:16px;color:var(--text3)">›</div></button>';
-  }).join('');
+  // Quick actions replaced by Briefing & Tasks preview (rendered in briefing preview block above)
 
   // Today's shift — uses same logic as renderSchedule (reads from branches/{id}/sch)
   var tsb = document.getElementById('today-shift');
