@@ -10577,7 +10577,7 @@ function btsPgAtt(){
   h+='<strong style="color:'+(vd===TODAY_BS?'var(--ceo)':'var(--brand-dir)')+'">'+bxe(dateLbl)+'</strong>';
   h+='<span class="bmono" style="font-size:10px;color:var(--text-tertiary)">'+pCt+' present \u00b7 '+aCt+' absent \u00b7 '+oCt+' other</span></div>';
   h+='<div style="display:flex;gap:5px;flex-wrap:wrap;padding:8px 14px;border-bottom:1px solid var(--border);background:var(--surface-2)">'+afBtns+'</div>';
-  h+='<div class="btw-s"><table class="btbl"><thead><tr><th>Name</th><th>Dept</th><th>Scheduled</th><th>In</th><th>Out</th><th>Break</th><th>Hours</th><th style='color:#b45309'>OT</th><th>Status</th><th>Note</th></tr></thead>';
+  h+='<div class="btw-s"><table class="btbl"><thead><tr><th>Name</th><th>Dept</th><th>Scheduled</th><th>In</th><th>Out</th><th>Break</th><th>Hours</th><th style="color:#b45309">OT</th><th>Status</th><th>Note</th></tr></thead>';
   h+='<tbody>'+(attRows||'<tr><td colspan="8" style="text-align:center;color:var(--text-tertiary);padding:24px">No records for this date</td></tr>')+'</tbody></table></div></div>';
 
   // Wire up status buttons and save button AFTER render via setTimeout
