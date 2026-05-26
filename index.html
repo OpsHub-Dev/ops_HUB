@@ -13060,8 +13060,7 @@ function pBmOtApprovals() {
             '<td><span style="color:#b45309;font-weight:700;font-family:var(--mono)">+'+xe(otLabel)+'</span></td>'+
             '<td style="font-size:11px">'+xe(r.note||'—')+'</td>'+
             '<td style="text-align:center;white-space:nowrap">'+
-            '<button class="btn btn-sm" style="background:#00875a;color:#fff;border-color:#00875a;margin-right:4px" onclick="bmOtApprove(''+bxe(k)+'',''+bxe(r.staffId||r.sap||'')+'',''+bxe(r.date||'')+'','+((r.otMins)||0)+',''+bxe(r.staffName||'')+'')">✓ Approve</button>'+
-            '<button class="btn btn-sm" style="color:var(--danger)" onclick="bmOtReject(''+bxe(k)+'')">✕ Reject</button></td></tr>';
+            '<button class="btn btn-sm" style="background:#00875a;color:#fff;border-color:#00875a;margin-right:4px"'+' data-k="'+bxe(k)+'" data-sid="'+bxe(r.staffId||r.sap||'')+'" data-dt="'+bxe(r.date||'')+'" data-ot="'+((r.otMins)||0)+'" data-nm="'+bxe(r.staffName||'')+'"'+' onclick="bmOtApprove(this.dataset.k,this.dataset.sid,this.dataset.dt,parseInt(this.dataset.ot),this.dataset.nm)">✓ Approve</button>'+            '<button class="btn btn-sm" style="color:var(--danger)" data-k="'+bxe(k)+'" onclick="bmOtReject(this.dataset.k)">✕ Reject</button></td></tr>';
         }).join('')+
         '</tbody></table></div></div>';
       // Update badge
