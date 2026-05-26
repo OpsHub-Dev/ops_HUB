@@ -1965,7 +1965,11 @@ function parseShiftText(txt){
   var eS=parts[1].replace(/\s*(break.*|brk.*)/i,'').trim();
   if(!sS||!eS)return null;
   var sM=pT(sS),eM=pT(eS);if(eM<=sM)eM+=1440;
-  var duty=eM-sM;if(!brkM&&duty>=480)brkM=60;
+  // dutyMins = full scheduled window (e.g. 8AM-5PM = 540 mins = 9h contract)
+  // OT = any minutes worked beyond this window
+  var duty=eM-sM;
+  // Only auto-add break if not specified AND shift >=8h, and only for display — NOT deducted from OT calc
+  if(!brkM&&duty>=480)brkM=60;
   function fmt(m){m=m%1440;return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');}
   return{start:fmt(sM),end:fmt(eM%1440),startMins:sM,endMins:eM,dutyMins:duty,breakMins:brkM,label:fmt(sM)+' – '+fmt(eM%1440)};
 }
@@ -2290,8 +2294,10 @@ function doPortalCheckOut() {
     var workedMins = Math.max(0, coMins - ciMins - totalBrkMins);
     var _otMins=0;
     if(_ciScheduledShift){
-      var _sw=_ciScheduledShift.dutyMins-_ciScheduledShift.breakMins;
-      _otMins=Math.max(0,workedMins-_sw);
+      // OT = checkout time past scheduled end time
+      // e.g. schedule 8AM-5PM (endMins=1020), checkout 6PM (coMins=1080) → OT=60mins
+      var coMinsRaw=ciTimeToMins(t);
+      _otMins=Math.max(0, coMinsRaw - _ciScheduledShift.endMins);
       if(_otMins>0){
         var _ow=document.getElementById('ci-ot-wrap'),_ov=document.getElementById('ci-ot-val');
         if(_ow)_ow.style.display='';
