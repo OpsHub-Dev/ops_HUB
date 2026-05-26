@@ -382,6 +382,8 @@ textarea.fi{resize:vertical;min-height:80px}
       <button class="sb-item" onclick="showPage('incidents')" id="si-incidents"><span class="si">⚠️</span>Incident Report</button>
       <button class="sb-item" onclick="showPage('leave')" id="si-leave"><span class="si">🏖️</span>Annual Leave</button>
       <button class="sb-item" onclick="showPage('training')" id="si-training"><span class="si">📚</span>Training</button>
+      <button class="sb-item" onclick="showPage('briefing')" id="si-briefing"><span class="si">📋</span>Briefing & Tasks</button>
+      <button class="sb-item" onclick="showPage('id-status')" id="si-id-status"><span class="si">🪪</span>ID & Documents</button>
       <div class="sb-div"></div>
       <div class="sb-sec" id="cap-sec" style="display:none">Captain Tools</div>
       <button class="sb-item" onclick="showPage('cap-staff')" id="si-cap-staff" style="display:none"><span class="si">👥</span>Staff Overview</button>
@@ -396,7 +398,7 @@ textarea.fi{resize:vertical;min-height:80px}
         <div style="padding:20px 0 0">
           <div id="welcome-banner" style="margin-bottom:14px"></div>
           <div class="g2" style="margin-bottom:14px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px" id="kpi-row"></div>
-          <div class="card"><div class="ctitle"><div class="cdot"></div>Quick Actions</div><div id="quick-actions"></div></div>
+          <div class="card"><div class="ctitle"><div class="cdot" style="background:var(--primary)"></div>Today's Briefing</div><div id="dash-briefing-preview"><div style="text-align:center;padding:16px;color:var(--text3);font-size:11px;font-family:var(--mono)">Loading…</div></div></div>
           <div class="card"><div class="ctitle"><div class="cdot"></div>Today's Shift</div><div id="today-shift"></div></div>
         </div>
       </div>
@@ -488,6 +490,39 @@ textarea.fi{resize:vertical;min-height:80px}
           </div>
           <div class="card"><div class="ctitle"><div class="cdot"></div>Leave History</div>
             <div class="tw"><table><thead><tr><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Status</th></tr></thead><tbody id="lv-history"></tbody></table></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- BRIEFING & TASKS -->
+      <div class="page" id="page-briefing">
+        <div style="padding:20px 0 0">
+          <div class="sechdr"><div><h2>📋 Briefing & Tasks</h2><div class="sechdr-sub">Today's shift info</div></div></div>
+          <div id="briefing-86" class="card" style="display:none;margin-bottom:12px">
+            <div class="ctitle" style="margin-bottom:8px"><div class="cdot" style="background:var(--danger)"></div>86 Items — Not Available</div>
+            <div id="briefing-86-items" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+          </div>
+          <div id="briefing-assignments" class="card" style="display:none;margin-bottom:12px">
+            <div class="ctitle" style="margin-bottom:8px"><div class="cdot" style="background:var(--primary)"></div>Your Table Assignments</div>
+            <div id="briefing-assign-items"></div>
+          </div>
+          <div id="briefing-tasks-list">
+            <div style="text-align:center;padding:30px;color:var(--text3);font-size:12px">Loading briefing…</div>
+          </div>
+          <div class="card" style="margin-top:12px">
+            <div class="ctitle" style="margin-bottom:10px"><div class="cdot" style="background:var(--success)"></div>Complete a Task</div>
+            <input class="fi" id="task-done-inp" placeholder="Describe the task you completed…" style="margin-bottom:8px">
+            <button class="btnp" onclick="submitTaskDone()">✅ Mark as Done</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ID & DOCUMENTS STATUS -->
+      <div class="page" id="page-id-status">
+        <div style="padding:20px 0 0">
+          <div class="sechdr"><div><h2>🪪 ID & Documents</h2><div class="sechdr-sub">Validity status</div></div></div>
+          <div id="id-status-cards">
+            <div style="text-align:center;padding:30px;color:var(--text3);font-size:12px">Loading…</div>
           </div>
         </div>
       </div>
@@ -1200,6 +1235,8 @@ function showPage(id) {
   if (id === 'cap-training') renderCapTraining();
   if (id === 'cap-notifs') renderCapNotifs();
   if (id === 'cap-staff') renderCapStaff();
+  if (id === 'briefing') renderBriefing();
+  if (id === 'id-status') renderIdStatus();
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -2281,6 +2318,7 @@ function doPortalCheckOut() {
     ciWriteRecord(_ciLog, ci, t, 'present', totalBrkMins, _ciBreakLogs, workedMins, _otMins, _ciScheduledShift?_ciScheduledShift.label:'');
     updateCIButtons(); renderCILog(); updateCIBadge(); updateSummaryCard();
     var _otMsg=_otMins>0?' · OT +'+Math.floor(_otMins/60)+'h'+(_otMins%60?_otMins%60+'m':''):'';
+    if(_otMins>0) submitOtRequest(_otMins);
     showToast('Checked out at ' + t + ' · Worked ' + minsToHHMM(workedMins) + _otMsg + ' 👋', 'success');
     ciSendNotification('out', t, loc);
   });
@@ -3080,6 +3118,228 @@ function showToast(msg, type) {
   clearTimeout(_tt); requestAnimationFrame(function() { t.classList.add('show'); });
   _tt = setTimeout(function() { t.classList.remove('show'); }, 2800);
 }
+
+// ══════════════════════════════════════════════════════
+// BRIEFING & TASKS (Staff Portal)
+// ══════════════════════════════════════════════════════
+function renderBriefing(){
+  var u=CU;
+  if(!u||!u.branchId){
+    document.getElementById('briefing-tasks-list').innerHTML='<div style="text-align:center;padding:20px;color:var(--text3);font-size:11px">No branch linked</div>';
+    return;
+  }
+  db.ref('branches/'+u.branchId+'/briefings/'+todayKey()).once('value', function(snap){
+    var list=snap.val()||{};
+    var el=document.getElementById('briefing-tasks-list');
+    if(!el) return;
+    var items=Object.values(list).sort(function(a,b){return (b.ts||0)-(a.ts||0);});
+    if(!items.length){
+      el.innerHTML='<div style="text-align:center;padding:30px;color:var(--text3);font-size:12px">No briefing posted yet for today</div>';
+      return;
+    }
+    // Collect all 86 items and assignments across all briefings
+    var all86=[], allAssigns=[];
+    items.forEach(function(v){
+      (v.items86||[]).forEach(function(i){if(!all86.includes(i))all86.push(i);});
+      (v.assignments||[]).forEach(function(a){
+        var myName=(u.name||'').toLowerCase();
+        if(a.staff&&a.staff.toLowerCase().indexOf(myName.split(' ')[0])>=0) allAssigns.push(a);
+      });
+    });
+    // Show 86 banner
+    var el86=document.getElementById('briefing-86');
+    var el86items=document.getElementById('briefing-86-items');
+    if(all86.length&&el86&&el86items){
+      el86.style.display='';
+      el86items.innerHTML=all86.map(function(i){return '<span style="background:rgba(255,33,87,.1);color:var(--danger);border:1px solid rgba(255,33,87,.3);border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700">⛔ '+escH(i)+'</span>';}).join('');
+    }
+    // Show my table assignments
+    var elA=document.getElementById('briefing-assignments');
+    var elAI=document.getElementById('briefing-assign-items');
+    if(allAssigns.length&&elA&&elAI){
+      elA.style.display='';
+      elAI.innerHTML=allAssigns.map(function(a){return '<div style="padding:8px 0;border-bottom:1px solid var(--border-light);font-size:13px;font-weight:600;color:var(--primary)">Tables: '+escH(a.tables)+'</div>';}).join('');
+    }
+    // Render briefing cards
+    el.innerHTML=items.map(function(v){
+      return '<div class="card" style="margin-bottom:10px">'+
+        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'+
+        '<span style="background:rgba(0,102,102,.1);color:var(--primary);border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700">'+escH(v.shift||'ALL')+'</span>'+
+        '<span style="font-size:10px;color:var(--text3);font-family:var(--mono)">'+new Date(v.ts||0).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})+'</span></div>'+
+        '<div style="font-size:13px;color:var(--text);line-height:1.5">'+escH(v.msg||'')+'</div></div>';
+    }).join('');
+  });
+}
+
+function submitTaskDone(){
+  var u=CU;
+  if(!u||!u.branchId){showToast('Not connected');return;}
+  var inp=document.getElementById('task-done-inp');
+  var task=(inp||{}).value||'';
+  if(!task.trim()){showToast('Describe the task first');return;}
+  var rec={staffName:u.name||'Staff',staffId:u.staffId||u.sap||'',task:task.trim(),ts:Date.now(),branchId:u.branchId};
+  db.ref('branches/'+u.branchId+'/taskCompletions/'+todayKey()).push(rec, function(err){
+    if(err){showToast('Error: '+err.message);return;}
+    if(inp) inp.value='';
+    showToast('Task marked as done ✓');
+  });
+}
+
+function todayKey(){
+  var d=new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+
+// ══════════════════════════════════════════════════════
+// ID & DOCUMENTS STATUS (Staff Portal)
+// Sources:
+//   Iqama      → branches/{branchId}/staff  → m.iqamaExpiry, m.iqama
+//   Passport   → branches/{branchId}/staff  → m.passportExpiry, m.passportNo
+//   Health Card→ branches/{branchId}/health → h.medExp (matched by name/SAP)
+// ══════════════════════════════════════════════════════
+function renderIdStatus(){
+  var u=CU;
+  var el=document.getElementById('id-status-cards');
+  if(!el) return;
+  if(!u||!u.branchId){
+    el.innerHTML='<div style="text-align:center;padding:20px;color:var(--text3)">No branch linked</div>';
+    return;
+  }
+  el.innerHTML='<div style="text-align:center;padding:30px;color:var(--text3);font-size:12px;font-family:var(--mono)">⏳ Loading…</div>';
+
+  var staffData=null, healthData=null, pending=2;
+
+  function tryRender(){
+    pending--;
+    if(pending>0) return;
+
+    var now=new Date();
+    var todayStr=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0');
+
+    // Match HR staff record by staffId or SAP
+    var emp=null;
+    if(staffData){
+      var emps=Array.isArray(staffData)?staffData.filter(Boolean):Object.values(staffData).filter(Boolean);
+      emp=emps.find(function(e){
+        return e&&(String(e.id)===String(u.staffId)||String(e.sap||'')===String(u.sap||'')||
+          (u.name&&e.name&&e.name.toLowerCase()===u.name.toLowerCase()));
+      });
+    }
+
+    // Match health card record by name or SAP
+    var hcard=null;
+    if(healthData){
+      var hcards=Array.isArray(healthData)?healthData.filter(Boolean):Object.values(healthData).filter(Boolean);
+      hcard=hcards.find(function(h){
+        return h&&(String(h.sap||'')===String(u.sap||'')||
+          (u.name&&h.name&&h.name.toLowerCase()===u.name.toLowerCase()));
+      });
+    }
+
+    function docCard(label, icon, number, expiry, renewLabel){
+      var daysLeft=null, statusTxt='Not on file', color='var(--text3)', bgColor='var(--base)';
+      if(expiry){
+        var exp=new Date(expiry+'T00:00:00');
+        daysLeft=Math.ceil((exp-now)/(1000*60*60*24));
+        if(daysLeft<0){statusTxt='EXPIRED';color='var(--danger)';bgColor='rgba(255,33,87,.06)';}
+        else if(daysLeft<=14){statusTxt=daysLeft+' days left';color='var(--danger)';bgColor='rgba(255,33,87,.06)';}
+        else if(daysLeft<=30){statusTxt=daysLeft+' days left';color='var(--warning)';bgColor='rgba(254,153,0,.06)';}
+        else{statusTxt=daysLeft+' days left';color='var(--success)';bgColor='rgba(0,166,61,.06)';}
+      }
+      var urgent=daysLeft!==null&&daysLeft<30;
+      return '<div style="background:'+bgColor+';border:1px solid rgba(0,0,0,.08);border-left:4px solid '+color+';border-radius:14px;padding:16px;margin-bottom:10px">'+
+        '<div style="display:flex;align-items:center;gap:14px">'+
+        // Icon bubble
+        '<div style="width:48px;height:48px;border-radius:14px;background:var(--base);box-shadow:3px 3px 8px rgba(0,0,0,.12),-2px -2px 6px rgba(255,255,255,.8);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">'+icon+'</div>'+
+        '<div style="flex:1;min-width:0">'+
+        '<div style="font-size:13px;font-weight:700;color:var(--text)">'+label+'</div>'+
+        (number?'<div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:1px">No: '+escH(number)+'</div>':'')+
+        (expiry?'<div style="font-size:10px;color:var(--text3);font-family:var(--mono)">Expires: '+expiry+'</div>':
+                '<div style="font-size:10px;color:var(--text3)">Expiry not on file</div>')+
+        '<div style="font-size:12px;font-weight:700;color:'+color+';margin-top:3px">'+statusTxt+'</div>'+
+        '</div>'+
+        (urgent?'<button onclick="requestDocRenewal(''+escH(renewLabel||label)+'',''+escH(expiry||'')+'',''+escH(number||'')+'')" '+
+          'style="flex-shrink:0;background:'+color+';color:#fff;border:none;border-radius:10px;padding:8px 12px;font-size:10px;font-weight:700;cursor:pointer;font-family:var(--font);line-height:1.3;text-align:center">'+
+          'Request<br>Renewal</button>':'')+
+        '</div></div>';
+    }
+
+    var html='';
+
+    // 1. Health Card (from BM health cards module)
+    html+=docCard(
+      'Health Card', '💳',
+      hcard?hcard.cardNo||'':'',
+      hcard?hcard.medExp||'':'',
+      'Health Card'
+    );
+
+    // 2. Iqama (from HR staff record)
+    html+=docCard(
+      'Iqama', '🪪',
+      emp?emp.iqama||'':'',
+      emp?emp.iqamaExpiry||'':'',
+      'Iqama'
+    );
+
+    // 3. Passport (from HR staff record)
+    html+=docCard(
+      'Passport', '📕',
+      emp?emp.passportNo||'':'',
+      emp?emp.passportExpiry||'':'',
+      'Passport'
+    );
+
+    el.innerHTML=html;
+  }
+
+  // Load HR staff record (iqama + passport)
+  db.ref('branches/'+u.branchId+'/staff').once('value', function(snap){
+    staffData=snap.val()||{};
+    tryRender();
+  });
+
+  // Load BM health cards (health card expiry)
+  db.ref('branches/'+u.branchId+'/health').once('value', function(snap){
+    healthData=snap.val()||{};
+    tryRender();
+  });
+}
+
+function requestDocRenewal(docName, expiry, docNumber){
+  var u=CU;
+  if(!u||!u.branchId){showToast('Not connected');return;}
+  var rec={type:'doc_renewal',docName:docName,expiry:expiry,docNumber:docNumber||'',staffName:u.name||'Staff',staffId:u.staffId||u.sap||'',sap:u.sap||'',ts:Date.now(),status:'pending'};
+  db.ref('branches/'+u.branchId+'/notifications').push({
+    type:'doc_renewal',staffName:u.name||'Staff',
+    body:docName+' expiring: '+expiry,time:new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}),ts:Date.now()
+  });
+  db.ref('branches/'+u.branchId+'/docRenewals').push(rec,function(err){
+    if(err){showToast('Error: '+err.message);return;}
+    showToast('Renewal request sent to Branch Manager ✓');
+  });
+}
+
+// ══════════════════════════════════════════════════════
+// OVERTIME REQUEST (Staff Portal — from check-in)
+// ══════════════════════════════════════════════════════
+function submitOtRequest(otMins){
+  var u=CU;
+  if(!u||!u.branchId||!otMins){return;}
+  var rec={
+    staffName:u.name||'Staff', staffId:u.staffId||'', sap:u.sap||'',
+    date:todayKey(), otMins:otMins, status:'pending',
+    note:'Auto-submitted from check-out', ts:Date.now()
+  };
+  db.ref('branches/'+u.branchId+'/otRequests').push(rec);
+  // Notify BM
+  db.ref('branches/'+u.branchId+'/notifications').push({
+    type:'ot_request', staffName:u.name||'Staff',
+    body:'Overtime: '+Math.floor(otMins/60)+'h'+(otMins%60?otMins%60+'m':''),
+    time:new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}), ts:Date.now()
+  });
+}
+
 </script>
 </body>
 </html>

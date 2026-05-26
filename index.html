@@ -3795,7 +3795,11 @@ var NAV_CONFIG = {
       { id:'sales',             icon:'💰', label:'Sales' },
       { id:'petty-cash',        icon:'🧾', label:'Petty Cash' },
       { id:'dsr',               icon:'📋', label:'DSR' },
-      { id:'bm-leave',          icon:'🏖️', label:'Leave Management', badge:'bm-leave-pending' }
+      { id:'bm-leave',          icon:'🏖️', label:'Leave Management', badge:'bm-leave-pending' },
+      { id:'bm-ot-approvals',   icon:'⏰', label:'OT Approvals', badge:'bm-ot-pending' }
+    ]},
+    { section:'SHIFT MANAGEMENT', items:[
+      { id:'bm-briefing',        icon:'📋', label:'Briefing & Tasks', badge:'bm-briefing-pending' }
     ]},
     { section:'COMMUNICATIONS', items:[
       { id:'bm-compliance',      icon:'🏛️', label:'Compliance & Costs', badge:'bm-compliance-expiry' },
@@ -8158,7 +8162,8 @@ function renderPage_(pageId) {
       'branch-dash':pBranchDash,'inv-items':pInvItems,'inv-moves':pInvMoves,'inv-orders':pInvOrders,
       'low-stock':pLowStock,'inv-report':pInvReport,'wastage':pWastage,'staff':pStaff,
       'schedule':pSchedule,'timesheet':pTimesheet,'health-cards':pHealthCards,
-      'sales':pSales,'petty-cash':pPettyCash,'dsr':pDSR,'checklists':pChecklists,'qr-checkin':pQRCheckin
+      'sales':pSales,'petty-cash':pPettyCash,'dsr':pDSR,'checklists':pChecklists,'qr-checkin':pQRCheckin,
+      'bm-briefing':pBmBriefing,'bm-ot-approvals':pBmOtApprovals
     };
     return fns[pageId] ? fns[pageId]() : '';
   } catch(e) { return '<div class="empty-state"><div class="es-icon">&#x26A0;&#xFE0F;</div><p>' + bxe(e.message) + '</p></div>'; }
@@ -10578,7 +10583,7 @@ function btsPgAtt(){
   h+='<span class="bmono" style="font-size:10px;color:var(--text-tertiary)">'+pCt+' present \u00b7 '+aCt+' absent \u00b7 '+oCt+' other</span></div>';
   h+='<div style="display:flex;gap:5px;flex-wrap:wrap;padding:8px 14px;border-bottom:1px solid var(--border);background:var(--surface-2)">'+afBtns+'</div>';
   h+='<div class="btw-s"><table class="btbl"><thead><tr><th>Name</th><th>Dept</th><th>Scheduled</th><th>In</th><th>Out</th><th>Break</th><th>Hours</th><th style="color:#b45309">OT</th><th>Status</th><th>Note</th></tr></thead>';
-  h+='<tbody>'+(attRows||'<tr><td colspan="8" style="text-align:center;color:var(--text-tertiary);padding:24px">No records for this date</td></tr>')+'</tbody></table></div></div>';
+  h+='<tbody>'+(attRows||'<tr><td colspan="10" style="text-align:center;color:var(--text-tertiary);padding:24px">No records for this date</td></tr>')+'</tbody></table></div></div>';
 
   // Wire up status buttons and save button AFTER render via setTimeout
   setTimeout(function(){
@@ -12056,8 +12061,15 @@ function pDSR(){
   attachBranchListeners();
   var s=NX.session||{};
   var branchName=xe(s.branchName||s.entityName||'Branch');
-  // Initialize active date to today if not set
-  if(!BS.dsrActiveDate)BS.dsrActiveDate=TODAY_BS;
+  // Active date sticks until manager explicitly calls End Shift
+  // If shift is marked closed, auto-advance to today is allowed; otherwise keep last date
+  if(!BS.dsrActiveDate){
+    BS.dsrActiveDate=TODAY_BS;
+  } else if(BS.dsrShiftClosed && BS.dsrActiveDate!==TODAY_BS){
+    // Shift was closed by manager, auto-advance is OK
+    BS.dsrActiveDate=TODAY_BS;
+    BS.dsrShiftClosed=false;
+  }
   var today=BS.dsrActiveDate;
 
   // Init DSR state if not exists
@@ -12698,6 +12710,7 @@ function dsrEndShiftConfirmed(){
       };
       BS.dsrActiveDate=nextStr;
       BS._dsrDateChanged=true;
+      BS.dsrShiftClosed=true;
       showToast('Shift ended. Now editing '+nextStr,'success');
       navTo('dsr');
     });
@@ -12822,6 +12835,282 @@ function pQRCheckin() {
 function doQRCheckin(){var eid=bgv('qr-emp'),time=bgv('qr-time'),type=bgv('qr-type');if(!eid){showToast('Select a staff member','error');return;}var key=TODAY_BS.slice(0,7);if(!BS.tsAtt[eid])BS.tsAtt[eid]={};if(!BS.tsAtt[eid][key])BS.tsAtt[eid][key]=[];var recs=BS.tsAtt[eid][key];var ex=recs.find(function(r){return r.date===TODAY_BS;});if(type==='ci'){if(ex){ex.ci=time;if(!ex.st)ex.st='present';}else recs.push({date:TODAY_BS,ci:time,co:'',brk:'',note:'',st:'present'});showToast('Check-in recorded: '+time,'success');}else{if(ex)ex.co=time;else recs.push({date:TODAY_BS,ci:'',co:time,brk:'',note:'',st:'present'});showToast('Check-out recorded: '+time,'success');}bSaveTsAtt();navTo('qr-checkin');}
 
 // ══════════════════════════════════════════════════════
+
+
+// ══════════════════════════════════════════════════════
+// BRIEFING & TASKS MODULE (Branch Manager)
+// ══════════════════════════════════════════════════════
+function pBmBriefing() {
+  attachBranchListeners();
+  var s = NX.session || {};
+  var branchId = s.branchId;
+  var tab = BS.briefingTab || 'today';
+
+  var h = '<div class="page-header"><h1>📋 Briefing & Tasks</h1><p>'+xe(s.branchName||'Branch')+'</p></div>';
+  h += '<div class="bstb">';
+  ['today','history'].forEach(function(t){
+    var l={today:'Today's Briefing',history:'History'};
+    h += '<button class="'+(tab===t?'on':'')+'" onclick="BS.briefingTab=''+t+'';navTo('bm-briefing')">'+l[t]+'</button>';
+  });
+  h += '</div>';
+
+  // Compose briefing form
+  if(tab==='today'){
+    h += '<div class="bcard" style="margin-bottom:16px">';
+    h += '<div style="font-size:13px;font-weight:700;margin-bottom:12px;color:var(--text-primary)">📝 New Briefing / Task</div>';
+    h += '<div class="bfg"><label class="bfg">Shift</label>';
+    h += '<select class="bfi" id="brf-shift"><option value="AM">AM Shift</option><option value="PM">PM Shift</option><option value="ALL">All Day</option></select></div>';
+    h += '<div class="bfg"><label>Message / Task</label><textarea class="bfi" id="brf-msg" rows="3" placeholder="e.g. Check station setup, table assignments…"></textarea></div>';
+    
+    // 86 items
+    h += '<div class="bfg"><label>86 Items (Not Available)</label>';
+    h += '<div id="brf-86-list" style="margin-bottom:6px"></div>';
+    h += '<div style="display:flex;gap:6px"><input class="bfi" id="brf-86-inp" placeholder="Item name…" style="flex:1"><button class="btn btn-sm" onclick="bmBrf86Add()">+ Add</button></div></div>';
+    
+    // Table assignments
+    h += '<div class="bfg"><label>Table Assignments</label>';
+    h += '<div id="brf-assign-list" style="margin-bottom:6px"></div>';
+    h += '<div style="display:flex;gap:6px"><input class="bfi" id="brf-assign-staff" placeholder="Staff name" style="flex:1"><input class="bfi" id="brf-assign-tables" placeholder="Tables e.g. 1-5, 12" style="flex:1"><button class="btn btn-sm" onclick="bmBrfAssignAdd()">+ Add</button></div></div>';
+    
+    h += '<button class="btn btn-primary" onclick="bmBrfPublish()">📢 Publish Briefing to All Staff</button>';
+    h += '</div>';
+    
+    // Today's published briefings
+    h += '<div class="btw"><div class="bttb"><strong>Published Today</strong></div><div id="brf-today-list" style="padding:12px"><div style="text-align:center;color:var(--text-tertiary);font-size:12px;padding:20px">Loading…</div></div></div>';
+    
+    // OT Completion notifications
+    h += '<div class="btw" style="margin-top:14px"><div class="bttb"><strong>✅ Task Completions</strong><span id="brf-notif-badge" style="display:none;background:var(--danger);color:#fff;border-radius:10px;padding:2px 8px;font-size:10px;font-weight:700;margin-left:8px">0</span></div><div id="brf-notif-list" style="padding:12px"><div style="text-align:center;color:var(--text-tertiary);font-size:12px;padding:20px">No completions yet</div></div></div>';
+    
+    if(db && branchId){
+      var todayStr = TODAY_BS;
+      db.ref('branches/'+branchId+'/briefings/'+todayStr).once('value', function(snap){
+        var list = snap.val() || {};
+        var items = Object.entries(list).sort(function(a,b){return (b[1].ts||0)-(a[1].ts||0);});
+        var el = document.getElementById('brf-today-list');
+        if(!el) return;
+        if(!items.length){ el.innerHTML='<div style="text-align:center;color:var(--text-tertiary);font-size:12px;padding:20px">No briefings published today</div>'; return; }
+        el.innerHTML = items.map(function(e){
+          var k=e[0], v=e[1];
+          var items86=(v.items86||[]).map(function(i){return '<span style="background:rgba(239,68,68,.1);color:var(--danger);border:1px solid rgba(239,68,68,.3);border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700;margin-right:4px">86: '+xe(i)+'</span>';}).join('');
+          var assigns=(v.assignments||[]).map(function(a){return '<span style="background:rgba(0,102,102,.08);color:var(--primary);border:1px solid rgba(0,102,102,.2);border-radius:4px;padding:2px 8px;font-size:10px;margin-right:4px">'+xe(a.staff)+': Tables '+xe(a.tables)+'</span>';}).join('');
+          return '<div style="border-bottom:1px solid var(--border);padding:10px 0;last-child:border-none">'+
+            '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'+
+            '<span style="background:rgba(0,102,102,.1);color:var(--primary);border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700">'+xe(v.shift||'ALL')+'</span>'+
+            '<span style="font-size:10px;color:var(--text-tertiary);font-family:var(--mono)">'+new Date(v.ts||0).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})+'</span>'+
+            '<span style="font-size:11px;color:var(--text-secondary)">by '+xe(v.by||'Manager')+'</span>'+
+            '<button class="btn btn-sm" style="margin-left:auto;color:var(--danger)" onclick="bmBrfDelete(''+bxe(todayStr)+'',''+bxe(k)+'')">✕ Delete</button>'+
+            '</div>'+
+            '<div style="font-size:12px;color:var(--text-primary);margin-bottom:6px">'+xe(v.msg||'')+'</div>'+
+            (items86?'<div style="margin-bottom:4px">'+items86+'</div>':'')+
+            (assigns?'<div>'+assigns+'</div>':'')+
+            '</div>';
+        }).join('');
+      });
+      
+      // Task completions
+      db.ref('branches/'+branchId+'/taskCompletions/'+todayStr).once('value', function(snap){
+        var list = snap.val() || {};
+        var items = Object.entries(list).sort(function(a,b){return (b[1].ts||0)-(a[1].ts||0);});
+        var el = document.getElementById('brf-notif-list');
+        var badge = document.getElementById('brf-notif-badge');
+        if(!el) return;
+        if(!items.length){ return; }
+        if(badge){badge.style.display='';badge.textContent=items.length;}
+        el.innerHTML = items.map(function(e){
+          var v=e[1];
+          return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">'+
+            '<div class="bav" style="background:rgba(0,166,61,.1);color:#00875a">✓</div>'+
+            '<div><div style="font-size:12px;font-weight:600">'+xe(v.staffName||'Staff')+'</div>'+
+            '<div style="font-size:11px;color:var(--text-secondary)">'+xe(v.task||'Task completed')+'</div>'+
+            '<div style="font-size:10px;color:var(--text-tertiary);font-family:var(--mono)">'+new Date(v.ts||0).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})+'</div></div></div>';
+        }).join('');
+      });
+    }
+  } else {
+    // History tab
+    h += '<div class="btw"><div id="brf-hist-list" style="padding:14px"><div style="text-align:center;color:var(--text-tertiary);font-size:12px;padding:20px">Loading…</div></div></div>';
+    if(db && branchId){
+      db.ref('branches/'+branchId+'/briefings').limitToLast(14).once('value', function(snap){
+        var all=snap.val()||{};
+        var el=document.getElementById('brf-hist-list');
+        if(!el) return;
+        var days=Object.keys(all).sort().reverse();
+        if(!days.length){el.innerHTML='<div style="text-align:center;color:var(--text-tertiary);font-size:12px;padding:20px">No history yet</div>';return;}
+        el.innerHTML=days.map(function(d){
+          var items=all[d]||{};
+          var count=Object.keys(items).length;
+          return '<div style="padding:10px 0;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px">'+
+            '<div class="bmono" style="font-size:13px;font-weight:700">'+d+'</div>'+
+            '<div style="font-size:11px;color:var(--text-secondary)">'+count+' briefing'+(count!==1?'s':'')+' published</div>'+
+            '<button class="btn btn-sm" style="margin-left:auto" onclick="BS.briefingTab='today';BS.dsrActiveDate=''+bxe(d)+'';navTo('bm-briefing')">View</button></div>';
+        }).join('');
+      });
+    }
+  }
+
+  // Wire up 86 items and assignments temp storage
+  if(!BS._brf86) BS._brf86=[];
+  if(!BS._brfAssign) BS._brfAssign=[];
+  
+  setTimeout(function(){
+    bmBrf86Render();
+    bmBrfAssignRender();
+  }, 50);
+
+  return h;
+}
+
+var _brf86 = [];
+var _brfAssign = [];
+
+function bmBrf86Add(){
+  var inp = document.getElementById('brf-86-inp');
+  if(!inp||!inp.value.trim()) return;
+  if(!BS._brf86) BS._brf86=[];
+  BS._brf86.push(inp.value.trim());
+  inp.value='';
+  bmBrf86Render();
+}
+function bmBrf86Render(){
+  var el=document.getElementById('brf-86-list');
+  if(!el) return;
+  var arr=BS._brf86||[];
+  if(!arr.length){el.innerHTML='<div style="font-size:11px;color:var(--text-tertiary);padding:4px 0">None added</div>';return;}
+  el.innerHTML=arr.map(function(it,i){
+    return '<span style="display:inline-flex;align-items:center;gap:4px;background:rgba(239,68,68,.1);color:var(--danger);border:1px solid rgba(239,68,68,.3);border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700;margin:2px">'+
+      xe(it)+'<button onclick="BS._brf86.splice('+i+',1);bmBrf86Render()" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:12px;padding:0 0 0 4px">×</button></span>';
+  }).join('');
+}
+function bmBrfAssignAdd(){
+  var staff=document.getElementById('brf-assign-staff');
+  var tables=document.getElementById('brf-assign-tables');
+  if(!staff||!tables||!staff.value.trim()) return;
+  if(!BS._brfAssign) BS._brfAssign=[];
+  BS._brfAssign.push({staff:staff.value.trim(),tables:tables.value.trim()});
+  staff.value=''; tables.value='';
+  bmBrfAssignRender();
+}
+function bmBrfAssignRender(){
+  var el=document.getElementById('brf-assign-list');
+  if(!el) return;
+  var arr=BS._brfAssign||[];
+  if(!arr.length){el.innerHTML='<div style="font-size:11px;color:var(--text-tertiary);padding:4px 0">None added</div>';return;}
+  el.innerHTML=arr.map(function(a,i){
+    return '<div style="display:inline-flex;align-items:center;gap:4px;background:rgba(0,102,102,.08);color:var(--primary);border:1px solid rgba(0,102,102,.2);border-radius:6px;padding:3px 10px;font-size:11px;margin:2px">'+
+      xe(a.staff)+' → Tables: '+xe(a.tables)+
+      '<button onclick="BS._brfAssign.splice('+i+',1);bmBrfAssignRender()" style="background:none;border:none;color:var(--primary);cursor:pointer;font-size:12px;padding:0 0 0 4px">×</button></div>';
+  }).join('');
+}
+function bmBrfPublish(){
+  var s=NX.session||{};
+  if(!db||!s.branchId){showToast('Not connected','error');return;}
+  var msg=(document.getElementById('brf-msg')||{}).value||'';
+  var shift=(document.getElementById('brf-shift')||{}).value||'ALL';
+  if(!msg.trim()&&!(BS._brf86||[]).length){showToast('Enter a message or add 86 items','error');return;}
+  var rec={
+    ts:Date.now(), shift:shift, msg:msg.trim(),
+    items86:(BS._brf86||[]).slice(),
+    assignments:(BS._brfAssign||[]).slice(),
+    by:s.branchName||s.entityName||'Manager',
+    branchId:s.branchId
+  };
+  db.ref('branches/'+s.branchId+'/briefings/'+TODAY_BS).push(rec,function(err){
+    if(err){showToast('Publish failed: '+err.message,'error');return;}
+    // Also write to shared briefings for staff portal
+    db.ref('branches/'+s.branchId+'/latestBriefing').set(rec);
+    BS._brf86=[];
+    BS._brfAssign=[];
+    showToast('Briefing published to all staff ✓','success');
+    navTo('bm-briefing');
+  });
+}
+function bmBrfDelete(dateStr, key){
+  var s=NX.session||{};
+  if(!db||!s.branchId) return;
+  if(!confirm('Delete this briefing?')) return;
+  db.ref('branches/'+s.branchId+'/briefings/'+dateStr+'/'+key).remove(function(){
+    showToast('Deleted ✓','success');
+    navTo('bm-briefing');
+  });
+}
+
+// ══════════════════════════════════════════════════════
+// OT APPROVALS MODULE (Branch Manager)
+// ══════════════════════════════════════════════════════
+function pBmOtApprovals() {
+  attachBranchListeners();
+  var s = NX.session || {};
+  var h = '<div class="page-header"><h1>⏰ Overtime Approvals</h1><p>Review and approve extra hours</p></div>';
+  h += '<div id="bm-ot-list"><div style="text-align:center;padding:40px;color:var(--text-tertiary)">Loading…</div></div>';
+  
+  if(db && s.branchId){
+    db.ref('branches/'+s.branchId+'/otRequests').orderByChild('status').equalTo('pending').once('value', function(snap){
+      var el=document.getElementById('bm-ot-list');
+      if(!el) return;
+      var data=snap.val()||{};
+      var keys=Object.keys(data).sort(function(a,b){return (data[b].ts||0)-(data[a].ts||0);});
+      if(!keys.length){el.innerHTML='<div style="text-align:center;padding:40px;color:var(--text-tertiary)"><div style="font-size:32px;margin-bottom:8px">✅</div>No pending overtime requests</div>';return;}
+      el.innerHTML='<div class="btw"><div class="btw-s"><table class="btbl"><thead><tr>'+
+        '<th>Employee</th><th>Date</th><th>Overtime</th><th>Notes</th><th style="text-align:center">Action</th></tr></thead><tbody>'+
+        keys.map(function(k){
+          var r=data[k];
+          var otLabel=Math.floor((r.otMins||0)/60)+'h '+((r.otMins||0)%60?((r.otMins||0)%60)+'m':'');
+          return '<tr><td><div style="font-weight:600">'+xe(r.staffName||'—')+'</div><div style="font-size:10px;color:var(--text-tertiary);font-family:var(--mono)">'+xe(r.sap||r.staffId||'')+'</div></td>'+
+            '<td class="bmono">'+xe(r.date||'—')+'</td>'+
+            '<td><span style="color:#b45309;font-weight:700;font-family:var(--mono)">+'+xe(otLabel)+'</span></td>'+
+            '<td style="font-size:11px">'+xe(r.note||'—')+'</td>'+
+            '<td style="text-align:center;white-space:nowrap">'+
+            '<button class="btn btn-sm" style="background:#00875a;color:#fff;border-color:#00875a;margin-right:4px" onclick="bmOtApprove(''+bxe(k)+'',''+bxe(r.staffId||r.sap||'')+'',''+bxe(r.date||'')+'','+((r.otMins)||0)+',''+bxe(r.staffName||'')+'')">✓ Approve</button>'+
+            '<button class="btn btn-sm" style="color:var(--danger)" onclick="bmOtReject(''+bxe(k)+'')">✕ Reject</button></td></tr>';
+        }).join('')+
+        '</tbody></table></div></div>';
+      // Update badge
+      var nb=document.getElementById('nb-bm-ot-pending');
+      if(nb&&keys.length>0){nb.style.display='';nb.textContent=keys.length;}
+    });
+  }
+  return h;
+}
+
+function bmOtApprove(reqKey, staffId, date, otMins, staffName){
+  var s=NX.session||{};
+  if(!db||!s.branchId){showToast('Not connected','error');return;}
+  var mo=date?date.slice(0,7):'';
+  if(!mo){showToast('Invalid date','error');return;}
+  // Update request status
+  db.ref('branches/'+s.branchId+'/otRequests/'+reqKey).update({status:'approved',approvedBy:s.entityName||'Manager',approvedAt:Date.now()});
+  // Write OT into tsAtt record so it shows in timesheet and payroll
+  var attRef=db.ref('branches/'+s.branchId+'/tsAtt/'+staffId+'/'+mo);
+  attRef.once('value', function(snap){
+    var recs=snap.val()||[];
+    if(!Array.isArray(recs)) recs=Object.values(recs).filter(Boolean);
+    var idx2=recs.findIndex(function(r){return r&&r.date===date;});
+    if(idx2>=0){
+      recs[idx2].overtimeMins=(recs[idx2].overtimeMins||0)+otMins;
+      recs[idx2].otApproved=true;
+    } else {
+      recs.push({date:date,overtimeMins:otMins,otApproved:true,st:'present',ci:'',co:'',brk:'',note:'OT approved by manager'});
+    }
+    attRef.set(recs, function(err){
+      if(err){showToast('Error updating attendance: '+err.message,'error');return;}
+      // Notify employee via their otApprovals path
+      db.ref('branches/'+s.branchId+'/otApprovals/'+staffId).push({
+        status:'approved', date:date, otMins:otMins, approvedBy:s.entityName||'Manager', ts:Date.now()
+      });
+      showToast('Overtime approved for '+staffName+' ✓','success');
+      navTo('bm-ot-approvals');
+    });
+  });
+}
+
+function bmOtReject(reqKey){
+  var s=NX.session||{};
+  if(!db||!s.branchId) return;
+  db.ref('branches/'+s.branchId+'/otRequests/'+reqKey).update({status:'rejected',rejectedAt:Date.now()},function(){
+    showToast('Overtime request rejected','warning');
+    navTo('bm-ot-approvals');
+  });
+}
 
 // ── Missing branch helper stubs ──
 function clNxGetItem(clId,di,itemId){ clNxEnsureST(); try{return clNxState[clNxWk()][clId][di][itemId]||{};}catch(e){return {};} }
@@ -15004,6 +15293,12 @@ function openHrfEmpModal(empId,branchId){
       '<div class="bfg"><label class="form-label">IQAMA Expiry</label>'+
       '<input class="form-input" type="date" id="hrfemp-iqama-exp" value="'+bxe(m?m.iqamaExpiry||'':'')+'"></div></div>'+
 
+      // Row 8b: Passport Number + Expiry
+      '<div class="form-row"><div class="bfg"><label class="form-label">Passport Number</label>'+
+      '<input class="form-input" id="hrfemp-passport" value="'+bxe(m?m.passportNo||''):''+'"></div>'+
+      '<div class="bfg"><label class="form-label">Passport Expiry</label>'+
+      '<input class="form-input" type="date" id="hrfemp-passport-exp" value="'+bxe(m?m.passportExpiry||'':'')+'"></div></div>'+
+
       // Row 9: Contract Type + Contract End Date
       '<div class="form-row"><div class="bfg"><label class="form-label">Contract Type</label>'+
       '<select class="form-input form-select" id="hrfemp-contract">'+
@@ -15107,6 +15402,8 @@ function saveHrfEmp(empId,oldBranchId){
     joinDate:bgv('hrfemp-hire'),
     iqama:bgv('hrfemp-iqama'),
     iqamaExpiry:bgv('hrfemp-iqama-exp'),
+    passportNo:bgv('hrfemp-passport'),
+    passportExpiry:bgv('hrfemp-passport-exp'),
     contractType:bgv('hrfemp-contract')||'Full-Time',
     contractEndDate:bgv('hrfemp-contract-end'),
     probationEnd:bgv('hrfemp-prob'),
@@ -16996,7 +17293,7 @@ function hrfExportEmployees(){
     'hireDate','contractType','contractEndDate','probationEnd','shift',
     'basicSalary','housingAllowance','transportAllowance','otherAllowances','gosiEnrolled',
     'leaveBalance','annualLeave',
-    'iqama','iqamaExpiry',
+    'iqama','iqamaExpiry','passportNo','passportExpiry',
     'bankName','iban',
     'emergencyName','emergencyPhone',
     'hrNotes'
