@@ -1940,6 +1940,7 @@ function submitLeave() {
    Notifications → branches/{branchId}/notifications/{pushId}
 ═══════════════════════════════════════════════════════ */
 var _ciState = 'out'; // 'out' | 'in' | 'on-break' | 'done'
+var _ciLockedDate = null; // date string locked at check-in, never changes until next check-in
 var _ciLog = [];
 var _ciTodayRec = null;
 var _ciAttKey = null; // which Firebase key has this staff's attendance
@@ -1976,18 +1977,24 @@ function parseShiftText(txt){
 var _ciScheduledShift=null;
 function ciLoadSchedule(){
   var u=CU;if(!u||!u.branchId)return;
-  var days=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  // Use SAME week key format as Branch Manager: YYYY-WXX with short day names Sun/Mon/Tue...
+  var days=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   var now=new Date(),dayName=days[now.getDay()];
-  var d=new Date(now);d.setHours(0,0,0,0);d.setDate(d.getDate()-((d.getDay()+6)%7));
-  var wk=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  var y=now.getFullYear(),j=new Date(y,0,1),w=Math.ceil(((now-j)/86400000+j.getDay()+1)/7);
+  var wk=y+'-W'+(w<10?'0':'')+w;
   var empId=u.staffId||u.sap;
-  db.ref('branches/'+u.branchId+'/sch/'+wk+'/'+empId).once('value',function(snap){
-    var ms=snap.val()||{},raw=ms[dayName]||'';
-    if(!raw&&u.sap&&empId!==u.sap){
-      db.ref('branches/'+u.branchId+'/sch/'+wk+'/'+u.sap).once('value',function(s2){
-        ciApplySchedule((s2.val()||{})[dayName]||'');
-      });
-    }else{ciApplySchedule(raw);}
+  function tryLoad(id,cb){
+    db.ref('branches/'+u.branchId+'/sch/'+wk+'/'+id).once('value',function(snap){
+      var ms=snap.val()||{},raw=ms[dayName]||'';
+      cb(raw);
+    });
+  }
+  tryLoad(empId,function(raw){
+    if(!raw&&u.sap&&String(empId)!==String(u.sap)){
+      tryLoad(u.sap,function(raw2){ ciApplySchedule(raw2); });
+    } else {
+      ciApplySchedule(raw);
+    }
   });
 }
 function ciApplySchedule(raw){
@@ -2009,46 +2016,68 @@ function renderCheckIn() {
 
   var now = new Date();
   var todayStr = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
+  // Yesterday string — for overnight shift detection
+  var yd = new Date(now); yd.setDate(yd.getDate() - 1);
+  var yesterdayStr = yd.getFullYear() + '-' + String(yd.getMonth()+1).padStart(2,'0') + '-' + String(yd.getDate()).padStart(2,'0');
   var dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   document.getElementById('ci-date-sub').textContent = dayNames[now.getDay()].toUpperCase() + ' · ' + now.getDate() + ' ' + monthNames[now.getMonth()].toUpperCase();
   ciLoadSchedule();
 
-  if (!u.branchId) return; // no branch — buttons unlocked above, ready to use
+  if (!u.branchId) return;
 
   var monthKey = todayStr.slice(0,7);
+  var prevMonthKey = yesterdayStr.slice(0,7);
 
-  // Try BOTH possible keys: staffId (numeric) and sap — whichever has today's record wins
-  // This handles legacy records written under sap vs new records under staffId
   var keys = [];
-  // Try staffId first (matches BM e.id), then sap (legacy portal writes)
   if (u.staffId) keys.push(String(u.staffId));
   if (u.sap && String(u.sap) !== String(u.staffId)) keys.push(String(u.sap));
   if (!keys.length) return;
 
   var found = false;
   var checked = 0;
+  // Total checks = today + yesterday (may differ if month rolled over)
+  var totalChecks = keys.length * (monthKey !== prevMonthKey ? 2 : 2);
 
-  function tryKey(key) {
-    db.ref('branches/' + u.branchId + '/tsAtt/' + key + '/' + monthKey).once('value', function(snap) {
+  function applyRec(rec, key) {
+    found = true;
+    _ciAttKey = key;
+    _ciTodayRec = rec;
+    _ciLog = rec.log || [];
+    // Restore break logs from saved record
+    _ciBreakLogs = rec.brkLogs || [];
+    _ciBreakStart = null;
+    // If on-break state: find last unmatched break-start in log
+    var lastBrkStart = null;
+    (_ciLog).forEach(function(l){ if(l.type==='break-start') lastBrkStart=l.time; else if(l.type==='break-end') lastBrkStart=null; });
+    if (lastBrkStart && !rec.co) { _ciState = 'on-break'; _ciBreakStart = lastBrkStart; }
+    else {
+      _ciState = rec.co ? 'done' : (rec.ci ? 'in' : 'out');
+      if (rec.date) _ciLockedDate = rec.date; // restore locked date from saved record
+    }
+    updateCIButtons(); renderCILog(); updateCIBadge(); updateSummaryCard();
+  }
+
+  function tryKey(key, dateStr, mKey) {
+    db.ref('branches/' + u.branchId + '/tsAtt/' + key + '/' + mKey).once('value', function(snap) {
       checked++;
-      if (found) return; // another key already found a record
+      if (found) return;
       var arr = snap.val();
       if (!Array.isArray(arr)) arr = arr ? Object.values(arr).filter(Boolean) : [];
+      // Look for matching date record
       var rec = null;
       for (var i = 0; i < arr.length; i++) {
-        if (arr[i] && arr[i].date === todayStr) { rec = arr[i]; break; }
+        if (arr[i] && arr[i].date === dateStr) { rec = arr[i]; break; }
       }
       if (rec) {
-        found = true;
-        _ciAttKey = key; // remember which key has the real record
-        _ciTodayRec = rec;
-        _ciLog = rec.log || [];
-        _ciState = rec.co ? 'done' : (rec.ci ? 'in' : 'out');
-        updateCIButtons(); renderCILog(); updateCIBadge();
-      } else if (checked === keys.length && !found) {
-        // All keys checked, nothing found today — fresh start
-        _ciAttKey = u.staffId || keys[keys.length - 1]; // default write key = staffId (matches BM e.id)
+        // Only restore if not already checked out (don't restore done overnight shifts as active)
+        if (dateStr === todayStr || (dateStr === yesterdayStr && rec.ci && !rec.co)) {
+          applyRec(rec, key);
+          return;
+        }
+      }
+      if (checked >= totalChecks && !found) {
+        _ciAttKey = u.staffId ? String(u.staffId) : keys[0];
         _ciTodayRec = null; _ciLog = []; _ciState = 'out';
         _ciBreakLogs = []; _ciBreakStart = null;
         updateCIButtons(); renderCILog(); updateCIBadge(); updateSummaryCard();
@@ -2056,7 +2085,11 @@ function renderCheckIn() {
     });
   }
 
-  keys.forEach(function(k) { tryKey(k); });
+  // Search today first, then yesterday (for overnight/cross-midnight shifts)
+  keys.forEach(function(k) {
+    tryKey(k, todayStr, monthKey);
+    tryKey(k, yesterdayStr, prevMonthKey);
+  });
 }
 function ciNowTime() {
   var n = new Date();
@@ -2154,8 +2187,16 @@ function updateSummaryCard() {
   var totalBrk = _ciBreakLogs.reduce(function(s, b) { return s + b.mins; }, 0);
   var ciStr = _ciTodayRec && _ciTodayRec.ci ? _ciTodayRec.ci : null;
   var coStr = _ciTodayRec && _ciTodayRec.co ? _ciTodayRec.co : null;
-  var workedMins = coStr && ciStr ? Math.max(0, ciTimeToMins(coStr) - ciTimeToMins(ciStr) - totalBrk) : null;
   var onBreakNow = _ciState === 'on-break';
+  // Cross-midnight aware: use current time as co proxy when still checked in
+  var effectiveCo = coStr || (_ciState === 'in' || onBreakNow ? ciNowTime() : null);
+  var grossElapsed = ciStr && effectiveCo ? ciElapsedMins(ciStr, effectiveCo) : 0;
+  var workedMins = ciStr ? Math.max(0, grossElapsed - totalBrk) : null;
+  // Live OT: gross elapsed beyond scheduled duty
+  var liveOT = (_ciScheduledShift && grossElapsed > _ciScheduledShift.dutyMins)
+    ? grossElapsed - _ciScheduledShift.dutyMins : 0;
+  var savedOT = _ciTodayRec && _ciTodayRec.overtimeMins ? _ciTodayRec.overtimeMins : 0;
+  var _rot = coStr ? savedOT : liveOT; // use saved OT after checkout, live before
 
   if (!ciStr && !totalBrk) { card.style.display = 'none'; return; }
   card.style.display = '';
@@ -2163,11 +2204,10 @@ function updateSummaryCard() {
   var html = '';
   if (ciStr) html += kpiMini('Check-In', ciStr, 'var(--success)');
   if (onBreakNow && _ciBreakStart) html += kpiMini('Break Since', _ciBreakStart, 'var(--warning)');
-  if (totalBrk) html += kpiMini('Total Break', minsToHHMM(totalBrk), 'var(--warning)');
-  if (workedMins != null) html += kpiMini('Worked', minsToHHMM(workedMins), 'var(--primary)');
+  if (totalBrk) html += kpiMini('Break Total', minsToHHMM(totalBrk), 'var(--warning)');
+  if (workedMins != null) html += kpiMini(coStr ? 'Worked' : 'Working…', minsToHHMM(workedMins), 'var(--primary)');
   if (coStr) html += kpiMini('Check-Out', coStr, 'var(--danger)');
-  var _rot=_ciTodayRec&&_ciTodayRec.overtimeMins?_ciTodayRec.overtimeMins:0;
-  if(_rot>0)html+=kpiMini('Overtime','+'+Math.floor(_rot/60)+'h'+(_rot%60?_rot%60+'m':''),'#b45309');
+  if (_rot > 0) html += kpiMini('Overtime', '+' + Math.floor(_rot/60) + 'h' + (_rot%60 ? _rot%60 + 'm' : ''), '#b45309');
   kpis.innerHTML = html;
 }
 
@@ -2180,7 +2220,8 @@ function kpiMini(label, val, color) {
 
 function ciWriteRecord(newLog, ci, co, status, brkMins, brkLogs, workedMins, overtimeMins3, scheduledShift3) {
   var u = CU; if (!u || !u.branchId) return;
-  var today = ciTodayStr();
+  // Use locked check-in date — never auto-advance on midnight crossing
+  var today = _ciLockedDate || ciTodayStr();
   var monthKey = today.slice(0,7);
   var attKey = _ciAttKey || u.staffId || u.sap;
   if (!attKey) return;
@@ -2199,7 +2240,7 @@ function ciWriteRecord(newLog, ci, co, status, brkMins, brkLogs, workedMins, ove
     workedMins: workedMins != null ? workedMins : null,
     workedHrs: workedMins != null ? minsToHHMM(workedMins) : null,
     overtimeMins: overtimeMins3||0,
-    scheduledShift: scheduledShift3||(_ciScheduledShift?_ciScheduledShift.label:'')
+    scheduledShift: scheduledShift3||(_ciScheduledShift?(_ciScheduledShift.label||_ciScheduledShift.start+' – '+_ciScheduledShift.end):'')
   };
   db.ref(path).once('value', function(snap) {
     var arr = snap.val();
@@ -2215,6 +2256,14 @@ function ciTimeToMins(t) {
   if (!t) return 0;
   var p = t.split(':');
   return parseInt(p[0] || 0) * 60 + parseInt(p[1] || 0);
+}
+// Cross-midnight aware duration: always returns positive elapsed mins
+// If coMins < ciMins, the shift crossed midnight → add 1440
+function ciElapsedMins(ciT, coT) {
+  if (!ciT || !coT) return 0;
+  var s = ciTimeToMins(ciT), e = ciTimeToMins(coT);
+  if (e < s) e += 1440; // crossed midnight
+  return Math.max(0, e - s);
 }
 
 function minsToHHMM(m) {
@@ -2242,6 +2291,7 @@ function ciGetLocation(cb) {
 function doPortalCheckIn() {
   ciGetLocation(function(loc) {
     var t = ciNowTime();
+    _ciLockedDate = ciTodayStr(); // lock date at moment of check-in
     _ciLog = [{ type: 'in', time: t, loc: loc }];
     _ciState = 'in';
     ciWriteRecord(_ciLog, t, null, 'present');
@@ -2266,9 +2316,7 @@ function doPortalBreak() {
   } else {
     // END BREAK
     var endT = t;
-    var startMins = ciTimeToMins(_ciBreakStart);
-    var endMins = ciTimeToMins(endT);
-    var brkDur = Math.max(0, endMins - startMins);
+    var brkDur = ciElapsedMins(_ciBreakStart, endT);
     _ciBreakLogs.push({ start: _ciBreakStart, end: endT, mins: brkDur });
     _ciBreakStart = null;
     _ciState = 'in';
@@ -2290,20 +2338,18 @@ function doPortalCheckOut() {
     _ciState = 'done';
     var ci = _ciTodayRec && _ciTodayRec.ci ? _ciTodayRec.ci : t;
     var totalBrkMins = _ciBreakLogs.reduce(function(s, b) { return s + b.mins; }, 0);
-    // Calculate total worked hours
-    var ciMins = ciTimeToMins(ci);
-    var coMins = ciTimeToMins(t);
-    var workedMins = Math.max(0, coMins - ciMins - totalBrkMins);
-    var _otMins=0;
-    if(_ciScheduledShift){
-      // OT = checkout time past scheduled end time
-      // e.g. schedule 8AM-5PM (endMins=1020), checkout 6PM (coMins=1080) → OT=60mins
-      var coMinsRaw=ciTimeToMins(t);
-      _otMins=Math.max(0, coMinsRaw - _ciScheduledShift.endMins);
-      if(_otMins>0){
-        var _ow=document.getElementById('ci-ot-wrap'),_ov=document.getElementById('ci-ot-val');
-        if(_ow)_ow.style.display='';
-        if(_ov)_ov.textContent='+'+Math.floor(_otMins/60)+'h'+(_otMins%60?_otMins%60+'m':'');
+    // Cross-midnight safe: elapsed from check-in to check-out minus breaks
+    var grossMins = ciElapsedMins(ci, t);
+    var workedMins = Math.max(0, grossMins - totalBrkMins);
+    var _otMins = 0;
+    if (_ciScheduledShift) {
+      // OT = gross elapsed time (incl. break) beyond the scheduled duty window
+      // e.g. schedule 8AM-5PM = 540min duty; leaves at 6PM → grossMins=600 → OT=60min
+      _otMins = Math.max(0, grossMins - _ciScheduledShift.dutyMins);
+      if (_otMins > 0) {
+        var _ow = document.getElementById('ci-ot-wrap'), _ov = document.getElementById('ci-ot-val');
+        if (_ow) _ow.style.display = '';
+        if (_ov) _ov.textContent = '+' + Math.floor(_otMins/60) + 'h' + (_otMins%60 ? _otMins%60 + 'm' : '');
       }
     }
     ciWriteRecord(_ciLog, ci, t, 'present', totalBrkMins, _ciBreakLogs, workedMins, _otMins, _ciScheduledShift?_ciScheduledShift.label:'');
