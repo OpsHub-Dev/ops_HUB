@@ -3223,8 +3223,7 @@ function renderBriefing(){
     items.forEach(function(v){
       (v.items86||[]).forEach(function(i){if(!all86.includes(i))all86.push(i);});
       (v.assignments||[]).forEach(function(a){
-        var myName=(u.name||'').toLowerCase();
-        if(a.staff&&a.staff.toLowerCase().indexOf(myName.split(' ')[0])>=0) allAssigns.push(a);
+        allAssigns.push(a); // collect all, filtered by SAP below
       });
     });
     // Show 86 banner
@@ -3234,20 +3233,52 @@ function renderBriefing(){
       el86.style.display='';
       el86items.innerHTML=all86.map(function(i){return '<span style="background:rgba(255,33,87,.1);color:var(--danger);border:1px solid rgba(255,33,87,.3);border-radius:6px;padding:4px 10px;font-size:12px;font-weight:700">⛔ '+escH(i)+'</span>';}).join('');
     }
-    // Show my table assignments
+    // Show my table assignments — match by SAP first, then name
     var elA=document.getElementById('briefing-assignments');
     var elAI=document.getElementById('briefing-assign-items');
-    if(allAssigns.length&&elA&&elAI){
+    var mySap=String(u.sap||u.staffId||'');
+    var myFirstName=(u.name||'').toLowerCase().split(' ')[0];
+    var myAssigns=allAssigns.filter(function(a){
+      if(a.sap && mySap && String(a.sap)===mySap) return true;
+      if(a.staff && myFirstName && a.staff.toLowerCase().indexOf(myFirstName)>=0) return true;
+      return false;
+    });
+    if(myAssigns.length&&elA&&elAI){
       elA.style.display='';
-      elAI.innerHTML=allAssigns.map(function(a){return '<div style="padding:8px 0;border-bottom:1px solid var(--border-light);font-size:13px;font-weight:600;color:var(--primary)">Tables: '+escH(a.tables)+'</div>';}).join('');
+      elAI.innerHTML=myAssigns.map(function(a){
+        return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border-light)">'+
+          '<div style="font-size:24px">🍽️</div>'+
+          '<div><div style="font-size:14px;font-weight:700;color:var(--primary)">Tables: '+escH(a.tables)+'</div>'+
+          '<div style="font-size:11px;color:var(--text3)">Assigned to '+escH(a.staff)+(a.sap?' · SAP '+escH(String(a.sap)):'')+'</div></div></div>';
+      }).join('');
     }
     // Render briefing cards
-    el.innerHTML=items.map(function(v){
+    el.innerHTML=items.map(function(v,vi){
+      var tasksHtml='';
+      if(v.tasks&&v.tasks.length){
+        tasksHtml='<div style="margin:8px 0">';
+        v.tasks.forEach(function(t,ti){
+          var tid='btask-'+vi+'-'+ti;
+          tasksHtml+='<label style="display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid rgba(0,0,0,.06);cursor:pointer">'+
+            '<input type="checkbox" id="'+tid+'" style="width:17px;height:17px;accent-color:var(--primary);cursor:pointer">'+
+            '<span style="font-size:13px;color:var(--text)">'+escH(t)+'</span></label>';
+        });
+        tasksHtml+='</div>';
+      }
+      var items86Html='';
+      if(v.items86&&v.items86.length){
+        items86Html='<div style="margin-bottom:8px">'+v.items86.map(function(i){
+          return '<span style="background:rgba(255,33,87,.1);color:var(--danger);border:1px solid rgba(255,33,87,.3);border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700;margin-right:4px">⛔ '+escH(i)+'</span>';
+        }).join('')+'</div>';
+      }
       return '<div class="card" style="margin-bottom:10px">'+
         '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">'+
         '<span style="background:rgba(0,102,102,.1);color:var(--primary);border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700">'+escH(v.shift||'ALL')+'</span>'+
-        '<span style="font-size:10px;color:var(--text3);font-family:var(--mono)">'+new Date(v.ts||0).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})+'</span></div>'+
-        '<div style="font-size:13px;color:var(--text);line-height:1.5">'+escH(v.msg||'')+'</div></div>';
+        '<span style="font-size:10px;color:var(--text3);font-family:var(--mono)">'+new Date(v.ts||0).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})+'</span>'+
+        '<span style="font-size:11px;color:var(--text3);margin-left:4px">by '+escH(v.by||'Manager')+'</span></div>'+
+        items86Html+
+        (v.msg?'<div style="font-size:13px;color:var(--text);line-height:1.5;margin-bottom:8px">'+escH(v.msg)+'</div>':'')+
+        tasksHtml+'</div>';
     }).join('');
   });
 }

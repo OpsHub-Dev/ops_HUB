@@ -12886,17 +12886,42 @@ function pBmBriefing() {
     h += '<div style="font-size:13px;font-weight:700;margin-bottom:12px;color:var(--text-primary)">📝 New Briefing / Task</div>';
     h += '<div class="bfg"><label class="bfg">Shift</label>';
     h += '<select class="bfi" id="brf-shift"><option value="AM">AM Shift</option><option value="PM">PM Shift</option><option value="ALL">All Day</option></select></div>';
-    h += '<div class="bfg"><label>Message / Task</label><textarea class="bfi" id="brf-msg" rows="3" placeholder="e.g. Check station setup, table assignments…"></textarea></div>';
-    
+
+    // Tasks as checkboxes
+    var _defaultTasks=['Open & clean station','Check stock & mise en place','Set tables & covers','Brief on specials & 86 items','Check grooming & uniform','Review reservations','Assign sections & tables','Cash float check','Safety & hygiene check'];
+    h += '<div class="bfg"><label>Tasks</label>';
+    h += '<div style="border:1px solid var(--border);border-radius:10px;padding:10px;background:var(--base);margin-bottom:8px" id="brf-task-checkboxes">';
+    _defaultTasks.forEach(function(task,i){
+      h += '<label style="display:flex;align-items:center;gap:10px;padding:7px 4px;border-bottom:1px solid var(--border);cursor:pointer;font-size:12px;color:var(--text-primary)">'+
+        '<input type="checkbox" id="brf-task-'+i+'" value="'+bxe(task)+'" style="width:16px;height:16px;accent-color:var(--primary);cursor:pointer">'+
+        bxe(task)+'</label>';
+    });
+    h += '</div>';
+    h += '<div style="display:flex;gap:6px;margin-bottom:4px"><input class="bfi" id="brf-custom-task" placeholder="+ Add custom task…" style="flex:1"><button class="btn btn-sm" onclick="bmBrfCustomTaskAdd()">+ Add</button></div>';
+    h += '<div id="brf-custom-task-list"></div>';
+    h += '</div>';
+
+    // Notes / message field
+    h += '<div class="bfg"><label>Notes / Message</label><textarea class="bfi" id="brf-msg" rows="2" placeholder="Additional notes for the shift…"></textarea></div>';
+
     // 86 items
     h += '<div class="bfg"><label>86 Items (Not Available)</label>';
     h += '<div id="brf-86-list" style="margin-bottom:6px"></div>';
     h += '<div style="display:flex;gap:6px"><input class="bfi" id="brf-86-inp" placeholder="Item name…" style="flex:1"><button class="btn btn-sm" onclick="bmBrf86Add()">+ Add</button></div></div>';
-    
-    // Table assignments
+
+    // Table assignments — staff picker with SAP
+    var _staffOpts='<option value="">— Select staff —</option>';
+    var _sl2=(BS.staff||[]).slice().sort(function(a,b){return (a.name||'').localeCompare(b.name||'');});
+    _sl2.forEach(function(m){
+      if(!m||!m.name) return;
+      _staffOpts+='<option value="'+bxe(m.name)+'" data-sap="'+bxe(String(m.sap||m.id||''))+'">'+bxe(m.name)+' ('+bxe(String(m.sap||m.id||''))+') — '+bxe(m.dept||'')+'</option>';
+    });
     h += '<div class="bfg"><label>Table Assignments</label>';
     h += '<div id="brf-assign-list" style="margin-bottom:6px"></div>';
-    h += '<div style="display:flex;gap:6px"><input class="bfi" id="brf-assign-staff" placeholder="Staff name" style="flex:1"><input class="bfi" id="brf-assign-tables" placeholder="Tables e.g. 1-5, 12" style="flex:1"><button class="btn btn-sm" onclick="bmBrfAssignAdd()">+ Add</button></div></div>';
+    h += '<div style="display:flex;gap:6px;flex-wrap:wrap">';
+    h += '<select class="bfi" id="brf-assign-staff" style="flex:2;min-width:160px">'+_staffOpts+'</select>';
+    h += '<input class="bfi" id="brf-assign-tables" placeholder="Tables e.g. 1-5, 12" style="flex:1;min-width:100px">';
+    h += '<button class="btn btn-sm" onclick="bmBrfAssignAdd()">+ Assign</button></div></div>';
     
     if(!isViewingHistory){
       h += '<button class="btn btn-primary" onclick="bmBrfPublish()">📢 Publish Briefing to All Staff</button>';
@@ -12920,7 +12945,8 @@ function pBmBriefing() {
         el.innerHTML = items.map(function(e){
           var k=e[0], v=e[1];
           var items86=(v.items86||[]).map(function(i){return '<span style="background:rgba(239,68,68,.1);color:var(--danger);border:1px solid rgba(239,68,68,.3);border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700;margin-right:4px">86: '+xe(i)+'</span>';}).join('');
-          var assigns=(v.assignments||[]).map(function(a){return '<span style="background:rgba(0,102,102,.08);color:var(--primary);border:1px solid rgba(0,102,102,.2);border-radius:4px;padding:2px 8px;font-size:10px;margin-right:4px">'+xe(a.staff)+': Tables '+xe(a.tables)+'</span>';}).join('');
+          var tasksList=(v.tasks||[]).map(function(t){return '<span style="display:inline-flex;align-items:center;gap:4px;background:rgba(0,102,102,.07);color:var(--primary);border:1px solid rgba(0,102,102,.15);border-radius:4px;padding:2px 8px;font-size:10px;margin-right:4px;margin-bottom:3px">☑ '+xe(t)+'</span>';}).join('');
+          var assigns=(v.assignments||[]).map(function(a){return '<span style="background:rgba(0,102,102,.08);color:var(--primary);border:1px solid rgba(0,102,102,.2);border-radius:4px;padding:2px 8px;font-size:10px;margin-right:4px">'+xe(a.staff)+(a.sap?' ('+xe(String(a.sap))+')':'')+': Tables '+xe(a.tables)+'</span>';}).join('');
           return '<div style="border-bottom:1px solid var(--border);padding:10px 0;last-child:border-none">'+
             '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'+
             '<span style="background:rgba(0,102,102,.1);color:var(--primary);border-radius:4px;padding:2px 8px;font-size:10px;font-weight:700">'+xe(v.shift||'ALL')+'</span>'+
@@ -12928,7 +12954,8 @@ function pBmBriefing() {
             '<span style="font-size:11px;color:var(--text-secondary)">by '+xe(v.by||'Manager')+'</span>'+
             '<button class="btn btn-sm" style="margin-left:auto;color:var(--danger)" data-date="'+bxe(todayStr)+'" data-key="'+bxe(k)+'" onclick="bmBrfDelete(this.dataset.date,this.dataset.key)">✕ Delete</button>'+
             '</div>'+
-            '<div style="font-size:12px;color:var(--text-primary);margin-bottom:6px">'+xe(v.msg||'')+'</div>'+
+            (v.msg?'<div style="font-size:12px;color:var(--text-primary);margin-bottom:6px">'+xe(v.msg)+'</div>':'')+
+            (tasksList?'<div style="margin-bottom:6px">'+tasksList+'</div>':'')+
             (items86?'<div style="margin-bottom:4px">'+items86+'</div>':'')+
             (assigns?'<div>'+assigns+'</div>':'')+
             '</div>';
@@ -13010,12 +13037,14 @@ function bmBrf86Render(){
   }).join('');
 }
 function bmBrfAssignAdd(){
-  var staff=document.getElementById('brf-assign-staff');
+  var staffSel=document.getElementById('brf-assign-staff');
   var tables=document.getElementById('brf-assign-tables');
-  if(!staff||!tables||!staff.value.trim()) return;
+  if(!staffSel||!tables||!staffSel.value.trim()) return;
   if(!BS._brfAssign) BS._brfAssign=[];
-  BS._brfAssign.push({staff:staff.value.trim(),tables:tables.value.trim()});
-  staff.value=''; tables.value='';
+  var selOpt=staffSel.options[staffSel.selectedIndex];
+  var sap=selOpt?selOpt.getAttribute('data-sap')||'':'';
+  BS._brfAssign.push({staff:staffSel.value.trim(),sap:sap,tables:tables.value.trim()});
+  staffSel.selectedIndex=0; tables.value='';
   bmBrfAssignRender();
 }
 function bmBrfAssignRender(){
@@ -13024,19 +13053,56 @@ function bmBrfAssignRender(){
   var arr=BS._brfAssign||[];
   if(!arr.length){el.innerHTML='<div style="font-size:11px;color:var(--text-tertiary);padding:4px 0">None added</div>';return;}
   el.innerHTML=arr.map(function(a,i){
-    return '<div style="display:inline-flex;align-items:center;gap:4px;background:rgba(0,102,102,.08);color:var(--primary);border:1px solid rgba(0,102,102,.2);border-radius:6px;padding:3px 10px;font-size:11px;margin:2px">'+
-      xe(a.staff)+' → Tables: '+xe(a.tables)+
-      '<button onclick="BS._brfAssign.splice('+i+',1);bmBrfAssignRender()" style="background:none;border:none;color:var(--primary);cursor:pointer;font-size:12px;padding:0 0 0 4px">×</button></div>';
+    return '<div style="display:inline-flex;align-items:center;gap:6px;background:rgba(0,102,102,.08);color:var(--primary);border:1px solid rgba(0,102,102,.2);border-radius:6px;padding:4px 10px;font-size:11px;margin:2px">'+
+      '<span style="font-weight:700">'+xe(a.staff)+'</span>'+
+      (a.sap?'<span style="font-family:var(--mono);font-size:10px;opacity:.7">('+xe(String(a.sap))+')</span>':'')+
+      '<span>→ Tables: <strong>'+xe(a.tables)+'</strong></span>'+
+      '<button onclick="BS._brfAssign.splice('+i+',1);bmBrfAssignRender()" style="background:none;border:none;color:var(--primary);cursor:pointer;font-size:14px;padding:0 0 0 4px">×</button></div>';
   }).join('');
 }
+function bmBrfCustomTaskAdd(){
+  var inp=document.getElementById('brf-custom-task');
+  if(!inp||!inp.value.trim()) return;
+  if(!BS._brfCustomTasks) BS._brfCustomTasks=[];
+  BS._brfCustomTasks.push({text:inp.value.trim(),done:false});
+  inp.value='';
+  bmBrfCustomTaskRender();
+}
+function bmBrfCustomTaskRender(){
+  var el=document.getElementById('brf-custom-task-list');
+  if(!el) return;
+  var arr=BS._brfCustomTasks||[];
+  if(!arr.length){el.innerHTML='';return;}
+  el.innerHTML=arr.map(function(t,i){
+    return '<label style="display:flex;align-items:center;gap:10px;padding:7px 8px;background:rgba(0,102,102,.06);border-radius:8px;margin-bottom:4px;cursor:pointer;font-size:12px;color:var(--text-primary)">'+
+      '<input type="checkbox" id="brf-ctask-'+i+'" style="width:16px;height:16px;accent-color:var(--primary)">'+
+      bxe(t.text)+
+      '<button onclick="BS._brfCustomTasks.splice('+i+',1);bmBrfCustomTaskRender()" style="margin-left:auto;background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px">×</button>'+
+      '</label>';
+  }).join('');
+}
+
 function bmBrfPublish(){
   var s=NX.session||{};
   if(!db||!s.branchId){showToast('Not connected','error');return;}
   var msg=(document.getElementById('brf-msg')||{}).value||'';
   var shift=(document.getElementById('brf-shift')||{}).value||'ALL';
-  if(!msg.trim()&&!(BS._brf86||[]).length){showToast('Enter a message or add 86 items','error');return;}
+  // Collect checked default tasks
+  var checkedTasks=[];
+  var defaultTasks=['Open & clean station','Check stock & mise en place','Set tables & covers','Brief on specials & 86 items','Check grooming & uniform','Review reservations','Assign sections & tables','Cash float check','Safety & hygiene check'];
+  defaultTasks.forEach(function(task,i){
+    var cb=document.getElementById('brf-task-'+i);
+    if(cb&&cb.checked) checkedTasks.push(task);
+  });
+  // Collect checked custom tasks
+  (BS._brfCustomTasks||[]).forEach(function(t,i){
+    var cb=document.getElementById('brf-ctask-'+i);
+    if(cb&&cb.checked) checkedTasks.push(t.text);
+  });
+  if(!msg.trim()&&!checkedTasks.length&&!(BS._brf86||[]).length){showToast('Select tasks or add a message','error');return;}
   var rec={
     ts:Date.now(), shift:shift, msg:msg.trim(),
+    tasks:checkedTasks,
     items86:(BS._brf86||[]).slice(),
     assignments:(BS._brfAssign||[]).slice(),
     by:s.branchName||s.entityName||'Manager',
@@ -13048,6 +13114,7 @@ function bmBrfPublish(){
     db.ref('branches/'+s.branchId+'/latestBriefing').set(rec);
     BS._brf86=[];
     BS._brfAssign=[];
+    BS._brfCustomTasks=[];
     showToast('Briefing published to all staff ✓','success');
     navTo('bm-briefing');
   });
