@@ -13149,7 +13149,29 @@ function bmBrfDelete(dateStr, key){
 function pBmOtApprovals() {
   attachBranchListeners();
   var s = NX.session || {};
+  // Build staff options for manual entry
+  var _staffOpts='<option value="">— Select Staff —</option>';
+  (BS.staff||[]).slice().sort(function(a,b){return (a.name||'').localeCompare(b.name||'');}).forEach(function(m){
+    if(!m||!m.name) return;
+    _staffOpts+='<option value="'+bxe(String(m.sap||m.id||''))+'" data-name="'+bxe(m.name)+'">'+bxe(m.name)+' ('+bxe(String(m.sap||m.id||''))+') — '+bxe(m.dept||'')+'</option>';
+  });
+
   var h = '<div class="page-header"><h1>⏰ Overtime Approvals</h1><p>Review and approve extra hours</p></div>';
+
+  // ── Manual OT Entry ──────────────────────────────────────────────────────────
+  h += '<div class="bcard" style="margin-bottom:16px">';
+  h += '<div style="font-size:13px;font-weight:700;margin-bottom:12px;color:var(--text-primary)">➕ Add Overtime Manually</div>';
+  h += '<div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:10px;align-items:end">';
+  h += '<div><label class="form-label">Staff</label><select class="bfi" id="mot-staff">'+_staffOpts+'</select></div>';
+  h += '<div><label class="form-label">Date</label><input class="bfi" type="date" id="mot-date" value="'+bxe(TODAY_BS)+'"></div>';
+  h += '<div><label class="form-label">OT Hours</label><input class="bfi" type="number" id="mot-hours" min="0" max="12" step="0.5" placeholder="e.g. 2"></div>';
+  h += '<div><label class="form-label">OT Minutes</label><input class="bfi" type="number" id="mot-mins" min="0" max="59" step="5" placeholder="e.g. 30"></div>';
+  h += '</div>';
+  h += '<div style="display:flex;gap:8px;margin-top:10px">';
+  h += '<input class="bfi" id="mot-note" placeholder="Note (optional)" style="flex:1">';
+  h += '<button class="btn btn-primary" style="white-space:nowrap" onclick="bmOtManualAdd()">✓ Add & Approve</button>';
+  h += '</div></div>';
+
   h += '<div id="bm-ot-list"><div style="text-align:center;padding:40px;color:var(--text-tertiary)">Loading…</div></div>';
   
   if(db && s.branchId){
@@ -13220,6 +13242,59 @@ function bmOtReject(reqKey){
   db.ref('branches/'+s.branchId+'/otRequests/'+reqKey).update({status:'rejected',rejectedAt:Date.now()},function(){
     showToast('Overtime request rejected','warning');
     navTo('bm-ot-approvals');
+  });
+}
+
+function bmOtManualAdd(){
+  var s=NX.session||{};
+  if(!db||!s.branchId){showToast('Not connected','error');return;}
+  var staffSel=document.getElementById('mot-staff');
+  var dateVal=(document.getElementById('mot-date')||{}).value||'';
+  var hrs=parseFloat((document.getElementById('mot-hours')||{}).value||0)||0;
+  var mins=parseFloat((document.getElementById('mot-mins')||{}).value||0)||0;
+  var note=(document.getElementById('mot-note')||{}).value||'';
+  if(!staffSel||!staffSel.value){showToast('Select a staff member','error');return;}
+  if(!dateVal){showToast('Select a date','error');return;}
+  var otMins=Math.round(hrs*60)+Math.round(mins);
+  if(otMins<=0){showToast('Enter overtime hours or minutes','error');return;}
+  var selOpt=staffSel.options[staffSel.selectedIndex];
+  var staffName=selOpt?selOpt.getAttribute('data-name')||selOpt.text:'';
+  var sap=staffSel.value;
+  var mo=dateVal.slice(0,7);
+  var otLabel=Math.floor(otMins/60)+'h'+(otMins%60?otMins%60+'m':'');
+  if(!confirm('Add '+otLabel+' overtime for '+staffName+' on '+dateVal+'?')) return;
+
+  // Write directly to tsAtt as approved OT
+  var attRef=db.ref('branches/'+s.branchId+'/tsAtt/'+sap+'/'+mo);
+  attRef.once('value',function(snap){
+    var recs=snap.val()||[];
+    if(!Array.isArray(recs)) recs=Object.values(recs).filter(Boolean);
+    var ri=recs.findIndex(function(r){return r&&r.date===dateVal;});
+    if(ri>=0){
+      recs[ri].overtimeMins=(recs[ri].overtimeMins||0)+otMins;
+      recs[ri].otApproved=true;
+      recs[ri].otNote=note||'Added by manager';
+    } else {
+      recs.push({date:dateVal,overtimeMins:otMins,otApproved:true,st:'present',ci:'',co:'',brk:'',note:note||'OT added by manager'});
+    }
+    attRef.set(recs,function(err){
+      if(err){showToast('Error: '+err.message,'error');return;}
+      // Also log to otRequests as approved
+      db.ref('branches/'+s.branchId+'/otRequests').push({
+        staffName:staffName, staffId:sap, sap:sap,
+        date:dateVal, otMins:otMins, status:'approved',
+        note:note||'Added manually by manager',
+        approvedBy:s.entityName||s.branchName||'Manager',
+        approvedAt:Date.now(), ts:Date.now(), manual:true
+      });
+      // Notify employee
+      db.ref('branches/'+s.branchId+'/otApprovals/'+sap).push({
+        status:'approved',date:dateVal,otMins:otMins,
+        approvedBy:s.entityName||'Manager',ts:Date.now(),manual:true
+      });
+      showToast('OT '+otLabel+' added & approved for '+staffName+' ✓','success');
+      navTo('bm-ot-approvals');
+    });
   });
 }
 
