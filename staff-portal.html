@@ -2031,6 +2031,31 @@ function ciApplySchedule(raw){
   if(ss)ss.textContent=parsed?parsed.label:raw;
   if(sd)sd.textContent=parsed?Math.floor(parsed.dutyMins/60)+'h duty':'--';
   if(sb)sb.textContent=parsed?Math.floor(parsed.breakMins/60)+'h break':'--';
+  // Retroactively submit OT if shift already completed without schedule
+  if(parsed && _ciState==='done' && _ciTodayRec && _ciTodayRec.ci && _ciTodayRec.co && !(_ciTodayRec.overtimeMins>0)){
+    var grossMins=ciElapsedMins(_ciTodayRec.ci, _ciTodayRec.co);
+    var retroOT=Math.max(0, grossMins - parsed.dutyMins);
+    if(retroOT>0){
+      var u=CU;
+      if(u&&u.branchId){
+        var today=_ciLockedDate||_ciTodayRec.date||ciTodayStr();
+        var monthKey=today.slice(0,7);
+        var attKey=_ciAttKey||u.staffId||u.sap;
+        // Update tsAtt record with OT
+        db.ref('branches/'+u.branchId+'/tsAtt/'+attKey+'/'+monthKey).once('value',function(snap){
+          var arr=snap.val();
+          if(!Array.isArray(arr)) arr=arr?Object.values(arr).filter(Boolean):[];
+          var ri=arr.findIndex(function(r){return r&&r.date===today;});
+          if(ri>=0){
+            arr[ri].overtimeMins=retroOT;
+            arr[ri].scheduledShift=parsed.label||raw;
+            db.ref('branches/'+u.branchId+'/tsAtt/'+attKey+'/'+monthKey).set(arr);
+          }
+        });
+        submitOtRequest(retroOT);
+      }
+    }
+  }
 }
 function renderCheckIn() {
   var u = CU; if (!u) return;
@@ -2080,6 +2105,13 @@ function renderCheckIn() {
     else {
       _ciState = rec.co ? 'done' : (rec.ci ? 'in' : 'out');
       if (rec.date) _ciLockedDate = rec.date; // restore locked date from saved record
+      // Restore break logs so summary card shows correct break total
+      if (rec.brkLogs && rec.brkLogs.length) {
+        _ciBreakLogs = rec.brkLogs;
+      } else if (rec.brkMins > 0) {
+        // Synthesize a single break entry from saved brkMins
+        _ciBreakLogs = [{ start: '', end: '', mins: rec.brkMins }];
+      }
     }
     updateCIButtons(); renderCILog(); updateCIBadge(); updateSummaryCard();
   }
@@ -3437,18 +3469,32 @@ function requestDocRenewal(docName, expiry, docNumber){
 // ══════════════════════════════════════════════════════
 function submitOtRequest(otMins){
   var u=CU;
-  if(!u||!u.branchId||!otMins){return;}
+  if(!u||!u.branchId||!otMins||otMins<=0) return;
+  var dateStr=_ciLockedDate||(_ciTodayRec&&_ciTodayRec.date)||todayKey();
+  var schLabel=_ciScheduledShift?(_ciScheduledShift.label||''):(_ciTodayRec&&_ciTodayRec.scheduledShift)||'';
   var rec={
-    staffName:u.name||'Staff', staffId:u.staffId||'', sap:u.sap||'',
-    date:todayKey(), otMins:otMins, status:'pending',
-    note:'Auto-submitted from check-out', ts:Date.now()
+    staffName:u.name||'Staff',
+    staffId:_ciAttKey||u.staffId||u.sap||'',
+    sap:u.sap||'',
+    date:dateStr,
+    otMins:otMins,
+    scheduledShift:schLabel,
+    ci:_ciTodayRec&&_ciTodayRec.ci||'',
+    co:_ciTodayRec&&_ciTodayRec.co||'',
+    status:'pending',
+    note:'Auto-submitted at checkout',
+    ts:Date.now()
   };
-  db.ref('branches/'+u.branchId+'/otRequests').push(rec);
+  db.ref('branches/'+u.branchId+'/otRequests').push(rec, function(err){
+    if(err) console.warn('[OT] push failed:', err.message);
+  });
   // Notify BM
+  var otLabel=Math.floor(otMins/60)+'h'+(otMins%60?otMins%60+'m':'');
   db.ref('branches/'+u.branchId+'/notifications').push({
-    type:'ot_request', staffName:u.name||'Staff',
-    body:'Overtime: '+Math.floor(otMins/60)+'h'+(otMins%60?otMins%60+'m':''),
-    time:new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}), ts:Date.now()
+    type:'ot_request', staffName:u.name||'Staff', sap:u.sap||'',
+    body:'OT +'+otLabel+' ('+schLabel+')',
+    time:new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}),
+    ts:Date.now()
   });
 }
 
