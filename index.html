@@ -12712,23 +12712,37 @@ function dsrEndShiftConfirmed(){
       Object.keys(D.denoms||{}).forEach(function(k){
         if(k.indexOf('mfh_')===0||k.indexOf('mfc_')===0) nextDenoms[k]=(D.denoms||{})[k];
       });
-      BS.dsrState[nextStr]={
-        date:nextStr,restName:D.restName||s.branchName||'',food:'',bev:'',misc:'',vat:'',vatAlfa:'',guests:'',
-        // ── Master File carried forward ──
+      var nextDayState={
+        date:nextStr,
+        restName:D.restName||s.branchName||'',
+        // ── All operational tabs BLANK for new day ──
+        food:'',bev:'',misc:'',vat:'',vatAlfa:'',guests:'',
+        discounts:[],
+        payments:[{id:'p1',method:'Cash',amount:''},{id:'p2',method:'MADA',amount:''},{id:'p3',method:'VISA',amount:''},{id:'p4',method:'Qlub',amount:''}],
+        delivery:[],
+        servers:[],
+        tab:'overview',
+        // ── Master File fully carried forward ──
         mfCompany:D.mfCompany||'',
         closedPetty:D.closedPetty||[],
         ongoingPetty:D.ongoingPetty||[],
         safeItems:D.safeItems||[],
         denoms:nextDenoms,
-        // ── Fresh day data ──
-        discounts:[],payments:[{id:'p1',method:'Cash',amount:''},{id:'p2',method:'MADA',amount:''},{id:'p3',method:'VISA',amount:''},{id:'p4',method:'Qlub',amount:''}],
-        delivery:[],servers:[],tab:'overview'
+        // ── Mark as carried-forward skeleton ──
+        _carriedFrom:activeDate,
+        _carriedAt:new Date().toISOString()
       };
+      BS.dsrState[nextStr]=nextDayState;
       BS.dsrActiveDate=nextStr;
       BS._dsrDateChanged=true;
       BS.dsrShiftClosed=true;
-      showToast('Shift ended. Now editing '+nextStr,'success');
-      navTo('dsr');
+      // ── Save next day skeleton to Firebase immediately ──
+      // This ensures Master File persists even after page refresh
+      db.ref(dsrFbPath(nextStr)).set(nextDayState,function(nextErr){
+        if(nextErr) console.warn('[DSR] next day skeleton save failed:',nextErr.message);
+        showToast('Shift ended. Now editing '+nextStr,'success');
+        navTo('dsr');
+      });
     });
   } else {
     showToast('Firebase not connected','error');
