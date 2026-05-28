@@ -1079,6 +1079,8 @@ function simpleHash(str) {
 ═══════════════════════════════════════════════════════ */
 function launchPortal(sap, staffData) {
   CU = Object.assign({ sap: sap }, staffData);
+  // Always load schedule after login so retro OT can be calculated for completed shifts
+  setTimeout(function(){ if(typeof ciLoadSchedule==='function') ciLoadSchedule(); }, 800);
   // Update last login in Firebase
   var sessionUpdate = { lastLogin: Date.now(), role: CU.role || 'staff', dept: CU.dept || 'Operations', icon: CU.icon || '👤', salary: CU.salary || 0, joinDate: CU.joinDate || new Date().toISOString().split('T')[0] };
   if (CU.name && !CU.name.startsWith('Staff ')) sessionUpdate.name = CU.name;
@@ -3468,6 +3470,24 @@ function requestDocRenewal(docName, expiry, docNumber){
 // OVERTIME REQUEST (Staff Portal — from check-in)
 // ══════════════════════════════════════════════════════
 function submitOtRequest(otMins){
+  var u=CU;
+  if(!u||!u.branchId||!otMins||otMins<=0) return;
+  var dateStr=_ciLockedDate||(_ciTodayRec&&_ciTodayRec.date)||todayKey();
+  // Deduplicate: don't submit OT request for same staff+date twice
+  db.ref('branches/'+u.branchId+'/otRequests')
+    .orderByChild('date').equalTo(dateStr)
+    .once('value', function(existSnap){
+      var ex=existSnap.val()||{};
+      var staffKey=_ciAttKey||u.staffId||u.sap||'';
+      var alreadyExists=Object.values(ex).some(function(r){
+        return r&&String(r.staffId||r.sap||'')===String(staffKey)&&(r.status==='pending'||r.status==='approved');
+      });
+      if(alreadyExists){ console.log('[OT] Request already exists for',staffKey,dateStr); return; }
+      _doSubmitOtRequest(otMins);
+    });
+  return;
+}
+function _doSubmitOtRequest(otMins){
   var u=CU;
   if(!u||!u.branchId||!otMins||otMins<=0) return;
   var dateStr=_ciLockedDate||(_ciTodayRec&&_ciTodayRec.date)||todayKey();

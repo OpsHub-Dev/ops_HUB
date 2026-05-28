@@ -13153,10 +13153,13 @@ function pBmOtApprovals() {
   h += '<div id="bm-ot-list"><div style="text-align:center;padding:40px;color:var(--text-tertiary)">Loading…</div></div>';
   
   if(db && s.branchId){
-    db.ref('branches/'+s.branchId+'/otRequests').orderByChild('status').equalTo('pending').once('value', function(snap){
+    db.ref('branches/'+s.branchId+'/otRequests').once('value', function(snap){
       var el=document.getElementById('bm-ot-list');
       if(!el) return;
-      var data=snap.val()||{};
+      var all=snap.val()||{};
+      // Filter pending in JS — avoids needing a Firebase index on 'status'
+      var data={};
+      Object.keys(all).forEach(function(k){ if((all[k].status||'pending')==='pending') data[k]=all[k]; });
       var keys=Object.keys(data).sort(function(a,b){return (data[b].ts||0)-(data[a].ts||0);});
       if(!keys.length){el.innerHTML='<div style="text-align:center;padding:40px;color:var(--text-tertiary)"><div style="font-size:32px;margin-bottom:8px">✅</div>No pending overtime requests</div>';return;}
       el.innerHTML='<div class="btw"><div class="btw-s"><table class="btbl"><thead><tr>'+
