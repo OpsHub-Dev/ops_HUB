@@ -1355,7 +1355,7 @@ function renderDashboard() {
       var myAssigns=[];
       entries.forEach(function(e){(e.assignments||[]).forEach(function(a){if(a.staff&&a.staff.toLowerCase().indexOf(myName)>=0)myAssigns.push(a);});});
       if(myAssigns.length) html+='<div style="margin-bottom:8px">'+myAssigns.map(function(a){return '<span style="background:rgba(0,102,102,.08);color:var(--primary);border:1px solid rgba(0,102,102,.2);border-radius:4px;padding:2px 8px;font-size:10px;margin-right:4px">🍽️ Tables: '+escH(a.tables)+'</span>';}).join('')+'</div>';
-      html+='<button class="btnp" style="margin-top:8px;padding:6px 14px;font-size:11px" onclick="showPage('briefing')">View Full Briefing →</button>';
+      html+='<button class="btnp" style="margin-top:8px;padding:6px 14px;font-size:11px" onclick="showPage(\'briefing\')">View Full Briefing →</button>';
       el.innerHTML=html;
     });
   })();
