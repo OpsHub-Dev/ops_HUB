@@ -1269,34 +1269,48 @@ function renderDashboard() {
   var now2 = new Date();
   var monthKey = now2.getFullYear() + '-' + String(now2.getMonth()+1).padStart(2,'0');
 
-  function renderKpiRow(present, late, sick, absent, leaveBal, incCount, otMins) {
+  function renderKpiRow(present, late, sick, absent, leaveBal, incCount, otMins, salary) {
     var el = document.getElementById('kpi-row');
     if (!el) return;
+    // Calculate OT pay amount
+    var base = parseInt(salary||CU&&CU.salary||0);
+    var hourlyRate = base > 0 ? base / (26*8) : 0;
+    var otPay = base > 0 ? Math.round(hourlyRate * 1.5 * (otMins/60)) : 0;
+    var otLabel = otMins > 0
+      ? Math.floor(otMins/60)+'h'+(otMins%60?otMins%60+'m':'')
+      : '—';
+    var otSub = otMins > 0 && otPay > 0
+      ? 'SAR '+otPay.toLocaleString()+' earned'
+      : 'This month';
     el.innerHTML =
       '<div class="kpi" style="--kc:var(--success)"><div class="kpi-l">PRESENT</div><div class="kpi-v">' + present + '</div><div class="kpi-s">This month</div></div>' +
       '<div class="kpi" style="--kc:var(--warning)"><div class="kpi-l">LATE</div><div class="kpi-v">' + late + '</div><div class="kpi-s">Days</div></div>' +
       '<div class="kpi" style="--kc:#f97316"><div class="kpi-l">SICK LEAVE</div><div class="kpi-v">' + sick + '</div><div class="kpi-s">Days</div></div>' +
       '<div class="kpi" style="--kc:var(--danger)"><div class="kpi-l">ABSENT</div><div class="kpi-v">' + absent + '</div><div class="kpi-s">Days</div></div>' +
       '<div class="kpi" style="--kc:var(--primary)"><div class="kpi-l">LEAVE BALANCE</div><div class="kpi-v">' + leaveBal + '</div><div class="kpi-s">Days remaining</div></div>' +
-      '<div class="kpi" style="--kc:#b45309"><div class="kpi-l">OVERTIME</div><div class="kpi-v" style="font-size:18px">' + (otMins>0?Math.floor(otMins/60)+'h'+(otMins%60?otMins%60+'m':''):'—') + '</div><div class="kpi-s">This month</div></div>';
+      '<div class="kpi" style="--kc:#b45309"><div class="kpi-l">OVERTIME</div>'+
+      '<div class="kpi-v" style="font-size:'+(otMins>0?'15':'18')+'px;color:#b45309;line-height:1.2">' + otLabel + '</div>'+
+      (otPay>0?'<div style="font-size:11px;font-weight:700;color:#00875a;font-family:var(--mono)">SAR '+otPay.toLocaleString()+'</div>':'') +
+      '<div class="kpi-s">' + (otMins>0?'This month':'This month') + '</div></div>';
   }
 
   var attPresent=0, attLate=0, attSick=0, attAbsent=0, attOtMins=0;
-  var leaveBal=21, incCount=0;
-  var pending=3;
+  var leaveBal=21, incCount=0, dashSalary=parseInt(CU&&CU.salary||0)||0;
+  var pending=4; // att + leave + incidents + salary
 
-  function tryRender(){ pending--; if(pending<=0) renderKpiRow(attPresent,attLate,attSick,attAbsent,leaveBal,incCount,attOtMins); }
+  function tryRender(){ pending--; if(pending<=0) renderKpiRow(attPresent,attLate,attSick,attAbsent,leaveBal,incCount,attOtMins,dashSalary||0); }
 
-  // 1. Attendance from tsAtt
-  if (u.branchId && u.staffId) {
-    // Try staffId first, fallback to sap (BM may write under sap key)
+  // 1. Attendance from tsAtt — whole current month (day 1 to 31)
+  if (u.branchId && (u.staffId || u.sap)) {
     function loadAttKpi(key){
       db.ref('branches/' + u.branchId + '/tsAtt/' + key + '/' + monthKey).once('value', function(snap) {
         var recs = snap.val() || [];
         if (!Array.isArray(recs)) recs = Object.values(recs);
-        if (!recs.length && key === u.staffId && u.sap && String(u.sap) !== String(u.staffId)) {
-          loadAttKpi(u.sap); return; // fallback to sap
+        if (!recs.length && u.sap && String(key) !== String(u.sap)) {
+          loadAttKpi(String(u.sap)); return; // fallback to SAP key
         }
+        // Collect records that need schedule lookup (no overtimeMins + no scheduledShift)
+        var needSchLookup = [];
         recs.forEach(function(r) {
           if (!r) return;
           var st = (r.st || r.status || '').toLowerCase();
@@ -1304,13 +1318,80 @@ function renderDashboard() {
           else if (st === 'late') attLate++;
           else if (st === 'sick') attSick++;
           else if (st === 'absent') attAbsent++;
-          if (r.overtimeMins > 0) attOtMins+=(r.overtimeMins||0);
+          // Use saved overtimeMins if already set
+          if (r.overtimeMins > 0) {
+            attOtMins += r.overtimeMins;
+          } else if (r.ci && r.co) {
+            if (r.scheduledShift) {
+              // Has schedule label — compute directly
+              var ps = parseShiftText(r.scheduledShift);
+              if (ps) {
+                var gross = ciElapsedMins(r.ci, r.co);
+                var ot = Math.max(0, gross - ps.dutyMins);
+                if (ot > 0) attOtMins += ot;
+              }
+            } else if (r.date) {
+              // No schedule saved — need Firebase lookup
+              needSchLookup.push(r);
+            }
+          }
         });
-        tryRender();
+
+        // For records missing scheduledShift, look up from sch path
+        var schPending = needSchLookup.length;
+        if (schPending === 0) {
+          tryRender();
+        } else {
+          needSchLookup.forEach(function(r) {
+            var d = new Date(r.date + 'T00:00:00');
+            var dayName = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()];
+            var y = d.getFullYear(), j = new Date(y,0,1);
+            var wn = Math.ceil(((d-j)/86400000+j.getDay()+1)/7);
+            var wk = y+'-W'+(wn<10?'0':'')+wn;
+            var empKey = _ciAttKey || u.staffId || u.sap;
+            function checkKey(k) {
+              db.ref('branches/'+u.branchId+'/sch/'+wk+'/'+k).once('value', function(ss){
+                var schVal = (ss.val()||{})[dayName]||'';
+                if (schVal) {
+                  var ps2 = parseShiftText(schVal);
+                  if (ps2) {
+                    var gross2 = ciElapsedMins(r.ci, r.co);
+                    var ot2 = Math.max(0, gross2 - ps2.dutyMins);
+                    if (ot2 > 0) attOtMins += ot2;
+                  }
+                }
+                schPending--;
+                if (schPending <= 0) tryRender();
+              });
+            }
+            checkKey(empKey);
+          });
+        }
       });
     }
-    loadAttKpi(u.staffId || u.sap);
+    loadAttKpi(String(u.staffId || u.sap || ''));
   } else { tryRender(); }
+
+  // 1b. Load salary from staff record for OT SAR calculation
+  if (u.branchId && (u.staffId||u.sap)) {
+    var _sKey = String(u.staffId||u.sap||'');
+    db.ref('branches/'+u.branchId+'/staff/'+_sKey).once('value',function(ss){
+      var sm=ss.val();
+      if(sm && (sm.basicSalary||sm.salary)) {
+        dashSalary=parseInt(sm.basicSalary||sm.salary)||0;
+        tryRender();
+      } else {
+        // Fallback: scan by SAP
+        db.ref('branches/'+u.branchId+'/staff').once('value',function(sa){
+          var raw=sa.val()||{};
+          var arr=Array.isArray(raw)?raw.filter(Boolean):Object.values(raw).filter(Boolean);
+          var em=arr.find(function(e){return e&&(String(e.sap||'')==String(u.sap||'')||String(e.id||'')==_sKey);});
+          if(em) dashSalary=parseInt(em.basicSalary||em.salary||0)||0;
+          tryRender();
+        });
+      }
+    });
+  } else { tryRender(); } // no branchId — still decrement pending
 
   // 2. Leave balance — authoritative source is branches/{branchId}/staff (HR record)
   //    matched by staffId key OR by sap field scan
