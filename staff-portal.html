@@ -1285,21 +1285,27 @@ function renderDashboard() {
 
   // 1. Attendance from tsAtt
   if (u.branchId && u.staffId) {
-    db.ref('branches/' + u.branchId + '/tsAtt/' + u.staffId + '/' + monthKey).once('value', function(snap) {
-      var recs = snap.val() || [];
-      if (!Array.isArray(recs)) recs = Object.values(recs);
-      recs.forEach(function(r) {
-        if (!r) return;
-        var st = (r.st || r.status || '').toLowerCase();
-        if (st === 'present') attPresent++;
-        else if (st === 'late') attLate++;
-        else if (st === 'sick') attSick++;
-        else if (st === 'absent') attAbsent++;
-        // Only count approved OT for the dashboard KPI
-        if (r.otApproved && r.overtimeMins > 0) attOtMins+=(r.overtimeMins||0);
+    // Try staffId first, fallback to sap (BM may write under sap key)
+    function loadAttKpi(key){
+      db.ref('branches/' + u.branchId + '/tsAtt/' + key + '/' + monthKey).once('value', function(snap) {
+        var recs = snap.val() || [];
+        if (!Array.isArray(recs)) recs = Object.values(recs);
+        if (!recs.length && key === u.staffId && u.sap && String(u.sap) !== String(u.staffId)) {
+          loadAttKpi(u.sap); return; // fallback to sap
+        }
+        recs.forEach(function(r) {
+          if (!r) return;
+          var st = (r.st || r.status || '').toLowerCase();
+          if (st === 'present') attPresent++;
+          else if (st === 'late') attLate++;
+          else if (st === 'sick') attSick++;
+          else if (st === 'absent') attAbsent++;
+          if (r.overtimeMins > 0) attOtMins+=(r.overtimeMins||0);
+        });
+        tryRender();
       });
-      tryRender();
-    });
+    }
+    loadAttKpi(u.staffId || u.sap);
   } else { tryRender(); }
 
   // 2. Leave balance — authoritative source is branches/{branchId}/staff (HR record)
@@ -1744,19 +1750,25 @@ function renderPayslip() {
   // 2. Attendance for selected month
   var totalOtMins = 0;
   if (u.branchId && attKey) {
-    db.ref('branches/' + u.branchId + '/tsAtt/' + attKey + '/' + month).once('value', function(snap) {
-      var recs = snap.val() || [];
-      if (!Array.isArray(recs)) recs = Object.values(recs);
-      recs.forEach(function(r) {
-        if (!r) return;
-        var st = (r.st || r.status || '').toLowerCase();
-        if (st === 'absent') absentDays++;
-        else if (st === 'late') lateDays++;
-        // Only count approved OT (otApproved flag set by BM)
-        if (r.otApproved && r.overtimeMins > 0) totalOtMins += r.overtimeMins;
+    function loadPayAtt(key){
+      db.ref('branches/' + u.branchId + '/tsAtt/' + key + '/' + month).once('value', function(snap) {
+        var recs = snap.val() || [];
+        if (!Array.isArray(recs)) recs = Object.values(recs);
+        // Fallback: if no records under staffId, try sap
+        if (!recs.length && key === attKey && u.sap && String(u.sap) !== String(attKey)) {
+          loadPayAtt(u.sap); return;
+        }
+        recs.forEach(function(r) {
+          if (!r) return;
+          var st = (r.st || r.status || '').toLowerCase();
+          if (st === 'absent') absentDays++;
+          else if (st === 'late') lateDays++;
+          if (r.overtimeMins > 0) totalOtMins += r.overtimeMins;
+        });
+        tryRender();
       });
-      tryRender();
-    });
+    }
+    loadPayAtt(attKey);
   } else { tryRender(); }
 }
 function renderPayslip_UNUSED_REMOVED() {
