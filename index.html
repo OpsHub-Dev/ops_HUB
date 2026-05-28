@@ -12870,9 +12870,19 @@ function pBmBriefing() {
   });
   h += '</div>';
 
+  // Use briefingViewDate when viewing history, clear it when on 'today' tab naturally
+  var briefDate = (tab==='today' && BS.briefingViewDate) ? BS.briefingViewDate : TODAY_BS;
+  var isViewingHistory = briefDate !== TODAY_BS;
+  if(tab==='today' && !BS.briefingViewDate) briefDate = TODAY_BS;
+
   // Compose briefing form
   if(tab==='today'){
-    h += '<div class="bcard" style="margin-bottom:16px">';
+    if(isViewingHistory){
+      h += '<div class="bcard" style="background:rgba(180,83,9,.06);border:1px solid rgba(180,83,9,.2);margin-bottom:12px;padding:10px 14px;display:flex;align-items:center;gap:10px">';
+      h += '<span style="font-size:13px">📅</span><div style="flex:1"><div style="font-size:12px;font-weight:700;color:#b45309">Viewing: '+xe(briefDate)+'</div><div style="font-size:11px;color:var(--text-secondary)">Read-only — historical briefings</div></div>';
+      h += '<button class="btn btn-sm" onclick="BS.briefingViewDate=null;navTo(\'bm-briefing\')">← Back to Today</button></div>';
+    }
+    if(!isViewingHistory) h += '<div class="bcard" style="margin-bottom:16px">';
     h += '<div style="font-size:13px;font-weight:700;margin-bottom:12px;color:var(--text-primary)">📝 New Briefing / Task</div>';
     h += '<div class="bfg"><label class="bfg">Shift</label>';
     h += '<select class="bfi" id="brf-shift"><option value="AM">AM Shift</option><option value="PM">PM Shift</option><option value="ALL">All Day</option></select></div>';
@@ -12888,8 +12898,10 @@ function pBmBriefing() {
     h += '<div id="brf-assign-list" style="margin-bottom:6px"></div>';
     h += '<div style="display:flex;gap:6px"><input class="bfi" id="brf-assign-staff" placeholder="Staff name" style="flex:1"><input class="bfi" id="brf-assign-tables" placeholder="Tables e.g. 1-5, 12" style="flex:1"><button class="btn btn-sm" onclick="bmBrfAssignAdd()">+ Add</button></div></div>';
     
-    h += '<button class="btn btn-primary" onclick="bmBrfPublish()">📢 Publish Briefing to All Staff</button>';
-    h += '</div>';
+    if(!isViewingHistory){
+      h += '<button class="btn btn-primary" onclick="bmBrfPublish()">📢 Publish Briefing to All Staff</button>';
+      h += '</div>';
+    }
     
     // Today's published briefings
     h += '<div class="btw"><div class="bttb"><strong>Published Today</strong></div><div id="brf-today-list" style="padding:12px"><div style="text-align:center;color:var(--text-tertiary);font-size:12px;padding:20px">Loading…</div></div></div>';
@@ -12898,7 +12910,7 @@ function pBmBriefing() {
     h += '<div class="btw" style="margin-top:14px"><div class="bttb"><strong>✅ Task Completions</strong><span id="brf-notif-badge" style="display:none;background:var(--danger);color:#fff;border-radius:10px;padding:2px 8px;font-size:10px;font-weight:700;margin-left:8px">0</span></div><div id="brf-notif-list" style="padding:12px"><div style="text-align:center;color:var(--text-tertiary);font-size:12px;padding:20px">No completions yet</div></div></div>';
     
     if(db && branchId){
-      var todayStr = TODAY_BS;
+      var todayStr = briefDate;
       db.ref('branches/'+branchId+'/briefings/'+todayStr).once('value', function(snap){
         var list = snap.val() || {};
         var items = Object.entries(list).sort(function(a,b){return (b[1].ts||0)-(a[1].ts||0);});
@@ -12958,7 +12970,7 @@ function pBmBriefing() {
           return '<div style="padding:10px 0;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px">'+
             '<div class="bmono" style="font-size:13px;font-weight:700">'+d+'</div>'+
             '<div style="font-size:11px;color:var(--text-secondary)">'+count+' briefing'+(count!==1?'s':'')+' published</div>'+
-            '<button class="btn btn-sm" style="margin-left:auto" data-d="'+bxe(d)+'" onclick="BS.briefingTab=\'today\';BS.dsrActiveDate=this.dataset.d;navTo(\'bm-briefing\')">View</button></div>';
+            '<button class="btn btn-sm" style="margin-left:auto" data-d="'+bxe(d)+'" onclick="BS.briefingTab=\'today\';BS.briefingViewDate=this.dataset.d;navTo(\'bm-briefing\')">View</button></div>';
         }).join('');
       });
     }

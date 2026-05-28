@@ -1332,7 +1332,33 @@ function renderDashboard() {
     tryRender();
   });
 
-  // Quick actions replaced by Briefing & Tasks preview (rendered in briefing preview block above)
+  // Load today's briefing preview into dash-briefing-preview
+  (function(){
+    var u2=CU;
+    var el=document.getElementById('dash-briefing-preview');
+    if(!el) return;
+    if(!u2||!u2.branchId){el.innerHTML='<div style="text-align:center;padding:12px;color:var(--text3);font-size:11px">No branch linked</div>';return;}
+    var todayK=todayKey();
+    db.ref('branches/'+u2.branchId+'/briefings/'+todayK).once('value',function(snap){
+      var list=snap.val()||{};
+      var entries=Object.values(list).sort(function(a,b){return (b.ts||0)-(a.ts||0);});
+      if(!entries.length){el.innerHTML='<div style="text-align:center;padding:14px;color:var(--text3);font-size:11px;font-family:var(--mono)">No briefing for today yet</div>';return;}
+      // Merge all 86 items, show latest message
+      var v=entries[0];
+      var all86=[];
+      entries.forEach(function(e){(e.items86||[]).forEach(function(i){if(!all86.includes(i))all86.push(i);});});
+      var html='';
+      if(all86.length) html+='<div style="margin-bottom:8px">'+all86.map(function(i){return '<span style="background:rgba(255,33,87,.1);color:var(--danger);border:1px solid rgba(255,33,87,.3);border-radius:4px;padding:2px 6px;font-size:10px;font-weight:700;margin-right:4px">⛔ '+escH(i)+'</span>';}).join('')+'</div>';
+      if(v.msg) html+='<div style="font-size:12px;color:var(--text);margin-bottom:8px;line-height:1.5">'+escH(v.msg)+'</div>';
+      // My table assignments
+      var myName=(u2.name||'').toLowerCase().split(' ')[0];
+      var myAssigns=[];
+      entries.forEach(function(e){(e.assignments||[]).forEach(function(a){if(a.staff&&a.staff.toLowerCase().indexOf(myName)>=0)myAssigns.push(a);});});
+      if(myAssigns.length) html+='<div style="margin-bottom:8px">'+myAssigns.map(function(a){return '<span style="background:rgba(0,102,102,.08);color:var(--primary);border:1px solid rgba(0,102,102,.2);border-radius:4px;padding:2px 8px;font-size:10px;margin-right:4px">🍽️ Tables: '+escH(a.tables)+'</span>';}).join('')+'</div>';
+      html+='<button class="btnp" style="margin-top:8px;padding:6px 14px;font-size:11px" onclick="showPage('briefing')">View Full Briefing →</button>';
+      el.innerHTML=html;
+    });
+  })();
 
   // Today's shift — uses same logic as renderSchedule (reads from branches/{id}/sch)
   var tsb = document.getElementById('today-shift');
@@ -2332,7 +2358,9 @@ function doPortalBreak() {
 
 function doPortalCheckOut() {
   if (_ciState === 'on-break') { showToast('End your break before checking out', 'error'); return; }
-  ciGetLocation(function(loc) {
+  // Ensure schedule is loaded before OT calc — reload if lost on page refresh
+  function _doCheckout(){
+    ciGetLocation(function(loc) {
     var t = ciNowTime();
     _ciLog.push({ type: 'out', time: t, loc: loc });
     _ciState = 'done';
@@ -2357,8 +2385,16 @@ function doPortalCheckOut() {
     var _otMsg=_otMins>0?' · OT +'+Math.floor(_otMins/60)+'h'+(_otMins%60?_otMins%60+'m':''):'';
     if(_otMins>0) submitOtRequest(_otMins);
     showToast('Checked out at ' + t + ' · Worked ' + minsToHHMM(workedMins) + _otMsg + ' 👋', 'success');
-    ciSendNotification('out', t, loc);
-  });
+      ciSendNotification('out', t, loc);
+    });
+  }
+  if(!_ciScheduledShift && CU && CU.branchId){
+    // reload schedule then checkout
+    ciLoadSchedule();
+    setTimeout(_doCheckout, 800);
+  } else {
+    _doCheckout();
+  }
 }
 
 function ciSendNotification(type, time, loc) {
