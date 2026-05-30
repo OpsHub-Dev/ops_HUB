@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OpsHub — Checklists</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<style>
+:root{
+  --base:#E7E5E4;--base-dk:#D4D2D1;--base-lt:#F5F3F2;
+  --sd:rgba(0,0,0,.18);--sl:rgba(255,255,255,.88);
+  --raise:6px 6px 16px var(--sd),-6px -6px 16px var(--sl);
+  --raise-sm:3px 3px 8px var(--sd),-3px -3px 8px var(--sl);
+  --raise-lg:10px 10px 28px var(--sd),-10px -10px 28px var(--sl);
+  --inset-sm:inset 2px 2px 6px rgba(0,0,0,.10),inset -2px -2px 6px rgba(255,255,255,.65);
+  --primary:#006666;--success:#00A63D;--danger:#FF2157;--warning:#FE9900;
+  --text:#1E2938;--text2:rgba(30,41,56,.58);--text3:rgba(30,41,56,.35);
+  --font:'Space Mono','Courier New',monospace;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);color:var(--text);background:var(--base);font-size:13px;min-height:100vh}
+button{cursor:pointer;border:none;font-family:var(--font)}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:var(--base-dk);border-radius:4px}
+
+/* TOP BAR */
+.top-bar{background:var(--base);border-bottom:1px solid rgba(0,0,0,.07);padding:12px 18px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:90;box-shadow:0 2px 6px rgba(0,0,0,.04)}
+.tb-logo{display:flex;align-items:center;gap:10px}
+.tb-mark{width:32px;height:32px;background:var(--primary);border-radius:9px;box-shadow:var(--raise-sm);display:flex;align-items:center;justify-content:center}
+.tb-name{font-size:13px;font-weight:700;color:var(--primary)}
+.tb-branch{font-size:10px;color:var(--text3);margin-left:6px}
+.tb-right{display:flex;align-items:center;gap:8px}
+.tb-btn{background:var(--base);box-shadow:var(--raise-sm);border-radius:8px;padding:6px 12px;font-size:10px;font-weight:700;color:var(--text2);cursor:pointer;transition:all .15s}
+.tb-btn:hover{color:var(--primary);box-shadow:var(--raise)}
+.tb-btn:active{box-shadow:var(--inset-sm)}
+.tb-btn.primary{background:var(--primary);color:#fff;box-shadow:3px 3px 10px rgba(0,102,102,.3)}
+
+/* WEEK NAV */
+.week-nav{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;background:var(--base-dk);border-bottom:1px solid rgba(0,0,0,.06)}
+.wn-btn{background:var(--base);box-shadow:var(--raise-sm);border-radius:8px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;color:var(--text2);transition:all .15s}
+.wn-btn:hover{box-shadow:var(--raise);color:var(--primary)}
+.wn-btn:active{box-shadow:var(--inset-sm)}
+.wn-label{font-size:11px;font-weight:700;color:var(--text)}
+
+/* TABS */
+.tabs{display:flex;gap:2px;background:var(--base-dk);padding:8px 12px 0}
+.tab{padding:8px 14px;border-radius:8px 8px 0 0;font-size:11px;font-weight:700;color:var(--text2);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:6px}
+.tab.on{background:var(--base);box-shadow:3px 0 8px rgba(0,0,0,.08);color:var(--primary)}
+.tab-badge{background:var(--danger);color:#fff;font-size:8px;font-weight:700;padding:1px 5px;border-radius:4px;min-width:14px;text-align:center}
+.tab-badge.ok{background:var(--success)}
+
+/* CONTENT */
+.content{padding:16px 18px;max-width:800px;margin:0 auto}
+
+/* CHECKLIST ITEMS */
+.cl-card{background:var(--base);border-radius:13px;box-shadow:var(--raise);padding:14px;margin-bottom:14px}
+.cl-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.cl-title{font-size:12px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px}
+.cl-acc{width:3px;height:13px;border-radius:2px;background:var(--primary);flex-shrink:0}
+.cl-progress{font-size:10px;color:var(--text3)}
+.cl-item{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:9px;background:var(--base);box-shadow:2px 2px 5px var(--sd),-2px -2px 5px var(--sl);margin-bottom:6px;transition:all .2s;cursor:pointer;user-select:none}
+.cl-item:hover{box-shadow:var(--raise-sm)}
+.cl-item:active{box-shadow:var(--inset-sm)}
+.cl-item.done{box-shadow:var(--inset-sm);opacity:.6}
+.cl-cb{width:20px;height:20px;border-radius:6px;background:var(--base);box-shadow:var(--inset-sm);display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--success);font-size:11px;transition:all .15s}
+.cl-item.done .cl-cb{background:var(--success);color:#fff;box-shadow:none}
+.cl-lbl{font-size:12px;color:var(--text);flex:1;line-height:1.4}
+.cl-item.done .cl-lbl{text-decoration:line-through;color:var(--text3)}
+.cl-time{font-size:9px;color:var(--text3)}
+
+/* ADD ITEM */
+.add-item-row{display:flex;align-items:center;gap:8px;margin-top:8px}
+.add-input{background:var(--base);box-shadow:var(--inset-sm);border-radius:8px;padding:7px 10px;font-size:11px;color:var(--text);font-family:var(--font);flex:1;border:none;outline:none}
+.add-input:focus{box-shadow:inset 2px 2px 6px rgba(0,0,0,.12),inset -2px -2px 6px rgba(255,255,255,.7),0 0 0 2px rgba(0,102,102,.1)}
+.add-btn{background:var(--primary);color:#fff;border-radius:8px;padding:7px 12px;font-size:10px;font-weight:700;box-shadow:2px 2px 8px rgba(0,102,102,.25)}
+
+/* PROGRESS BAR */
+.progress-wrap{background:var(--base-dk);border-radius:3px;height:5px;overflow:hidden;margin-top:8px}
+.progress-fill{height:100%;border-radius:3px;background:var(--primary);transition:width .4s}
+.progress-fill.done{background:var(--success)}
+
+/* BADGE */
+.badge{display:inline-flex;align-items:center;padding:2px 7px;border-radius:4px;font-size:9px;font-weight:700;text-transform:uppercase}
+.bg{background:rgba(0,166,61,.12);color:#065F46}
+.ba{background:rgba(254,153,0,.14);color:#92400E}
+.bk{background:rgba(0,0,0,.07);color:var(--text2)}
+
+/* TOAST */
+#toasts{position:fixed;bottom:14px;right:14px;z-index:999;display:flex;flex-direction:column;gap:7px}
+.toast{background:var(--base);border-radius:11px;box-shadow:var(--raise);padding:10px 14px;font-size:11px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px;border-left:3px solid var(--primary);animation:tin .2s ease}
+.toast.s{border-left-color:var(--success)}
+@keyframes tin{from{transform:translateX(40px);opacity:0}to{transform:none;opacity:1}}
+
+/* EMPTY */
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;gap:12px;color:var(--text3)}
+.empty-txt{font-size:11px}
+
+@media(max-width:600px){.tabs{overflow-x:auto}.tab{white-space:nowrap}}
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <div class="tb-logo">
+    <div class="tb-mark">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 12l3 3 5-5"/></svg>
+    </div>
+    <div>
+      <div class="tb-name">Checklists</div>
+    </div>
+    <span class="tb-branch" id="tb-branch"></span>
+  </div>
+  <div class="tb-right">
+    <div class="tb-btn" onclick="openAddTemplate()">+ Template</div>
+    <div class="tb-btn primary" onclick="window.close()">← Back</div>
+  </div>
+</div>
+
+<div class="week-nav">
+  <div class="wn-btn" onclick="shiftWeek(-1)">‹</div>
+  <div class="wn-label" id="wn-label">Week of —</div>
+  <div class="wn-btn" onclick="shiftWeek(1)">›</div>
+</div>
+
+<div class="tabs" id="tab-bar"></div>
+<div class="content" id="content">
+  <div class="empty"><div class="empty-txt">Connecting to Firebase…</div></div>
+</div>
+<div id="toasts"></div>
+
+<script>
+firebase.initializeApp({
+  apiKey:"AIzaSyDqhDGJCInvMMkVBCaW1f-6AFWW1gzniDQ",
+  authDomain:"opshub-f802f.firebaseapp.com",
+  databaseURL:"https://opshub-f802f-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:"opshub-f802f",storageBucket:"opshub-f802f.appspot.com",
+  messagingSenderId:"560849491600",appId:"1:560849491600:web:4cb3a1a56ed7ee5f0d45ea"
+});
+var db=firebase.database();
+
+var TODAY=new Date().toISOString().slice(0,10);
+var _bid=(new URLSearchParams(location.search)).get('branch')||'';
+var _weekOffset=0;
+var _activeTab=null;
+var _data={};
+
+/* ── DEFAULT TEMPLATES ── */
+var DEFAULT_TEMPLATES=[
+  {id:'opening',label:'Opening',icon:'🌅',items:['Unlock & disarm alarm','Check all refrigerator temperatures (≤5°C)','Inspect food storage areas','Prep stations stocked & clean','POS system powered on & tested','Staff briefed on daily specials','Music & AC on','Outdoor area ready']},
+  {id:'closing',label:'Closing',icon:'🌙',items:['POS end-of-day report printed','Cash counted & reconciled','All fridges & freezers checked','Surfaces & equipment sanitized','Trash removed & bins cleaned','Floors swept & mopped','Windows & doors locked','Alarm armed']},
+  {id:'cleaning',label:'Cleaning',icon:'🧹',items:['Floors mopped (all areas)','Tables & chairs sanitized','Kitchen surfaces deep cleaned','Hood filters degreased','Bathrooms cleaned & stocked','Dish area deep clean','Grease traps checked','Equipment wiped down']},
+  {id:'food-safety',label:'Food Safety',icon:'🥗',items:['Fridge temps logged','Freezer temps logged','Hot holding temps logged','Cold holding temps logged','Food labels & dates checked','Allergen menu updated','FIFO rotation applied','Pest control check']},
+  {id:'maintenance',label:'Maintenance',icon:'🔧',items:['Check kitchen equipment','Fire extinguishers visible','Emergency exits clear','CCTV system checked','Lighting checked','Plumbing issues noted','Report defects to manager','Safety log updated']},
+];
+
+function he(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function toast(msg,t){
+  var ts=document.getElementById('toasts');var el=document.createElement('div');
+  el.className='toast '+(t||'');el.innerHTML='<span>'+(t==='s'?'✓':'·')+'</span><span>'+he(msg)+'</span>';
+  ts.appendChild(el);setTimeout(function(){el.remove();},3000);
+}
+
+function getWeekStart(offset){
+  var d=new Date();d.setDate(d.getDate()-d.getDay()+1+(offset||0)*7);
+  return d.toISOString().slice(0,10);
+}
+function shiftWeek(dir){_weekOffset+=dir;init();}
+
+function init(){
+  var wk=getWeekStart(_weekOffset);
+  document.getElementById('wn-label').textContent='Week of '+wk;
+  document.getElementById('tb-branch').textContent=_bid?'· '+_bid:'';
+  if(!_bid){document.getElementById('content').innerHTML='<div class="empty"><div class="empty-txt">No branch specified.<br>Add ?branch=YOUR_BRANCH_ID to the URL.</div></div>';return;}
+  // Load custom templates + data
+  db.ref('branches/'+_bid+'/cl_templates').once('value',function(snap){
+    var custom=snap.val()||{};
+    var templates=DEFAULT_TEMPLATES.slice();
+    Object.values(custom).filter(Boolean).forEach(function(t){if(t.id&&t.label)templates.push(t);});
+    // Load week data
+    db.ref('branches/'+_bid+'/cl_weeks/'+wk).once('value',function(ds){
+      _data=ds.val()||{};
+      renderTabs(templates,wk);
+    });
+  });
+}
+
+function renderTabs(templates,wk){
+  var bar=document.getElementById('tab-bar');
+  bar.innerHTML=templates.map(function(t){
+    var done=_data[t.id]||{};
+    var cnt=t.items.filter(function(x,i){return done['i'+i];}).length;
+    var all=cnt===t.items.length;
+    return '<div class="tab '+(t.id===_activeTab?'on':'')+'" onclick="selectTab(\''+t.id+'\')">'+
+      (t.icon||'📋')+' '+he(t.label)+
+      ' <span class="tab-badge '+(all?'ok':'')+'">'+cnt+'/'+t.items.length+'</span>'+
+    '</div>';
+  }).join('');
+  if(!_activeTab||!templates.find(function(t){return t.id===_activeTab;}))
+    _activeTab=templates[0]&&templates[0].id;
+  renderChecklist(templates,wk);
+}
+
+function selectTab(id){_activeTab=id;var wk=getWeekStart(_weekOffset);db.ref('branches/'+_bid+'/cl_weeks/'+wk).once('value',function(ds){_data=ds.val()||{};var tpls=DEFAULT_TEMPLATES.slice();renderTabs(tpls,wk);});}
+
+function renderChecklist(templates,wk){
+  var t=templates.find(function(x){return x.id===_activeTab;});
+  if(!t){document.getElementById('content').innerHTML='<div class="empty"><div class="empty-txt">Select a checklist</div></div>';return;}
+  var done=_data[t.id]||{};
+  var cnt=t.items.filter(function(x,i){return done['i'+i];}).length;
+  var pct=t.items.length?Math.round(cnt/t.items.length*100):0;
+  var c=document.getElementById('content');
+  c.innerHTML=
+    '<div class="cl-card">'+
+      '<div class="cl-header">'+
+        '<div class="cl-title"><div class="cl-acc"></div>'+(t.icon||'📋')+' '+he(t.label)+'</div>'+
+        '<div class="cl-progress"><span class="badge '+(cnt===t.items.length?'bg':'ba')+'">'+cnt+'/'+t.items.length+' done</span></div>'+
+      '</div>'+
+      '<div class="progress-wrap"><div class="progress-fill '+(pct===100?'done':'')+'" style="width:'+pct+'%"></div></div>'+
+      '<div style="margin-top:12px">'+
+      t.items.map(function(item,i){
+        var ck=!!done['i'+i];var ts=done['t'+i]||'';
+        return '<div class="cl-item '+(ck?'done':'')+'" onclick="toggleItem(\''+t.id+'\',\'i'+i+'\','+(!ck)+',\''+wk+'\')">'+
+          '<div class="cl-cb">'+(ck?'✓':'')+'</div>'+
+          '<div class="cl-lbl">'+he(item)+'</div>'+
+          (ts?'<div class="cl-time">'+he(ts)+'</div>':'')+
+        '</div>';
+      }).join('')+
+      '</div>'+
+      '<div class="add-item-row">'+
+        '<input class="add-input" id="new-item-input" placeholder="Add custom item…" onkeydown="if(event.key===\'Enter\')addCustomItem(\''+t.id+'\',\''+wk+'\')">'+
+        '<button class="add-btn" onclick="addCustomItem(\''+t.id+'\',\''+wk+'\')">Add</button>'+
+      '</div>'+
+      (pct===100?'<div style="text-align:center;margin-top:12px;font-size:12px;color:var(--success);font-weight:700">✓ All done!</div>':'')+
+    '</div>';
+}
+
+function toggleItem(tmpl,key,val,wk){
+  var ts=val?new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}):'';
+  var updates={};
+  updates[tmpl+'/'+key]=val;
+  if(val)updates[tmpl+'/t'+key.slice(1)]=ts;
+  db.ref('branches/'+_bid+'/cl_weeks/'+wk).update(updates,function(err){
+    if(err){toast('Failed to save','e');return;}
+    if(!_data[tmpl])_data[tmpl]={};
+    _data[tmpl][key]=val;
+    if(val)_data[tmpl]['t'+key.slice(1)]=ts;
+    var templates=DEFAULT_TEMPLATES.slice();
+    renderTabs(templates,wk);
+  });
+}
+
+function addCustomItem(tmpl,wk){
+  var input=document.getElementById('new-item-input');
+  var text=(input&&input.value||'').trim();
+  if(!text)return;
+  // Find template and append item
+  var t=DEFAULT_TEMPLATES.find(function(x){return x.id===tmpl;});
+  if(!t)return;
+  var newIdx=t.items.length;
+  t.items.push(text);
+  input.value='';
+  toast('Item added','s');
+  var templates=DEFAULT_TEMPLATES.slice();
+  renderTabs(templates,wk);
+}
+
+function openAddTemplate(){
+  var name=prompt('New checklist name (e.g. Bar Setup):');
+  if(!name||!name.trim())return;
+  var id='custom_'+Date.now();
+  var template={id,label:name.trim(),icon:'📋',items:[]};
+  db.ref('branches/'+_bid+'/cl_templates/'+id).set(template,function(err){
+    if(err){toast('Save failed','e');return;}
+    toast('Template created','s');init();
+  });
+}
+
+window.onload=init;
+</script>
+</body>
+</html>

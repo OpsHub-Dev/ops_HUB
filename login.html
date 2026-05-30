@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OpsHub — Restaurant Operations Platform</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --base:#E7E5E4;--base-dk:#D4D2D1;--base-lt:#F5F3F2;
+  --sd:rgba(0,0,0,.18);--sl:rgba(255,255,255,.88);
+  --raise:6px 6px 16px var(--sd),-6px -6px 16px var(--sl);
+  --raise-sm:3px 3px 8px var(--sd),-3px -3px 8px var(--sl);
+  --raise-lg:10px 10px 28px var(--sd),-10px -10px 28px var(--sl);
+  --inset-sm:inset 2px 2px 6px rgba(0,0,0,.10),inset -2px -2px 6px rgba(255,255,255,.65);
+  --primary:#006666;--primary-h:#008080;
+  --text:#1E2938;--text2:rgba(30,41,56,.58);--text3:rgba(30,41,56,.35);
+  --font:'Space Mono','Courier New',monospace;
+  --success:#00A63D;--danger:#FF2157;--warning:#FE9900;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--font);color:var(--text);background:var(--base);font-size:13px;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+button{cursor:pointer;border:none;font-family:var(--font)}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-thumb{background:var(--base-dk);border-radius:4px}
+
+/* ── NAVBAR ── */
+.nav{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(231,229,228,.92);backdrop-filter:blur(12px);border-bottom:1px solid rgba(0,0,0,.07);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between}
+.nav-logo{display:flex;align-items:center;gap:10px}
+.nav-logo-mark{width:36px;height:36px;background:var(--primary);border-radius:10px;box-shadow:var(--raise-sm);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.nav-logo-name{font-size:15px;font-weight:700;color:var(--primary)}
+.nav-links{display:flex;align-items:center;gap:6px}
+.nav-link{font-size:11px;font-weight:700;color:var(--text2);padding:6px 10px;border-radius:8px;cursor:pointer;transition:all .15s}
+.nav-link:hover{color:var(--primary);background:rgba(0,102,102,.06)}
+.nav-cta{background:var(--primary);color:#fff;padding:7px 14px;border-radius:9px;font-size:11px;font-weight:700;box-shadow:3px 3px 10px rgba(0,102,102,.3),-2px -2px 8px rgba(255,255,255,.5);transition:all .15s}
+.nav-cta:hover{background:var(--primary-h);transform:translateY(-1px)}
+
+/* ── HERO ── */
+.hero{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 24px 60px;text-align:center;position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 60% 50% at 50% 40%,rgba(0,102,102,.06) 0%,transparent 70%);pointer-events:none}
+.hero-badge{display:inline-flex;align-items:center;gap:6px;background:var(--base);box-shadow:var(--raise-sm);padding:5px 12px;border-radius:20px;font-size:10px;font-weight:700;color:var(--primary);margin-bottom:24px;text-transform:uppercase;letter-spacing:.5px}
+.hero-badge-dot{width:6px;height:6px;border-radius:50%;background:var(--success);animation:blink 2s ease infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.hero-title{font-size:clamp(28px,5vw,52px);font-weight:700;color:var(--text);line-height:1.15;letter-spacing:-1.5px;margin-bottom:18px;max-width:720px}
+.hero-title span{color:var(--primary)}
+.hero-sub{font-size:14px;color:var(--text2);line-height:1.7;max-width:520px;margin:0 auto 32px;font-family:var(--font)}
+.hero-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:center;margin-bottom:56px}
+.btn-hero{padding:12px 24px;border-radius:12px;font-size:13px;font-weight:700;transition:all .18s;font-family:var(--font)}
+.btn-hero-primary{background:var(--primary);color:#fff;box-shadow:4px 4px 14px rgba(0,102,102,.35),-3px -3px 10px rgba(255,255,255,.6)}
+.btn-hero-primary:hover{background:var(--primary-h);transform:translateY(-2px);box-shadow:6px 6px 18px rgba(0,102,102,.4),-4px -4px 12px rgba(255,255,255,.7)}
+.btn-hero-secondary{background:var(--base);box-shadow:var(--raise-sm);color:var(--text)}
+.btn-hero-secondary:hover{box-shadow:var(--raise);transform:translateY(-2px)}
+
+/* ── APP PREVIEW ── */
+.hero-preview{width:100%;max-width:780px;margin:0 auto;background:var(--base);border-radius:18px;box-shadow:var(--raise-lg);overflow:hidden;border:1px solid rgba(0,0,0,.06)}
+.preview-bar{background:var(--base-dk);padding:10px 14px;display:flex;align-items:center;gap:8px}
+.preview-dot{width:10px;height:10px;border-radius:50%}
+.preview-screen{display:grid;grid-template-columns:180px 1fr;min-height:320px}
+.preview-sidebar{background:var(--base-dk);padding:14px 10px;display:flex;flex-direction:column;gap:3px}
+.preview-logo-row{display:flex;align-items:center;gap:8px;padding:0 4px;margin-bottom:12px}
+.preview-logo-mark{width:26px;height:26px;background:var(--primary);border-radius:7px;display:flex;align-items:center;justify-content:center}
+.preview-logo-name{font-size:11px;font-weight:700;color:var(--primary)}
+.preview-nav-item{padding:7px 10px;border-radius:7px;font-size:10px;font-weight:700;color:var(--text2);display:flex;align-items:center;gap:6px}
+.preview-nav-item.active{background:var(--base);box-shadow:var(--raise-sm);color:var(--primary)}
+.preview-nav-dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0}
+.preview-main{padding:14px}
+.preview-kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+.preview-kpi{background:var(--base);border-radius:9px;box-shadow:var(--raise-sm);padding:9px 10px;border-left:2px solid var(--primary)}
+.preview-kpi:nth-child(2){border-left-color:#D97706}
+.preview-kpi:nth-child(3){border-left-color:#5B21B6}
+.preview-kpi:nth-child(4){border-left-color:#065F46}
+.preview-kpi-label{font-size:7px;color:var(--text3);text-transform:uppercase;letter-spacing:.3px;margin-bottom:2px}
+.preview-kpi-val{font-size:13px;font-weight:700;color:var(--text)}
+.preview-chart-row{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.preview-chart{background:var(--base);border-radius:9px;box-shadow:var(--raise-sm);padding:10px;height:120px;display:flex;flex-direction:column}
+.preview-chart-title{font-size:8px;font-weight:700;color:var(--text2);margin-bottom:8px}
+.preview-bars{display:flex;align-items:flex-end;gap:3px;flex:1}
+.preview-bar-item{flex:1;border-radius:2px 2px 0 0;background:rgba(0,102,102,.2);transition:height .5s}
+
+/* ── SECTION ── */
+.section{padding:80px 24px;max-width:1100px;margin:0 auto}
+.section-label{font-size:9px;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;text-align:center}
+.section-title{font-size:clamp(22px,3.5vw,36px);font-weight:700;color:var(--text);text-align:center;letter-spacing:-.5px;margin-bottom:12px}
+.section-sub{font-size:13px;color:var(--text2);text-align:center;max-width:520px;margin:0 auto 48px;line-height:1.7}
+
+/* ── FEATURES ── */
+.features-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.feature-card{background:var(--base);border-radius:16px;box-shadow:var(--raise);padding:22px;transition:transform .2s}
+.feature-card:hover{transform:translateY(-3px)}
+.feature-ic{width:44px;height:44px;border-radius:13px;display:flex;align-items:center;justify-content:center;margin-bottom:14px;flex-shrink:0}
+.feature-title{font-size:13px;font-weight:700;color:var(--text);margin-bottom:7px}
+.feature-desc{font-size:11px;color:var(--text2);line-height:1.7}
+.feature-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:12px}
+.feature-tag{font-size:9px;font-weight:700;color:var(--text2);background:var(--base-dk);padding:3px 7px;border-radius:4px;text-transform:uppercase;letter-spacing:.3px}
+
+/* ── ROLES ── */
+.roles-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
+.role-card{background:var(--base);border-radius:13px;box-shadow:var(--raise-sm);padding:16px 14px;text-align:center;transition:transform .15s}
+.role-card:hover{transform:translateY(-2px);box-shadow:var(--raise)}
+.role-ic{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 10px}
+.role-name{font-size:11px;font-weight:700;color:var(--text);margin-bottom:3px}
+.role-desc{font-size:9px;color:var(--text3)}
+
+/* ── PRICING ── */
+.pricing-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;align-items:start}
+.plan-card{background:var(--base);border-radius:16px;box-shadow:var(--raise);padding:24px;position:relative}
+.plan-card.featured{box-shadow:var(--raise-lg);border:2px solid var(--primary)}
+.plan-badge{position:absolute;top:-10px;left:50%;transform:translateX(-50%);background:var(--primary);color:#fff;font-size:9px;font-weight:700;padding:3px 12px;border-radius:8px;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}
+.plan-name{font-size:13px;font-weight:700;color:var(--text);margin-bottom:4px}
+.plan-desc{font-size:10px;color:var(--text3);margin-bottom:16px}
+.plan-price{font-size:32px;font-weight:700;color:var(--primary);line-height:1;margin-bottom:2px;letter-spacing:-1px}
+.plan-price span{font-size:12px;color:var(--text2);font-weight:400}
+.plan-period{font-size:10px;color:var(--text3);margin-bottom:18px}
+.plan-divider{height:1px;background:rgba(0,0,0,.06);margin:14px 0}
+.plan-feature{display:flex;align-items:flex-start;gap:7px;font-size:11px;color:var(--text2);padding:4px 0}
+.plan-feature-ic{width:14px;height:14px;color:var(--success);flex-shrink:0;margin-top:1px}
+.plan-cta{display:block;text-align:center;padding:10px;border-radius:10px;font-size:11px;font-weight:700;margin-top:18px;transition:all .15s;background:var(--base);box-shadow:var(--raise-sm);color:var(--text)}
+.plan-card.featured .plan-cta{background:var(--primary);color:#fff;box-shadow:3px 3px 10px rgba(0,102,102,.3)}
+.plan-cta:hover{transform:translateY(-1px)}
+
+/* ── STATS BAR ── */
+.stats-bar{background:var(--primary);padding:32px 24px;margin:0}
+.stats-inner{max-width:900px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:24px;text-align:center}
+.stat-val{font-size:32px;font-weight:700;color:#fff;letter-spacing:-1px;margin-bottom:4px}
+.stat-label{font-size:10px;color:rgba(255,255,255,.65);text-transform:uppercase;letter-spacing:.5px}
+
+/* ── CONTACT / DEMO ── */
+.contact-wrap{display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:start}
+.contact-info{display:flex;flex-direction:column;gap:16px}
+.contact-point{display:flex;align-items:flex-start;gap:12px}
+.contact-point-ic{width:38px;height:38px;border-radius:11px;background:var(--base);box-shadow:var(--raise-sm);display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--primary)}
+.contact-point-title{font-size:12px;font-weight:700;color:var(--text);margin-bottom:2px}
+.contact-point-desc{font-size:11px;color:var(--text2)}
+.demo-form{background:var(--base);border-radius:16px;box-shadow:var(--raise-lg);padding:26px}
+.demo-form-title{font-size:13px;font-weight:700;color:var(--text);margin-bottom:18px}
+.fg{display:flex;flex-direction:column;gap:3px;margin-bottom:12px}
+.fl{font-size:8px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.4px}
+.fi,.fs,.fta{background:var(--base);box-shadow:var(--inset-sm);border-radius:8px;padding:8px 11px;font-size:12px;color:var(--text);font-family:var(--font);width:100%;border:none;outline:none}
+.fi:focus,.fs:focus,.fta:focus{box-shadow:inset 4px 4px 10px rgba(0,0,0,.12),inset -4px -4px 10px rgba(255,255,255,.72),0 0 0 2px rgba(0,102,102,.1)}
+.fg2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.btn-submit{width:100%;padding:11px;border-radius:11px;font-size:12px;font-weight:700;background:var(--primary);color:#fff;box-shadow:3px 3px 10px rgba(0,102,102,.3),-2px -2px 8px rgba(255,255,255,.5);transition:all .15s;margin-top:4px;font-family:var(--font)}
+.btn-submit:hover{background:var(--primary-h);transform:translateY(-1px)}
+.btn-submit:active{transform:none}
+.form-success{display:none;text-align:center;padding:20px}
+.form-success-ic{font-size:36px;margin-bottom:12px}
+.form-success-title{font-size:14px;font-weight:700;color:var(--text);margin-bottom:6px}
+.form-success-desc{font-size:11px;color:var(--text2)}
+
+/* ── FOOTER ── */
+footer{background:var(--base-dk);border-top:1px solid rgba(0,0,0,.07);padding:32px 24px}
+.footer-inner{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:1fr auto;gap:32px;align-items:center}
+.footer-logo{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.footer-logo-mark{width:30px;height:30px;background:var(--primary);border-radius:8px;display:flex;align-items:center;justify-content:center}
+.footer-logo-name{font-size:13px;font-weight:700;color:var(--primary)}
+.footer-desc{font-size:10px;color:var(--text3);max-width:300px;line-height:1.6}
+.footer-links{display:flex;gap:16px;align-items:center}
+.footer-link{font-size:11px;color:var(--text2);cursor:pointer;transition:color .15s}
+.footer-link:hover{color:var(--primary)}
+.footer-copy{font-size:9px;color:var(--text3);margin-top:20px;padding-top:16px;border-top:1px solid rgba(0,0,0,.06);text-align:center}
+
+/* ── TOAST ── */
+#toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--base);border-radius:11px;box-shadow:var(--raise-lg);padding:11px 20px;font-size:12px;font-weight:700;color:var(--text);border-left:3px solid var(--success);display:none;z-index:999;white-space:nowrap}
+
+@media(max-width:768px){
+  .preview-screen{grid-template-columns:1fr}
+  .preview-sidebar{display:none}
+  .contact-wrap{grid-template-columns:1fr}
+  .footer-inner{grid-template-columns:1fr}
+  .nav-links .nav-link{display:none}
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav">
+  <div class="nav-logo">
+    <div class="nav-logo-mark">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="7" height="7" rx="1.2"/><rect x="14" y="3" width="7" height="7" rx="1.2"/>
+        <rect x="3" y="14" width="7" height="7" rx="1.2"/><path d="M14 14h7M14 17.5h7M14 21h7"/>
+      </svg>
+    </div>
+    <div class="nav-logo-name">OpsHub</div>
+  </div>
+  <div class="nav-links">
+    <a class="nav-link" href="#features">Features</a>
+    <a class="nav-link" href="#roles">Roles</a>
+    <a class="nav-link" href="#pricing">Pricing</a>
+    <a class="nav-link" href="#demo">Contact</a>
+    <a class="nav-link" href="index.html">Sign In</a>
+    <a class="nav-cta" href="#demo">Book a Demo</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-badge">
+    <div class="hero-badge-dot"></div>
+    Live Platform — Multi-Branch Ready
+  </div>
+  <h1 class="hero-title">
+    The Operating System for<br><span>Restaurant Groups</span>
+  </h1>
+  <p class="hero-sub">
+    OpsHub connects your branches, teams, and numbers in one neumorphic platform — from daily sales and petty cash to HR, payroll, and real-time check-ins.
+  </p>
+  <div class="hero-actions">
+    <a class="btn-hero btn-hero-primary" href="#demo">Book a Free Demo</a>
+    <a class="btn-hero btn-hero-secondary" href="index.html">Sign In to Platform</a>
+  </div>
+
+  <!-- APP PREVIEW -->
+  <div class="hero-preview">
+    <div class="preview-bar">
+      <div class="preview-dot" style="background:#FF5F57"></div>
+      <div class="preview-dot" style="background:#FFBD2E"></div>
+      <div class="preview-dot" style="background:#28C840"></div>
+      <div style="flex:1;text-align:center;font-size:9px;color:var(--text3)">opshub.io — Dashboard</div>
+    </div>
+    <div class="preview-screen">
+      <div class="preview-sidebar">
+        <div class="preview-logo-row">
+          <div class="preview-logo-mark">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="white" stroke-width="1.6"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+          </div>
+          <div class="preview-logo-name">OpsHub</div>
+        </div>
+        <div class="preview-nav-item active"><div class="preview-nav-dot"></div>Dashboard</div>
+        <div class="preview-nav-item"><div class="preview-nav-dot"></div>Sales</div>
+        <div class="preview-nav-item"><div class="preview-nav-dot"></div>Petty Cash</div>
+        <div class="preview-nav-item"><div class="preview-nav-dot"></div>Inventory</div>
+        <div class="preview-nav-item"><div class="preview-nav-dot"></div>Staff</div>
+        <div class="preview-nav-item"><div class="preview-nav-dot"></div>Checklists</div>
+        <div class="preview-nav-item"><div class="preview-nav-dot"></div>Leave</div>
+      </div>
+      <div class="preview-main">
+        <div style="font-size:10px;font-weight:700;color:var(--text);margin-bottom:10px">Good morning, Raed ☀️</div>
+        <div class="preview-kpi-row">
+          <div class="preview-kpi"><div class="preview-kpi-label">Today Sales</div><div class="preview-kpi-val">SAR 4,280</div></div>
+          <div class="preview-kpi"><div class="preview-kpi-label">MTD Revenue</div><div class="preview-kpi-val">SAR 87K</div></div>
+          <div class="preview-kpi"><div class="preview-kpi-label">Staff</div><div class="preview-kpi-val">24</div></div>
+          <div class="preview-kpi"><div class="preview-kpi-label">PC Pending</div><div class="preview-kpi-val">3</div></div>
+        </div>
+        <div class="preview-chart-row">
+          <div class="preview-chart">
+            <div class="preview-chart-title">Monthly Sales</div>
+            <div class="preview-bars" id="preview-bars"></div>
+          </div>
+          <div class="preview-chart">
+            <div class="preview-chart-title">Recent Petty Cash</div>
+            <div style="display:flex;flex-direction:column;gap:6px;flex:1;justify-content:center">
+              <div style="display:flex;justify-content:space-between;font-size:9px"><span style="color:var(--text2)">Cleaning Supplies</span><span style="font-weight:700">SAR 120</span></div>
+              <div style="display:flex;justify-content:space-between;font-size:9px"><span style="color:var(--text2)">Office Stationery</span><span style="font-weight:700">SAR 85</span></div>
+              <div style="display:flex;justify-content:space-between;font-size:9px"><span style="color:var(--text2)">Maintenance</span><span style="font-weight:700">SAR 340</span></div>
+              <div style="display:flex;justify-content:space-between;font-size:9px"><span style="color:var(--text2)">Staff Meals</span><span style="font-weight:700">SAR 210</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- STATS BAR -->
+<div class="stats-bar">
+  <div class="stats-inner">
+    <div><div class="stat-val" id="cnt-branches">0</div><div class="stat-label">Branches Managed</div></div>
+    <div><div class="stat-val" id="cnt-roles">9</div><div class="stat-label">User Roles</div></div>
+    <div><div class="stat-val" id="cnt-modules">30+</div><div class="stat-label">Modules</div></div>
+    <div><div class="stat-val" id="cnt-uptime">99.9%</div><div class="stat-label">Uptime</div></div>
+  </div>
+</div>
+
+<!-- FEATURES -->
+<section class="section" id="features">
+  <div class="section-label">What's included</div>
+  <h2 class="section-title">Everything your restaurant group needs</h2>
+  <p class="section-sub">From daily operations to HR and finance — one platform, every role, real data.</p>
+  <div class="features-grid">
+
+    <div class="feature-card">
+      <div class="feature-ic" style="background:rgba(0,102,102,.1);color:var(--primary)">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      </div>
+      <div class="feature-title">Daily Sales & DSR</div>
+      <div class="feature-desc">Log food, beverage, and misc revenue daily. Auto-generate DSR reports with VAT, void, and deposit breakdowns. Full month-on-month trend charts.</div>
+      <div class="feature-tags"><span class="feature-tag">Sales</span><span class="feature-tag">DSR</span><span class="feature-tag">Charts</span></div>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-ic" style="background:rgba(254,153,0,.1);color:#D97706">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      </div>
+      <div class="feature-title">Petty Cash Workflow</div>
+      <div class="feature-desc">Multi-stage approval flow — submit, review, approve, reject. Real-time totals by category. Full audit trail per branch.</div>
+      <div class="feature-tags"><span class="feature-tag">Petty Cash</span><span class="feature-tag">Approvals</span><span class="feature-tag">Audit</span></div>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-ic" style="background:rgba(91,33,182,.1);color:#5B21B6">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/></svg>
+      </div>
+      <div class="feature-title">Inventory & Wastage</div>
+      <div class="feature-desc">Item catalog with stock levels, low-stock alerts, and purchase orders. Log wastage with auto cost calculation. Receiving and issue tracking.</div>
+      <div class="feature-tags"><span class="feature-tag">Stock</span><span class="feature-tag">Wastage</span><span class="feature-tag">PO</span></div>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-ic" style="background:rgba(6,95,70,.1);color:#065F46">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M2 20c0-3.5 3.134-6 7-6M13 20c0-3.5 3.134-6 7-6"/><circle cx="15" cy="8" r="3"/></svg>
+      </div>
+      <div class="feature-title">HR & People</div>
+      <div class="feature-desc">Full employee records, GOSI tracking, Iqama expiry alerts, payroll overview, health cards, leave balances, and OT approvals — all in one place.</div>
+      <div class="feature-tags"><span class="feature-tag">HR</span><span class="feature-tag">Payroll</span><span class="feature-tag">GOSI</span><span class="feature-tag">Iqama</span></div>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-ic" style="background:rgba(3,105,161,.1);color:#0369A1">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg>
+      </div>
+      <div class="feature-title">Staff Check-In Portal</div>
+      <div class="feature-desc">Staff self-service with PIN login, live check-in timer, break tracking, and shift summary. Writes workedMins and brkLogs directly to Firebase.</div>
+      <div class="feature-tags"><span class="feature-tag">Check-In</span><span class="feature-tag">Breaks</span><span class="feature-tag">Attendance</span></div>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-ic" style="background:rgba(159,18,57,.1);color:#9F1239">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>
+      </div>
+      <div class="feature-title">Training & Quizzes</div>
+      <div class="feature-desc">Captains build modules with multi-choice questions. Staff complete quizzes with instant scoring. 70% pass threshold and progress tracking per employee.</div>
+      <div class="feature-tags"><span class="feature-tag">Training</span><span class="feature-tag">Quiz</span><span class="feature-tag">Progress</span></div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ROLES -->
+<section style="padding:60px 24px;background:var(--base-dk)">
+  <div style="max-width:900px;margin:0 auto" id="roles">
+    <div class="section-label">Who it's for</div>
+    <h2 class="section-title">Built for every role in your group</h2>
+    <p class="section-sub">Each role gets a tailored dashboard — only the modules they need, nothing they don't.</p>
+    <div class="roles-grid">
+      <div class="role-card">
+        <div class="role-ic" style="background:rgba(180,83,9,.1);color:#b45309"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/></svg></div>
+        <div class="role-name">CEO</div><div class="role-desc">Full company overview, all branches</div>
+      </div>
+      <div class="role-card">
+        <div class="role-ic" style="background:rgba(91,33,182,.1);color:#5B21B6"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></div>
+        <div class="role-name">Brand Director</div><div class="role-desc">Brand performance & sales</div>
+      </div>
+      <div class="role-card">
+        <div class="role-ic" style="background:rgba(29,78,216,.1);color:#1D4ED8"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg></div>
+        <div class="role-name">Area Manager</div><div class="role-desc">Region-level ops & staff</div>
+      </div>
+      <div class="role-card">
+        <div class="role-ic" style="background:rgba(6,95,70,.1);color:#065F46"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18z"/></svg></div>
+        <div class="role-name">Branch Manager</div><div class="role-desc">Full branch operations</div>
+      </div>
+      <div class="role-card">
+        <div class="role-ic" style="background:rgba(3,105,161,.1);color:#0369A1"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/></svg></div>
+        <div class="role-name">Captain</div><div class="role-desc">Checklists, training & check-in</div>
+      </div>
+      <div class="role-card">
+        <div class="role-ic" style="background:rgba(55,48,163,.1);color:#3730A3"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg></div>
+        <div class="role-name">Staff</div><div class="role-desc">Self-service portal</div>
+      </div>
+      <div class="role-card">
+        <div class="role-ic" style="background:rgba(3,105,161,.1);color:#0369A1"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M2 20c0-3.5 3.134-6 7-6M13 20c0-3.5 3.134-6 7-6"/><circle cx="15" cy="8" r="3"/></svg></div>
+        <div class="role-name">HR Manager</div><div class="role-desc">People, payroll & compliance</div>
+      </div>
+      <div class="role-card">
+        <div class="role-ic" style="background:rgba(217,119,6,.1);color:#D97706"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div>
+        <div class="role-name">Finance Director</div><div class="role-desc">P&L, revenue & invoices</div>
+      </div>
+      <div class="role-card">
+        <div class="role-ic" style="background:rgba(153,27,27,.1);color:#991B1B"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></div>
+        <div class="role-name">Super Admin</div><div class="role-desc">Full system & SaaS control</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section class="section" id="pricing">
+  <div class="section-label">Pricing</div>
+  <h2 class="section-title">Simple, transparent plans</h2>
+  <p class="section-sub">All plans include Firebase Realtime Database, unlimited users per branch, and full module access for your tier.</p>
+  <div class="pricing-grid">
+
+    <div class="plan-card">
+      <div class="plan-name">Starter</div>
+      <div class="plan-desc">Perfect for a single-branch operation</div>
+      <div class="plan-price">SAR 299<span> /mo</span></div>
+      <div class="plan-period">1 branch · Up to 30 staff</div>
+      <div class="plan-divider"></div>
+      <div class="plan-feature"><svg class="plan-feature-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Sales, DSR & Petty Cash</div>
+      <div class="plan-feature"><svg class="plan-feature-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Checklists & Inventory</div>
+      <div class="plan-feature"><svg class="plan-feature-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Staff Portal & Check-In</div>
+      <div class="plan-feature"><svg class="plan-feature-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Branch Manager role</div>
+      <a class="plan-cta" href="#demo">Get Started</a>
+    </div>
+
+    <div class="plan-card featured">
+      <div class="plan-badge">Most Popular</div>
+      <div class="plan-name">Professional</div>
+      <div class="plan-desc">For growing restaurant groups</div>
+      <div class="plan-price">SAR 799<span> /mo</span></div>
+      <div class="plan-period">Up to 5 branches · Unlimited staff</div>
+      <div class="plan-divider"></div>
+      <div class="plan-feature"><svg class="plan-feature-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Everything in Starter</div>
+      <div class="plan-feature"><svg class="plan-feature-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>HR, Payroll & Health Cards</div>
+      <div class="plan-feature"><svg class="plan-feature-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Finance Director dashboard</div>
+      <div class="plan-feature"><svg class="plan-feature-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Training & Quiz engine</div>
+      <div class="plan-feature"><svg class="plan-feature-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Area Manager & CEO roles</div>
+      <a class="plan-cta" href="#demo">Get Started</a>
+    </div>
+
+    <div class="plan-card">
+      <div class="plan-name">Enterprise</div>
+      <div class="plan-desc">For large multi-brand groups</div>
+      <div class="plan-price" style="font-size:22px;padding-top:5px">Custom</div>
+      <div class="plan-period">Unlimited branches & staff</div>
+      <div class="plan-divider"></div>
+      <div class="plan-feature"><svg class="plan-feature-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Everything in Professional</div>
+      <div class="plan-feature"><svg class="plan-feature-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Super Admin SaaS panel</div>
+      <div class="plan-feature"><svg class="plan-feature-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Per-company module overrides</div>
+      <div class="plan-feature"><svg class="plan-feature-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>White-label branding</div>
+      <div class="plan-feature"><svg class="plan-feature-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>Dedicated onboarding & support</div>
+      <a class="plan-cta" href="#demo">Contact Sales</a>
+    </div>
+
+  </div>
+</section>
+
+<!-- CONTACT / DEMO -->
+<section style="padding:80px 24px;background:var(--base-dk)" id="demo">
+  <div style="max-width:900px;margin:0 auto">
+    <div class="section-label">Get in touch</div>
+    <h2 class="section-title">Book a free demo</h2>
+    <p class="section-sub" style="margin-bottom:40px">See OpsHub live with your data. We'll walk you through the full platform in 30 minutes.</p>
+    <div class="contact-wrap">
+      <div class="contact-info">
+        <div class="contact-point">
+          <div class="contact-point-ic">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg>
+          </div>
+          <div>
+            <div class="contact-point-title">30-minute demo</div>
+            <div class="contact-point-desc">Live walkthrough of the platform with your branch setup</div>
+          </div>
+        </div>
+        <div class="contact-point">
+          <div class="contact-point-ic">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+          </div>
+          <div>
+            <div class="contact-point-title">Free migration</div>
+            <div class="contact-point-desc">We handle the Firebase setup and data import for you</div>
+          </div>
+        </div>
+        <div class="contact-point">
+          <div class="contact-point-ic">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M2 20c0-3.5 3.134-6 7-6M13 20c0-3.5 3.134-6 7-6"/><circle cx="15" cy="8" r="3"/></svg>
+          </div>
+          <div>
+            <div class="contact-point-title">Onboarding support</div>
+            <div class="contact-point-desc">Full team training for every role — managers, HR, finance, and staff</div>
+          </div>
+        </div>
+        <div class="contact-point">
+          <div class="contact-point-ic">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.77 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.73a16 16 0 0 0 6.29 6.29l1.1-1.1a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+          </div>
+          <div>
+            <div class="contact-point-title">Saudi-based team</div>
+            <div class="contact-point-desc">Arabic & English support — understanding your F&B context</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="demo-form">
+        <div class="demo-form-title">Request a Demo</div>
+        <div id="form-fields">
+          <div class="fg2">
+            <div class="fg"><label class="fl">First Name *</label><input class="fi" id="f-fn" placeholder="Ahmed"></div>
+            <div class="fg"><label class="fl">Last Name *</label><input class="fi" id="f-ln" placeholder="Al-Rashidi"></div>
+          </div>
+          <div class="fg"><label class="fl">Company / Restaurant Group *</label><input class="fi" id="f-co" placeholder="ALFA Restaurant Group"></div>
+          <div class="fg"><label class="fl">Email *</label><input class="fi" id="f-em" type="email" placeholder="ahmed@example.com"></div>
+          <div class="fg2">
+            <div class="fg"><label class="fl">Phone</label><input class="fi" id="f-ph" placeholder="+966 5x xxx xxxx"></div>
+            <div class="fg"><label class="fl">Branches</label><select class="fs" id="f-br"><option>1</option><option>2-5</option><option>6-10</option><option>10+</option></select></div>
+          </div>
+          <div class="fg"><label class="fl">Message</label><textarea class="fta" id="f-ms" rows="2" placeholder="Tell us about your operation…"></textarea></div>
+          <button class="btn-submit" onclick="submitDemo()">Request Demo →</button>
+        </div>
+        <div class="form-success" id="form-success">
+          <div class="form-success-ic">✅</div>
+          <div class="form-success-title">Request received!</div>
+          <div class="form-success-desc">We'll be in touch within 24 hours to schedule your demo.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-inner">
+    <div>
+      <div class="footer-logo">
+        <div class="footer-logo-mark">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="white" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="7" height="7" rx="1.2"/><rect x="14" y="3" width="7" height="7" rx="1.2"/>
+            <rect x="3" y="14" width="7" height="7" rx="1.2"/><path d="M14 14h7M14 17.5h7M14 21h7"/>
+          </svg>
+        </div>
+        <div class="footer-logo-name">OpsHub</div>
+      </div>
+      <div class="footer-desc">The complete operations platform for restaurant groups. Built on Firebase Realtime Database with a neumorphic design system.</div>
+    </div>
+    <div>
+      <div class="footer-links">
+        <a class="footer-link" href="#features">Features</a>
+        <a class="footer-link" href="#pricing">Pricing</a>
+        <a class="footer-link" href="#demo">Contact</a>
+        <a class="footer-link" href="index.html">Sign In</a>
+        <a class="footer-link" href="admin.html">Admin</a>
+      </div>
+    </div>
+  </div>
+  <div class="footer-copy">© 2026 OpsHub. Built for the F&B industry.</div>
+</footer>
+
+<div id="toast">✓ Demo request sent!</div>
+
+<script>
+/* ── PREVIEW BARS ANIMATION ── */
+(function(){
+  var vals=[42,68,55,80,73,91,60,85,77,92,65,88,70,95,82];
+  var el=document.getElementById('preview-bars');
+  if(!el)return;
+  el.innerHTML=vals.map(function(v){return '<div class="preview-bar-item" style="height:'+v+'%;background:rgba(0,102,102,'+(0.15+v/400)+')"></div>';}).join('');
+})();
+
+/* ── COUNTER ANIMATION ── */
+(function(){
+  function animateCount(id,target,suffix){
+    var el=document.getElementById(id);if(!el)return;
+    var start=0;var dur=1800;var step=dur/30;
+    var iv=setInterval(function(){
+      start+=target/30;
+      el.textContent=Math.min(Math.round(start),target)+(suffix||'');
+      if(start>=target){el.textContent=target+(suffix||'');clearInterval(iv);}
+    },step);
+  }
+  var io=new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(e.isIntersecting){
+        animateCount('cnt-branches',12,'');
+        animateCount('cnt-roles',9,'');
+        io.disconnect();
+      }
+    });
+  },{threshold:.5});
+  var el=document.getElementById('cnt-branches');
+  if(el)io.observe(el);
+})();
+
+/* ── DEMO FORM ── */
+function submitDemo(){
+  var fn=document.getElementById('f-fn').value.trim();
+  var ln=document.getElementById('f-ln').value.trim();
+  var co=document.getElementById('f-co').value.trim();
+  var em=document.getElementById('f-em').value.trim();
+  if(!fn||!co||!em){
+    var t=document.getElementById('toast');
+    t.textContent='Please fill in the required fields';
+    t.style.borderLeftColor='var(--danger)';
+    t.style.display='block';
+    setTimeout(function(){t.style.display='none';t.style.borderLeftColor='var(--success)';},2800);
+    return;
+  }
+  // Show success
+  document.getElementById('form-fields').style.display='none';
+  document.getElementById('form-success').style.display='block';
+  // Show toast
+  var t=document.getElementById('toast');
+  t.style.display='block';
+  setTimeout(function(){t.style.display='none';},3000);
+}
+
+/* ── SMOOTH SCROLL OFFSET FOR FIXED NAV ── */
+document.querySelectorAll('a[href^="#"]').forEach(function(a){
+  a.addEventListener('click',function(e){
+    var id=this.getAttribute('href').slice(1);
+    var el=document.getElementById(id);
+    if(!el)return;
+    e.preventDefault();
+    window.scrollTo({top:el.getBoundingClientRect().top+window.scrollY-64,behavior:'smooth'});
+  });
+});
+</script>
+</body>
+</html>
