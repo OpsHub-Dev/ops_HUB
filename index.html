@@ -438,18 +438,14 @@ function loadBranches(cb){
 var _ls={branchId:null,branchName:null,role:null,pin:'',companyId:null};
 
 function renderStep0(){
-  var branches=Object.values(NX.branches);
   var card=document.getElementById('l-card');
-  if(!branches.length){
-    card.innerHTML='<div style="text-align:center;padding:24px;color:var(--text3);font-size:11px">No branches found.<br>Contact your administrator.</div>';
-    return;
-  }
-  card.innerHTML='<div class="l-step-title">Select your branch</div><div class="branch-list">'+
-    branches.map(function(b){
-      return '<button class="branch-btn" onclick="lBranch(\''+b.id+'\',\''+he(b.name)+'\',\''+he(b.companyId||'alfaco')+'\')">'+
-        '<div class="b-icon">'+(b.icon||'🍽️')+'</div>'+
-        '<div><div class="b-name">'+he(b.name)+'</div><div class="b-loc">'+he(b.brand||b.location||b.id)+'</div></div>'+
-      '</button>';
+  card.innerHTML='<div class="l-step-title">Select your role</div>'+
+    '<div class="role-grid">'+
+    ROLES.map(function(r){
+      return '<div class="role-card" onclick="lRole(''+r.id+'')">'+
+        '<div class="role-ic" style="background:'+r.c+'18;color:'+r.c+'">'+ic('users',13)+'</div>'+
+        '<div class="role-label"><strong style="color:'+r.c+'">'+r.l+'</strong><span>'+r.s+'</span></div>'+
+      '</div>';
     }).join('')+
   '</div>';
 }
@@ -466,23 +462,38 @@ var ROLES=[
   {id:'super_admin',l:'Super Admin',s:'Full system access',c:'#991B1B'},
 ];
 
-function lBranch(id,name,co){_ls.branchId=id;_ls.branchName=name;_ls.companyId=co;lShowRoles();}
+var FREE_ROLES=['ceo','super_admin','hr_manager','finance_dir','brand_dir','regional'];
 
-function lShowRoles(){
-  document.getElementById('l-card').innerHTML=
-    '<div class="l-step-title">Select your role</div>'+
-    '<div class="role-grid">'+
-    ROLES.map(function(r){
-      return '<div class="role-card" onclick="lRole(\''+r.id+'\')">'+
-        '<div class="role-ic" style="background:'+r.c+'18;color:'+r.c+'">'+ic('users',13)+'</div>'+
-        '<div class="role-label"><strong style="color:'+r.c+'">'+r.l+'</strong><span>'+r.s+'</span></div>'+
-      '</div>';
-    }).join('')+
-    '</div>'+
-    '<div class="l-back" onclick="renderStep0()">← Back to branches</div>';
+function lRole(role){
+  _ls.role=role;_ls.pin='';
+  if(FREE_ROLES.indexOf(role)>=0){
+    _ls.branchId='hq';_ls.branchName='HQ';_ls.companyId='alfaco';
+    lShowPIN();
+  } else {
+    lShowBranches();
+  }
 }
 
-function lRole(role){_ls.role=role;_ls.pin='';lShowPIN();}
+function lShowBranches(){
+  var branches=Object.values(NX.branches);
+  var card=document.getElementById('l-card');
+  var role=ROLES.find(function(r){return r.id===_ls.role;})||{};
+  card.innerHTML='<div class="l-step-title" style="color:'+he(role.c||'var(--primary)')+'">'+he(role.l||'')+'</div>'+
+    '<div style="font-size:10px;color:var(--text3);margin-bottom:12px">Select your branch</div>'+
+    (branches.length?
+      '<div class="branch-list">'+
+      branches.map(function(b){
+        return '<button class="branch-btn" onclick="lBranch(''+b.id+'',''+he(b.name)+'',''+he(b.companyId||'alfaco')+'')">'+
+          '<div class="b-icon">'+(b.icon||'🍽️')+'</div>'+
+          '<div><div class="b-name">'+he(b.name)+'</div><div class="b-loc">'+he(b.brand||b.location||b.id)+'</div></div>'+
+        '</button>';
+      }).join('')+
+      '</div>'
+    :'<div style="text-align:center;padding:20px;color:var(--text3);font-size:11px">No branches found. Contact your administrator.</div>')+
+    '<div class="l-back" onclick="renderStep0()">← Back to roles</div>';
+}
+
+function lBranch(id,name,co){_ls.branchId=id;_ls.branchName=name;_ls.companyId=co;lShowPIN();}
 
 function lShowPIN(){
   document.getElementById('l-card').innerHTML=
