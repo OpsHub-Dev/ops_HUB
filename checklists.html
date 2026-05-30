@@ -173,12 +173,12 @@ function init(){
   document.getElementById('tb-branch').textContent=_bid?'· '+_bid:'';
   if(!_bid){document.getElementById('content').innerHTML='<div class="empty"><div class="empty-txt">No branch specified.<br>Add ?branch=YOUR_BRANCH_ID to the URL.</div></div>';return;}
   // Load custom templates + data
-  db.ref('branches/'+_bid+'/cl_templates').once('value',function(snap){
+  db.ref('checklists/'+_bid+'/templates').once('value',function(snap){
     var custom=snap.val()||{};
     var templates=DEFAULT_TEMPLATES.slice();
     Object.values(custom).filter(Boolean).forEach(function(t){if(t.id&&t.label)templates.push(t);});
     // Load week data
-    db.ref('branches/'+_bid+'/cl_weeks/'+wk).once('value',function(ds){
+    db.ref('cl_weeks/'+_bid+'/'+wk).once('value',function(ds){
       _data=ds.val()||{};
       renderTabs(templates,wk);
     });
@@ -201,7 +201,7 @@ function renderTabs(templates,wk){
   renderChecklist(templates,wk);
 }
 
-function selectTab(id){_activeTab=id;var wk=getWeekStart(_weekOffset);db.ref('branches/'+_bid+'/cl_weeks/'+wk).once('value',function(ds){_data=ds.val()||{};var tpls=DEFAULT_TEMPLATES.slice();renderTabs(tpls,wk);});}
+function selectTab(id){_activeTab=id;var wk=getWeekStart(_weekOffset);db.ref('cl_weeks/'+_bid+'/'+wk).once('value',function(ds){_data=ds.val()||{};var tpls=DEFAULT_TEMPLATES.slice();renderTabs(tpls,wk);});}
 
 function renderChecklist(templates,wk){
   var t=templates.find(function(x){return x.id===_activeTab;});
@@ -240,7 +240,7 @@ function toggleItem(tmpl,key,val,wk){
   var updates={};
   updates[tmpl+'/'+key]=val;
   if(val)updates[tmpl+'/t'+key.slice(1)]=ts;
-  db.ref('branches/'+_bid+'/cl_weeks/'+wk).update(updates,function(err){
+  db.ref('cl_weeks/'+_bid+'/'+wk).update(updates,function(err){
     if(err){toast('Failed to save','e');return;}
     if(!_data[tmpl])_data[tmpl]={};
     _data[tmpl][key]=val;
@@ -270,7 +270,7 @@ function openAddTemplate(){
   if(!name||!name.trim())return;
   var id='custom_'+Date.now();
   var template={id,label:name.trim(),icon:'📋',items:[]};
-  db.ref('branches/'+_bid+'/cl_templates/'+id).set(template,function(err){
+  db.ref('checklists/'+_bid+'/templates/'+id).set(template,function(err){
     if(err){toast('Save failed','e');return;}
     toast('Template created','s');init();
   });

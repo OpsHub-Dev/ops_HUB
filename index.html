@@ -33,7 +33,7 @@ button{cursor:pointer;border:none}
 
 /* SPLASH */
 #splash{position:fixed;inset:0;z-index:999;background:var(--base);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px}
-#splash.gone{display:none}
+#splash.gone{display:none!important}
 .sp-icon{width:68px;height:68px;border-radius:18px;background:var(--primary);box-shadow:var(--raise-lg);display:flex;align-items:center;justify-content:center}
 .sp-bar{width:48px;height:3px;border-radius:2px;background:var(--base-dk);overflow:hidden;position:relative}
 .sp-bar::after{content:'';position:absolute;left:-100%;width:55%;height:100%;background:var(--primary);border-radius:2px;animation:sld 1s linear infinite}
@@ -412,19 +412,42 @@ var PT={
 
 /* ═══ STARTUP ═══ */
 window.onload=function(){
+  // Always kill splash within 1.5s — never leave user on blank screen
+  var _splashKill=setTimeout(function(){
+    var sp=document.getElementById('splash');if(sp)sp.classList.add('gone');
+    var lc=document.getElementById('l-card');
+    if(lc&&lc.innerHTML.indexOf('Loading')>=0)renderStep0();
+  },1500);
+
   var s=sessionStorage.getItem('nx_session');
-  if(s){try{NX.session=JSON.parse(s);bootApp();}catch(e){bootLogin();}}
-  else bootLogin();
+  if(s){
+    try{
+      NX.session=JSON.parse(s);
+      clearTimeout(_splashKill);
+      bootApp();
+    }catch(e){
+      clearTimeout(_splashKill);
+      bootLogin();
+    }
+  } else {
+    bootLogin();
+  }
 };
 function bootLogin(){
-  setTimeout(function(){document.getElementById('splash').classList.add('gone');},900);
+  // Hard-kill splash after 1.2s no matter what
+  setTimeout(function(){
+    var sp=document.getElementById('splash');
+    if(sp)sp.classList.add('gone');
+  },1200);
   loadBranches(renderStep0);
 }
 function bootApp(){
-  document.getElementById('splash').classList.add('gone');
+  var sp=document.getElementById('splash');if(sp)sp.classList.add('gone');
   document.getElementById('login').classList.add('gone');
   document.getElementById('app').classList.add('show');
-  renderSidebar();updateHeader();loadAlerts();loadPrayers();navTo(defaultPage());
+  renderSidebar();updateHeader();
+  setTimeout(function(){loadAlerts();loadPrayers();},1500);
+  navTo(defaultPage());
 }
 function loadBranches(cb){
   // 1. Try admin/branches
@@ -437,20 +460,22 @@ function loadBranches(cb){
       if(cb)cb();return;
     }
     // 2. Try branches/ root (existing Firebase data)
-    db.ref('branches').once('value',function(bs){
+    db.ref('config').once('value',function(bs){
       NX.branches={};
-      var branchRaw=bs.val()||{};
+      var branchRaw=bs.val()||{}; /* config root */
       Object.keys(branchRaw).forEach(function(id){
-        if(id&&branchRaw[id]&&typeof branchRaw[id]==='object'){
-          NX.branches[id]={
-            id:id,
-            name:branchRaw[id].branchName||branchRaw[id].name||id,
-            brand:branchRaw[id].brand||'',
-            location:branchRaw[id].location||'',
-            icon:branchRaw[id].icon||'🍽️',
-            companyId:branchRaw[id].companyId||'default'
-          };
-        }
+        var node=branchRaw[id];
+        if(!node||typeof node!=='object')return;
+        // config/{id}/meta holds branch info
+        var meta=node.meta||node;
+        NX.branches[id]={
+          id:id,
+          name:meta.name||meta.branchName||id,
+          brand:meta.brand||'',
+          location:meta.location||'',
+          icon:meta.icon||'🍽️',
+          companyId:meta.companyId||'default'
+        };
       });
       if(cb)cb();
     });
@@ -524,11 +549,11 @@ function runFirstSetup(){
   // Branch
   writes['admin/branches/'+branchId]={id:branchId,name:branchName,companyId:companyId,brand:company,location:location,icon:icon||'🍽️',createdAt:Date.now()};
   // Also create the branch data path
-  writes['branches/'+branchId+'/meta']={name:branchName,companyId:companyId,brand:company,location:location,createdAt:Date.now()};
+  writes['config/'+branchId+'/meta']={name:branchName,companyId:companyId,brand:company,location:location,createdAt:Date.now()};
   // Admin user
-  writes['admin/users/admin_'+companyId]={id:'admin_'+companyId,name:adminName,role:'super_admin',pin:adminPin,companyId:companyId,branchIds:[],createdAt:Date.now()};
+  writes['users/admin_'+companyId]={id:'admin_'+companyId,name:adminName,role:'super_admin',pin:adminPin,companyId:companyId,branchIds:[],createdAt:Date.now()};
   // Branch manager user (same person for now)
-  writes['admin/users/bm_'+branchId]={id:'bm_'+branchId,name:adminName,role:'branch_mgr',pin:adminPin,companyId:companyId,branchIds:[branchId],createdAt:Date.now()};
+  writes['users/bm_'+branchId]={id:'bm_'+branchId,name:adminName,role:'branch_mgr',pin:adminPin,companyId:companyId,branchIds:[branchId],createdAt:Date.now()};
 
   db.ref().update(writes,function(err){
     if(err){
@@ -616,7 +641,7 @@ function checkPIN(){
   var pin=_ls.pin;
 
   // Step 1: check admin/users (works after migration)
-  db.ref('admin/users').orderByChild('role').equalTo(role).once('value',function(snap){
+  db.ref('users').orderByChild('role').equalTo(role).once('value',function(snap){
     var found=null;
     snap.forEach(function(c){
       var u=c.val();
@@ -630,7 +655,7 @@ function checkPIN(){
     }
     // Step 2: fallback — check branches/{bid}/staff directly (works before migration)
     if(bid){
-      db.ref('branches/'+bid+'/staff').once('value',function(ss){
+      db.ref('staff/'+bid).once('value',function(ss){
         var raw=ss.val();var staffFound=null;
         if(raw){
           var list=Array.isArray(raw)?raw:Object.values(raw);
@@ -750,10 +775,10 @@ function rDash(){
   var mo=TODAY.slice(0,7);
   var done=0,todaySales=0,mtdSales=0,staffCnt=0,pcPend=0;
   function fin(){done++;if(done<4)return;render();}
-  db.ref('branches/'+b+'/sales').orderByChild('date').equalTo(TODAY).once('value',function(s){s.forEach(function(c){var v=c.val();if(v)todaySales+=parseFloat(v.total||v.net||0);});fin();});
-  db.ref('branches/'+b+'/sales').orderByChild('date').startAt(mo+'-01').endAt(mo+'-31').once('value',function(s){s.forEach(function(c){var v=c.val();if(v)mtdSales+=parseFloat(v.total||v.net||0);});fin();});
-  db.ref('branches/'+b+'/staff').once('value',function(s){var r=s.val();if(r){staffCnt=Array.isArray(r)?r.filter(Boolean).length:Object.keys(r).length;}fin();});
-  db.ref('branches/'+b+'/pc').orderByChild('status').equalTo('pending').once('value',function(s){s.forEach(function(){pcPend++;});fin();});
+  db.ref('sales/'+b).orderByChild('date').equalTo(TODAY).once('value',function(s){s.forEach(function(c){var v=c.val();if(v)todaySales+=parseFloat(v.total||v.net||0);});fin();});
+  db.ref('sales/'+b).orderByChild('date').startAt(mo+'-01').endAt(mo+'-31').once('value',function(s){s.forEach(function(c){var v=c.val();if(v)mtdSales+=parseFloat(v.total||v.net||0);});fin();});
+  db.ref('staff/'+b).once('value',function(s){var r=s.val();if(r){staffCnt=Array.isArray(r)?r.filter(Boolean).length:Object.keys(r).length;}fin();});
+  db.ref('pc/'+b).orderByChild('status').equalTo('pending').once('value',function(s){s.forEach(function(){pcPend++;});fin();});
   function render(){
     var name=(NX.session&&NX.session.name||'').split(' ')[0];
     var hr=new Date().getHours();
@@ -791,7 +816,7 @@ function rDash(){
 
 function drawDashChart(b,mo){
   var ctx=document.getElementById('dash-chart');if(!ctx||typeof Chart==='undefined')return;
-  db.ref('branches/'+b+'/sales').orderByChild('date').startAt(mo+'-01').endAt(mo+'-31').once('value',function(snap){
+  db.ref('sales/'+b).orderByChild('date').startAt(mo+'-01').endAt(mo+'-31').once('value',function(snap){
     var byD={};snap.forEach(function(c){var v=c.val();if(v&&v.date)byD[v.date]=(byD[v.date]||0)+parseFloat(v.total||v.net||0);});
     var days=Object.keys(byD).sort();
     new Chart(ctx,{type:'bar',data:{labels:days.map(function(d){return d.slice(8);}),datasets:[{data:days.map(function(d){return Math.round(byD[d]);}),backgroundColor:'rgba(0,102,102,.2)',borderColor:'#006666',borderWidth:1.5,borderRadius:3}]},options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{grid:{color:'rgba(0,0,0,.04)'},ticks:{font:{size:9},callback:function(v){return 'SAR '+v;}}},x:{grid:{display:false},ticks:{font:{size:9}}}}}});
@@ -799,7 +824,7 @@ function drawDashChart(b,mo){
 }
 function loadDashPC(b){
   var el=document.getElementById('dash-pc');if(!el)return;
-  db.ref('branches/'+b+'/pc').orderByChild('ts').limitToLast(5).once('value',function(snap){
+  db.ref('pc/'+b).orderByChild('ts').limitToLast(5).once('value',function(snap){
     var items=[];snap.forEach(function(c){var v=c.val();if(v)items.push(v);});items.reverse();
     el.innerHTML=items.length?items.map(function(it){
       return '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(0,0,0,.04)">'+
@@ -817,7 +842,7 @@ function rSales(){
   var c=document.getElementById('content'),b=bid();
   if(!b){c.innerHTML=rStub('sales');return;}
   BS._smo=BS._smo||TODAY.slice(0,7);
-  db.ref('branches/'+b+'/sales').orderByChild('date').startAt(BS._smo+'-01').endAt(BS._smo+'-31').once('value',function(snap){
+  db.ref('sales/'+b).orderByChild('date').startAt(BS._smo+'-01').endAt(BS._smo+'-31').once('value',function(snap){
     var rows=[];snap.forEach(function(ch){var v=ch.val();if(v)rows.push(Object.assign({_k:ch.key},v));});
     rows.sort(function(a,z){return z.date>a.date?1:-1;});
     var total=rows.reduce(function(a,r){return a+parseFloat(r.total||r.net||0);},0);
@@ -868,7 +893,7 @@ function saveSale(){
   var vat=parseFloat(document.getElementById('s-vt').value)||0;
   var guests=parseInt(document.getElementById('s-gu').value)||0;
   var total=food+bev+misc;
-  db.ref('branches/'+b+'/sales/sale_'+date.replace(/-/g,'')+'_'+Date.now()).set({date,food,bev,misc,vat,total,guests},function(err){
+  db.ref('sales/'+b+'/sale_'+date.replace(/-/g,'')+'_'+Date.now()).set({date,food,bev,misc,vat,total,guests},function(err){
     if(err){toast('Save failed','e');return;}
     toast('Sale saved','s');closeModal();rSales();
   });
@@ -885,7 +910,7 @@ function rDSR(){
       '<button class="btn btn-primary btn-sm" onclick="saveDSR()">Save DSR</button>'+
     '</div>'+
     '<div id="dsr-body"><div class="muted" style="text-align:center;padding:24px">Loading…</div></div>';
-  db.ref('branches/'+b+'/sales').orderByChild('date').equalTo(dt).once('value',function(snap){
+  db.ref('sales/'+b).orderByChild('date').equalTo(dt).once('value',function(snap){
     var rows=[];snap.forEach(function(ch){var v=ch.val();if(v)rows.push(v);});
     var agg={food:0,bev:0,misc:0,vat:0,total:0,guests:0};
     rows.forEach(function(r){agg.food+=parseFloat(r.food||0);agg.bev+=parseFloat(r.bev||0);agg.misc+=parseFloat(r.misc||0);agg.vat+=parseFloat(r.vat||0);agg.total+=parseFloat(r.total||r.net||0);agg.guests+=parseInt(r.guests||0);});
@@ -914,7 +939,7 @@ function saveDSR(){toast('DSR saved','s');}
 function rPC(){
   var c=document.getElementById('content'),b=bid();
   if(!b){c.innerHTML=rStub('petty-cash');return;}
-  db.ref('branches/'+b+'/pc').orderByChild('ts').limitToLast(50).once('value',function(snap){
+  db.ref('pc/'+b).orderByChild('ts').limitToLast(50).once('value',function(snap){
     var rows=[];snap.forEach(function(ch){var v=ch.val();if(v)rows.push(Object.assign({_k:ch.key},v));});
     rows.sort(function(a,z){return (z.ts||0)-(a.ts||0);});
     var total=rows.reduce(function(a,r){return a+parseFloat(r.amount||0);},0);
@@ -957,7 +982,7 @@ function savePC(b){
   var desc=document.getElementById('pc-ds').value.trim();
   var amt=parseFloat(document.getElementById('pc-am').value)||0;
   if(!desc||amt<=0){toast('Description and amount required','e');return;}
-  db.ref('branches/'+b+'/pc/pc_'+Date.now()).set({
+  db.ref('pc/'+b+'/pc_'+Date.now()).set({
     date:document.getElementById('pc-dt').value,desc,
     vendor:document.getElementById('pc-vd').value,
     amount:amt,category:document.getElementById('pc-ct').value,
@@ -968,7 +993,7 @@ function savePC(b){
   });
 }
 function approvePC(key,b){
-  db.ref('branches/'+b+'/pc/'+key+'/status').set('approved',function(){toast('Approved','s');rPC();});
+  db.ref('pc/'+b+'/'+key+'/status').set('approved',function(){toast('Approved','s');rPC();});
 }
 
 /* ═══ CHECKLISTS ═══ */
@@ -976,7 +1001,7 @@ function rCL(){
   var c=document.getElementById('content'),b=bid();
   if(!b){c.innerHTML=rStub('checklists');return;}
   var wk=getWK();
-  db.ref('branches/'+b+'/cl_weeks/'+wk).once('value',function(snap){
+  db.ref('cl_weeks/'+b+'/'+wk).once('value',function(snap){
     var data=snap.val()||{};
     var templates=[
       {id:'opening',label:'Opening',items:['Unlock & disarm','Fridge temp check','Prep stations ready','Staff briefed','POS on','Music & AC on']},
@@ -1003,17 +1028,17 @@ function rCL(){
   });
 }
 function toggleCL(b,wk,t,key,val){
-  db.ref('branches/'+b+'/cl_weeks/'+wk+'/'+t+'/'+key).set(val,function(){rCL();});
+  db.ref('cl_weeks/'+b+'/'+wk+'/'+t+'/'+key).set(val,function(){rCL();});
 }
 
 /* ═══ INVENTORY ITEMS ═══ */
 function rInv(){
   var c=document.getElementById('content'),b=bid();
   if(!b){c.innerHTML=rStub('inv-items');return;}
-  db.ref('branches/'+b+'/inv_items').once('value',function(snap){
+  db.ref('inv_items/'+b).once('value',function(snap){
     var items=[];var raw=snap.val()||{};
     (Array.isArray(raw)?raw:Object.values(raw)).filter(Boolean).forEach(function(v){items.push(v);});
-    db.ref('branches/'+b+'/stock').once('value',function(ss){
+    db.ref('stock/'+b).once('value',function(ss){
       var stock=ss.val()||{};
       var safe=function(code){return String(code||'').replace(/[.#$\[\]\/]/g,'_');};
       var low=items.filter(function(it){return(stock[safe(it.code)]||it.qty||0)<=(it.min||0);}).length;
@@ -1068,7 +1093,7 @@ function saveItem(){
   var name=(document.getElementById('it-nm').value||'').trim();
   if(!code||!name){toast('Code and name required','e');return;}
   var safe=code.replace(/[.#$\[\]\/]/g,'_');
-  db.ref('branches/'+b+'/inv_items/'+safe).set({
+  db.ref('inv_items/'+b+'/'+safe).set({
     code,name,unit:document.getElementById('it-un').value,
     min:parseFloat(document.getElementById('it-mn').value)||0,
     price:parseFloat(document.getElementById('it-pr').value)||0,
@@ -1076,7 +1101,7 @@ function saveItem(){
   },function(err){
     if(err){toast('Save failed','e');return;}
     var qty=parseFloat(document.getElementById('it-qt').value)||0;
-    if(qty>0)db.ref('branches/'+b+'/stock/'+safe).set(qty);
+    if(qty>0)db.ref('stock/'+b+'/'+safe).set(qty);
     toast('Item added','s');closeModal();rInv();
   });
 }
@@ -1085,7 +1110,7 @@ function saveItem(){
 function rMoves(){
   var c=document.getElementById('content'),b=bid();
   if(!b){c.innerHTML=rStub('inv-moves');return;}
-  db.ref('branches/'+b+'/inv_logs').orderByChild('ts').limitToLast(60).once('value',function(snap){
+  db.ref('inv_logs/'+b).orderByChild('ts').limitToLast(60).once('value',function(snap){
     var rows=[];snap.forEach(function(ch){var v=ch.val();if(v)rows.push(v);});rows.reverse();
     c.innerHTML=
       '<div class="sec-hdr mb-12"><div class="sec-title">Stock Movements</div>'+
@@ -1107,7 +1132,7 @@ function openIssue(){toast('Open issue dialog here');}
 function rOrders(){
   var c=document.getElementById('content'),b=bid();
   if(!b){c.innerHTML=rStub('inv-orders');return;}
-  db.ref('branches/'+b+'/inv_orders').orderByChild('ts').limitToLast(40).once('value',function(snap){
+  db.ref('inv_orders/'+b).orderByChild('ts').limitToLast(40).once('value',function(snap){
     var rows=[];snap.forEach(function(ch){var v=ch.val();if(v)rows.push(Object.assign({_k:ch.key},v));});
     rows.sort(function(a,z){return(z.ts||0)-(a.ts||0);});
     c.innerHTML=
@@ -1124,7 +1149,7 @@ function rOrders(){
       '</tbody></table></div>';
   });
 }
-function markReceived(k,b){db.ref('branches/'+b+'/inv_orders/'+k+'/status').set('received',function(){toast('Marked received','s');rOrders();});}
+function markReceived(k,b){db.ref('inv_orders/'+b+'/'+k+'/status').set('received',function(){toast('Marked received','s');rOrders();});}
 function openNewOrder(){toast('Open new order dialog');}
 
 /* ═══ WASTAGE ═══ */
@@ -1132,7 +1157,7 @@ function rWaste(){
   var c=document.getElementById('content'),b=bid();
   if(!b){c.innerHTML=rStub('wastage');return;}
   var mo=TODAY.slice(0,7);
-  db.ref('branches/'+b+'/waste').orderByChild('date').startAt(mo+'-01').endAt(mo+'-31').once('value',function(snap){
+  db.ref('waste/'+b).orderByChild('date').startAt(mo+'-01').endAt(mo+'-31').once('value',function(snap){
     var rows=[];snap.forEach(function(ch){var v=ch.val();if(v)rows.push(v);});
     rows.sort(function(a,z){return z.date>a.date?1:-1;});
     var totalCost=rows.reduce(function(a,r){return a+parseFloat(r.cost||0);},0);
@@ -1175,7 +1200,7 @@ function saveWaste(b){
   var name=(document.getElementById('w-nm').value||'').trim();
   var qty=parseFloat(document.getElementById('w-qt').value)||0;
   if(!name||qty<=0){toast('Name and qty required','e');return;}
-  db.ref('branches/'+b+'/waste/wst_'+Date.now()).set({
+  db.ref('waste/'+b+'/wst_'+Date.now()).set({
     date:document.getElementById('w-dt').value,name,qty,
     unit:document.getElementById('w-un').value,
     cost:parseFloat(document.getElementById('w-cs').value)||0,
@@ -1190,7 +1215,7 @@ function saveWaste(b){
 function rStaff(){
   var c=document.getElementById('content'),b=bid();
   if(!b){c.innerHTML=rStub('staff');return;}
-  db.ref('branches/'+b+'/staff').once('value',function(snap){
+  db.ref('staff/'+b).once('value',function(snap){
     var raw=snap.val();var rows=[];
     if(!raw){c.innerHTML='<div class="empty" style="height:200px"><div class="empty-txt">No staff data</div></div>';return;}
     (Array.isArray(raw)?raw:Object.values(raw)).filter(Boolean).forEach(function(v){rows.push(v);});
@@ -1225,7 +1250,7 @@ function fStaff(q){document.querySelectorAll('#staff-tbl tbody tr').forEach(func
 function rHealth(){
   var c=document.getElementById('content'),b=bid();
   if(!b){c.innerHTML=rStub('health-cards');return;}
-  db.ref('branches/'+b+'/health').once('value',function(snap){
+  db.ref('health/'+b).once('value',function(snap){
     var raw=snap.val()||{};var rows=[];
     (Array.isArray(raw)?raw:Object.values(raw)).filter(Boolean).forEach(function(v){rows.push(v);});
     var now=new Date();var soon=new Date(now);soon.setDate(soon.getDate()+30);
@@ -1258,7 +1283,7 @@ function rHealth(){
 function rLeave(){
   var c=document.getElementById('content'),b=bid();
   if(!b){c.innerHTML=rStub('bm-leave');return;}
-  db.ref('branches/'+b+'/tsLeaves').once('value',function(snap){
+  db.ref('tsLeaves/'+b).once('value',function(snap){
     var rows=[];snap.forEach(function(ch){var v=ch.val();if(v)rows.push(Object.assign({_k:ch.key},v));});
     c.innerHTML=
       '<div class="sec-hdr mb-12"><div class="sec-title">Leave Requests</div></div>'+
@@ -1285,14 +1310,14 @@ function rLeave(){
       '</tbody></table></div>';
   });
 }
-function approveLeave(k,b){db.ref('branches/'+b+'/tsLeaves/'+k+'/status').set('approved',function(){toast('Leave approved','s');rLeave();});}
-function rejectLeave(k,b){db.ref('branches/'+b+'/tsLeaves/'+k+'/status').set('rejected',function(){toast('Leave rejected','w');rLeave();});}
+function approveLeave(k,b){db.ref('tsLeaves/'+b+'/'+k+'/status').set('approved',function(){toast('Leave approved','s');rLeave();});}
+function rejectLeave(k,b){db.ref('tsLeaves/'+b+'/'+k+'/status').set('rejected',function(){toast('Leave rejected','w');rLeave();});}
 
 /* ═══ COMPLIANCE ═══ */
 function rComplex(){
   var c=document.getElementById('content'),b=bid();
   if(!b){c.innerHTML=rStub('bm-compliance');return;}
-  db.ref('branches/'+b+'/compliance').once('value',function(snap){
+  db.ref('config/'+b+'/compliance').once('value',function(snap){
     var data=snap.val()||{};
     var cats=Object.keys(data);
     if(!cats.length){c.innerHTML='<div class="card"><div class="card-title"><div class="card-acc"></div>Fixed Costs & Compliance</div><div class="muted" style="padding:12px 0">No compliance data yet</div></div>';return;}
@@ -1377,7 +1402,7 @@ function rRev(){
 function rHeadcount(){
   var c=document.getElementById('content'),b=bid();
   if(!b){c.innerHTML=rStub('headcount');return;}
-  db.ref('branches/'+b+'/staff').once('value',function(snap){
+  db.ref('staff/'+b).once('value',function(snap){
     var raw=snap.val();var rows=[];
     if(!raw){c.innerHTML='<div class="empty"><div class="empty-txt">No staff data</div></div>';return;}
     (Array.isArray(raw)?raw:Object.values(raw)).filter(Boolean).forEach(function(v){rows.push(v);});
@@ -1436,8 +1461,8 @@ function rFoodCost(){
         '<div class="muted">Target: ≤30% · Industry avg: 28-32%</div>'+
       '</div>';
   }
-  db.ref('branches/'+b+'/waste').orderByChild('date').startAt(mo+'-01').endAt(mo+'-31').once('value',function(s){s.forEach(function(c){var v=c.val();if(v)wasteCost+=parseFloat(v.cost||0);});wDone=true;tryRender();});
-  db.ref('branches/'+b+'/sales').orderByChild('date').startAt(mo+'-01').endAt(mo+'-31').once('value',function(s){s.forEach(function(c){var v=c.val();if(v)salesTotal+=parseFloat(v.food||0)+parseFloat(v.bev||0);});sDone=true;tryRender();});
+  db.ref('waste/'+b).orderByChild('date').startAt(mo+'-01').endAt(mo+'-31').once('value',function(s){s.forEach(function(c){var v=c.val();if(v)wasteCost+=parseFloat(v.cost||0);});wDone=true;tryRender();});
+  db.ref('sales/'+b).orderByChild('date').startAt(mo+'-01').endAt(mo+'-31').once('value',function(s){s.forEach(function(c){var v=c.val();if(v)salesTotal+=parseFloat(v.food||0)+parseFloat(v.bev||0);});sDone=true;tryRender();});
 }
 
 /* ═══ HR DASHBOARD ═══ */
@@ -1451,7 +1476,7 @@ function rHRDash(){
   '</div>'+
   '<div class="card"><div class="card-title"><div class="card-acc"></div>HR Module</div>'+
   '<div class="muted" style="padding:10px 0">Use the navigation to access detailed HR views.</div></div>';
-  if(b)db.ref('branches/'+b+'/staff').once('value',function(s){
+  if(b)db.ref('staff/'+b).once('value',function(s){
     var r=s.val();var cnt=r?(Array.isArray(r)?r.filter(Boolean).length:Object.keys(r).length):0;
     c.querySelector('.kpi-val').textContent=cnt;
   });
@@ -1477,7 +1502,7 @@ function rAlerts(){
 /* ═══ AUDIT LOG ═══ */
 function rAudit(){
   var c=document.getElementById('content');
-  db.ref('admin/audit').limitToLast(60).once('value',function(snap){
+  db.ref('config/audit').limitToLast(60).once('value',function(snap){
     var rows=[];snap.forEach(function(ch){var v=ch.val();if(v)rows.unshift(v);});
     c.innerHTML='<div class="card" style="padding:0"><table><thead><tr><th>Action</th><th>Description</th><th>By</th><th>Time</th></tr></thead><tbody>'+
     (rows.length?rows.map(function(r){
@@ -1526,9 +1551,9 @@ function switchBranch(id,name){
 function rLowStock(){
   var c=document.getElementById('content'),b=bid();
   if(!b){c.innerHTML=rStub('low-stock');return;}
-  db.ref('branches/'+b+'/inv_items').once('value',function(snap){
+  db.ref('inv_items/'+b).once('value',function(snap){
     var items=[];(Array.isArray(snap.val()||{})?snap.val():Object.values(snap.val()||{})).filter(Boolean).forEach(function(v){items.push(v);});
-    db.ref('branches/'+b+'/stock').once('value',function(ss){
+    db.ref('stock/'+b).once('value',function(ss){
       var stock=ss.val()||{};
       var safe=function(c){return String(c||'').replace(/[.#$\[\]\/]/g,'_');};
       var low=items.filter(function(it){return(stock[safe(it.code)]||it.qty||0)<=(it.min||0);});
@@ -1575,9 +1600,9 @@ function rSchedule(){
   if(!b){c.innerHTML=rStub('schedule');return;}
   var days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
   var wk=getWK();
-  db.ref('branches/'+b+'/sch/'+wk).once('value',function(snap){
+  db.ref('sch/'+b+'/'+wk).once('value',function(snap){
     var data=snap.val()||{};
-    db.ref('branches/'+b+'/staff').once('value',function(ss){
+    db.ref('staff/'+b).once('value',function(ss){
       var raw=ss.val();var staff=[];
       if(raw)(Array.isArray(raw)?raw:Object.values(raw)).filter(Boolean).forEach(function(v){staff.push(v);});
       var shifts=['07:00-15:00','09:00-17:00','12:00-20:00','15:00-23:00','OFF'];
@@ -1614,7 +1639,7 @@ function saveSchedule(b,wk){
     if(!updates[sid])updates[sid]={};
     updates[sid][day]=sel.value;
   });
-  db.ref('branches/'+b+'/sch/'+wk).set(updates,function(err){
+  db.ref('sch/'+b+'/'+wk).set(updates,function(err){
     if(err){toast('Save failed','e');return;}
     toast('Schedule saved','s');
   });
@@ -1629,7 +1654,7 @@ function rTimesheet(){
   c.innerHTML='<div class="sec-hdr mb-12"><input type="month" class="fi" style="width:170px" value="'+mo+'" onchange="BS._tsmo=this.value;rTimesheet()"><div class="muted">Timesheet — '+mo+'</div></div>'+
     '<div id="ts-body"><div class="muted" style="text-align:center;padding:24px">Loading…</div></div>';
   // tsAtt structure: {empId:{YYYY-MM:[records]}}
-  db.ref('branches/'+b+'/tsAtt').once('value',function(snap){
+  db.ref('tsAtt/'+b).once('value',function(snap){
     var raw=snap.val()||{};
     var rows=[];
     // Iterate by empId key — never use Object.values on tsAtt
@@ -1673,7 +1698,7 @@ function fmtHm(ms){var m=Math.floor((ms||0)/60000);var h=Math.floor(m/60);return
 function rOT(){
   var c=document.getElementById('content'),b=bid();
   if(!b){c.innerHTML=rStub('bm-ot');return;}
-  db.ref('branches/'+b+'/otRequests').once('value',function(snap){
+  db.ref('config/'+b+'/otRequests').once('value',function(snap){
     var rows=[];snap.forEach(function(ch){var v=ch.val();if(v)rows.push(Object.assign({_k:ch.key},v));});
     rows.sort(function(a,z){return(z.ts||0)-(a.ts||0);});
     c.innerHTML=
@@ -1701,7 +1726,7 @@ function rOT(){
   });
 }
 function setOTStatus(k,b,status){
-  db.ref('branches/'+b+'/otRequests/'+k+'/status').set(status,function(){
+  db.ref('config/'+b+'/otRequests/'+k+'/status').set(status,function(){
     toast(status==='approved'?'OT Approved':'OT Rejected',status==='approved'?'s':'w');rOT();
   });
 }
@@ -1710,7 +1735,7 @@ function setOTStatus(k,b,status){
 function rTransfers(){
   var c=document.getElementById('content'),b=bid();
   if(!b){c.innerHTML=rStub('bm-transfers');return;}
-  db.ref('branches/'+b+'/transfers').once('value',function(snap){
+  db.ref('transfers/'+b).once('value',function(snap){
     var rows=[];snap.forEach(function(ch){var v=ch.val();if(v)rows.push(Object.assign({_k:ch.key},v));});
     rows.sort(function(a,z){return(z.ts||0)-(a.ts||0);});
     c.innerHTML=
@@ -1750,7 +1775,7 @@ function saveTransfer(b){
   var name=(document.getElementById('tr-nm').value||'').trim();
   var toBranch=document.getElementById('tr-to').value;
   if(!name||!toBranch){toast('Name and destination required','e');return;}
-  db.ref('branches/'+b+'/transfers/tr_'+Date.now()).set({
+  db.ref('transfers/'+b+'/tr_'+Date.now()).set({
     staffName:name,fromBranch:b,toBranch,
     sap:document.getElementById('tr-sap').value,
     date:document.getElementById('tr-dt').value,
@@ -1762,14 +1787,14 @@ function saveTransfer(b){
   });
 }
 function approveTransfer(k,b){
-  db.ref('branches/'+b+'/transfers/'+k+'/status').set('approved',function(){toast('Approved','s');rTransfers();});
+  db.ref('transfers/'+b+'/'+k+'/status').set('approved',function(){toast('Approved','s');rTransfers();});
 }
 
 /* ═══ ANNOUNCEMENTS ═══ */
 function rAnnouncements(){
   var c=document.getElementById('content'),b=bid();
   if(!b){c.innerHTML=rStub('bm-announcements');return;}
-  db.ref('branches/'+b+'/announcements').orderByChild('ts').limitToLast(30).once('value',function(snap){
+  db.ref('announcements/'+b).orderByChild('ts').limitToLast(30).once('value',function(snap){
     var rows=[];snap.forEach(function(ch){var v=ch.val();if(v)rows.push(Object.assign({_k:ch.key},v));});
     rows.sort(function(a,z){return(z.ts||0)-(a.ts||0);});
     c.innerHTML=
@@ -1805,7 +1830,7 @@ function saveAnnounce(b){
   var title=(document.getElementById('an-ti').value||'').trim();
   var body=(document.getElementById('an-bd').value||'').trim();
   if(!title||!body){toast('Title and message required','e');return;}
-  db.ref('branches/'+b+'/announcements/ann_'+Date.now()).set({
+  db.ref('announcements/'+b+'/ann_'+Date.now()).set({
     title,body,priority:document.getElementById('an-pr').value,
     by:NX.session&&NX.session.name,ts:Date.now()
   },function(err){
@@ -1818,7 +1843,7 @@ function saveAnnounce(b){
 function rBriefing(){
   var c=document.getElementById('content'),b=bid();
   if(!b){c.innerHTML=rStub('bm-briefing');return;}
-  db.ref('branches/'+b+'/briefings/'+TODAY).once('value',function(snap){
+  db.ref('config/'+b+'/briefings/'+TODAY).once('value',function(snap){
     var data=snap.val()||{notes:'',tasks:[]};
     var tasks=data.tasks||[];
     c.innerHTML=
@@ -1859,21 +1884,21 @@ function commitBriefTask(){
   var tx=(document.getElementById('bt-tx').value||'').trim();
   if(!tx){toast('Task text required','e');return;}
   var b=bid();
-  db.ref('branches/'+b+'/briefings/'+TODAY+'/tasks').once('value',function(snap){
+  db.ref('config/'+b+'/briefings/'+TODAY+'/tasks').once('value',function(snap){
     var tasks=snap.val()||[];
     tasks.push({text:tx,assignee:document.getElementById('bt-as').value||'All',done:false,ts:Date.now()});
-    db.ref('branches/'+b+'/briefings/'+TODAY+'/tasks').set(tasks,function(){
+    db.ref('config/'+b+'/briefings/'+TODAY+'/tasks').set(tasks,function(){
       toast('Task added','s');closeModal();rBriefing();
     });
   });
 }
 function toggleBriefTask(i,val){
   var b=bid();
-  db.ref('branches/'+b+'/briefings/'+TODAY+'/tasks/'+i+'/done').set(val,function(){rBriefing();});
+  db.ref('config/'+b+'/briefings/'+TODAY+'/tasks/'+i+'/done').set(val,function(){rBriefing();});
 }
 function saveBriefing(b){
   var notes=document.getElementById('brf-notes').value;
-  db.ref('branches/'+b+'/briefings/'+TODAY+'/notes').set(notes,function(err){
+  db.ref('config/'+b+'/briefings/'+TODAY+'/notes').set(notes,function(err){
     if(err){toast('Save failed','e');return;}
     toast('Briefing saved','s');
   });
@@ -1883,7 +1908,7 @@ function saveBriefing(b){
 function rAssets(){
   var c=document.getElementById('content'),b=bid();
   if(!b){c.innerHTML=rStub('bm-assets');return;}
-  db.ref('branches/'+b+'/assets').once('value',function(snap){
+  db.ref('assets/'+b).once('value',function(snap){
     var rows=[];snap.forEach(function(ch){var v=ch.val();if(v)rows.push(Object.assign({_k:ch.key},v));});
     c.innerHTML=
       '<div class="sec-hdr mb-12">'+
@@ -1927,7 +1952,7 @@ function openAddAsset(){
 function saveAsset(b){
   var name=(document.getElementById('as-nm').value||'').trim();
   if(!name){toast('Name required','e');return;}
-  db.ref('branches/'+b+'/assets/ast_'+Date.now()).set({
+  db.ref('assets/'+b+'/ast_'+Date.now()).set({
     name,category:document.getElementById('as-ct').value,
     brand:document.getElementById('as-br').value,serial:document.getElementById('as-sr').value,
     location:document.getElementById('as-lc').value,condition:document.getElementById('as-cd').value,
@@ -1938,7 +1963,7 @@ function saveAsset(b){
   });
 }
 function serviceAsset(k,b){
-  db.ref('branches/'+b+'/assets/'+k).update({lastService:TODAY,condition:'Good'},function(){
+  db.ref('assets/'+b+'/'+k).update({lastService:TODAY,condition:'Good'},function(){
     toast('Service logged','s');rAssets();
   });
 }
@@ -2025,7 +2050,7 @@ function pnlRow(label,val,income){
 function rInvoices(){
   var c=document.getElementById('content'),b=bid();
   if(!b){c.innerHTML=rStub('hrf-invoices');return;}
-  db.ref('branches/'+b+'/invoices').orderByChild('ts').limitToLast(40).once('value',function(snap){
+  db.ref('invoices/'+b).orderByChild('ts').limitToLast(40).once('value',function(snap){
     var rows=[];snap.forEach(function(ch){var v=ch.val();if(v)rows.push(Object.assign({_k:ch.key},v));});
     rows.sort(function(a,z){return(z.ts||0)-(a.ts||0);});
     var total=rows.reduce(function(a,r){return a+parseFloat(r.amount||0);},0);
@@ -2071,7 +2096,7 @@ function saveInvoice(b){
   var invoiceNo=(document.getElementById('inv-no').value||'').trim();
   var amount=parseFloat(document.getElementById('inv-am').value)||0;
   if(!supplier||!invoiceNo||amount<=0){toast('Supplier, invoice # and amount required','e');return;}
-  db.ref('branches/'+b+'/invoices/inv_'+Date.now()).set({
+  db.ref('invoices/'+b+'/inv_'+Date.now()).set({
     supplier,invoiceNo,amount,date:document.getElementById('inv-dt').value,
     due:document.getElementById('inv-du').value,category:document.getElementById('inv-ct').value,
     status:'pending',ts:Date.now()
@@ -2081,7 +2106,7 @@ function saveInvoice(b){
   });
 }
 function markInvoicePaid(k,b){
-  db.ref('branches/'+b+'/invoices/'+k+'/status').set('paid',function(){toast('Marked paid','s');rInvoices();});
+  db.ref('invoices/'+b+'/'+k+'/status').set('paid',function(){toast('Marked paid','s');rInvoices();});
 }
 
 /* ═══ FINANCIAL REPORT ═══ */
@@ -2148,7 +2173,7 @@ function rPINSetup(){
       '<div id="pin-setup-list"><div class="muted" style="text-align:center;padding:16px">Loading staff…</div></div>'+
     '</div>';
   var b=bid();if(!b)return;
-  db.ref('branches/'+b+'/staff').once('value',function(snap){
+  db.ref('staff/'+b).once('value',function(snap){
     var raw=snap.val();var staff=[];
     if(raw)(Array.isArray(raw)?raw:Object.values(raw)).filter(Boolean).forEach(function(v){staff.push(v);});
     var el=document.getElementById('pin-setup-list');if(!el)return;
@@ -2166,13 +2191,13 @@ function savePIN(b,sid,i){
   var pin=(document.getElementById('pin-'+i).value||'').trim();
   if(pin.length!==4||isNaN(pin)){toast('PIN must be exactly 4 digits','e');return;}
   // Save to staff record
-  db.ref('branches/'+b+'/staff').once('value',function(snap){
+  db.ref('staff/'+b).once('value',function(snap){
     var raw=snap.val();
     if(!raw){toast('Staff not found','e');return;}
     if(Array.isArray(raw)){
-      var idx=parseInt(i);if(raw[idx])db.ref('branches/'+b+'/staff/'+idx+'/pin').set(pin);
+      var idx=parseInt(i);if(raw[idx])db.ref('staff/'+b+'/'+idx+'/pin').set(pin);
     } else {
-      Object.keys(raw).forEach(function(k){if((raw[k].id||raw[k].staffId||k)===sid)db.ref('branches/'+b+'/staff/'+k+'/pin').set(pin);});
+      Object.keys(raw).forEach(function(k){if((raw[k].id||raw[k].staffId||k)===sid)db.ref('staff/'+b+'/'+k+'/pin').set(pin);});
     }
     toast('PIN saved','s');
   });
@@ -2193,7 +2218,7 @@ function loadAlerts(){
   }
   // Health card expiry
   var now=new Date();var soon=new Date();soon.setDate(soon.getDate()+30);
-  db.ref('branches/'+b+'/health').once('value',function(snap){
+  db.ref('health/'+b).once('value',function(snap){
     var raw=snap.val()||{};
     (Array.isArray(raw)?raw:Object.values(raw)).filter(Boolean).forEach(function(r){
       if(r.expiry){var exp=new Date(r.expiry);if(exp<now)alerts.push({type:'Health Card Expired',msg:r.name+' — expired '+r.expiry,level:'e'});
@@ -2201,10 +2226,10 @@ function loadAlerts(){
     });fin();
   });
   // Low stock
-  db.ref('branches/'+b+'/inv_items').once('value',function(snap){
+  db.ref('inv_items/'+b).once('value',function(snap){
     var items=[];var raw=snap.val()||{};
     (Array.isArray(raw)?raw:Object.values(raw)).filter(Boolean).forEach(function(v){items.push(v);});
-    db.ref('branches/'+b+'/stock').once('value',function(ss){
+    db.ref('stock/'+b).once('value',function(ss){
       var stock=ss.val()||{};
       items.forEach(function(it){
         var safe=String(it.code||'').replace(/[.#$\[\]\/]/g,'_');
@@ -2215,7 +2240,7 @@ function loadAlerts(){
     });
   });
   // PC pending
-  db.ref('branches/'+b+'/pc').orderByChild('status').equalTo('pending').once('value',function(snap){
+  db.ref('pc/'+b).orderByChild('status').equalTo('pending').once('value',function(snap){
     snap.forEach(function(ch){var v=ch.val();if(v)alerts.push({type:'Petty Cash Pending',msg:(v.desc||v.vendor||'Request')+' — SAR '+fmt(v.amount,2),level:'i'});});
     fin();
   });
@@ -2292,7 +2317,7 @@ function importHealthCSV(b){
   if(!parsed.length){toast('No records to import','e');return;}
   var updates={};
   parsed.forEach(function(r,i){updates['hc_'+Date.now()+'_'+i]=r;});
-  db.ref('branches/'+b+'/health').update(updates,function(err){
+  db.ref('health/'+b).update(updates,function(err){
     if(err){toast('Import failed','e');return;}
     toast('Imported '+parsed.length+' health cards','s');closeModal();rHealth();
   });
@@ -2401,9 +2426,9 @@ function saveNewBranch(){
 
   var writes={};
   writes['admin/branches/'+id]={id,name,brand,location:loc,icon:icon||'🍽️',companyId,createdAt:Date.now()};
-  writes['branches/'+id+'/meta']={name,brand,location:loc,companyId,createdAt:Date.now()};
+  writes['config/'+id+'/meta']={name,brand,location:loc,companyId,createdAt:Date.now()};
   if(mgr&&pin.length===4){
-    writes['admin/users/bm_'+id]={id:'bm_'+id,name:mgr,role:'branch_mgr',pin,companyId,branchIds:[id],createdAt:Date.now()};
+    writes['users/bm_'+id]={id:'bm_'+id,name:mgr,role:'branch_mgr',pin,companyId,branchIds:[id],createdAt:Date.now()};
   }
 
   db.ref().update(writes,function(err){
@@ -2459,7 +2484,7 @@ function deleteBranch(id){
 /* ═══ USER / ROLE MANAGEMENT ═══ */
 function rUserMgmt(){
   var c=document.getElementById('content');
-  db.ref('admin/users').once('value',function(snap){
+  db.ref('users').once('value',function(snap){
     var users=[];snap.forEach(function(ch){var v=ch.val();if(v)users.push(Object.assign({_k:ch.key},v));});
     c.innerHTML=
       '<div class="sec-hdr mb-12">'+
@@ -2518,14 +2543,14 @@ function saveNewUser(){
   if(!name||!role||pin.length!==4){toast('Name, role and 4-digit PIN required','e');return;}
   var companyId=NX.session&&NX.session.companyId||'default';
   var uid='user_'+Date.now();
-  db.ref('admin/users/'+uid).set({id:uid,name,role,pin,companyId,branchIds,createdAt:Date.now()},function(err){
+  db.ref('users/'+uid).set({id:uid,name,role,pin,companyId,branchIds,createdAt:Date.now()},function(err){
     if(err){toast('Failed: '+err.message,'e');return;}
     toast(name+' added','s');closeModal();rUserMgmt();
   });
 }
 
 function editUser(key){
-  db.ref('admin/users/'+key).once('value',function(snap){
+  db.ref('users/'+key).once('value',function(snap){
     var u=snap.val();if(!u)return;
     openModal(
       '<div class="modal-head"><div class="modal-title">Edit User</div><button class="modal-x" onclick="closeModal()">✕</button></div>'+
@@ -2549,7 +2574,7 @@ function updateUser(key){
   var updates={name:document.getElementById('eu-name').value.trim(),role:document.getElementById('eu-role').value};
   var pin=document.getElementById('eu-pin').value.trim();
   if(pin.length===4)updates.pin=pin;
-  db.ref('admin/users/'+key).update(updates,function(err){
+  db.ref('users/'+key).update(updates,function(err){
     if(err){toast('Failed','e');return;}
     toast('User updated','s');closeModal();rUserMgmt();
   });
@@ -2557,7 +2582,7 @@ function updateUser(key){
 
 function deleteUser(key){
   if(!confirm('Delete this user?'))return;
-  db.ref('admin/users/'+key).remove(function(){toast('User deleted','w');closeModal();rUserMgmt();});
+  db.ref('users/'+key).remove(function(){toast('User deleted','w');closeModal();rUserMgmt();});
 }
 /* ═══ PAGES MAP ═══ */
 var PAGES={
@@ -2593,7 +2618,7 @@ function rTrainingPage(){
 function rPayrollPage(){
   var c=document.getElementById('content'),b=bid();
   if(!b){c.innerHTML=rStub('hrf-payroll');return;}
-  db.ref('branches/'+b+'/staff').once('value',function(snap){
+  db.ref('staff/'+b).once('value',function(snap){
     var raw=snap.val();var staff=[];
     if(raw)(Array.isArray(raw)?raw:Object.values(raw)).filter(Boolean).forEach(function(v){staff.push(v);});
     var total=staff.reduce(function(a,s){return a+parseFloat(s.salary||s.basicSalary||0);},0);
@@ -2640,9 +2665,9 @@ function rHRReport(){
     '<div class="card"><div class="card-title"><div class="card-acc"></div>HR Summary</div>'+
     '<div class="muted">For detailed records use the individual HR module pages: Employees, Attendance, Leave, Health Cards, and Payroll.</div></div>';
   }
-  db.ref('branches/'+b+'/staff').once('value',function(s){var r=s.val();staffCount=r?(Array.isArray(r)?r.filter(Boolean).length:Object.keys(r).length):0;fin();});
-  db.ref('branches/'+b+'/tsLeaves').once('value',function(s){s.forEach(function(){leaveCount++;});fin();});
-  db.ref('branches/'+b+'/health').once('value',function(s){
+  db.ref('staff/'+b).once('value',function(s){var r=s.val();staffCount=r?(Array.isArray(r)?r.filter(Boolean).length:Object.keys(r).length):0;fin();});
+  db.ref('tsLeaves/'+b).once('value',function(s){s.forEach(function(){leaveCount++;});fin();});
+  db.ref('health/'+b).once('value',function(s){
     var now=new Date();
     var raw=s.val()||{};(Array.isArray(raw)?raw:Object.values(raw)).filter(Boolean).forEach(function(r){if(r.expiry&&new Date(r.expiry)<now)healthExpired++;});fin();
   });

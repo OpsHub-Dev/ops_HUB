@@ -353,7 +353,7 @@ function pErr(msg){var e=document.getElementById('perr');if(e)e.textContent=msg;
 function checkPIN(){
   // Search staff in branch by PIN
   var bid=_ls.branchId;
-  db.ref('branches/'+bid+'/staff').once('value',function(snap){
+  db.ref('staff/'+bid).once('value',function(snap){
     var raw=snap.val();var found=null;
     if(!raw){pErr('No staff in this branch');return;}
     var list=Array.isArray(raw)?raw:Object.values(raw);
@@ -435,7 +435,7 @@ function restoreCheckState(cb){
   var bid=s.branchId;var sid=s.staffId;
   if(!bid||!sid){if(cb)cb();return;}
   // Look for open log today
-  db.ref('staff/checkins/'+bid+'/'+TODAY).orderByChild('staffId').equalTo(sid).limitToLast(1).once('value',function(snap){
+  db.ref('qr_checkins/'+bid+'/'+TODAY).orderByChild('staffId').equalTo(sid).limitToLast(1).once('value',function(snap){
     var found=null;
     snap.forEach(function(ch){var v=ch.val();if(v&&!v.outTime)found={key:ch.key,data:v};});
     if(found){
@@ -535,7 +535,7 @@ function doCheckIn(){
   var ts=nowTs();
   var key='ci_'+sid+'_'+ts;
   var rec={staffId:sid,sapId:sap,name:s.name,branchId:bid,inTime:ts,date:TODAY,outTime:null,onBreak:false,totalBreak:0,brkLogs:[],workedMins:0,workedHrs:0};
-  db.ref('staff/checkins/'+bid+'/'+TODAY+'/'+key).set(rec,function(err){
+  db.ref('qr_checkins/'+bid+'/'+TODAY+'/'+key).set(rec,function(err){
     if(err){toast('Check-in failed','e');return;}
     SP.checkState='in';SP.checkKey=key;SP.checkInTime=ts;SP.totalBreak=0;SP.breakStart=null;
     toast('Checked in at '+new Date(ts).toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'}),'s');
@@ -547,7 +547,7 @@ function doBreakStart(){
   if(SP.checkState!=='in'){return;}
   var ts=nowTs();
   var bid=SP.session.branchId;var key=SP.checkKey;
-  db.ref('staff/checkins/'+bid+'/'+TODAY+'/'+key).update({onBreak:true,breakStart:ts},function(err){
+  db.ref('qr_checkins/'+bid+'/'+TODAY+'/'+key).update({onBreak:true,breakStart:ts},function(err){
     if(err){toast('Failed','e');return;}
     SP.checkState='break';SP.breakStart=ts;
     toast('Break started','w');rCheckin();
@@ -560,7 +560,7 @@ function doBreakEnd(){
   SP.totalBreak+=dur;
   var bid=SP.session.branchId;var key=SP.checkKey;
   var brkLog={start:SP.breakStart,end:ts,dur:dur};
-  db.ref('staff/checkins/'+bid+'/'+TODAY+'/'+key).transaction(function(cur){
+  db.ref('qr_checkins/'+bid+'/'+TODAY+'/'+key).transaction(function(cur){
     if(cur===null)return cur;
     cur.onBreak=false;cur.breakStart=null;
     cur.totalBreak=(cur.totalBreak||0)+dur;
@@ -583,7 +583,7 @@ function doCheckOut(){
   var workedMs=ts-inTime-totalBreak;
   var workedMins=Math.round(workedMs/60000);
   var workedHrs=parseFloat((workedMins/60).toFixed(2));
-  db.ref('staff/checkins/'+bid+'/'+TODAY+'/'+key).update({
+  db.ref('qr_checkins/'+bid+'/'+TODAY+'/'+key).update({
     outTime:ts,onBreak:false,workedMins:workedMins,workedHrs:workedHrs,totalBreak:totalBreak
   },function(err){
     if(err){toast('Check-out failed','e');return;}
@@ -595,7 +595,7 @@ function doCheckOut(){
 
 function loadTodayLog(){
   var s=SP.session;if(!s)return;
-  db.ref('staff/checkins/'+s.branchId+'/'+TODAY).orderByChild('staffId').equalTo(s.staffId).once('value',function(snap){
+  db.ref('qr_checkins/'+s.branchId+'/'+TODAY).orderByChild('staffId').equalTo(s.staffId).once('value',function(snap){
     var rows=[];snap.forEach(function(ch){var v=ch.val();if(v)rows.push(v);});
     rows.sort(function(a,z){return (a.inTime||0)-(z.inTime||0);});
     var el=document.getElementById('ci-log-wrap');if(!el)return;
@@ -632,7 +632,7 @@ function rAttendance(){
   var fetched=0;var logs=[];
   function next(){fetched++;if(fetched<days.length)return;render();}
   days.forEach(function(day){
-    db.ref('staff/checkins/'+bid+'/'+day).orderByChild('staffId').equalTo(sid).once('value',function(snap){
+    db.ref('qr_checkins/'+bid+'/'+day).orderByChild('staffId').equalTo(sid).once('value',function(snap){
       snap.forEach(function(ch){var v=ch.val();if(v)logs.push(Object.assign({date:day},v));});
       next();
     });
@@ -684,12 +684,12 @@ function rLeave(){
   var s=SP.session;if(!s){c.innerHTML='<div class="empty"><div class="empty-txt">Not logged in</div></div>';return;}
   var bid=s.branchId;var sid=s.staffId;var name=s.name;
 
-  db.ref('branches/'+bid+'/tsLeaves').orderByChild('staffId').equalTo(sid).once('value',function(snap){
+  db.ref('tsLeaves/'+bid).orderByChild('staffId').equalTo(sid).once('value',function(snap){
     var rows=[];
     snap.forEach(function(ch){var v=ch.val();if(v)rows.push(Object.assign({_k:ch.key},v));});
     // Also match by name if no staffId
     if(!rows.length){
-      db.ref('branches/'+bid+'/tsLeaves').once('value',function(snap2){
+      db.ref('tsLeaves/'+bid).once('value',function(snap2){
         snap2.forEach(function(ch){var v=ch.val();if(v&&v.name===name)rows.push(Object.assign({_k:ch.key},v));});
         renderLeave(c,rows,bid,sid,name);
       });
@@ -753,7 +753,7 @@ function submitLeave(){
     reason:document.getElementById('lv-rs').value,
     status:'pending',ts:Date.now()
   };
-  db.ref('branches/'+s.branchId+'/tsLeaves/lv_'+Date.now()).set(rec,function(err){
+  db.ref('tsLeaves/'+s.branchId+'/lv_'+Date.now()).set(rec,function(err){
     if(err){toast('Failed to submit','e');return;}
     toast('Leave request submitted','s');closeModal();rLeave();
   });
@@ -766,7 +766,7 @@ function rPayslip(){
   var bid=s.branchId;var sid=s.staffId;var sap=s.sapId;
 
   // Try to find staff record for salary info
-  db.ref('branches/'+bid+'/staff').once('value',function(snap){
+  db.ref('staff/'+bid).once('value',function(snap){
     var raw=snap.val();var staffRec=null;
     if(raw){
       var list=Array.isArray(raw)?raw:Object.values(raw);
@@ -836,14 +836,14 @@ function rTraining(){
   var bid=s.branchId;var sid=s.staffId;
 
   // Load modules published for this branch
-  db.ref('staff/modules/'+bid).once('value',function(snap){
+  db.ref('config/'+bid+'/training_modules').once('value',function(snap){
     var mods=[];snap.forEach(function(ch){var v=ch.val();if(v&&v.published)mods.push(Object.assign({_k:ch.key},v));});
     if(!mods.length){
       c.innerHTML='<div class="empty" style="height:200px"><div class="empty-txt">No training modules published yet</div></div>';
       return;
     }
     // Check completions
-    db.ref('staff/progress/'+bid+'/'+sid).once('value',function(ps){
+    db.ref('config/'+bid+'/training_progress/'+sid).once('value',function(ps){
       var progress=ps.val()||{};
       c.innerHTML='<div style="margin-bottom:10px;font-size:10px;color:var(--text3)">'+mods.length+' module'+( mods.length!==1?'s':'')+' available</div>'+
         mods.map(function(m){
@@ -929,7 +929,7 @@ function finishQuiz(){
   var s=SP.session;var bid=s.branchId;var sid=s.staffId;
 
   // Save progress
-  db.ref('staff/progress/'+bid+'/'+sid+'/'+_quiz.modKey).set({
+  db.ref('config/'+bid+'/training_progress/'+sid+'/'+_quiz.modKey).set({
     score:pct,passed:passed,ts:Date.now(),total:_quiz.total,correct:_quiz.score
   });
 
