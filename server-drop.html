@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Server Drop Entry — ALFA.CO</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<style>
+
+/* ═══════════════════════════════════════════════════════════
+   NEUMORPHISM — Server Drop Entry
+   Surface #E7E5E4 · Primary #006666 · Font: Space Mono
+═══════════════════════════════════════════════════════════ */
+:root {
+  --base:    #E7E5E4;
+  --base-dk: #D4D2D1;
+  --base-lt: #F4F2F1;
+
+  --sh-raise:
+    6px 6px 16px rgba(0,0,0,0.18),
+    -6px -6px 16px rgba(255,255,255,0.88);
+  --sh-raise-sm:
+    3px 3px 8px rgba(0,0,0,0.15),
+    -3px -3px 8px rgba(255,255,255,0.85);
+  --sh-raise-lg:
+    12px 12px 30px rgba(0,0,0,0.20),
+    -12px -12px 30px rgba(255,255,255,0.92);
+  --sh-inset:
+    inset 4px 4px 10px rgba(0,0,0,0.13),
+    inset -4px -4px 10px rgba(255,255,255,0.75);
+  --sh-inset-sm:
+    inset 2px 2px 6px rgba(0,0,0,0.10),
+    inset -2px -2px 6px rgba(255,255,255,0.72);
+  --sh-flat:
+    2px 2px 5px rgba(0,0,0,0.12),
+    -2px -2px 5px rgba(255,255,255,0.75);
+
+  --primary: #006666;
+  --accent:  #C8860A;
+  --success: #00A63D;
+  --danger:  #FF2157;
+  --warning: #FE9900;
+
+  --font: 'Space Mono', 'Courier New', monospace;
+  --mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+  --text:  #1E2938;
+  --text2: rgba(30,41,56,0.55);
+  --text3: rgba(30,41,56,0.32);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  min-height: 100%;
+  background: var(--base);
+  background-image:
+    radial-gradient(ellipse 70% 50% at 15% 10%, rgba(0,102,102,0.05) 0%, transparent 55%),
+    radial-gradient(ellipse 50% 60% at 85% 90%, rgba(200,134,10,0.04) 0%, transparent 55%);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-track { background: var(--base); }
+::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.13); border-radius: 3px; }
+
+/* ── TOP BAR ── */
+.top {
+  background: var(--base);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.10), 0 1px 0 rgba(255,255,255,0.8);
+  padding: 13px 18px;
+  display: flex; align-items: center; gap: 12px;
+  position: sticky; top: 0; z-index: 100;
+}
+.top-brand {
+  font-size: 14px; font-weight: 700;
+  color: var(--text);
+  font-family: var(--font);
+  letter-spacing: -0.3px;
+}
+.top-sub {
+  font-size: 9px; color: var(--text3);
+  margin-top: 2px;
+  font-family: var(--mono);
+  letter-spacing: 0.05em;
+}
+.conn-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--danger);
+  margin-left: auto; flex-shrink: 0;
+  box-shadow: 0 0 0 2px rgba(255,33,87,0.2), 0 0 6px rgba(255,33,87,0.4);
+}
+.conn-dot.online {
+  background: var(--success);
+  box-shadow: 0 0 0 2px rgba(0,166,61,0.2), 0 0 6px rgba(0,166,61,0.5);
+  animation: pulse 2.5s infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.45} }
+
+/* ── LAYOUT ── */
+.wrap { max-width: 520px; margin: 0 auto; padding: 20px 16px 48px; }
+
+/* ── PAGES ── */
+.page { display: none; }
+.page.active { display: block; }
+
+/* ══════════════════════════════
+   LOGIN PAGE
+══════════════════════════════ */
+.login-wrap {
+  min-height: calc(100vh - 58px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+}
+.login-card {
+  background: var(--base);
+  border-radius: 28px;
+  box-shadow: var(--sh-raise-lg);
+  padding: 36px 28px;
+  width: 100%; max-width: 380px;
+}
+.login-icon {
+  width: 64px; height: 64px;
+  border-radius: 18px;
+  background: var(--base);
+  box-shadow: var(--sh-raise);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px;
+  margin: 0 auto 20px;
+}
+.login-title {
+  font-size: 20px; font-weight: 700;
+  color: var(--text);
+  font-family: var(--font);
+  text-align: center;
+  letter-spacing: -0.5px;
+  margin-bottom: 4px;
+}
+.login-sub {
+  font-size: 10px; color: var(--text3);
+  text-align: center;
+  font-family: var(--mono);
+  letter-spacing: 0.06em;
+  margin-bottom: 28px;
+}
+.login-divider {
+  height: 1px;
+  background: rgba(0,0,0,0.06);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.8);
+  margin-bottom: 20px;
+}
+
+/* ── FORM GROUPS ── */
+.fg { margin-bottom: 14px; }
+.fg label, label {
+  display: block;
+  font-size: 9px; font-weight: 700;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  margin-bottom: 6px;
+  font-family: var(--mono);
+}
+.fg input, .fg select, .fg textarea,
+input, select, textarea {
+  width: 100%;
+  background: var(--base);
+  border: none;
+  border-radius: 12px;
+  padding: 11px 14px;
+  box-shadow: var(--sh-inset);
+  color: var(--text);
+  font-size: 13px;
+  font-family: var(--font);
+  outline: none;
+  transition: box-shadow 0.2s;
+  -webkit-appearance: none; appearance: none;
+}
+.fg input:focus, .fg select:focus, .fg textarea:focus,
+input:focus, select:focus, textarea:focus {
+  box-shadow: var(--sh-inset), 0 0 0 2px rgba(0,102,102,0.2);
+}
+input[type=number] { font-family: var(--mono); font-weight: 600; }
+select option { background: var(--base-lt); color: var(--text); }
+
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+
+/* ── CARDS ── */
+.card {
+  background: var(--base);
+  border-radius: 22px;
+  box-shadow: var(--sh-raise);
+  padding: 20px;
+  margin-bottom: 16px;
+}
+.card-title {
+  font-size: 9px; font-weight: 700;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-family: var(--mono);
+  margin-bottom: 16px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.card-title-dot {
+  display: inline-block;
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--primary);
+  box-shadow: 0 0 5px rgba(0,102,102,0.4);
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+/* ── BALANCE BAR ── */
+.bal-bar {
+  display: flex; gap: 0; flex-wrap: wrap;
+  background: var(--base);
+  border-radius: 14px;
+  box-shadow: var(--sh-inset-sm);
+  margin-top: 12px;
+  overflow: hidden;
+}
+.bal-item {
+  flex: 1; min-width: 80px;
+  padding: 12px 14px;
+  border-right: 1px solid rgba(0,0,0,0.06);
+  text-align: center;
+}
+.bal-item:last-child { border-right: none; }
+.bal-label {
+  font-size: 9px; color: var(--text3);
+  font-family: var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.bal-value {
+  font-size: 14px; font-weight: 700;
+  font-family: var(--mono);
+  color: var(--text);
+}
+.bal-status-bar {
+  width: 100%;
+  background: var(--base);
+  border-radius: 14px;
+  box-shadow: var(--sh-inset-sm);
+  padding: 12px 16px;
+  margin-top: 10px;
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 11px; font-family: var(--mono);
+  color: var(--text2);
+}
+#balStatus {
+  font-size: 12px; font-weight: 700;
+  font-family: var(--mono);
+}
+
+/* ── DYNAMIC ROWS — Tips / Voids / Returns ── */
+.tiprow, .vrow, .retrow {
+  background: var(--base);
+  border-radius: 16px;
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  position: relative;
+  transition: box-shadow 0.18s;
+}
+/* Each type gets a directional coloured shadow */
+.tiprow {
+  box-shadow:
+    3px 3px 10px rgba(200,134,10,0.18),
+    -3px -3px 8px rgba(255,255,255,0.82);
+}
+.tiprow:hover {
+  box-shadow:
+    5px 5px 14px rgba(200,134,10,0.25),
+    -4px -4px 10px rgba(255,255,255,0.88);
+}
+.vrow {
+  box-shadow:
+    3px 3px 10px rgba(255,33,87,0.15),
+    -3px -3px 8px rgba(255,255,255,0.82);
+}
+.vrow:hover {
+  box-shadow:
+    5px 5px 14px rgba(255,33,87,0.22),
+    -4px -4px 10px rgba(255,255,255,0.88);
+}
+.retrow {
+  box-shadow:
+    3px 3px 10px rgba(254,153,0,0.18),
+    -3px -3px 8px rgba(255,255,255,0.82);
+}
+.retrow:hover {
+  box-shadow:
+    5px 5px 14px rgba(254,153,0,0.25),
+    -4px -4px 10px rgba(255,255,255,0.88);
+}
+
+/* Row type accent strip */
+.tiprow::before {
+  content: '';
+  position: absolute; left: 0; top: 12px; bottom: 12px;
+  width: 3px; border-radius: 0 3px 3px 0;
+  background: var(--accent); opacity: 0.6;
+}
+.vrow::before {
+  content: '';
+  position: absolute; left: 0; top: 12px; bottom: 12px;
+  width: 3px; border-radius: 0 3px 3px 0;
+  background: var(--danger); opacity: 0.55;
+}
+.retrow::before {
+  content: '';
+  position: absolute; left: 0; top: 12px; bottom: 12px;
+  width: 3px; border-radius: 0 3px 3px 0;
+  background: var(--warning); opacity: 0.6;
+}
+
+/* Remove button */
+.xbtn {
+  position: absolute; top: 10px; right: 10px;
+  background: var(--base);
+  border: none; border-radius: 8px;
+  box-shadow: var(--sh-flat);
+  color: var(--danger);
+  cursor: pointer;
+  font-size: 16px; line-height: 1;
+  width: 28px; height: 28px;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s;
+}
+.xbtn:hover { box-shadow: var(--sh-raise-sm); }
+.xbtn:active { box-shadow: var(--sh-inset-sm); }
+
+/* Empty state */
+.empty-row {
+  font-size: 11px; color: var(--text3);
+  padding: 8px 0; font-family: var(--mono);
+  text-align: center; letter-spacing: 0.04em;
+}
+
+/* ── BADGES ── */
+.badge {
+  display: inline-block; border-radius: 20px;
+  padding: 3px 10px; font-size: 10px; font-weight: 700;
+  font-family: var(--mono);
+  background: var(--base);
+  box-shadow: var(--sh-inset-sm);
+}
+.badge-pend { color: var(--warning); }
+.badge-ok   { color: var(--success); }
+.badge-rej  { color: var(--danger); }
+
+/* ── BUTTONS ── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: 6px; padding: 10px 18px;
+  border-radius: 12px; border: none;
+  background: var(--base);
+  color: var(--text);
+  font-size: 12px; font-weight: 700;
+  font-family: var(--font);
+  cursor: pointer;
+  box-shadow: var(--sh-raise-sm);
+  transition: all 0.15s;
+  letter-spacing: 0.02em;
+}
+.btn:hover { box-shadow: var(--sh-raise); transform: translateY(-1px); }
+.btn:active { box-shadow: var(--sh-inset-sm); transform: none; }
+
+.btn-primary {
+  background: var(--primary); color: #fff;
+  box-shadow:
+    4px 4px 12px rgba(0,102,102,0.35),
+    -2px -2px 6px rgba(255,255,255,0.5);
+}
+.btn-primary:hover {
+  box-shadow:
+    6px 6px 18px rgba(0,102,102,0.45),
+    -3px -3px 8px rgba(255,255,255,0.6);
+}
+.btn-primary:active { box-shadow: var(--sh-inset-sm); }
+
+.btn-sm {
+  padding: 5px 12px; font-size: 10px; border-radius: 8px;
+}
+.btn-danger { color: var(--danger); }
+.btn-warn   { color: var(--warning); }
+
+/* ── ENTRY HEADER ── */
+.entry-header {
+  background: var(--base);
+  border-radius: 20px;
+  box-shadow: var(--sh-raise-sm);
+  padding: 16px 20px;
+  margin-bottom: 18px;
+  display: flex; align-items: center; gap: 14px;
+}
+.entry-header-icon {
+  width: 46px; height: 46px;
+  border-radius: 14px;
+  background: var(--base);
+  box-shadow: var(--sh-inset-sm);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px; flex-shrink: 0;
+}
+.entry-header-name {
+  font-size: 16px; font-weight: 700;
+  color: var(--text);
+  font-family: var(--font);
+  letter-spacing: -0.3px;
+}
+.entry-header-meta {
+  font-size: 10px; color: var(--text3);
+  font-family: var(--mono);
+  margin-top: 3px; letter-spacing: 0.03em;
+}
+
+/* ── SECTION DIVIDERS ── */
+.sect-title {
+  font-size: 9px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.14em;
+  color: var(--text3);
+  font-family: var(--mono);
+  margin-bottom: 10px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.sect-title.tips-title { color: var(--accent); }
+.sect-title.void-title { color: var(--danger); }
+.sect-title.ret-title  { color: var(--warning); }
+
+/* ── SUCCESS SCREEN ── */
+.success-screen {
+  text-align: center;
+  padding: 56px 24px 40px;
+}
+.success-card {
+  background: var(--base);
+  border-radius: 28px;
+  box-shadow: var(--sh-raise-lg);
+  padding: 48px 32px;
+  display: inline-block; width: 100%;
+}
+.success-icon-wrap {
+  width: 84px; height: 84px;
+  border-radius: 24px;
+  background: var(--base);
+  box-shadow: var(--sh-raise);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 38px;
+  margin: 0 auto 24px;
+}
+.success-title {
+  font-size: 22px; font-weight: 700;
+  color: var(--success);
+  font-family: var(--font);
+  margin-bottom: 10px;
+  letter-spacing: -0.5px;
+}
+.success-msg {
+  font-size: 12px; color: var(--text2);
+  font-family: var(--mono);
+  line-height: 1.8; margin-bottom: 28px;
+}
+
+/* ── TOAST ── */
+#toast {
+  position: fixed; bottom: 24px; left: 50%;
+  transform: translateX(-50%);
+  background: var(--base);
+  border: none; border-radius: 14px;
+  padding: 12px 22px;
+  font-size: 13px; font-weight: 700;
+  font-family: var(--font);
+  z-index: 999; opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+  white-space: nowrap;
+  box-shadow: var(--sh-raise-lg);
+  color: var(--text);
+}
+#toast.show { opacity: 1; }
+#toast.success { border-left: 3px solid var(--success); }
+#toast.error   { border-left: 3px solid var(--danger); }
+#toast.warning { border-left: 3px solid var(--warning); }
+
+/* ── NM DIVIDER ── */
+.nm-div {
+  height: 1px;
+  background: rgba(0,0,0,0.06);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.8);
+  margin: 0 0 16px;
+}
+
+/* Spacer */
+.sp8  { height: 8px; }
+.sp12 { height: 12px; }
+
+/* Override inputs inside tiprow/vrow/retrow */
+.tiprow input, .tiprow select,
+.vrow input, .vrow select,
+.retrow input, .retrow select {
+  background: var(--base);
+  box-shadow: var(--sh-inset-sm);
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-size: 12px;
+}
+.tiprow .fg, .vrow .fg, .retrow .fg { margin-bottom: 8px; }
+
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="top">
+  <div>
+    <div class="top-brand">ALFA.CO</div>
+    <div class="top-sub">Server Drop Entry</div>
+  </div>
+  <div class="conn-dot" id="connDot"></div>
+</div>
+
+<!-- ══ LOGIN PAGE ══ -->
+<div class="page active" id="page-login">
+  <div class="login-wrap">
+    <div class="login-card">
+      <div class="login-icon">💰</div>
+      <div class="login-title">Server Drop</div>
+      <div class="login-sub">Enter your details to begin your drop</div>
+      <div class="login-divider"></div>
+
+      <div class="fg" id="branch-row">
+        <label>Branch</label>
+        <select id="branchSel">
+          <option value="">Loading branches…</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label>Your Name *</label>
+        <input type="text" id="loginName" placeholder="Full name" autocomplete="off">
+      </div>
+      <div class="fg">
+        <label>SAP Number</label>
+        <input type="text" id="loginSap" placeholder="SAP-XXXXXX" autocomplete="off">
+      </div>
+      <div class="fg">
+        <label>Report Date</label>
+        <input type="date" id="loginDate">
+      </div>
+      <div class="sp8"></div>
+      <button class="btn btn-primary" style="width:100%;font-size:13px;padding:14px" onclick="doLogin()">
+        Start Drop Entry →
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ DROP ENTRY PAGE ══ -->
+<div class="page" id="page-entry">
+  <div class="wrap">
+
+    <!-- Entry Header -->
+    <div class="entry-header">
+      <div class="entry-header-icon">💰</div>
+      <div>
+        <div class="entry-header-name" id="hdName">Server Drop</div>
+        <div class="entry-header-meta" id="hdMeta"></div>
+      </div>
+    </div>
+
+    <!-- Sales Totals -->
+    <div class="card">
+      <div class="card-title">
+        <span><span class="card-title-dot"></span>Sales Totals</span>
+      </div>
+
+      <div class="row2" style="margin-bottom:10px">
+        <div class="fg">
+          <label>Total Sales (SAR) *</label>
+          <input type="number" id="fTotal" step="0.01" placeholder="0.00" oninput="calcBal()">
+        </div>
+        <div class="fg">
+          <label>Cash Sales (SAR) *</label>
+          <input type="number" id="fCash" step="0.01" placeholder="0.00" oninput="calcBal()">
+        </div>
+      </div>
+
+      <div class="row3">
+        <div class="fg"><label>MADA</label><input type="number" id="fMada" step="0.01" placeholder="0.00" oninput="calcBal()"></div>
+        <div class="fg"><label>VISA</label><input type="number" id="fVisa" step="0.01" placeholder="0.00" oninput="calcBal()"></div>
+        <div class="fg"><label>Master Card</label><input type="number" id="fMc" step="0.01" placeholder="0.00" oninput="calcBal()"></div>
+        <div class="fg"><label>AMEX</label><input type="number" id="fAmex" step="0.01" placeholder="0.00" oninput="calcBal()"></div>
+        <div class="fg"><label>Qlub</label><input type="number" id="fQlub" step="0.01" placeholder="0.00" oninput="calcBal()"></div>
+        <div class="fg"><label>Loyalty Point</label><input type="number" id="fLoy" step="0.01" placeholder="0.00" oninput="calcBal()"></div>
+        <div class="fg"><label>Delivery Sales</label><input type="number" id="fDelivery" step="0.01" placeholder="0.00" oninput="calcBal()"></div>
+        <div class="fg"><label>VAT on Alfa</label><input type="number" id="fVatAlfa" step="0.01" placeholder="0.00" oninput="calcBal()"></div>
+      </div>
+
+      <!-- Balance Summary -->
+      <div class="bal-bar">
+        <div class="bal-item">
+          <div class="bal-label">Cash</div>
+          <div class="bal-value" id="balCash">0.00</div>
+        </div>
+        <div class="bal-item">
+          <div class="bal-label">Tips</div>
+          <div class="bal-value" id="balTips">0.00</div>
+        </div>
+        <div class="bal-item">
+          <div class="bal-label">Drop</div>
+          <div class="bal-value" id="balDrop">0.00</div>
+        </div>
+      </div>
+      <div class="bal-status-bar">
+        <span style="font-size:10px;letter-spacing:0.08em;text-transform:uppercase">Balance</span>
+        <span id="balStatus" style="color:var(--text3)">—</span>
+      </div>
+    </div>
+
+    <!-- Tips by Card -->
+    <div class="card">
+      <div class="card-title">
+        <span class="sect-title tips-title" style="margin:0">
+          <span>💳 Tips by Card</span>
+          <button class="btn btn-sm" onclick="addTip()">+ Tip</button>
+        </span>
+      </div>
+      <div id="tipsList">
+        <div class="empty-row">No tips added yet</div>
+      </div>
+    </div>
+
+    <!-- Voids -->
+    <div class="card">
+      <div class="card-title">
+        <span class="sect-title void-title" style="margin:0">
+          <span>⊗ Voids</span>
+          <button class="btn btn-sm btn-danger" onclick="addVoid()">+ Void</button>
+        </span>
+      </div>
+      <div id="voidsList">
+        <div class="empty-row">No voids added</div>
+      </div>
+    </div>
+
+    <!-- Returns -->
+    <div class="card">
+      <div class="card-title">
+        <span class="sect-title ret-title" style="margin:0">
+          <span>↩ Returns</span>
+          <button class="btn btn-sm btn-warn" onclick="addReturn()">+ Return</button>
+        </span>
+      </div>
+      <div id="returnsList">
+        <div class="empty-row">No returns added</div>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div style="display:flex;gap:10px;margin-top:4px">
+      <button class="btn" onclick="goLogin()">← Back</button>
+      <button class="btn btn-primary" style="flex:1;font-size:13px;padding:14px" onclick="submitDrop()">
+        ✓ Submit Drop
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══ SUCCESS PAGE ══ -->
+<div class="page" id="page-success">
+  <div class="wrap">
+    <div class="success-screen">
+      <div class="success-card">
+        <div class="success-icon-wrap">✅</div>
+        <div class="success-title">Drop Submitted!</div>
+        <div class="success-msg">
+          Your server drop has been sent<br>to the manager for review.
+        </div>
+        <button class="btn btn-primary" onclick="anotherDrop()">+ New Drop</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ══ FIREBASE ══
+var firebaseConfig={apiKey:"AIzaSyCF9vPi_b8SstBbLo1ANLwnOt3hXAHXosc",authDomain:"opshub-f802f.firebaseapp.com",databaseURL:"https://opshub-f802f-default-rtdb.asia-southeast1.firebasedatabase.app",projectId:"opshub-f802f",storageBucket:"opshub-f802f.appspot.com",messagingSenderId:"123456789",appId:"1:opshub-f802f:web:abcdef"};
+var db=null;
+try{
+  firebase.initializeApp(firebaseConfig);
+  db=firebase.database();
+  db.ref('.info/connected').on('value',function(s){
+    document.getElementById('connDot').className='conn-dot'+(s.val()?' online':'');
+  });
+}catch(e){console.warn('Firebase init failed:',e);}
+
+// ══ STATE ══
+var S={branchId:'',branchName:'',name:'',sap:'',date:'',tips:[],voids:[],returns:[]};
+var VR_REASONS=['Customer Complaint','Wrong Order','Burnt/Overcooked','Out of Stock','Manager Courtesy','Pricing Error','Other'];
+var CARD_METHODS=['MADA','VISA','Master Card','AMEX','Qlub'];
+
+function uid(){return Date.now()+''+Math.random().toString(36).substr(2,5);}
+function n(id){return parseFloat(document.getElementById(id)?.value)||0;}
+function xe(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+function toast(msg,type){
+  var t=document.getElementById('toast');
+  t.textContent=msg;
+  t.className='';
+  t.classList.add('show');
+  if(type) t.classList.add(type);
+  setTimeout(function(){t.className='';},2800);
+}
+
+function showPage(id){
+  document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});
+  document.getElementById('page-'+id).classList.add('active');
+  window.scrollTo(0,0);
+}
+
+// ══ INIT ══
+window.onload=function(){
+  var td=new Date();
+  S.date=td.getFullYear()+'-'+String(td.getMonth()+1).padStart(2,'0')+'-'+String(td.getDate()).padStart(2,'0');
+  document.getElementById('loginDate').value=S.date;
+  var urlBranch=new URLSearchParams(window.location.search).get('branch')||'';
+  loadBranches(urlBranch);
+  renderTips(); renderVoids(); renderReturns();
+};
+
+function loadBranches(preselect){
+  var sel=document.getElementById('branchSel');
+  if(!db){sel.innerHTML='<option value="">Firebase unavailable</option>';return;}
+  db.ref('admin/branches').once('value',function(snap){
+    var raw=snap.val()||{};
+    var branches=Object.values(raw).filter(Boolean).sort(function(a,b){return (a.name||'').localeCompare(b.name||'');});
+    sel.innerHTML='<option value="">— Select branch —</option>';
+    branches.forEach(function(b){
+      var opt=document.createElement('option');
+      opt.value=b.id;
+      opt.textContent=b.name+(b.location?' — '+b.location:'');
+      if(preselect&&b.id===preselect)opt.selected=true;
+      sel.appendChild(opt);
+    });
+    if(preselect&&sel.value){
+      var row=document.getElementById('branch-row');
+      if(row)row.style.display='none';
+    }
+  });
+}
+
+function doLogin(){
+  var branchId=document.getElementById('branchSel').value;
+  var name=document.getElementById('loginName').value.trim();
+  var sap=document.getElementById('loginSap').value.trim();
+  var date=document.getElementById('loginDate').value;
+  if(!branchId){toast('Select your branch','error');return;}
+  if(!name){toast('Enter your name','error');return;}
+  S.branchId=branchId; S.name=name; S.sap=sap; S.date=date;
+  var sel=document.getElementById('branchSel');
+  S.branchName=sel.options[sel.selectedIndex]?.text||branchId;
+  S.tips=[]; S.voids=[]; S.returns=[];
+  document.getElementById('hdName').textContent=name;
+  document.getElementById('hdMeta').textContent=S.branchName+' · '+date+(sap?' · '+sap:'');
+  ['fTotal','fCash','fMada','fVisa','fMc','fAmex','fQlub','fLoy','fDelivery','fVatAlfa'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+  renderTips(); renderVoids(); renderReturns(); calcBal();
+  showPage('entry');
+}
+
+function goLogin(){showPage('login');}
+
+// ══ CALC BALANCE ══
+function calcBal(){
+  var total=n('fTotal'),cash=n('fCash'),mada=n('fMada'),visa=n('fVisa'),mc=n('fMc'),amex=n('fAmex'),qlub=n('fQlub'),loy=n('fLoy'),delivery=n('fDelivery'),vatAlfa=n('fVatAlfa');
+  var cardTips=S.tips.reduce(function(a,t){return a+(parseFloat(t.amount)||0);},0);
+  var drop=cash-cardTips;
+  var sumPayments=cash+mada+visa+mc+amex+qlub+loy+delivery+vatAlfa;
+  var diff=total-sumPayments;
+  document.getElementById('balCash').textContent=cash.toFixed(2);
+  document.getElementById('balTips').textContent=cardTips.toFixed(2);
+  document.getElementById('balDrop').textContent=drop.toFixed(2);
+  var el=document.getElementById('balStatus');
+  if(total===0){el.textContent='—';el.style.color='var(--text3)';}
+  else if(Math.abs(diff)<0.01){el.textContent='✓ Balanced';el.style.color='var(--success)';}
+  else if(diff>0){el.textContent='Short SAR '+Math.abs(diff).toFixed(2);el.style.color='var(--danger)';}
+  else{el.textContent='Over SAR '+Math.abs(diff).toFixed(2);el.style.color='var(--warning)';}
+}
+
+// ══ TIPS ══
+function addTip(){S.tips.push({id:uid(),method:'MADA',amount:'',approval:'',guest:''});renderTips();}
+function rmTip(id){S.tips=S.tips.filter(function(t){return t.id!==id;});renderTips();calcBal();}
+function renderTips(){
+  var list=document.getElementById('tipsList');
+  if(!S.tips.length){list.innerHTML='<div class="empty-row">No tips added yet</div>';return;}
+  list.innerHTML='';
+  S.tips.forEach(function(t,i){
+    var opts=CARD_METHODS.map(function(m){return '<option'+(t.method===m?' selected':'')+'>'+m+'</option>';}).join('');
+    var el=document.createElement('div');el.className='tiprow';
+    el.style.position='relative';el.style.paddingLeft='20px';
+    el.innerHTML=
+      '<div class="row2 fg"><div><label>Card Method</label><select onchange="S.tips['+i+'].method=this.value">'+opts+'</select></div>'+
+      '<div><label>Amount SAR</label><input type="number" step="0.01" placeholder="0.00" value="'+(t.amount||'')+'" oninput="S.tips['+i+'].amount=this.value;calcBal()"></div></div>'+
+      '<div class="row2 fg"><div><label>Approval Code</label><input type="text" placeholder="123456" value="'+xe(t.approval||'')+'" oninput="S.tips['+i+'].approval=this.value"></div>'+
+      '<div><label>Guest #</label><input type="text" placeholder="Guest" value="'+xe(t.guest||'')+'" oninput="S.tips['+i+'].guest=this.value"></div></div>'+
+      '<button class="xbtn" onclick="rmTip(\''+t.id+'\')">×</button>';
+    list.appendChild(el);
+  });
+  calcBal();
+}
+
+// ══ VOIDS ══
+function addVoid(){S.voids.push({id:uid(),item:'',reason:'',check:'',manager:'',amount:''});renderVoids();}
+function rmVoid(id){S.voids=S.voids.filter(function(v){return v.id!==id;});renderVoids();}
+function renderVoids(){
+  var list=document.getElementById('voidsList');
+  if(!S.voids.length){list.innerHTML='<div class="empty-row">No voids added</div>';return;}
+  list.innerHTML='';
+  S.voids.forEach(function(v,i){
+    var rr=VR_REASONS.map(function(r){return '<option'+(v.reason===r?' selected':'')+'>'+r+'</option>';}).join('');
+    var el=document.createElement('div');el.className='vrow';el.style.position='relative';el.style.paddingLeft='20px';
+    el.innerHTML=
+      '<div class="row2 fg"><div><label>Item Name</label><input type="text" placeholder="Item" value="'+xe(v.item||'')+'" oninput="S.voids['+i+'].item=this.value"></div>'+
+      '<div><label>Reason</label><select onchange="S.voids['+i+'].reason=this.value"><option value="">Select</option>'+rr+'</select></div></div>'+
+      '<div class="row3 fg"><div><label>Check #</label><input type="text" placeholder="Check #" value="'+xe(v.check||'')+'" oninput="S.voids['+i+'].check=this.value"></div>'+
+      '<div><label>Mgr Approved</label><input type="text" placeholder="Name" value="'+xe(v.manager||'')+'" oninput="S.voids['+i+'].manager=this.value"></div>'+
+      '<div><label>Amount SAR</label><input type="number" step="0.01" placeholder="0.00" value="'+(v.amount||'')+'" oninput="S.voids['+i+'].amount=this.value"></div></div>'+
+      '<button class="xbtn" onclick="rmVoid(\''+v.id+'\')">×</button>';
+    list.appendChild(el);
+  });
+}
+
+// ══ RETURNS ══
+function addReturn(){S.returns.push({id:uid(),item:'',reason:'',check:'',manager:'',amount:''});renderReturns();}
+function rmReturn(id){S.returns=S.returns.filter(function(v){return v.id!==id;});renderReturns();}
+function renderReturns(){
+  var list=document.getElementById('returnsList');
+  if(!S.returns.length){list.innerHTML='<div class="empty-row">No returns added</div>';return;}
+  list.innerHTML='';
+  S.returns.forEach(function(v,i){
+    var rr=VR_REASONS.map(function(r){return '<option'+(v.reason===r?' selected':'')+'>'+r+'</option>';}).join('');
+    var el=document.createElement('div');el.className='retrow';el.style.position='relative';el.style.paddingLeft='20px';
+    el.innerHTML=
+      '<div class="row2 fg"><div><label>Item Name</label><input type="text" placeholder="Item" value="'+xe(v.item||'')+'" oninput="S.returns['+i+'].item=this.value"></div>'+
+      '<div><label>Reason</label><select onchange="S.returns['+i+'].reason=this.value"><option value="">Select</option>'+rr+'</select></div></div>'+
+      '<div class="row3 fg"><div><label>Check #</label><input type="text" placeholder="Check #" value="'+xe(v.check||'')+'" oninput="S.returns['+i+'].check=this.value"></div>'+
+      '<div><label>Mgr Approved</label><input type="text" placeholder="Name" value="'+xe(v.manager||'')+'" oninput="S.returns['+i+'].manager=this.value"></div>'+
+      '<div><label>Amount SAR</label><input type="number" step="0.01" placeholder="0.00" value="'+(v.amount||'')+'" oninput="S.returns['+i+'].amount=this.value"></div></div>'+
+      '<button class="xbtn" onclick="rmReturn(\''+v.id+'\')">×</button>';
+    list.appendChild(el);
+  });
+}
+
+// ══ SUBMIT ══
+function submitDrop(){
+  if(!S.name){toast('Please log in first','error');return;}
+  var total=n('fTotal'),cash=n('fCash');
+  if(!total&&!cash){toast('Enter at least your total or cash sales','error');return;}
+  if(!db){toast('Not connected to server','error');return;}
+  var drop={
+    id:uid(),name:S.name,sap:S.sap,date:S.date,
+    totalSales:document.getElementById('fTotal').value||'0',
+    cashSales:document.getElementById('fCash').value||'0',
+    madaSales:document.getElementById('fMada').value||'',
+    visaSales:document.getElementById('fVisa').value||'',
+    mcSales:document.getElementById('fMc').value||'',
+    amexSales:document.getElementById('fAmex').value||'',
+    qlubSales:document.getElementById('fQlub').value||'',
+    loyaltySales:document.getElementById('fLoy').value||'',
+    deliverySales:document.getElementById('fDelivery').value||'',
+    vatAlfaSales:document.getElementById('fVatAlfa').value||'',
+    tips:S.tips.map(function(t){return Object.assign({},t,{status:'pending'});}),
+    voids:S.voids.map(function(v){return Object.assign({},v,{status:'pending'});}),
+    returns:S.returns.map(function(v){return Object.assign({},v,{status:'pending'});}),
+    submittedAt:Date.now()
+  };
+  var btn=document.querySelector('#page-entry .btn-primary:last-of-type');
+  if(btn){btn.disabled=true;btn.textContent='Submitting…';}
+  var path='branches/'+S.branchId+'/dsr/'+S.date+'/server_drops/'+drop.id;
+  db.ref(path).set(drop,function(err){
+    if(btn){btn.disabled=false;btn.textContent='✓ Submit Drop';}
+    if(err){toast('Submit failed: '+err.message,'error');return;}
+    db.ref('branches/'+S.branchId+'/dsr/'+S.date+'/pending_drops/'+drop.id).set({id:drop.id,name:drop.name,submittedAt:drop.submittedAt,status:'pending'});
+    showPage('success');
+    toast('Drop submitted ✓','success');
+  });
+}
+
+function anotherDrop(){
+  S.tips=[];S.voids=[];S.returns=[];
+  ['fTotal','fCash','fMada','fVisa','fMc','fAmex','fQlub','fLoy','fDelivery','fVatAlfa'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+  renderTips();renderVoids();renderReturns();calcBal();
+  showPage('entry');
+}
+</script>
+<script>
+/* NEXUS SVG ICONS — Modern Outline 1.6px stroke · currentColor */
+var NX_SVG={
+  '👑': '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 18h18M5 18l-1-9 4.5 4L12 5l3.5 8L20 9l-1 9H5z"/><circle cx="12" cy="4.2" r="1.1" fill="currentColor" stroke="none"/><circle cx="5" cy="9" r="1.1" fill="currentColor" stroke="none"/><circle cx="19" cy="9" r="1.1" fill="currentColor" stroke="none"/></svg>',
+  '🎯': '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5.5"/><circle cx="12" cy="12" r="2"/></svg>',
+  '👤': '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.5"/><path d="M4 20c0-4.418 3.582-7 8-7s8 2.582 8 7"/></svg>',
+  '👥': '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M2 20c0-3.5 3.134-6 7-6M16 8a4 4 0 0 1 4 4"/><circle cx="16" cy="7" r="3"/><path d="M22 20c0-3.5-3.134-6-7-6M9 20c0-3.5 3.134-6 7-6"/></svg>',
+  '📋': '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 3a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2"/><path d="M8 11h8M8 15h6"/></svg>',
+  '📝': '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H6a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-5"/><path d="M8 10h7M8 14h4"/><path d="M17.5 3.5a2 2 0 0 1 2.8 2.8L13 13l-4 1 1-4 7.5-6.5z"/></svg>',
+  '✅': '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 12l3 3 5-5"/></svg>',
+  '⚠️': '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><circle cx="12" cy="17" r="0.8" fill="currentColor" stroke="none"/></svg>',
+  '💰': '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="13" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><circle cx="12" cy="13.5" r="2.5"/></svg>',
+  '💳': '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="15" x2="9" y2="15"/><line x1="12" y1="15" x2="16" y2="15"/></svg>',
+  '🧾': '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 2h16v20l-2-1.5-2 1.5-2-1.5-2 1.5-2-1.5-2 1.5-2-1.5V2z"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>',
+  '📱': '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="2"/><circle cx="12" cy="18" r="1" fill="currentColor" stroke="none"/><line x1="9" y1="6" x2="15" y2="6"/></svg>',
+  '🏪': '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l1-5h16l1 5"/><rect x="3" y="9" width="18" height="12" rx="1"/><path d="M9 21V14a3 3 0 0 1 6 0v7"/><line x1="3" y1="9" x2="21" y2="9"/></svg>',
+  '🏃': '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="15" cy="4" r="1.8"/><path d="M7 17l2.5-5L13 14l2-4"/><path d="M9 12L7 17M15 10l2.5 5"/><path d="M7 22l2-3M17 22l-2-3"/></svg>',
+  '🏖️': '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M17 8c0 4-5 9-5 9S7 12 7 8a5 5 0 0 1 10 0z"/><circle cx="12" cy="8" r="2"/><line x1="2" y1="20" x2="22" y2="20"/></svg>',
+  '🍽️': '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v6c0 1.9.98 3.5 2.5 4.47V22h3V12.47A5 5 0 0 0 11 7V2"/><line x1="7" y1="2" x2="7" y2="7"/><path d="M18 2c0 0 3 2.5 3 7s-3 7-3 7v6h-3V2h3z"/></svg>',
+  '📅': '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg>',
+  '📤': '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>',
+  '⏱️': '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><polyline points="12 9 12 13 15 15"/><path d="M9 2h6M12 2v3"/></svg>',
+  '📴': '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="2"/><line x1="6" y1="2" x2="18" y2="22"/></svg>',
+  '🤒': '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="7"/><path d="M12 10v3M12 16h.01"/><path d="M8 3.5C9.3 2.5 10.6 2 12 2s2.7.5 4 1.5"/></svg>',
+  '☕': '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M17 8h1a4 4 0 0 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V8z"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/><line x1="14" y1="2" x2="14" y2="4"/></svg>',
+  '🗓️': '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><rect x="7" y="13" width="3" height="3" rx="0.5"/></svg>',
+};
+function renderIcon(e,sz){sz=sz||18;var n=e&&e.replace(/\uFE0F/g,'');var s=NX_SVG[e]||NX_SVG[n];if(!s)return '<span style="font-size:'+(sz*.9)+'px;line-height:1">'+e+'</span>';return s.replace(/width="20"/g,'width="'+sz+'"').replace(/height="20"/g,'height="'+sz+'"');}
+function patchIcons(){
+  document.querySelectorAll('.role-icon,.bs-icon,.kpi-icon,.hdr-logo,.header-logo,.load-icon,.entry-header-icon,.loading-icon,.load-card .load-icon,.bs-card-logo').forEach(function(el){
+    var t=el.textContent.trim(),n=t.replace(/\uFE0F/g,'');
+    var s=NX_SVG[t]||NX_SVG[n];
+    if(s){el.innerHTML=s.replace(/width="20"/g,'width="24"').replace(/height="20"/g,'height="24"');el.style.cssText+='display:flex;align-items:center;justify-content:center';}
+  });
+  document.querySelectorAll('.lt-btn-emoji').forEach(function(el){
+    var t=el.textContent.trim(),n=t.replace(/\uFE0F/g,'');
+    var s=NX_SVG[t]||NX_SVG[n];
+    if(s){el.innerHTML=s.replace(/width="20"/g,'width="22"').replace(/height="20"/g,'height="22"');el.style.cssText='display:flex;align-items:center;justify-content:center;margin-bottom:4px';}
+  });
+  document.querySelectorAll('.hdr-icon,.header-branch-icon,[id*="hdr-logo"],[id*="header-branch-icon"],[id*="header-logo"]').forEach(function(el){
+    var t=el.textContent.trim(),n=t.replace(/\uFE0F/g,'');
+    var s=NX_SVG[t]||NX_SVG[n];
+    if(s){el.innerHTML=s.replace(/width="20"/g,'width="20"').replace(/height="20"/g,'height="20"');el.style.cssText+='display:flex;align-items:center;justify-content:center';}
+  });
+  document.querySelectorAll('.break-btn>span:first-child,.date-bar .ico,.hdr-logo-wrap,.success-icon-wrap,.success-icon,.pin-back-btn>.ico').forEach(function(el){
+    var t=el.textContent.trim(),n=t.replace(/\uFE0F/g,'');
+    var s=NX_SVG[t]||NX_SVG[n];
+    if(s){el.innerHTML=s.replace(/width="20"/g,'width="24"').replace(/height="20"/g,'height="24"');el.style.cssText+='display:flex;align-items:center;justify-content:center';}
+  });
+}
+document.addEventListener('DOMContentLoaded',function(){setTimeout(patchIcons,200);setTimeout(patchIcons,800);});
+setTimeout(patchIcons,500);
+</script>
+</body>
+</html>
