@@ -256,7 +256,7 @@ tbody tr:hover td{background:rgba(0,0,0,.015)}
       </div>
       <div><div class="l-title">OpsHub</div><div class="l-sub">Restaurant Ops</div></div>
     </div>
-    <div class="l-card" id="l-card"><div class="l-step-title">Loading...</div></div>
+    <div class="l-card" id="l-card"><div style="text-align:center;padding:20px;color:var(--text3);font-size:11px">Loading…</div></div>
   </div>
 </div>
 
@@ -373,11 +373,11 @@ function ic(name,sz){return(ICO[name]||ICO.file).replace(/\{s\}/g,String(sz||14)
 var NAV={
   super_admin:[
     {s:'OVERVIEW',i:[{p:'exec-dash',ic:'dashboard',l:'Dashboard'},{p:'rev-analytics',ic:'chart',l:'Revenue'},{p:'headcount',ic:'users',l:'Headcount'},{p:'alerts-center',ic:'bell',l:'Alerts'}]},
-    {s:'SYSTEM',i:[{p:'brand-mgmt',ic:'building',l:'Brands'},{p:'access-ctrl',ic:'lock',l:'Access'},{p:'audit-log',ic:'file',l:'Audit Log'}]}
+    {s:'SYSTEM',i:[{p:'brand-mgmt',ic:'building',l:'Branches'},{p:'access-ctrl',ic:'users',l:'Users & Roles'},{p:'audit-log',ic:'file',l:'Audit Log'}]}
   ],
   ceo:[
     {s:'OVERVIEW',i:[{p:'exec-dash',ic:'dashboard',l:'Dashboard'},{p:'rev-analytics',ic:'chart',l:'Revenue'},{p:'headcount',ic:'users',l:'Headcount'},{p:'food-cost',ic:'leaf',l:'Food Cost'},{p:'alerts-center',ic:'bell',l:'Alerts'}]},
-    {s:'MANAGE',i:[{p:'brand-mgmt',ic:'building',l:'Brands'},{p:'access-ctrl',ic:'lock',l:'Access'}]}
+    {s:'MANAGE',i:[{p:'brand-mgmt',ic:'building',l:'Branches'},{p:'access-ctrl',ic:'users',l:'Users & Roles'}]}
   ],
   brand_dir:[{s:'BRAND',i:[{p:'branch-dash',ic:'dashboard',l:'Dashboard'},{p:'brand-branches',ic:'store',l:'My Branches'},{p:'rev-analytics',ic:'chart',l:'Sales'},{p:'food-cost',ic:'leaf',l:'Food Cost'}]}],
   regional:[{s:'REGION',i:[{p:'branch-dash',ic:'dashboard',l:'Dashboard'},{p:'brand-branches',ic:'store',l:'My Branches'},{p:'rev-analytics',ic:'chart',l:'Sales'},{p:'headcount',ic:'users',l:'Staff'}]}],
@@ -402,12 +402,12 @@ var PT={
   'bm-assets':'Assets','bm-transfers':'Transfers','bm-announcements':'Announcements',
   'bm-briefing':'Briefing','bm-music':'Music Player','training':'Training','qr-checkin':'Check-In',
   'exec-dash':'Executive Dashboard','rev-analytics':'Revenue Analytics','headcount':'Headcount',
-  'food-cost':'Food Cost','alerts-center':'Alerts','brand-mgmt':'Brand Management',
-  'access-ctrl':'Access Control','audit-log':'Audit Log','brand-branches':'My Branches',
+  'food-cost':'Food Cost','alerts-center':'Alerts','brand-mgmt':'Branch Management',
+  'access-ctrl':'Users & Roles','audit-log':'Audit Log','brand-branches':'My Branches',
   'hrf-dash':'HR Dashboard','hrf-employees':'Employees','hrf-attendance':'Attendance',
   'hrf-leave':'Leave','hrf-health':'Health Cards','hrf-payroll':'Payroll','hrf-approvals':'Approvals',
   'fin-dash':'Finance Dashboard','hrf-pnl':'P&L Statement','hrf-invoices':'Invoices','fin-report':'Financial Report',
-  'low-stock':'Low Stock',
+  'low-stock':'Low Stock','pin-setup':'Staff PINs',
 };
 
 /* ═══ STARTUP ═══ */
@@ -427,10 +427,33 @@ function bootApp(){
   renderSidebar();updateHeader();loadAlerts();loadPrayers();navTo(defaultPage());
 }
 function loadBranches(cb){
+  // 1. Try admin/branches
   db.ref('admin/branches').once('value',function(s){
-    NX.branches={};
-    Object.values(s.val()||{}).filter(Boolean).forEach(function(b){if(b.id)NX.branches[b.id]=b;});
-    if(cb)cb();
+    var raw=s.val()||{};
+    var list=Object.values(raw).filter(function(b){return b&&b.id;});
+    if(list.length){
+      NX.branches={};
+      list.forEach(function(b){NX.branches[b.id]=b;});
+      if(cb)cb();return;
+    }
+    // 2. Try branches/ root (existing Firebase data)
+    db.ref('branches').once('value',function(bs){
+      NX.branches={};
+      var branchRaw=bs.val()||{};
+      Object.keys(branchRaw).forEach(function(id){
+        if(id&&branchRaw[id]&&typeof branchRaw[id]==='object'){
+          NX.branches[id]={
+            id:id,
+            name:branchRaw[id].branchName||branchRaw[id].name||id,
+            brand:branchRaw[id].brand||'',
+            location:branchRaw[id].location||'',
+            icon:branchRaw[id].icon||'🍽️',
+            companyId:branchRaw[id].companyId||'default'
+          };
+        }
+      });
+      if(cb)cb();
+    });
   });
 }
 
@@ -439,6 +462,27 @@ var _ls={branchId:null,branchName:null,role:null,pin:'',companyId:null};
 
 function renderStep0(){
   var card=document.getElementById('l-card');
+  // If no branches yet — show first-time setup
+  if(!Object.keys(NX.branches).length){
+    card.innerHTML=
+      '<div style="text-align:center;margin-bottom:18px">'+
+        '<div style="font-size:28px;margin-bottom:8px">👋</div>'+
+        '<div style="font-size:13px;font-weight:700;color:var(--text)">Welcome to OpsHub</div>'+
+        '<div style="font-size:11px;color:var(--text3);margin-top:4px">No branches yet — set up your first one</div>'+
+      '</div>'+
+      '<div class="fg"><label class="fl">Company / Brand Name *</label><input class="fi" id="setup-company" placeholder="e.g. ALFA Restaurant Group"></div>'+
+      '<div class="fg"><label class="fl">Branch Name *</label><input class="fi" id="setup-branch" placeholder="e.g. Hybrid Café — Riyadh"></div>'+
+      '<div class="fg"><label class="fl">Branch ID *</label><input class="fi" id="setup-id" placeholder="e.g. hybrid-riyadh (no spaces)"></div>'+
+      '<div class="fg2">'+
+        '<div class="fg"><label class="fl">Location</label><input class="fi" id="setup-loc" placeholder="City or Area"></div>'+
+        '<div class="fg"><label class="fl">Icon (emoji)</label><input class="fi" id="setup-icon" placeholder="🍽️" style="text-align:center"></div>'+
+      '</div>'+
+      '<div class="fg"><label class="fl">Your Name (Super Admin) *</label><input class="fi" id="setup-name" placeholder="Your full name"></div>'+
+      '<div class="fg"><label class="fl">Admin PIN (4 digits) *</label><input class="fi" id="setup-pin" type="password" maxlength="4" placeholder="••••"></div>'+
+      '<button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:4px" onclick="runFirstSetup()">Create & Launch →</button>';
+    return;
+  }
+  // Normal flow — role select
   card.innerHTML='<div class="l-step-title">Select your role</div>'+
     '<div class="role-grid">'+
     ROLES.map(function(r){
@@ -448,6 +492,54 @@ function renderStep0(){
       '</div>';
     }).join('')+
   '</div>';
+}
+
+/* ── FIRST TIME SETUP ── */
+function runFirstSetup(){
+  var company=(document.getElementById('setup-company').value||'').trim();
+  var branchName=(document.getElementById('setup-branch').value||'').trim();
+  var branchId=(document.getElementById('setup-id').value||'').trim().toLowerCase().replace(/[^a-z0-9-]/g,'');
+  var location=(document.getElementById('setup-loc').value||'').trim();
+  var icon=(document.getElementById('setup-icon').value||'🍽️').trim();
+  var adminName=(document.getElementById('setup-name').value||'').trim();
+  var adminPin=(document.getElementById('setup-pin').value||'').trim();
+
+  if(!company||!branchName||!branchId||!adminName||adminPin.length!==4){
+    var card=document.getElementById('l-card');
+    var err=card.querySelector('.setup-err');
+    if(!err){err=document.createElement('div');err.className='setup-err';err.style='color:var(--danger);font-size:10px;text-align:center;margin-bottom:8px;';card.insertBefore(err,card.querySelector('button'));}
+    err.textContent='Please fill all fields. PIN must be exactly 4 digits.';
+    return;
+  }
+
+  var companyId=company.toLowerCase().replace(/[^a-z0-9]/g,'')||'company1';
+  var btn=document.querySelector('.btn-primary');
+  if(btn){btn.textContent='Setting up…';btn.disabled=true;}
+
+  var writes={};
+  // Company
+  writes['admin/companies/'+companyId]={id:companyId,name:company,planId:'enterprise',status:'active',createdAt:Date.now()};
+  // Plan
+  writes['admin/plans/enterprise']={id:'enterprise',name:'Enterprise',modules:['all'],price:0};
+  // Branch
+  writes['admin/branches/'+branchId]={id:branchId,name:branchName,companyId:companyId,brand:company,location:location,icon:icon||'🍽️',createdAt:Date.now()};
+  // Also create the branch data path
+  writes['branches/'+branchId+'/meta']={name:branchName,companyId:companyId,brand:company,location:location,createdAt:Date.now()};
+  // Admin user
+  writes['admin/users/admin_'+companyId]={id:'admin_'+companyId,name:adminName,role:'super_admin',pin:adminPin,companyId:companyId,branchIds:[],createdAt:Date.now()};
+  // Branch manager user (same person for now)
+  writes['admin/users/bm_'+branchId]={id:'bm_'+branchId,name:adminName,role:'branch_mgr',pin:adminPin,companyId:companyId,branchIds:[branchId],createdAt:Date.now()};
+
+  db.ref().update(writes,function(err){
+    if(err){
+      var b=document.querySelector('.btn-primary');
+      if(b){b.textContent='Create & Launch →';b.disabled=false;}
+      alert('Setup failed: '+err.message);return;
+    }
+    // Reload branches and proceed
+    NX.branches[branchId]={id:branchId,name:branchName,brand:company,location:location,icon:icon,companyId:companyId};
+    renderStep0();
+  });
 }
 
 var ROLES=[
@@ -483,13 +575,13 @@ function lShowBranches(){
     (branches.length?
       '<div class="branch-list">'+
       branches.map(function(b){
-        return '<button class="branch-btn" onclick="lBranch(''+b.id+'',''+he(b.name)+'',''+he(b.companyId||'alfaco')+'')">'+
+        return '<button class="branch-btn" onclick="lBranch(''+b.id+'',''+he(b.name)+'',''+he(b.companyId||'default')+'')">'+
           '<div class="b-icon">'+(b.icon||'🍽️')+'</div>'+
           '<div><div class="b-name">'+he(b.name)+'</div><div class="b-loc">'+he(b.brand||b.location||b.id)+'</div></div>'+
         '</button>';
       }).join('')+
       '</div>'
-    :'<div style="text-align:center;padding:20px;color:var(--text3);font-size:11px">No branches found. Contact your administrator.</div>')+
+    :'<div style="text-align:center;padding:16px;color:var(--text3);font-size:11px">No branches yet</div>')+
     '<div class="l-back" onclick="renderStep0()">← Back to roles</div>';
 }
 
@@ -518,28 +610,60 @@ function pDots(){for(var i=0;i<4;i++){var e=document.getElementById('pd'+i);if(e
 function pErr(msg){var e=document.getElementById('perr');if(e)e.textContent=msg;_ls.pin='';pDots();setTimeout(function(){if(e)e.textContent='';},2200);}
 
 function checkPIN(){
-  var freeRoles=['super_admin','ceo','hr_manager','finance_dir'];
-  db.ref('admin/users').orderByChild('role').equalTo(_ls.role).once('value',function(snap){
+  var freeRoles=['super_admin','ceo','hr_manager','finance_dir','brand_dir','regional'];
+  var bid=_ls.branchId;
+  var role=_ls.role;
+  var pin=_ls.pin;
+
+  // Step 1: check admin/users (works after migration)
+  db.ref('admin/users').orderByChild('role').equalTo(role).once('value',function(snap){
     var found=null;
     snap.forEach(function(c){
       var u=c.val();
-      if(!u||u.pin!==_ls.pin)return;
-      var branchOk=freeRoles.indexOf(_ls.role)>=0||!u.branchIds||!u.branchIds.length||u.branchIds.indexOf(_ls.branchId)>=0;
+      if(!u||u.pin!==pin)return;
+      var branchOk=freeRoles.indexOf(role)>=0||!u.branchIds||!u.branchIds.length||u.branchIds.indexOf(bid)>=0;
       if(branchOk)found=u;
     });
     if(found){
-      NX.session={
-        userId:found.id,name:found.name,role:_ls.role,pin:_ls.pin,
-        branchId:_ls.branchId,branchName:_ls.branchName,
-        companyId:found.companyId||_ls.companyId||'alfaco',
-        allowedModules:null
-      };
-      sessionStorage.setItem('nx_session',JSON.stringify(NX.session));
-      bootApp();
+      doSession(found.id,found.name);
+      return;
+    }
+    // Step 2: fallback — check branches/{bid}/staff directly (works before migration)
+    if(bid){
+      db.ref('branches/'+bid+'/staff').once('value',function(ss){
+        var raw=ss.val();var staffFound=null;
+        if(raw){
+          var list=Array.isArray(raw)?raw:Object.values(raw);
+          list.filter(Boolean).forEach(function(s){
+            if(String(s.pin||s.staffPin||'')===pin)staffFound=s;
+          });
+        }
+        if(staffFound){
+          doSession(staffFound.id||staffFound.staffId||pin,staffFound.name||'Staff');
+        } else {
+          // Step 3: check hrf/ for HR/Finance managers
+          db.ref('hrf/employees').orderByChild('pin').equalTo(pin).limitToFirst(1).once('value',function(hs){
+            var hFound=null;hs.forEach(function(c){hFound=c.val();});
+            if(hFound){doSession(hFound.id||pin,hFound.name||role);}
+            else{pErr('Invalid PIN — try again');}
+          });
+        }
+      });
     } else {
       pErr('Invalid PIN — try again');
     }
   });
+
+  function doSession(uid,name){
+    NX.session={
+      userId:uid,name:name,role:role,pin:pin,
+      branchId:bid,branchName:_ls.branchName,
+      companyId:_ls.companyId||'alfaco',
+      allowedModules:null
+    };
+    sessionStorage.setItem('nx_session',JSON.stringify(NX.session));
+    bootApp();
+  }
 }
 
 function doLogout(){
@@ -2211,6 +2335,230 @@ function renderPrayerWidget(){
   '</div>';
 }
 
+
+/* ═══ BRANCH MANAGEMENT (in-app) ═══ */
+function rBranchMgmt(){
+  var c=document.getElementById('content');
+  db.ref('admin/branches').once('value',function(snap){
+    var branches=[];snap.forEach(function(ch){var v=ch.val();if(v)branches.push(v);});
+    c.innerHTML=
+      '<div class="sec-hdr mb-12">'+
+        '<div class="sec-title">Branches</div>'+
+        '<button class="btn btn-primary btn-sm" onclick="openAddBranch()">+ Add Branch</button>'+
+      '</div>'+
+      '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px">'+
+      (branches.length?branches.map(function(b){
+        return '<div class="card">'+
+          '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">'+
+            '<div style="font-size:24px">'+he(b.icon||'🍽️')+'</div>'+
+            '<div>'+
+              '<div style="font-weight:700;font-size:12px">'+he(b.name||b.id)+'</div>'+
+              '<div class="muted">'+he(b.brand||b.companyId||'')+'</div>'+
+              '<div class="muted">'+he(b.location||'')+'</div>'+
+            '</div>'+
+          '</div>'+
+          '<div style="display:flex;gap:6px">'+
+            '<button class="btn btn-xs" onclick="editBranch(\''+b.id+'\')">Edit</button>'+
+            '<button class="btn btn-xs btn-primary" onclick="switchBranch(\''+b.id+'\',\''+he(b.name)+'\')">Switch</button>'+
+          '</div>'+
+        '</div>';
+      }).join(''):'<div style="color:var(--text3);font-size:11px;text-align:center;padding:24px">No branches yet</div>')+
+      '</div>';
+  });
+}
+
+function openAddBranch(){
+  openModal(
+    '<div class="modal-head"><div class="modal-title">Add New Branch</div><button class="modal-x" onclick="closeModal()">✕</button></div>'+
+    '<div class="fg"><label class="fl">Branch Name *</label><input class="fi" id="ab-name" placeholder="e.g. Piatto — Jeddah"></div>'+
+    '<div class="fg"><label class="fl">Branch ID * <span style="color:var(--text3)">(unique, no spaces)</span></label><input class="fi" id="ab-id" placeholder="e.g. piatto-jeddah"></div>'+
+    '<div class="fg2">'+
+      '<div class="fg"><label class="fl">Brand</label><input class="fi" id="ab-brand" placeholder="e.g. Piatto"></div>'+
+      '<div class="fg"><label class="fl">Location</label><input class="fi" id="ab-loc" placeholder="City / Area"></div>'+
+    '</div>'+
+    '<div class="fg2">'+
+      '<div class="fg"><label class="fl">Icon (emoji)</label><input class="fi" id="ab-icon" placeholder="🍕" style="text-align:center"></div>'+
+      '<div class="fg"><label class="fl">Manager Name</label><input class="fi" id="ab-mgr" placeholder="Branch Manager"></div>'+
+    '</div>'+
+    '<div class="fg"><label class="fl">Manager PIN (4 digits)</label><input class="fi" id="ab-pin" type="password" maxlength="4" placeholder="••••"></div>'+
+    '<div class="flex-g" style="justify-content:flex-end;margin-top:6px">'+
+    '<button class="btn" onclick="closeModal()">Cancel</button>'+
+    '<button class="btn btn-primary" onclick="saveNewBranch()">Create Branch</button></div>'
+  );
+}
+
+function saveNewBranch(){
+  var name=(document.getElementById('ab-name').value||'').trim();
+  var id=(document.getElementById('ab-id').value||'').trim().toLowerCase().replace(/[^a-z0-9-]/g,'');
+  var brand=(document.getElementById('ab-brand').value||'').trim();
+  var loc=(document.getElementById('ab-loc').value||'').trim();
+  var icon=(document.getElementById('ab-icon').value||'🍽️').trim();
+  var mgr=(document.getElementById('ab-mgr').value||'').trim();
+  var pin=(document.getElementById('ab-pin').value||'').trim();
+
+  if(!name||!id){toast('Branch name and ID are required','e');return;}
+  var companyId=NX.session&&NX.session.companyId||'default';
+
+  var writes={};
+  writes['admin/branches/'+id]={id,name,brand,location:loc,icon:icon||'🍽️',companyId,createdAt:Date.now()};
+  writes['branches/'+id+'/meta']={name,brand,location:loc,companyId,createdAt:Date.now()};
+  if(mgr&&pin.length===4){
+    writes['admin/users/bm_'+id]={id:'bm_'+id,name:mgr,role:'branch_mgr',pin,companyId,branchIds:[id],createdAt:Date.now()};
+  }
+
+  db.ref().update(writes,function(err){
+    if(err){toast('Failed: '+err.message,'e');return;}
+    NX.branches[id]={id,name,brand,location:loc,icon:icon||'🍽️',companyId};
+    toast('Branch "'+name+'" created','s');
+    closeModal();rBranchMgmt();
+  });
+}
+
+function editBranch(id){
+  db.ref('admin/branches/'+id).once('value',function(snap){
+    var b=snap.val();if(!b){toast('Branch not found','e');return;}
+    openModal(
+      '<div class="modal-head"><div class="modal-title">Edit Branch</div><button class="modal-x" onclick="closeModal()">✕</button></div>'+
+      '<div class="fg"><label class="fl">Branch Name</label><input class="fi" id="eb-name" value="'+he(b.name||'')+'"></div>'+
+      '<div class="fg2">'+
+        '<div class="fg"><label class="fl">Brand</label><input class="fi" id="eb-brand" value="'+he(b.brand||'')+'"></div>'+
+        '<div class="fg"><label class="fl">Location</label><input class="fi" id="eb-loc" value="'+he(b.location||'')+'"></div>'+
+      '</div>'+
+      '<div class="fg"><label class="fl">Icon</label><input class="fi" id="eb-icon" value="'+he(b.icon||'🍽️')+'" style="text-align:center"></div>'+
+      '<div class="flex-g" style="justify-content:flex-end;margin-top:6px">'+
+      '<button class="btn btn-danger btn-sm" onclick="deleteBranch(\''+id+'\')">Delete</button>'+
+      '<div style="flex:1"></div>'+
+      '<button class="btn" onclick="closeModal()">Cancel</button>'+
+      '<button class="btn btn-primary" onclick="updateBranch(\''+id+'\')">Save</button></div>'
+    );
+  });
+}
+
+function updateBranch(id){
+  var updates={
+    name:document.getElementById('eb-name').value.trim(),
+    brand:document.getElementById('eb-brand').value.trim(),
+    location:document.getElementById('eb-loc').value.trim(),
+    icon:document.getElementById('eb-icon').value.trim()||'🍽️'
+  };
+  db.ref('admin/branches/'+id).update(updates,function(err){
+    if(err){toast('Failed','e');return;}
+    if(NX.branches[id])Object.assign(NX.branches[id],updates);
+    toast('Branch updated','s');closeModal();rBranchMgmt();
+  });
+}
+
+function deleteBranch(id){
+  if(!confirm('Delete branch "'+id+'"? This removes it from the app but does NOT delete its Firebase data.'))return;
+  db.ref('admin/branches/'+id).remove(function(){
+    delete NX.branches[id];
+    toast('Branch removed','s');closeModal();rBranchMgmt();
+  });
+}
+
+/* ═══ USER / ROLE MANAGEMENT ═══ */
+function rUserMgmt(){
+  var c=document.getElementById('content');
+  db.ref('admin/users').once('value',function(snap){
+    var users=[];snap.forEach(function(ch){var v=ch.val();if(v)users.push(Object.assign({_k:ch.key},v));});
+    c.innerHTML=
+      '<div class="sec-hdr mb-12">'+
+        '<div class="sec-title">Users & Roles</div>'+
+        '<button class="btn btn-primary btn-sm" onclick="openAddUser()">+ Add User</button>'+
+      '</div>'+
+      '<div class="tbl"><table><thead><tr><th>Name</th><th>Role</th><th>Branches</th><th>PIN</th><th></th></tr></thead><tbody>'+
+      (users.length?users.map(function(u){
+        var rl=ROLE_LABELS[u.role]||u.role;
+        var branches=u.branchIds&&u.branchIds.length?u.branchIds.join(', '):'All';
+        return '<tr>'+
+          '<td style="font-weight:700">'+he(u.name||'')+'</td>'+
+          '<td><span class="badge bb">'+he(rl)+'</span></td>'+
+          '<td class="muted">'+he(branches)+'</td>'+
+          '<td class="td-mono">'+('•'.repeat((u.pin||'').length))+'</td>'+
+          '<td><div class="flex-g">'+
+            '<button class="btn btn-xs" onclick="editUser(\''+u._k+'\')">Edit</button>'+
+            '<button class="btn btn-xs" style="color:var(--danger)" onclick="deleteUser(\''+u._k+'\')">Del</button>'+
+          '</div></td></tr>';
+      }).join(''):'<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--text3)">No users yet</td></tr>')+
+      '</tbody></table></div>';
+  });
+}
+
+function openAddUser(){
+  var branchOpts=Object.values(NX.branches).map(function(b){
+    return '<option value="'+b.id+'">'+he(b.name)+'</option>';
+  }).join('');
+  openModal(
+    '<div class="modal-head"><div class="modal-title">Add User</div><button class="modal-x" onclick="closeModal()">✕</button></div>'+
+    '<div class="fg"><label class="fl">Full Name *</label><input class="fi" id="au-name" placeholder="Employee name"></div>'+
+    '<div class="fg2">'+
+      '<div class="fg"><label class="fl">Role *</label><select class="fs" id="au-role">'+
+        Object.entries(ROLE_LABELS).map(function(e){return '<option value="'+e[0]+'">'+e[1]+'</option>';}).join('')+
+      '</select></div>'+
+      '<div class="fg"><label class="fl">PIN (4 digits) *</label><input class="fi" id="au-pin" type="password" maxlength="4" placeholder="••••"></div>'+
+    '</div>'+
+    '<div class="fg"><label class="fl">Branch Access <span style="color:var(--text3)">(hold Ctrl to multi-select)</span></label>'+
+      '<select class="fs" id="au-branches" multiple style="height:80px">'+
+        '<option value="">All Branches</option>'+branchOpts+
+      '</select>'+
+    '</div>'+
+    '<div class="flex-g" style="justify-content:flex-end;margin-top:6px">'+
+    '<button class="btn" onclick="closeModal()">Cancel</button>'+
+    '<button class="btn btn-primary" onclick="saveNewUser()">Add User</button></div>'
+  );
+}
+
+function saveNewUser(){
+  var name=(document.getElementById('au-name').value||'').trim();
+  var role=document.getElementById('au-role').value;
+  var pin=(document.getElementById('au-pin').value||'').trim();
+  var sel=document.getElementById('au-branches');
+  var branchIds=Array.from(sel.selectedOptions).map(function(o){return o.value;}).filter(Boolean);
+
+  if(!name||!role||pin.length!==4){toast('Name, role and 4-digit PIN required','e');return;}
+  var companyId=NX.session&&NX.session.companyId||'default';
+  var uid='user_'+Date.now();
+  db.ref('admin/users/'+uid).set({id:uid,name,role,pin,companyId,branchIds,createdAt:Date.now()},function(err){
+    if(err){toast('Failed: '+err.message,'e');return;}
+    toast(name+' added','s');closeModal();rUserMgmt();
+  });
+}
+
+function editUser(key){
+  db.ref('admin/users/'+key).once('value',function(snap){
+    var u=snap.val();if(!u)return;
+    openModal(
+      '<div class="modal-head"><div class="modal-title">Edit User</div><button class="modal-x" onclick="closeModal()">✕</button></div>'+
+      '<div class="fg"><label class="fl">Name</label><input class="fi" id="eu-name" value="'+he(u.name||'')+'"></div>'+
+      '<div class="fg2">'+
+        '<div class="fg"><label class="fl">Role</label><select class="fs" id="eu-role">'+
+          Object.entries(ROLE_LABELS).map(function(e){return '<option value="'+e[0]+'"'+(e[0]===u.role?' selected':'')+'>'+e[1]+'</option>';}).join('')+
+        '</select></div>'+
+        '<div class="fg"><label class="fl">New PIN (4 digits)</label><input class="fi" id="eu-pin" type="password" maxlength="4" placeholder="Leave blank to keep"></div>'+
+      '</div>'+
+      '<div class="flex-g" style="justify-content:flex-end;margin-top:6px">'+
+      '<button class="btn btn-danger btn-sm" onclick="deleteUser(\''+key+'\')">Delete</button>'+
+      '<div style="flex:1"></div>'+
+      '<button class="btn" onclick="closeModal()">Cancel</button>'+
+      '<button class="btn btn-primary" onclick="updateUser(\''+key+'\')">Save</button></div>'
+    );
+  });
+}
+
+function updateUser(key){
+  var updates={name:document.getElementById('eu-name').value.trim(),role:document.getElementById('eu-role').value};
+  var pin=document.getElementById('eu-pin').value.trim();
+  if(pin.length===4)updates.pin=pin;
+  db.ref('admin/users/'+key).update(updates,function(err){
+    if(err){toast('Failed','e');return;}
+    toast('User updated','s');closeModal();rUserMgmt();
+  });
+}
+
+function deleteUser(key){
+  if(!confirm('Delete this user?'))return;
+  db.ref('admin/users/'+key).remove(function(){toast('User deleted','w');closeModal();rUserMgmt();});
+}
 /* ═══ PAGES MAP ═══ */
 var PAGES={
   'branch-dash':rDash,'sales':rSales,'dsr':rDSR,'petty-cash':rPC,
@@ -2220,8 +2568,8 @@ var PAGES={
   'bm-assets':rAssets,'bm-briefing':rBriefing,'bm-ot':rOT,
   'bm-music':rMusic,'training':rTrainingPage,'qr-checkin':rCheckin,
   'exec-dash':rExec,'rev-analytics':rRev,'headcount':rHeadcount,
-  'food-cost':rFoodCost,'alerts-center':rAlerts,'brand-mgmt':rAdmin,
-  'access-ctrl':rAdmin,'audit-log':rAudit,'brand-branches':rBranches,
+  'food-cost':rFoodCost,'alerts-center':rAlerts,'brand-mgmt':rBranchMgmt,
+  'access-ctrl':rUserMgmt,'audit-log':rAudit,'brand-branches':rBranches,
   'region-branches':rBranches,'low-stock':rLowStock,
   'hrf-dash':rHRDash,'hrf-employees':rStaff,'hrf-attendance':rTimesheet,
   'hrf-leave':rLeave,'hrf-health':rHealth,'hrf-payroll':rPayrollPage,
