@@ -479,7 +479,10 @@ textarea.fi{resize:vertical;min-height:80px}
                 <button class="ltb" onclick="selLeave(this,'dayoff')"><div class="li">☀️</div><span class="ll">Day Off</span><span class="ld">Shift swap</span></button>
                 <button class="ltb" onclick="selLeave(this,'unpaid')"><div class="li">📋</div><span class="ll">Unpaid</span><span class="ld">Manager ok</span></button>
                 <button class="ltb" onclick="selLeave(this,'training')"><div class="li">📚</div><span class="ll">Training</span><span class="ld">Course leave</span></button>
+                <button class="ltb" onclick="selLeave(this,'ot')"><div class="li">⏱️</div><span class="ll">OT Request</span><span class="ld">Overtime claim</span></button>
               </div></div>
+            <!-- Standard leave date fields -->
+            <div id="lv-date-block">
             <div class="g2">
               <div class="fg"><label class="fl">From Date</label><input class="fi" type="date" id="lv-from"></div>
               <div class="fg"><label class="fl">To Date</label><input class="fi" type="date" id="lv-to"></div>
@@ -487,6 +490,18 @@ textarea.fi{resize:vertical;min-height:80px}
             <div class="fg"><label class="fl">Reason (optional)</label><textarea class="fi" id="lv-reason" rows="3" placeholder="Brief reason…"></textarea></div>
             <div id="lv-daycount" style="font-size:12px;color:var(--primary);font-family:var(--mono);margin-bottom:14px;text-align:center;font-weight:700"></div>
             <button class="btnp" onclick="submitLeave()">Submit Leave Request</button>
+            </div>
+            <!-- OT Request fields (shown only when OT type selected) -->
+            <div id="lv-ot-block" style="display:none">
+            <div class="fg"><label class="fl">OT Date</label><input class="fi" type="date" id="lv-ot-date"></div>
+            <div class="g2">
+              <div class="fg"><label class="fl">Hours</label><input class="fi" type="number" id="lv-ot-hours" min="0" max="12" step="1" placeholder="0"></div>
+              <div class="fg"><label class="fl">Minutes</label><input class="fi" type="number" id="lv-ot-mins" min="0" max="59" step="5" placeholder="0"></div>
+            </div>
+            <div class="fg"><label class="fl">Note (optional)</label><textarea class="fi" id="lv-ot-note" rows="2" placeholder="e.g. stayed for event setup…"></textarea></div>
+            <div id="lv-ot-preview" style="font-size:12px;color:#b45309;font-family:var(--mono);margin-bottom:14px;text-align:center;font-weight:700"></div>
+            <button class="btnp" style="background:linear-gradient(135deg,#b45309,#92400e)" onclick="submitOtManual()">Submit OT Request</button>
+            </div>
           </div>
           <div class="card"><div class="ctitle"><div class="cdot"></div>Leave History</div>
             <div class="tw"><table><thead><tr><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Status</th></tr></thead><tbody id="lv-history"></tbody></table></div>
@@ -1981,6 +1996,22 @@ function loadIncidents() {
 function selLeave(btn, type) {
   document.querySelectorAll('.ltb').forEach(function(b) { b.classList.remove('selected'); });
   btn.classList.add('selected'); leaveType = type;
+  var isOt = type === 'ot';
+  var dateBlock = document.getElementById('lv-date-block');
+  var otBlock = document.getElementById('lv-ot-block');
+  if (dateBlock) dateBlock.style.display = isOt ? 'none' : '';
+  if (otBlock) otBlock.style.display = isOt ? '' : 'none';
+  if (isOt) {
+    // Pre-fill today's date for OT
+    var todEl = document.getElementById('lv-ot-date');
+    if (todEl && !todEl.value) todEl.value = todayKey();
+    // Live preview
+    ['lv-ot-hours','lv-ot-mins'].forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) el.addEventListener('input', updateOtPreview);
+    });
+    updateOtPreview();
+  }
 }
 function renderLeave() {
   var u = CU; if (!u) return;
@@ -2169,8 +2200,7 @@ function checkRetroOT(){
       arr[ri].scheduledShift=_ciScheduledShift.label||'';
       db.ref('branches/'+u.branchId+'/tsAtt/'+attKey+'/'+mo).set(arr,function(err){
         if(!err){
-          console.log('[OT] tsAtt updated with retroOT', retroOT);
-          submitOtRequest(retroOT);
+          console.log('[OT] tsAtt saved (retro), manual OT request required by staff);
         }
       });
     }
@@ -2583,7 +2613,7 @@ function doPortalCheckOut() {
     ciWriteRecord(_ciLog, ci, t, 'present', totalBrkMins, _ciBreakLogs, workedMins, _otMins, _ciScheduledShift?_ciScheduledShift.label:'');
     updateCIButtons(); renderCILog(); updateCIBadge(); updateSummaryCard();
     var _otMsg=_otMins>0?' · OT +'+Math.floor(_otMins/60)+'h'+(_otMins%60?_otMins%60+'m':''):'';
-    if(_otMins>0) submitOtRequest(_otMins);
+    // OT auto-submit removed — staff submits manually via Leave page
     showToast('Checked out at ' + t + ' · Worked ' + minsToHHMM(workedMins) + _otMsg + ' 👋', 'success');
       ciSendNotification('out', t, loc);
     });
@@ -3635,6 +3665,64 @@ function requestDocRenewal(docName, expiry, docNumber){
 // ══════════════════════════════════════════════════════
 // OVERTIME REQUEST (Staff Portal — from check-in)
 // ══════════════════════════════════════════════════════
+function updateOtPreview(){
+  var h=parseInt(document.getElementById('lv-ot-hours').value)||0;
+  var m=parseInt(document.getElementById('lv-ot-mins').value)||0;
+  var tot=h*60+m;
+  var el=document.getElementById('lv-ot-preview');
+  if(!el)return;
+  el.textContent=tot>0?'⏱ '+h+'h '+(m?m+'m ':'')+' OT requested':'Enter hours and/or minutes above';
+}
+function submitOtManual(){
+  var u=CU;
+  if(!u||!u.branchId){showToast('Not logged in','error');return;}
+  var dt=document.getElementById('lv-ot-date').value;
+  var h=parseInt(document.getElementById('lv-ot-hours').value)||0;
+  var m=parseInt(document.getElementById('lv-ot-mins').value)||0;
+  var note=(document.getElementById('lv-ot-note').value||'').trim();
+  if(!dt){showToast('Please select a date','error');return;}
+  var tot=h*60+m;
+  if(tot<=0){showToast('Enter at least 1 minute of OT','error');return;}
+  // Deduplicate check
+  db.ref('branches/'+u.branchId+'/otRequests').limitToLast(100).once('value',function(snap){
+    var ex=snap.val()||{};
+    var staffKey=u.staffId||u.sap||'';
+    var exists=Object.values(ex).some(function(r){
+      return r&&r.date===dt&&String(r.staffId||r.sap||'')===String(staffKey)&&
+        (r.status==='pending'||r.status==='approved');
+    });
+    if(exists){showToast('An OT request already exists for this date','error');return;}
+    var otLabel=h+'h'+(m?m+'m':'');
+    var rec={
+      staffName:u.name||'Staff',
+      staffId:staffKey,
+      sap:u.sap||'',
+      date:dt,
+      otMins:tot,
+      scheduledShift:'',
+      ci:'',co:'',
+      status:'pending',
+      note:note||'Manual OT request',
+      ts:Date.now()
+    };
+    db.ref('branches/'+u.branchId+'/otRequests').push(rec,function(err){
+      if(err){showToast('Error submitting OT request','error');return;}
+      // Notify BM
+      db.ref('branches/'+u.branchId+'/notifications').push({
+        type:'ot_request',staffName:u.name||'Staff',sap:u.sap||'',
+        body:'OT +'+otLabel+' for '+dt+' (manual request)',
+        time:new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}),
+        ts:Date.now()
+      });
+      showToast('OT request submitted ✓','success');
+      // Reset fields
+      document.getElementById('lv-ot-hours').value='';
+      document.getElementById('lv-ot-mins').value='';
+      document.getElementById('lv-ot-note').value='';
+      document.getElementById('lv-ot-preview').textContent='';
+    });
+  });
+}
 function submitOtRequest(otMins){
   var u=CU;
   if(!u||!u.branchId||!otMins||otMins<=0) return;
