@@ -11256,7 +11256,7 @@ function parseAndFillHealthCard(text,id){
   html+='<div class="bfg"><label class="form-label">Training Expiry — Gregorian</label><input class="form-input" type="date" id="hpdf-train" value="'+bxe(trainExp)+'"></div></div>';
   if(hijriDates.length){html+='<div style="font-size:11px;color:var(--text-tertiary);margin-top:8px;padding:8px;background:var(--surface-2);border-radius:6px;font-family:var(--mono)">Hijri dates: '+hijriDates.map(function(d){return d.y+'/'+String(d.mo).padStart(2,'0')+'/'+String(d.d).padStart(2,'0');}).join(' · ')+'</div>';}
   if(!cardNo&&!gregDates.length){html+='<div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:6px;padding:10px;font-size:12px;color:#92400e;margin-top:8px">⚠️ No dates or card number detected. Please fill manually.</div>';}
-  html+='<button class="btn btn-primary" style="width:100%;margin-top:12px" onclick="confirmHealthPdfImport(''+id+'')">Apply to Health Card</button>';
+  html+='<button class="btn btn-primary" style="width:100%;margin-top:12px" onclick="confirmHealthPdfImport(\''+id+'\')">Apply to Health Card</button>';
   openModal(html);
 }
 function confirmHealthPdfImport(id){
@@ -13253,8 +13253,8 @@ function pBmOtApprovals() {
   h += '<button class="btn btn-primary" style="white-space:nowrap" onclick="bmOtManualAdd()">✓ Add & Approve</button>';
   h += '</div></div>';
   h += '<div style="display:flex;gap:0;margin-bottom:16px;border-radius:10px;overflow:hidden;border:1px solid var(--border);background:var(--surface)">';
-  h += '<button id="ot-tab-pending" onclick="bmOtSwitchTab('pending')" style="flex:1;padding:10px;border:none;font-size:12px;font-weight:700;cursor:pointer;background:var(--primary);color:#fff;border-radius:0">⏳ Pending Requests <span id="nb-bm-ot-pending" style="display:none;background:rgba(255,255,255,0.3);border-radius:8px;padding:1px 7px;margin-left:4px;font-size:11px"></span></button>';
-  h += '<button id="ot-tab-approved" onclick="bmOtSwitchTab('approved')" style="flex:1;padding:10px;border:none;font-size:12px;font-weight:700;cursor:pointer;background:var(--surface-2);color:var(--text-secondary);border-radius:0">✅ Approved OT — Timesheet Record</button>';
+  h += '<button id="ot-tab-pending" onclick="bmOtSwitchTab(\'pending\')" style="flex:1;padding:10px;border:none;font-size:12px;font-weight:700;cursor:pointer;background:var(--primary);color:#fff;border-radius:0">⏳ Pending Requests <span id="nb-bm-ot-pending" style="display:none;background:rgba(255,255,255,0.3);border-radius:8px;padding:1px 7px;margin-left:4px;font-size:11px"></span></button>';
+  h += '<button id="ot-tab-approved" onclick="bmOtSwitchTab(\'approved\')" style="flex:1;padding:10px;border:none;font-size:12px;font-weight:700;cursor:pointer;background:var(--surface-2);color:var(--text-secondary);border-radius:0">✅ Approved OT — Timesheet Record</button>';
   h += '</div>';
   h += '<div id="bm-ot-list"><div style="text-align:center;padding:40px;color:var(--text-tertiary)">Loading…</div></div>';
   h += '<div id="bm-ot-approved-list" style="display:none"><div style="text-align:center;padding:40px;color:var(--text-tertiary)">Loading…</div></div>';
