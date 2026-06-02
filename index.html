@@ -3184,6 +3184,7 @@ body { font-size: 13px !important; color: var(--text-primary) !important; }
 }
 
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 </head>
 <body>
 <!-- ═══════════════════════════════════════════════
@@ -10902,6 +10903,10 @@ function pHealthCards(){
       '<td><div style="display:flex;gap:4px">'+
         '<button class="btn btn-sm" onclick="openBranchHealthModal(\''+bxe(h2.id)+'\')">Edit</button>'+
         '<button class="btn btn-sm" style="color:var(--danger)" onclick="delBranchHealth(\''+bxe(h2.id)+'\')">Del</button>'+
+        '<button class="btn btn-sm" style="background:var(--primary);color:#fff;display:flex;align-items:center;gap:4px" onclick="triggerHealthPdfImport(\''+bxe(h2.id)+'\')">'+
+          '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>PDF'+
+        '</button>'+
+        '<input type="file" id="hpdf-'+bxe(h2.id)+'" accept=".pdf" style="display:none" onchange="handleHealthPdfImport(this,\''+bxe(h2.id)+'\')">'+
       '</div></td></tr>';
   }).join('');
   var h='<div class="page-header"><h1>Health Cards</h1></div>';
@@ -11187,6 +11192,106 @@ function convHijriToGreg(){
   var gStr=g.y+'-'+String(g.m).padStart(2,'0')+'-'+String(g.d).padStart(2,'0');
   var el=document.getElementById('conv-greg');if(el)el.value=gStr;
   document.getElementById('conv-result').textContent='✓ '+hy+'/'+hm+'/'+hd+' Hijri = '+gStr+' Gregorian';
+}
+function triggerHealthPdfImport(id){
+  var el=document.getElementById('hpdf-'+id);
+  if(el){el.value='';el.click();}
+}
+function handleHealthPdfImport(input,id){
+  var file=input.files[0];
+  if(!file)return;
+  if(!window.pdfjsLib){showToast('PDF.js not loaded','error');return;}
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var typedArray=new Uint8Array(e.target.result);
+    window.pdfjsLib.getDocument({data:typedArray}).promise.then(function(pdf){
+      var textPromises=[];
+      for(var i=1;i<=pdf.numPages;i++){
+        textPromises.push(pdf.getPage(i).then(function(page){
+          return page.getTextContent().then(function(tc){
+            return tc.items.map(function(it){return it.str;}).join(' ');
+          });
+        }));
+      }
+      return Promise.all(textPromises);
+    }).then(function(pages){
+      var text=pages.join(' ');
+      parseAndFillHealthCard(text,id);
+    }).catch(function(err){
+      showToast('Could not read PDF: '+err.message,'error');
+    });
+  };
+  reader.readAsArrayBuffer(file);
+}
+function parseAndFillHealthCard(text,id){
+  // Extract card number (رقم الشهادة الصحية) - typically a long number
+  var cardNo='';
+  // Pattern: look for 12+ digit number sequences (Balady card numbers are typically 12 digits)
+  var cardMatch=text.match(/\b(\d{10,15})\b/g);
+  if(cardMatch&&cardMatch.length){
+    // Prefer numbers that look like card numbers (around 12 digits) and not ID numbers (10 digits)
+    var candidates=cardMatch.filter(function(n){return n.length>=11;});
+    if(candidates.length)cardNo=candidates[0];
+    else cardNo=cardMatch[cardMatch.length-1];
+  }
+  // Extract dates in Hijri format YYYY/MM/DD or YYYY-MM-DD with year > 1400
+  var hijriDates=[];
+  var datePattern=/\b(1[4-5]\d{2})[\/-](\d{1,2})[\/-](\d{1,2})\b/g;
+  var m;
+  while((m=datePattern.exec(text))!==null){
+    hijriDates.push({y:parseInt(m[1]),mo:parseInt(m[2]),d:parseInt(m[3])});
+  }
+  // Convert all found Hijri dates to Gregorian
+  var gregDates=hijriDates.map(function(hd){
+    var g=hijriToGregorian(hd.y,hd.mo,hd.d);
+    return g.y+'-'+String(g.m).padStart(2,'0')+'-'+String(g.d).padStart(2,'0');
+  });
+  // medExp = first/earlier date found (card expiry), trainExp = second/later date
+  var medExp='',trainExp='';
+  if(gregDates.length>=2){
+    // Sort ascending
+    gregDates.sort();
+    medExp=gregDates[0];
+    trainExp=gregDates[1];
+  } else if(gregDates.length===1){
+    medExp=gregDates[0];
+  }
+  // Find the health card record and open the edit modal pre-filled
+  var hc=BS.health.find(function(x){return x.id===id;});
+  if(!hc){showToast('Health card not found','error');return;}
+  // Build a preview modal showing what was found and confirm
+  var html='<div class="modal-head"><h2 style="display:flex;align-items:center;gap:8px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>PDF Import — '+bxe(hc.name)+'</h2><button class="modal-close" onclick="closeModalForce()">✕</button></div>';
+  html+='<div style="font-size:12px;color:var(--text-secondary);margin-bottom:14px">Values extracted from PDF. Review and confirm before saving.</div>';
+  html+='<div class="bfg"><label class="form-label">Card Number (رقم الشهادة)</label><input class="form-input bmono" id="hpdf-card" value="'+bxe(cardNo)+'" placeholder="Not detected"></div>';
+  html+='<div class="form-row">';
+  html+='<div class="bfg"><label class="form-label">Medical Expiry — Gregorian</label><input class="form-input" type="date" id="hpdf-med" value="'+bxe(medExp)+'"></div>';
+  html+='<div class="bfg"><label class="form-label">Training Expiry — Gregorian</label><input class="form-input" type="date" id="hpdf-train" value="'+bxe(trainExp)+'"></div>';
+  html+='</div>';
+  if(hijriDates.length){
+    html+='<div style="font-size:11px;color:var(--text-tertiary);margin-top:8px;padding:8px;background:var(--surface-2);border-radius:6px;font-family:var(--mono)">';
+    html+='Hijri dates found: '+hijriDates.map(function(d){return d.y+'/'+String(d.mo).padStart(2,'0')+'/'+String(d.d).padStart(2,'0');}).join(' &nbsp;·&nbsp; ');
+    html+='</div>';
+  }
+  if(!cardNo&&!gregDates.length){
+    html+='<div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:6px;padding:10px;font-size:12px;color:#92400e;margin-top:8px">⚠️ No dates or card number detected. Please fill manually.</div>';
+  }
+  html+='<button class="btn btn-primary" style="width:100%;margin-top:12px" onclick="confirmHealthPdfImport(\''+id+'\')">Apply to Health Card</button>';
+  openModal(html);
+}
+function confirmHealthPdfImport(id){
+  var card=(document.getElementById('hpdf-card')||{}).value||'';
+  var med=(document.getElementById('hpdf-med')||{}).value||'';
+  var train=(document.getElementById('hpdf-train')||{}).value||'';
+  var i=BS.health.findIndex(function(x){return x.id===id;});
+  if(i<0){showToast('Record not found','error');return;}
+  if(card)BS.health[i].cardNo=card;
+  if(med)BS.health[i].medExp=med;
+  if(train)BS.health[i].trainExp=train;
+  bSaveColl('health',BS.health);
+  closeModalForce();
+  showToast('Health card updated from PDF','success');
+  navTo('health-cards');
 }
 function convGregToHijri(){
   var val=(document.getElementById('conv-greg')||{}).value||'';
