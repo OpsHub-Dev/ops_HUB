@@ -10814,8 +10814,8 @@ function runBranchTsReport(){var eid=bgv('bts-r-emp'),mo=parseInt(bgv('bts-r-mo'
   // ── ALL STAFF: Day-by-day matrix for the month ──
   if(mo===0){
     // Year view stays as summary
-    var allRows='';BS.tsEmps.slice().sort(function(a,b){return a.name.localeCompare(b.name);}).forEach(function(emp){var recs=getRecs(emp.id),cnt=countSt(recs),tot=recs.length,worked=cnt.present+cnt.late,pct=tot?Math.round(worked/tot*100)+'%':'\u2014';allRows+='<tr><td><div style="display:flex;align-items:center;gap:8px"><div class="bav">'+bini(emp.name)+'</div><div><div style="font-size:12px;font-weight:600">'+bxe(emp.name)+'</div><div style="font-size:10px;color:'+bdc(emp.dept||'FOH')+'">'+bxe(emp.dept||'')+'</div></div></div></td><td class="bmono" style="text-align:center">'+tot+'</td><td class="bmono" style="text-align:center;color:#00875a;font-weight:700">'+cnt.present+'</td><td class="bmono" style="text-align:center;color:#b45309;font-weight:700">'+cnt.late+'</td><td class="bmono" style="text-align:center;color:#c0392b;font-weight:700">'+cnt.absent+'</td><td class="bmono" style="text-align:center;color:#b45309;font-weight:700">'+cnt.sick+'</td><td class="bmono" style="text-align:center;color:#5b21b6;font-weight:700">'+cnt.holiday+'</td><td class="bmono" style="text-align:center;color:#b45309;font-weight:700">'+cnt.dayoff+'</td><td class="bmono" style="text-align:center">'+pct+'</td></tr>';});
-    out.innerHTML='<div class="btw"><div class="btw-s"><table class="btbl"><thead><tr><th>Employee</th><th style="text-align:center">Total</th><th style="text-align:center;color:#00875a">P</th><th style="text-align:center;color:#b45309">L</th><th style="text-align:center;color:#c0392b">A</th><th style="text-align:center;color:#b45309">S</th><th style="text-align:center;color:#5b21b6">H</th><th style="text-align:center;color:#b45309">O</th><th style="text-align:center">Rate</th></tr></thead><tbody>'+(allRows||'<tr><td colspan="9" style="text-align:center;color:var(--text-tertiary);padding:20px">No records</td></tr>')+'</tbody></table></div></div>';
+    var allRows='';BS.tsEmps.slice().sort(function(a,b){return a.name.localeCompare(b.name);}).forEach(function(emp){var recs=getRecs(emp.id),cnt=countSt(recs),tot=recs.length,worked=cnt.present+cnt.late,pct=tot?Math.round(worked/tot*100)+'%':'\u2014';var empOtMins=getRecs(emp.id).reduce(function(s,r){return s+(r.otApproved&&r.overtimeMins?r.overtimeMins:0);},0);var empOtLabel=empOtMins>0?(Math.floor(empOtMins/60)+'h'+(empOtMins%60?empOtMins%60+'m':'')):'—';allRows+='<tr><td><div style="display:flex;align-items:center;gap:8px"><div class="bav">'+bini(emp.name)+'</div><div><div style="font-size:12px;font-weight:600">'+bxe(emp.name)+'</div><div style="font-size:10px;color:'+bdc(emp.dept||'FOH')+'">'+bxe(emp.dept||'')+'</div></div></div></td><td class="bmono" style="text-align:center">'+tot+'</td><td class="bmono" style="text-align:center;color:#00875a;font-weight:700">'+cnt.present+'</td><td class="bmono" style="text-align:center;color:#b45309;font-weight:700">'+cnt.late+'</td><td class="bmono" style="text-align:center;color:#c0392b;font-weight:700">'+cnt.absent+'</td><td class="bmono" style="text-align:center;color:#b45309;font-weight:700">'+cnt.sick+'</td><td class="bmono" style="text-align:center;color:#5b21b6;font-weight:700">'+cnt.holiday+'</td><td class="bmono" style="text-align:center;color:#b45309;font-weight:700">'+cnt.dayoff+'</td><td class="bmono" style="text-align:center">'+pct+'</td><td class="bmono" style="text-align:center;color:#b45309;font-weight:700;background:#fef3c720">'+empOtLabel+'</td></tr>';});
+    out.innerHTML='<div class="btw"><div class="btw-s"><table class="btbl"><thead><tr><th>Employee</th><th style="text-align:center">Total</th><th style="text-align:center;color:#00875a">P</th><th style="text-align:center;color:#b45309">L</th><th style="text-align:center;color:#c0392b">A</th><th style="text-align:center;color:#b45309">S</th><th style="text-align:center;color:#5b21b6">H</th><th style="text-align:center;color:#b45309">O</th><th style="text-align:center">Rate</th><th style="text-align:center;color:#b45309;background:#fef3c730">OT Hours</th></tr></thead><tbody>'+(allRows||'<tr><td colspan="10" style="text-align:center;color:var(--text-tertiary);padding:20px">No records</td></tr>')+'</tbody></table></div></div>';
     return;
   }
   // Month view: show 1..N daily grid + summary
@@ -10834,9 +10834,10 @@ function runBranchTsReport(){var eid=bgv('bts-r-emp'),mo=parseInt(bgv('bts-r-mo'
   var matrixRows='';
   BS.tsEmps.slice().sort(function(a,b){return a.name.localeCompare(b.name);}).forEach(function(emp){
     var recs=(BS.tsAtt[emp.id]&&BS.tsAtt[emp.id][ymKey])||[];
-    var dayMap={};
-    recs.forEach(function(r){if(r.date){var dd=r.date.slice(-2);dayMap[dd]=r.st;}});
+    var dayMap={};var otMap={};
+    recs.forEach(function(r){if(r.date){var dd=r.date.slice(-2);dayMap[dd]=r.st;if(r.otApproved&&r.overtimeMins)otMap[dd]=(r.overtimeMins||0);}});
     var cnt=countSt(recs);
+    var totalOtMins=recs.reduce(function(s,r){return s+(r.otApproved&&r.overtimeMins?r.overtimeMins:0);},0);
     var dayCells='';
     for(var dj=1;dj<=daysInMo;dj++){
       var dStr=String(dj<10?'0'+dj:dj);
@@ -10848,14 +10849,15 @@ function runBranchTsReport(){var eid=bgv('bts-r-emp'),mo=parseInt(bgv('bts-r-mo'
         dayCells+='<td style="text-align:center;color:var(--text-tertiary);font-size:10px">\u2014</td>';
       }
     }
-    matrixRows+='<tr><td style="position:sticky;left:0;background:var(--surface-1);z-index:1;min-width:160px"><div style="display:flex;align-items:center;gap:8px"><div class="bav">'+bini(emp.name)+'</div><div><div style="font-size:11px;font-weight:600">'+bxe(emp.name)+'</div><div style="font-size:9px;color:'+bdc(emp.dept||'FOH')+'">'+bxe(emp.dept||'')+'</div></div></div></td>'+dayCells+'<td style="text-align:center;font-family:var(--mono);color:#b45309;font-weight:700;background:var(--surface-1)">'+cnt.present+'</td><td style="text-align:center;font-family:var(--mono);color:#b45309">'+cnt.late+'</td><td style="text-align:center;font-family:var(--mono);color:#c0392b">'+cnt.absent+'</td></tr>';
+    var otLabel=totalOtMins>0?(Math.floor(totalOtMins/60)+'h'+(totalOtMins%60?totalOtMins%60+'m':'')):'—';
+    matrixRows+='<tr><td style="position:sticky;left:0;background:var(--surface-1);z-index:1;min-width:160px"><div style="display:flex;align-items:center;gap:8px"><div class="bav">'+bini(emp.name)+'</div><div><div style="font-size:11px;font-weight:600">'+bxe(emp.name)+'</div><div style="font-size:9px;color:'+bdc(emp.dept||'FOH')+'">'+bxe(emp.dept||'')+'</div></div></div></td>'+dayCells+'<td style="text-align:center;font-family:var(--mono);color:#b45309;font-weight:700;background:var(--surface-1)">'+cnt.present+'</td><td style="text-align:center;font-family:var(--mono);color:#b45309">'+cnt.late+'</td><td style="text-align:center;font-family:var(--mono);color:#c0392b">'+cnt.absent+'</td><td style="text-align:center;font-family:var(--mono);color:#b45309;font-weight:700;background:var(--surface-1)">'+(totalOtMins>0?'<span style="background:#fef3c7;color:#b45309;border-radius:4px;padding:1px 5px;font-size:10px">'+otLabel+'</span>':'—')+'</td></tr>';
   });
   // Legend
   var legend='<div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:14px;font-size:11px;color:var(--text-secondary)">'+
     Object.keys(SC).map(function(k){return '<div style="display:flex;align-items:center;gap:6px"><span style="display:inline-block;width:18px;height:18px;line-height:18px;text-align:center;border-radius:4px;background:'+SC[k]+'25;color:'+SC[k]+';font-size:10px;font-weight:700">'+SLAB[k]+'</span> '+k.charAt(0).toUpperCase()+k.slice(1)+'</div>';}).join('')+'</div>';
-  out.innerHTML=legend+'<div class="btw" style="overflow-x:auto"><table class="btbl" style="font-size:11px"><thead><tr><th style="position:sticky;left:0;background:var(--surface-2);z-index:2;min-width:160px">Employee</th>'+dayHdrs+'<th style="text-align:center;background:var(--surface-2);color:#b45309">P</th><th style="text-align:center;background:var(--surface-2);color:#b45309">L</th><th style="text-align:center;background:var(--surface-2);color:#c0392b">A</th></tr></thead><tbody>'+(matrixRows||'<tr><td colspan="'+(daysInMo+4)+'" style="text-align:center;color:var(--text-tertiary);padding:20px">No staff or no records</td></tr>')+'</tbody></table></div>';
+  out.innerHTML=legend+'<div class="btw" style="overflow-x:auto"><table class="btbl" style="font-size:11px"><thead><tr><th style="position:sticky;left:0;background:var(--surface-2);z-index:2;min-width:160px">Employee</th>'+dayHdrs+'<th style="text-align:center;background:var(--surface-2);color:#b45309">P</th><th style="text-align:center;background:var(--surface-2);color:#b45309">L</th><th style="text-align:center;background:var(--surface-2);color:#c0392b">A</th><th style="text-align:center;background:#fef3c7;color:#b45309;min-width:48px">OT</th></tr></thead><tbody>'+(matrixRows||'<tr><td colspan="'+(daysInMo+5)+'" style="text-align:center;color:var(--text-tertiary);padding:20px">No staff or no records</td></tr>')+'</tbody></table></div>';
   return;
-}var emp=BS.tsEmps.find(function(e){return e.id===eid;});if(!emp){out.innerHTML='<div style="color:var(--danger);padding:12px">Employee not found.</div>';return;}var recs=getRecs(emp.id),cnt=countSt(recs),tot=recs.length,worked=cnt.present+cnt.late,pct=tot?Math.round(worked/tot*100)+'%':'\u2014';if(pb)pb.style.display='';var rows=recs.map(function(r){return '<tr><td class="bmono">'+bxe(r.date)+'</td><td class="bmono" style="text-align:center">'+(r.ci||'\u2014')+'</td><td class="bmono" style="text-align:center">'+(r.co||'\u2014')+'</td><td class="bmono" style="text-align:center;color:var(--info);font-weight:600">'+(r.brk||'\u2014')+'</td><td class="bmono" style="text-align:center">'+btsHrs(r.ci,r.co)+'</td><td>'+btsBadge(r.st)+'</td><td style="font-size:11px;color:var(--text-secondary)">'+(r.note||'')+'</td></tr>';}).join('');out.innerHTML='<div class="bcard" style="margin-bottom:14px"><div style="font-size:15px;font-weight:700">'+bxe(emp.name)+'</div><div style="font-size:11px;color:var(--ceo);margin-top:3px">'+bxe(emp.dept||'')+' \u00b7 '+(mo===0?'Full Year':MONTHS_FULL[mo-1])+' '+yr+'</div></div><div class="bgrid-4" style="margin-bottom:14px">'+[['Total',tot,'var(--text-primary)'],['Present',cnt.present,'#00875a'],['Absent',cnt.absent,'#c0392b'],['Rate',pct,'#00875a']].map(function(x){return '<div style="text-align:center;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:12px"><div class="bmono" style="font-size:22px;font-weight:300;color:'+x[2]+'">'+bxe(String(x[1]))+'</div><div style="font-size:9px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:1px;margin-top:3px">'+x[0]+'</div></div>';}).join('')+'</div>'+(recs.length?'<div class="btw"><div class="btw-s"><table class="btbl"><thead><tr><th>Date</th><th style="text-align:center">In</th><th style="text-align:center">Out</th><th style="text-align:center">Break</th><th style="text-align:center">Hours</th><th>Status</th><th>Note</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>':'<div style="color:var(--text-tertiary);text-align:center;padding:28px;font-style:italic">No records for this period.</div>');}
+}var emp=BS.tsEmps.find(function(e){return e.id===eid;});if(!emp){out.innerHTML='<div style="color:var(--danger);padding:12px">Employee not found.</div>';return;}var recs=getRecs(emp.id),cnt=countSt(recs),tot=recs.length,worked=cnt.present+cnt.late,pct=tot?Math.round(worked/tot*100)+'%':'\u2014';if(pb)pb.style.display='';var totalEmpOtMins=recs.reduce(function(s,r){return s+(r.otApproved&&r.overtimeMins?r.overtimeMins:0);},0);var rows=recs.map(function(r){var otMins=r.otApproved&&r.overtimeMins?r.overtimeMins:0;var otCell=otMins>0?'<span style="background:#fef3c7;color:#b45309;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">'+Math.floor(otMins/60)+'h'+(otMins%60?otMins%60+'m':'')+'</span>':'<span style="color:var(--text-tertiary)">—</span>';return '<tr><td class="bmono">'+bxe(r.date)+'</td><td class="bmono" style="text-align:center">'+(r.ci||'\u2014')+'</td><td class="bmono" style="text-align:center">'+(r.co||'\u2014')+'</td><td class="bmono" style="text-align:center;color:var(--info);font-weight:600">'+(r.brk||'\u2014')+'</td><td class="bmono" style="text-align:center">'+btsHrs(r.ci,r.co)+'</td><td>'+btsBadge(r.st)+'</td><td style="text-align:center">'+otCell+'</td><td style="font-size:11px;color:var(--text-secondary)">'+(r.note||'')+'</td></tr>';}).join('');var otSummary=totalEmpOtMins>0?'<div class="bcard" style="margin-bottom:14px;border-left:4px solid #b45309"><div style="display:flex;align-items:center;gap:12px"><div class="bmono" style="font-size:28px;font-weight:300;color:#b45309">'+Math.floor(totalEmpOtMins/60)+'h'+(totalEmpOtMins%60?totalEmpOtMins%60+'m':'')+'</div><div><div style="font-size:13px;font-weight:700">Approved Overtime</div><div style="font-size:11px;color:var(--text-secondary)">'+recs.filter(function(r){return r.otApproved&&r.overtimeMins;}).length+' day(s) with OT recorded in timesheet</div></div></div></div>':'';out.innerHTML='<div class="bcard" style="margin-bottom:14px"><div style="font-size:15px;font-weight:700">'+bxe(emp.name)+'</div><div style="font-size:11px;color:var(--ceo);margin-top:3px">'+bxe(emp.dept||'')+' \u00b7 '+(mo===0?'Full Year':MONTHS_FULL[mo-1])+' '+yr+'</div></div><div class="bgrid-4" style="margin-bottom:14px">'+[['Total',tot,'var(--text-primary)'],['Present',cnt.present,'#00875a'],['Absent',cnt.absent,'#c0392b'],['Rate',pct,'#00875a']].map(function(x){return '<div style="text-align:center;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:12px"><div class="bmono" style="font-size:22px;font-weight:300;color:'+x[2]+'">'+bxe(String(x[1]))+'</div><div style="font-size:9px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:1px;margin-top:3px">'+x[0]+'</div></div>';}).join('')+'</div>'+otSummary+(recs.length?'<div class="btw"><div class="btw-s"><table class="btbl"><thead><tr><th>Date</th><th style="text-align:center">In</th><th style="text-align:center">Out</th><th style="text-align:center">Break</th><th style="text-align:center">Hours</th><th>Status</th><th style="text-align:center;color:#b45309">OT</th><th>Note</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>':'<div style="color:var(--text-tertiary);text-align:center;padding:28px;font-style:italic">No records for this period.</div>');}
 function printBranchTsReport(){var eid=bgv('bts-r-emp'),mo=parseInt(bgv('bts-r-mo')),yr=bgv('bts-r-yr');if(!eid){showToast('Select an employee first','error');return;}var emp=BS.tsEmps.find(function(e){return e.id===eid;});if(!emp)return;var recs=[];if(mo===0){for(var mi=1;mi<=12;mi++){var k=yr+'-'+(mi<10?'0':'')+mi;recs=recs.concat((BS.tsAtt[emp.id]&&BS.tsAtt[emp.id][k])||[]);}}else{var k=yr+'-'+(mo<10?'0':'')+mo;recs=(BS.tsAtt[emp.id]&&BS.tsAtt[emp.id][k])||[];}var cnt={present:0,late:0,absent:0,sick:0,holiday:0,dayoff:0};recs.forEach(function(r){if(cnt[r.st]!==undefined)cnt[r.st]++;});var tot=recs.length,worked=cnt.present+cnt.late,pct=tot?Math.round(worked/tot*100)+'%':'\u2014';var TC={present:'#00875a',late:'#b45309',absent:'#c0392b',sick:'#b45309',holiday:'#5b21b6',dayoff:'#b45309'};var TL={present:'Present',late:'Late',absent:'Absent',sick:'Sick Leave',holiday:'Holiday',dayoff:'OFF'};var rows=recs.map(function(r,i){var col=TC[r.st]||'#888';return '<tr style="background:'+(i%2===0?'#fff':'#f8fafc')+'"><td style="padding:7px 10px;font-family:monospace;font-size:11px;color:#64748b">'+bxe(r.date)+'</td><td style="padding:7px 10px;text-align:center;font-weight:600;font-family:monospace">'+(r.ci||'\u2014')+'</td><td style="padding:7px 10px;text-align:center;font-weight:600;font-family:monospace">'+(r.co||'\u2014')+'</td><td style="padding:7px 10px;text-align:center;font-weight:600;font-family:monospace;color:#0057ff">'+(r.brk||'\u2014')+'</td><td style="padding:7px 10px;text-align:center;font-weight:700;font-family:monospace">'+btsHrs(r.ci,r.co)+'</td><td style="padding:7px 10px;text-align:center"><span style="background:'+col+'20;color:'+col+';border:1px solid '+col+'40;border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700">'+(TL[r.st]||r.st)+'</span></td><td style="padding:7px 10px;font-size:11px;color:#64748b">'+(r.note||'')+'</td></tr>';}).join('');var s=NX.session||{};var moLabel=mo===0?'Full Year '+yr:MONTHS_FULL[mo-1]+' '+yr;var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Timesheet \u2014 '+bxe(emp.name)+'</title><style>@page{size:A4;margin:10mm}*{box-sizing:border-box;margin:0;padding:0;font-family:Arial,Helvetica,sans-serif}body{background:#fff;color:#111;font-size:12px}table{width:100%;border-collapse:collapse}th{background:#1a2340;color:#fff;padding:8px 10px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:1px}.c{text-align:center}.stats{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:16px}.stat{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 8px;text-align:center}.stat-n{font-size:22px;font-weight:300;font-family:monospace}.stat-l{font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-top:3px}.foot{margin-top:20px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:30px}.foot-cell{border-top:1px solid #333;padding-top:5px;text-align:center;font-size:9px;color:#64748b}@media print{.np{display:none!important}}</style></head><body>';html+='<div style="display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:10px;margin-bottom:16px;border-bottom:3px solid #1a2340"><div><img src="https://i.imgur.com/jeqtcE2.png" alt="ALFA.CO" style="height:44px;width:auto;display:block"><div style="font-size:10px;color:#64748b">'+bxe(s.branchName||s.entityName||'')+'</div></div><div style="text-align:center"><h1 style="font-size:16px;font-weight:800;color:#1a2340">Employee Timesheet</h1><p style="font-size:11px;color:#64748b">'+bxe(emp.name)+' \u00b7 '+bxe(emp.dept||'')+' \u00b7 '+bxe(moLabel)+'</p></div><div style="text-align:right;font-size:10px;color:#64748b"><div>Printed: '+new Date().toLocaleDateString('en-GB')+'</div><div>Work Rate: '+pct+'</div></div></div>';html+='<div class="stats"><div class="stat"><div class="stat-n" style="color:#1a2340">'+tot+'</div><div class="stat-l">Total</div></div><div class="stat"><div class="stat-n" style="color:#00875a">'+cnt.present+'</div><div class="stat-l">Present</div></div><div class="stat"><div class="stat-n" style="color:#b45309">'+cnt.late+'</div><div class="stat-l">Late</div></div><div class="stat"><div class="stat-n" style="color:#c0392b">'+cnt.absent+'</div><div class="stat-l">Absent</div></div><div class="stat"><div class="stat-n" style="color:#b45309">'+cnt.sick+'</div><div class="stat-l">Sick</div></div><div class="stat"><div class="stat-n" style="color:#00875a">'+pct+'</div><div class="stat-l">Rate</div></div></div>';html+=(recs.length?'<table><thead><tr><th>Date</th><th class="c">In</th><th class="c">Out</th><th class="c">Break</th><th class="c">Hours</th><th class="c">Status</th><th>Note</th></tr></thead><tbody>'+rows+'</tbody></table>':'<div style="text-align:center;padding:30px;color:#94a3b8;font-style:italic">No records.</div>');html+='<div class="foot"><div class="foot-cell">Employee Signature</div><div class="foot-cell">HR / Manager</div><div class="foot-cell">Date &amp; Stamp</div></div><div class="np" style="text-align:center;margin-top:20px"><button onclick="window.print()" style="background:#1a2340;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:13px;font-weight:700;cursor:pointer">Print / Save PDF</button></div></body></html>';var w=window.open('','_blank','width=900,height=700');if(w){w.document.write(html);w.document.close();}else showToast('Allow pop-ups to print','error');}
 function btsPgLeave(){var filt=BS.tsLTab==='all'?BS.tsLeaves:BS.tsLeaves.filter(function(l){return l.type===BS.tsLTab;});var pend=0,appr=0,rej=0;filt.forEach(function(l){if(l.status==='pending')pend++;else if(l.status==='approved')appr++;else rej++;});var eo='<option value="">Select</option>'+BS.tsEmps.slice().sort(function(a,b){return a.name.localeCompare(b.name);}).map(function(e){return '<option value="'+bxe(e.id)+'">'+bxe(e.name)+' ('+bxe(e.dept||'')+')</option>';}).join('');var lbar='<div style="display:flex;gap:6px;margin-bottom:16px">'+['all','sick','holiday','dayoff'].map(function(t){var l={all:'All',sick:'Sick',holiday:'Holiday',dayoff:'OFF'};return '<button class="bfbt'+(BS.tsLTab===t?' on':'')+'" onclick="BS.tsLTab=\''+t+'\';navTo(\'timesheet\')">'+l[t]+'</button>';}).join('')+'</div>';var rows=filt.slice().sort(function(a,b){return(b.start||'').localeCompare(a.start||'');}).map(function(l){var lt=TS_LT_BRANCH[l.type]||{l:l.type,c:'#888'};var emp=BS.tsEmps.find(function(e){return e.id===l.empId;});var sc=l.status==='approved'?'#00875a':l.status==='rejected'?'#c0392b':'#b45309';return '<tr><td style="font-weight:600;color:var(--text-primary)">'+bxe(emp?emp.name:'Unknown')+'</td><td>'+bpl(lt.l,lt.c)+'</td><td class="bmono">'+bxe(l.start)+'</td><td class="bmono">'+bxe(l.end)+'</td><td class="bmono" style="font-weight:600">'+bxe(l.days)+'d</td><td>'+bpl(l.status,sc)+'</td><td><div style="display:flex;gap:4px">'+(l.status==='pending'?'<button class="btn btn-sm" style="color:var(--success)" onclick="approveBranchLeave(\''+bxe(l.id)+'\')">Approve</button><button class="btn btn-sm" style="color:var(--danger)" onclick="rejectBranchLeave(\''+bxe(l.id)+'\')">Reject</button>':'')+'<button class="btn btn-sm" style="color:var(--danger)" onclick="delBranchLeave(\''+bxe(l.id)+'\')">Del</button></div></td></tr>';}).join('');var h='<div class="bcard" style="margin-bottom:16px"><div style="font-size:13px;font-weight:700;color:var(--ceo);margin-bottom:14px">New Leave Request</div><div class="bgrid-2" style="margin-bottom:12px"><div class="bfg" style="margin-bottom:0"><label class="form-label">Employee *</label><select class="form-input form-select" id="blf-emp">'+eo+'</select></div><div class="bfg" style="margin-bottom:0"><label class="form-label">Leave Type *</label><select class="form-input form-select" id="blf-type"><option value="sick">Sick Leave</option><option value="holiday">Annual Holiday</option><option value="dayoff">Day Off</option></select></div><div class="bfg" style="margin-bottom:0"><label class="form-label">Start Date *</label><input class="form-input" type="date" id="blf-start"></div><div class="bfg" style="margin-bottom:0"><label class="form-label">End Date *</label><input class="form-input" type="date" id="blf-end"></div></div><div class="bfg"><label class="form-label">Notes</label><input class="form-input" id="blf-note" placeholder="Optional reason"></div><button class="btn btn-primary" onclick="saveBranchLeave()">Submit Leave Request</button></div>'+lbar;h+='<div class="bgrid-4" style="margin-bottom:16px">'+[['Pending',pend,'#b45309'],['Approved',appr,'#00875a'],['Rejected',rej,'#c0392b'],['Total',filt.length,'var(--text-primary)']].map(function(x){return '<div style="text-align:center;background:var(--surface-2);border:1px solid '+x[2]+'30;border-radius:9px;padding:12px"><div class="bmono" style="font-size:24px;font-weight:300;color:'+x[2]+'">'+x[1]+'</div><div style="font-size:9px;color:var(--text-tertiary);margin-top:3px;text-transform:uppercase;letter-spacing:1px">'+x[0]+'</div></div>';}).join('')+'</div>';return h+'<div class="btw"><div class="btw-s"><table class="btbl"><thead><tr><th>Employee</th><th>Type</th><th>Start</th><th>End</th><th>Days</th><th>Status</th><th>Actions</th></tr></thead><tbody>'+(rows||'<tr><td colspan="7" style="text-align:center;color:var(--text-tertiary);padding:24px">No leave requests yet</td></tr>')+'</tbody></table></div></div>';}
 function saveBranchLeave(){var eid=bgv('blf-emp'),type=bgv('blf-type'),start=bgv('blf-start'),end=bgv('blf-end');if(!eid||!start||!end){showToast('Fill all required fields','error');return;}var days=Math.max(1,Math.ceil((new Date(end+'T00:00:00')-new Date(start+'T00:00:00'))/86400000)+1);BS.tsLeaves.push({id:buid(),empId:eid,type:type,start:start,end:end,days:days,note:bgv('blf-note'),status:'pending'});bSaveColl('tsLeaves',BS.tsLeaves);showToast('Leave request submitted','success');BS.tsTab='leave';navTo('timesheet');}
@@ -13156,7 +13158,7 @@ function pBmOtApprovals() {
     _staffOpts+='<option value="'+bxe(String(m.sap||m.id||''))+'" data-name="'+bxe(m.name)+'">'+bxe(m.name)+' ('+bxe(String(m.sap||m.id||''))+') — '+bxe(m.dept||'')+'</option>';
   });
 
-  var h = '<div class="page-header"><h1>⏰ Overtime Approvals</h1><p>Review, approve extra hours, and track approved OT in timesheet</p></div>';
+  var h = '<div class="page-header"><h1>⏰ Overtime Approvals</h1><p>Review and approve extra hours</p></div>';
 
   // ── Manual OT Entry ──────────────────────────────────────────────────────────
   h += '<div class="bcard" style="margin-bottom:16px">';
@@ -13172,148 +13174,37 @@ function pBmOtApprovals() {
   h += '<button class="btn btn-primary" style="white-space:nowrap" onclick="bmOtManualAdd()">✓ Add & Approve</button>';
   h += '</div></div>';
 
-  // ── Tabs: Pending | Approved ──────────────────────────────────────────────
-  h += '<div style="display:flex;gap:0;margin-bottom:16px;border-radius:10px;overflow:hidden;border:1px solid var(--border);background:var(--surface)">';
-  h += '<button id="ot-tab-pending" onclick="bmOtSwitchTab(\'pending\')" style="flex:1;padding:10px;border:none;font-size:12px;font-weight:700;cursor:pointer;background:var(--primary);color:#fff;border-radius:0">⏳ Pending Requests <span id="nb-bm-ot-pending" style="display:none;background:rgba(255,255,255,0.3);border-radius:8px;padding:1px 7px;margin-left:4px;font-size:11px"></span></button>';
-  h += '<button id="ot-tab-approved" onclick="bmOtSwitchTab(\'approved\')" style="flex:1;padding:10px;border:none;font-size:12px;font-weight:700;cursor:pointer;background:var(--surface-2);color:var(--text-secondary);border-radius:0">✅ Approved OT — Timesheet Record</button>';
-  h += '</div>';
-
   h += '<div id="bm-ot-list"><div style="text-align:center;padding:40px;color:var(--text-tertiary)">Loading…</div></div>';
-  h += '<div id="bm-ot-approved-list" style="display:none"><div style="text-align:center;padding:40px;color:var(--text-tertiary)">Loading…</div></div>';
   
   if(db && s.branchId){
-    // Load all OT requests once
     db.ref('branches/'+s.branchId+'/otRequests').once('value', function(snap){
-      var all=snap.val()||{};
-      var pending={}, approved=[];
-      Object.keys(all).forEach(function(k){
-        var r=all[k];
-        if((r.status||'pending')==='pending') pending[k]=r;
-        else if(r.status==='approved') approved.push(Object.assign({_key:k},r));
-      });
-
-      // ── Render Pending ──
       var el=document.getElementById('bm-ot-list');
-      if(el){
-        var keys=Object.keys(pending).sort(function(a,b){return (pending[b].ts||0)-(pending[a].ts||0);});
-        if(!keys.length){
-          el.innerHTML='<div style="text-align:center;padding:40px;color:var(--text-tertiary)"><div style="font-size:32px;margin-bottom:8px">✅</div>No pending overtime requests</div>';
-        } else {
-          el.innerHTML='<div class="btw"><div class="btw-s"><table class="btbl"><thead><tr>'+
-            '<th>Employee</th><th>Date</th><th>OT Hours</th><th>Note</th><th style="text-align:center">Action</th></tr></thead><tbody>'+
-            keys.map(function(k){
-              var r=pending[k];
-              var hh=Math.floor((r.otMins||0)/60), mm=(r.otMins||0)%60;
-              var otLabel=hh+'h'+(mm?mm+'m':'');
-              return '<tr>'+
-                '<td><div style="font-weight:600">'+bxe(r.staffName||'—')+'</div>'+
-                  '<div style="font-size:10px;color:var(--text-tertiary);font-family:var(--mono)">'+bxe(r.sap||r.staffId||'')+'</div></td>'+
-                '<td class="bmono">'+bxe(r.date||'—')+'</td>'+
-                '<td><span style="color:#b45309;font-weight:700;font-family:var(--mono)">+'+otLabel+'</span></td>'+
-                '<td style="font-size:11px">'+bxe(r.note||'—')+'</td>'+
-                '<td style="text-align:center;white-space:nowrap">'+
-                  '<button class="btn btn-sm" style="background:#065f46;color:#fff;border-color:#065f46;margin-right:4px"'+
-                    ' data-k="'+bxe(k)+'" data-sid="'+bxe(r.staffId||r.sap||'')+'" data-dt="'+bxe(r.date||'')+'" data-ot="'+(r.otMins||0)+'" data-nm="'+bxe(r.staffName||'')+'"'+
-                    ' onclick="bmOtApprove(this.dataset.k,this.dataset.sid,this.dataset.dt,parseInt(this.dataset.ot),this.dataset.nm)">'+
-                    '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px"><polyline points="20 6 9 17 4 12"/></svg> Approve</button>'+
-                  '<button class="btn btn-sm" style="color:var(--danger)"'+
-                    ' data-k="'+bxe(k)+'" onclick="bmOtReject(this.dataset.k)">✕ Reject</button></td></tr>';
-            }).join('')+
-            '</tbody></table></div></div>';
-          var nb=document.getElementById('nb-bm-ot-pending');
-          if(nb){nb.style.display='';nb.textContent=keys.length;}
-        }
-      }
-
-      // ── Render Approved OT — Employee Summary ──
-      var el2=document.getElementById('bm-ot-approved-list');
-      if(el2){
-        if(!approved.length){
-          el2.innerHTML='<div style="text-align:center;padding:40px;color:var(--text-tertiary)"><div style="font-size:32px;margin-bottom:8px">📋</div>No approved OT records yet</div>';
-        } else {
-          // Group by employee
-          var empMap={};
-          approved.forEach(function(r){
-            var key=r.staffId||r.sap||r.staffName||'unknown';
-            if(!empMap[key]) empMap[key]={name:r.staffName||'—',sap:r.sap||r.staffId||'',records:[],totalMins:0};
-            empMap[key].records.push(r);
-            empMap[key].totalMins+=(r.otMins||0);
-          });
-          var empList=Object.values(empMap).sort(function(a,b){return b.totalMins-a.totalMins;});
-          var totalAllMins=empList.reduce(function(s,e){return s+e.totalMins;},0);
-          // Summary KPIs
-          var kpis='<div class="bgrid-4" style="margin-bottom:14px">';
-          kpis+='<div class="bsc"><div class="bsc-lbl">Employees with OT</div><div class="bsc-val bmono" style="color:var(--primary)">'+empList.length+'</div></div>';
-          kpis+='<div class="bsc"><div class="bsc-lbl">Total OT Records</div><div class="bsc-val bmono" style="color:#b45309">'+approved.length+'</div></div>';
-          kpis+='<div class="bsc"><div class="bsc-lbl">Total OT Hours</div><div class="bsc-val bmono" style="color:#065f46">'+Math.floor(totalAllMins/60)+'h'+(totalAllMins%60?(totalAllMins%60)+'m':'')+'</div></div>';
-          kpis+='<div class="bsc"><div class="bsc-lbl">Avg OT / Employee</div><div class="bsc-val bmono" style="color:var(--text-secondary)">'+Math.floor(totalAllMins/empList.length/60)+'h'+((Math.floor(totalAllMins/empList.length))%60?Math.floor(totalAllMins/empList.length)%60+'m':'')+'</div></div>';
-          kpis+='</div>';
-          // Per-employee table with expandable records
-          var rows='';
-          empList.forEach(function(emp,ei){
-            var hh=Math.floor(emp.totalMins/60), mm=emp.totalMins%60;
-            var totalLabel=hh+'h'+(mm?mm+'m':'');
-            var statusBadge='<span style="background:#e6f9f0;color:#065f46;border:1px solid #a7f3d0;border-radius:12px;padding:2px 8px;font-size:10px;font-weight:700;font-family:var(--mono)">✅ In Timesheet</span>';
-            rows+='<tr style="cursor:pointer" onclick="bmOtToggleEmpRecords('+ei+')">';
-            rows+='<td><div style="font-weight:600;color:var(--text-primary)">'+bxe(emp.name)+'</div>';
-            rows+='<div style="font-size:10px;color:var(--text-tertiary);font-family:var(--mono)">SAP: '+bxe(emp.sap)+'</div></td>';
-            rows+='<td class="bmono" style="color:#b45309;font-weight:700">'+bxe(totalLabel)+'</td>';
-            rows+='<td style="text-align:center">'+emp.records.length+' record'+(emp.records.length!==1?'s':'')+'</td>';
-            rows+='<td>'+statusBadge+'</td>';
-            rows+='<td style="text-align:center;color:var(--text-tertiary);font-size:11px">▼ Details</td>';
-            rows+='</tr>';
-            // Expandable sub-rows per date
-            rows+='<tr id="ot-emp-records-'+ei+'" style="display:none"><td colspan="5" style="padding:0">';
-            rows+='<table style="width:100%;border-collapse:collapse;background:var(--surface-2)">';
-            rows+='<thead><tr style="background:var(--surface-3,#f1f5f9)">';
-            rows+='<th style="padding:6px 12px;font-size:10px;font-weight:700;color:var(--text-secondary);text-align:left;border-bottom:1px solid var(--border)">Date</th>';
-            rows+='<th style="padding:6px 12px;font-size:10px;font-weight:700;color:var(--text-secondary);text-align:left;border-bottom:1px solid var(--border)">OT Hours</th>';
-            rows+='<th style="padding:6px 12px;font-size:10px;font-weight:700;color:var(--text-secondary);text-align:left;border-bottom:1px solid var(--border)">Approved By</th>';
-            rows+='<th style="padding:6px 12px;font-size:10px;font-weight:700;color:var(--text-secondary);text-align:left;border-bottom:1px solid var(--border)">Note</th>';
-            rows+='<th style="padding:6px 12px;font-size:10px;font-weight:700;color:var(--text-secondary);text-align:left;border-bottom:1px solid var(--border)">Timesheet</th>';
-            rows+='</tr></thead><tbody>';
-            emp.records.sort(function(a,b){return (b.ts||0)-(a.ts||0);}).forEach(function(r){
-              var rhh=Math.floor((r.otMins||0)/60), rmm=(r.otMins||0)%60;
-              rows+='<tr><td style="padding:6px 12px;font-family:var(--mono);font-size:11px;border-bottom:1px solid var(--border)">'+bxe(r.date||'—')+'</td>';
-              rows+='<td style="padding:6px 12px;font-family:var(--mono);font-size:11px;font-weight:700;color:#b45309;border-bottom:1px solid var(--border)">'+rhh+'h'+(rmm?rmm+'m':'')+'</td>';
-              rows+='<td style="padding:6px 12px;font-size:11px;border-bottom:1px solid var(--border)">'+bxe(r.approvedBy||'Manager')+'</td>';
-              rows+='<td style="padding:6px 12px;font-size:11px;color:var(--text-secondary);border-bottom:1px solid var(--border)">'+bxe(r.note||'—')+'</td>';
-              rows+='<td style="padding:6px 12px;border-bottom:1px solid var(--border)"><span style="font-size:10px;color:#065f46;font-weight:700">✅ Recorded</span></td></tr>';
-            });
-            rows+='</tbody></table></td></tr>';
-          });
-          el2.innerHTML=kpis+'<div class="btw"><div class="btw-s"><table class="btbl"><thead><tr>'+
-            '<th>Employee</th><th>Total OT</th><th>Records</th><th>Timesheet Status</th><th>Details</th></tr></thead>'+
-            '<tbody>'+rows+'</tbody></table></div></div>';
-        }
-      }
+      if(!el) return;
+      var all=snap.val()||{};
+      // Filter pending in JS — avoids needing a Firebase index on 'status'
+      var data={};
+      Object.keys(all).forEach(function(k){ if((all[k].status||'pending')==='pending') data[k]=all[k]; });
+      var keys=Object.keys(data).sort(function(a,b){return (data[b].ts||0)-(data[a].ts||0);});
+      if(!keys.length){el.innerHTML='<div style="text-align:center;padding:40px;color:var(--text-tertiary)"><div style="font-size:32px;margin-bottom:8px">✅</div>No pending overtime requests</div>';return;}
+      el.innerHTML='<div class="btw"><div class="btw-s"><table class="btbl"><thead><tr>'+
+        '<th>Employee</th><th>Date</th><th>Overtime</th><th>Notes</th><th style="text-align:center">Action</th></tr></thead><tbody>'+
+        keys.map(function(k){
+          var r=data[k];
+          var otLabel=Math.floor((r.otMins||0)/60)+'h '+((r.otMins||0)%60?((r.otMins||0)%60)+'m':'');
+          return '<tr><td><div style="font-weight:600">'+xe(r.staffName||'—')+'</div><div style="font-size:10px;color:var(--text-tertiary);font-family:var(--mono)">'+xe(r.sap||r.staffId||'')+'</div></td>'+
+            '<td class="bmono">'+xe(r.date||'—')+'</td>'+
+            '<td><span style="color:#b45309;font-weight:700;font-family:var(--mono)">+'+xe(otLabel)+'</span></td>'+
+            '<td style="font-size:11px">'+xe(r.note||'—')+'</td>'+
+            '<td style="text-align:center;white-space:nowrap">'+
+            '<button class="btn btn-sm" style="background:#00875a;color:#fff;border-color:#00875a;margin-right:4px"'+' data-k="'+bxe(k)+'" data-sid="'+bxe(r.staffId||r.sap||'')+'" data-dt="'+bxe(r.date||'')+'" data-ot="'+((r.otMins)||0)+'" data-nm="'+bxe(r.staffName||'')+'"'+' onclick="bmOtApprove(this.dataset.k,this.dataset.sid,this.dataset.dt,parseInt(this.dataset.ot),this.dataset.nm)">✓ Approve</button>'+            '<button class="btn btn-sm" style="color:var(--danger)" data-k="'+bxe(k)+'" onclick="bmOtReject(this.dataset.k)">✕ Reject</button></td></tr>';
+        }).join('')+
+        '</tbody></table></div></div>';
+      // Update badge
+      var nb=document.getElementById('nb-bm-ot-pending');
+      if(nb&&keys.length>0){nb.style.display='';nb.textContent=keys.length;}
     });
   }
   return h;
-}
-
-function bmOtSwitchTab(tab){
-  var pendBtn=document.getElementById('ot-tab-pending');
-  var apprBtn=document.getElementById('ot-tab-approved');
-  var pendList=document.getElementById('bm-ot-list');
-  var apprList=document.getElementById('bm-ot-approved-list');
-  if(tab==='pending'){
-    if(pendBtn){pendBtn.style.background='var(--primary)';pendBtn.style.color='#fff';}
-    if(apprBtn){apprBtn.style.background='var(--surface-2)';apprBtn.style.color='var(--text-secondary)';}
-    if(pendList)pendList.style.display='';
-    if(apprList)apprList.style.display='none';
-  } else {
-    if(pendBtn){pendBtn.style.background='var(--surface-2)';pendBtn.style.color='var(--text-secondary)';}
-    if(apprBtn){apprBtn.style.background='var(--primary)';apprBtn.style.color='#fff';}
-    if(pendList)pendList.style.display='none';
-    if(apprList)apprList.style.display='';
-  }
-}
-
-function bmOtToggleEmpRecords(idx){
-  var row=document.getElementById('ot-emp-records-'+idx);
-  if(!row) return;
-  row.style.display=row.style.display==='none'?'':'none';
 }
 
 function bmOtApprove(reqKey, staffId, date, otMins, staffName){
