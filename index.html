@@ -11247,8 +11247,45 @@ function parseAndFillHealthCard(text,id){
     return g.y+'-'+String(g.m).padStart(2,'0')+'-'+String(g.d).padStart(2,'0');
   });
   var medExp='',trainExp='';
-  if(gregDates.length>=2){gregDates.sort();medExp=gregDates[0];trainExp=gregDates[1];}
-  else if(gregDates.length===1){medExp=gregDates[0];}
+  // Strategy 1: look for labeled dates using Arabic keywords near each date
+  // The PDF text contains: "تاريخ نهاية الشهادة الصحية" then the medical expiry date
+  //                        "تاريخ انتهاء البرنامج التثقيفي" then the training expiry date
+  // We search for each keyword and grab the Hijri date that follows it
+  function extractDateAfterKeyword(txt, keyword) {
+    var idx = txt.indexOf(keyword);
+    if (idx < 0) return '';
+    var sub = txt.substring(idx, idx + 120);
+    var dm = sub.match(/\b(1[4-5]\d{2})[\/\-](\d{1,2})[\/\-](\d{1,2})\b/);
+    if (!dm) return '';
+    var g = hijriToGregorian(parseInt(dm[1]), parseInt(dm[2]), parseInt(dm[3]));
+    return g.y + '-' + String(g.m).padStart(2,'0') + '-' + String(g.d).padStart(2,'0');
+  }
+  // Try Arabic keyword extraction first (works when PDF embeds Arabic text)
+  var medByLabel  = extractDateAfterKeyword(text, '\u0646\u0647\u0627\u064a\u0629 \u0627\u0644\u0634\u0647\u0627\u062f\u0629'); // نهاية الشهادة
+  var trainByLabel = extractDateAfterKeyword(text, '\u0627\u0646\u062a\u0647\u0627\u0621 \u0627\u0644\u0628\u0631\u0646\u0627\u0645\u062c'); // انتهاء البرنامج
+  if (medByLabel)   medExp   = medByLabel;
+  if (trainByLabel) trainExp = trainByLabel;
+  // Strategy 2: if labels not found, use position heuristic —
+  // Balady card always has: issue date (earliest), then medical expiry, then training expiry
+  // So skip the first (earliest) date and assign remaining two in order
+  if (!medExp && !trainExp) {
+    if (gregDates.length >= 3) {
+      gregDates.sort();
+      medExp   = gregDates[1]; // skip [0] = issue date
+      trainExp = gregDates[2];
+    } else if (gregDates.length === 2) {
+      gregDates.sort();
+      medExp   = gregDates[0];
+      trainExp = gregDates[1];
+    } else if (gregDates.length === 1) {
+      medExp = gregDates[0];
+    }
+  } else if (medExp && !trainExp && gregDates.length >= 2) {
+    // Got med from label, find training from remaining dates
+    gregDates.sort();
+    var remaining = gregDates.filter(function(d) { return d !== medExp; });
+    if (remaining.length) trainExp = remaining[remaining.length - 1];
+  }
   var hc=BS.health.find(function(x){return x.id===id;});
   if(!hc){showToast('Health card not found','error');return;}
   var html='<div class="modal-head"><h2>PDF Import — '+bxe(hc.name)+'</h2><button class="modal-close" onclick="closeModalForce()">✕</button></div>';
