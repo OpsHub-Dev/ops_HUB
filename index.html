@@ -3800,7 +3800,8 @@ var NAV_CONFIG = {
       { id:'bm-ot-approvals',   icon:'⏰', label:'OT Approvals', badge:'bm-ot-pending' }
     ]},
     { section:'SHIFT MANAGEMENT', items:[
-      { id:'bm-briefing',        icon:'📋', label:'Briefing & Tasks', badge:'bm-briefing-pending' }
+      { id:'bm-briefing',        icon:'📋', label:'Briefing & Tasks', badge:'bm-briefing-pending' },
+      { id:'bm-competition',     icon:'🏆', label:'Competition Tracking' }
     ]},
     { section:'COMMUNICATIONS', items:[
       { id:'bm-compliance',      icon:'🏛️', label:'Compliance & Costs', badge:'bm-compliance-expiry' },
@@ -5045,6 +5046,7 @@ function renderPage(pageId) {
     'bm-payroll':        pBmPayroll,
     'bm-transfers':      pBmTransfers,
     'bm-briefing':        pBmBriefing,
+    'bm-competition':     pBmCompetition,
     'bm-ot-approvals':    pBmOtApprovals,
     'bm-compliance':      pBmCompliance,
     'bm-assets':          pBmAssets,
@@ -8180,7 +8182,7 @@ function renderPage_(pageId) {
       'low-stock':pLowStock,'inv-report':pInvReport,'wastage':pWastage,'staff':pStaff,
       'schedule':pSchedule,'timesheet':pTimesheet,'health-cards':pHealthCards,
       'sales':pSales,'petty-cash':pPettyCash,'dsr':pDSR,'checklists':pChecklists,'qr-checkin':pQRCheckin,
-      'bm-briefing':pBmBriefing,'bm-ot-approvals':pBmOtApprovals
+      'bm-briefing':pBmBriefing,'bm-ot-approvals':pBmOtApprovals,'bm-competition':pBmCompetition
     };
     return fns[pageId] ? fns[pageId]() : '';
   } catch(e) { return '<div class="empty-state"><div class="es-icon">&#x26A0;&#xFE0F;</div><p>' + bxe(e.message) + '</p></div>'; }
@@ -13239,7 +13241,24 @@ function pBmOtApprovals() {
     if(!m||!m.name) return;
     _staffOpts+='<option value="'+bxe(String(m.sap||m.id||''))+'" data-name="'+bxe(m.name)+'">'+bxe(m.name)+' ('+bxe(String(m.sap||m.id||''))+') — '+bxe(m.dept||'')+'</option>';
   });
-  var h = '<div class="page-header"><h1>⏰ Overtime Approvals</h1><p>Review, approve extra hours, and track approved OT in timesheet</p></div>';
+  var h = '<div class="page-header"><h1>⏰ Overtime Approvals</h1><p>Review, approve extra hours, and track approved OT in timesheet</p>' +
+    '<button class="btn btn-sm" style="margin-left:auto;background:var(--primary);color:#fff;border-color:var(--primary)" onclick="bmOtPrintMonth()">🖨️ Print OT Report</button></div>';
+  h += '<div class="bcard" style="margin-bottom:16px;padding:12px 16px">';
+  h += '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">';
+  h += '<div style="font-size:12px;font-weight:700;color:var(--text-secondary)">🔍 Filter:</div>';
+  h += '<select class="bfi" id="ot-filter-mo" style="width:130px;padding:7px 10px" onchange="bmOtApplyFilter()">';
+  var _now=new Date(),_mos=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  for(var _mi=0;_mi<12;_mi++){h+='<option value="'+(_mi+1)+'"'+((_now.getMonth()===_mi)?' selected':'')+'>'+_mos[_mi]+'</option>';}
+  h += '</select>';
+  h += '<select class="bfi" id="ot-filter-yr" style="width:90px;padding:7px 10px" onchange="bmOtApplyFilter()">';
+  for(var _yi=_now.getFullYear()-1;_yi<=_now.getFullYear()+1;_yi++){h+='<option value="'+_yi+'"'+((_yi===_now.getFullYear())?' selected':'')+'>'+_yi+'</option>';}
+  h += '</select>';
+  h += '<div style="display:flex;gap:0;border-radius:8px;overflow:hidden;border:1px solid var(--border);margin-left:8px">';
+  h += '<button id="ot-ftype-all" onclick="bmOtSetTypeFilter(\'all\')" style="padding:7px 14px;border:none;font-size:11px;font-weight:700;cursor:pointer;background:var(--primary);color:#fff">All</button>';
+  h += '<button id="ot-ftype-alfa" onclick="bmOtSetTypeFilter(\'alfa\')" style="padding:7px 14px;border:none;font-size:11px;font-weight:700;cursor:pointer;background:var(--surface-2);color:var(--text-secondary)">ALFA Staff</button>';
+  h += '<button id="ot-ftype-3p" onclick="bmOtSetTypeFilter(\'3p\')" style="padding:7px 14px;border:none;font-size:11px;font-weight:700;cursor:pointer;background:var(--surface-2);color:var(--text-secondary)">3rd Party</button>';
+  h += '</div>';
+  h += '</div></div>';
   h += '<div class="bcard" style="margin-bottom:16px">';
   h += '<div style="font-size:13px;font-weight:700;margin-bottom:12px;color:var(--text-primary)">➕ Add Overtime Manually</div>';
   h += '<div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:10px;align-items:end">';
@@ -13259,97 +13278,7 @@ function pBmOtApprovals() {
   h += '<div id="bm-ot-list"><div style="text-align:center;padding:40px;color:var(--text-tertiary)">Loading…</div></div>';
   h += '<div id="bm-ot-approved-list" style="display:none"><div style="text-align:center;padding:40px;color:var(--text-tertiary)">Loading…</div></div>';
   if(db && s.branchId){
-    db.ref('branches/'+s.branchId+'/otRequests').once('value', function(snap){
-      var all=snap.val()||{};
-      var pending={}, approved=[];
-      Object.keys(all).forEach(function(k){
-        var r=all[k];
-        if((r.status||'pending')==='pending') pending[k]=r;
-        else if(r.status==='approved') approved.push(Object.assign({_key:k},r));
-      });
-      var el=document.getElementById('bm-ot-list');
-      if(el){
-        var keys=Object.keys(pending).sort(function(a,b){return (pending[b].ts||0)-(pending[a].ts||0);});
-        if(!keys.length){
-          el.innerHTML='<div style="text-align:center;padding:40px;color:var(--text-tertiary)"><div style="font-size:32px;margin-bottom:8px">✅</div>No pending overtime requests</div>';
-        } else {
-          el.innerHTML='<div class="btw"><div class="btw-s"><table class="btbl"><thead><tr>'+
-            '<th>Employee</th><th>Date</th><th>OT Hours</th><th>Note</th><th style="text-align:center">Action</th></tr></thead><tbody>'+
-            keys.map(function(k){
-              var r=pending[k];
-              var hh=Math.floor((r.otMins||0)/60),mm=(r.otMins||0)%60;
-              var otLabel=hh+'h'+(mm?mm+'m':'');
-              return '<tr>'+
-                '<td><div style="font-weight:600">'+bxe(r.staffName||'—')+'</div>'+
-                '<div style="font-size:10px;color:var(--text-tertiary);font-family:var(--mono)">'+bxe(r.sap||r.staffId||'')+'</div></td>'+
-                '<td class="bmono">'+bxe(r.date||'—')+'</td>'+
-                '<td><span style="color:#b45309;font-weight:700;font-family:var(--mono)">+'+otLabel+'</span></td>'+
-                '<td style="font-size:11px">'+bxe(r.note||'—')+'</td>'+
-                '<td style="text-align:center;white-space:nowrap">'+
-                '<button class="btn btn-sm" style="background:#065f46;color:#fff;border-color:#065f46;margin-right:4px"'+
-                ' data-k="'+bxe(k)+'" data-sid="'+bxe(r.staffId||r.sap||'')+'" data-dt="'+bxe(r.date||'')+'" data-ot="'+(r.otMins||0)+'" data-nm="'+bxe(r.staffName||'')+'"'+
-                ' onclick="bmOtApprove(this.dataset.k,this.dataset.sid,this.dataset.dt,parseInt(this.dataset.ot),this.dataset.nm)">✓ Approve</button>'+
-                '<button class="btn btn-sm" style="color:var(--danger)"'+
-                ' data-k="'+bxe(k)+'" onclick="bmOtReject(this.dataset.k)">✕ Reject</button></td></tr>';
-            }).join('')+
-            '</tbody></table></div></div>';
-          var nb=document.getElementById('nb-bm-ot-pending');
-          if(nb){nb.style.display='';nb.textContent=keys.length;}
-        }
-      }
-      var el2=document.getElementById('bm-ot-approved-list');
-      if(el2){
-        if(!approved.length){
-          el2.innerHTML='<div style="text-align:center;padding:40px;color:var(--text-tertiary)"><div style="font-size:32px;margin-bottom:8px">📋</div>No approved OT records yet</div>';
-        } else {
-          var empMap={};
-          approved.forEach(function(r){
-            var key=r.staffId||r.sap||r.staffName||'unknown';
-            if(!empMap[key]) empMap[key]={name:r.staffName||'—',sap:r.sap||r.staffId||'',records:[],totalMins:0};
-            empMap[key].records.push(r);
-            empMap[key].totalMins+=(r.otMins||0);
-          });
-          var empList=Object.values(empMap).sort(function(a,b){return b.totalMins-a.totalMins;});
-          var totalAllMins=empList.reduce(function(s,e){return s+e.totalMins;},0);
-          var kpis='<div class="bgrid-4" style="margin-bottom:14px">';
-          kpis+='<div class="bsc"><div class="bsc-lbl">Employees with OT</div><div class="bsc-val bmono" style="color:var(--primary)">'+empList.length+'</div></div>';
-          kpis+='<div class="bsc"><div class="bsc-lbl">Total OT Records</div><div class="bsc-val bmono" style="color:#b45309">'+approved.length+'</div></div>';
-          kpis+='<div class="bsc"><div class="bsc-lbl">Total OT Hours</div><div class="bsc-val bmono" style="color:#065f46">'+Math.floor(totalAllMins/60)+'h'+(totalAllMins%60?(totalAllMins%60)+'m':'')+'</div></div>';
-          kpis+='<div class="bsc"><div class="bsc-lbl">Avg OT / Employee</div><div class="bsc-val bmono" style="color:var(--text-secondary)">'+Math.floor(totalAllMins/empList.length/60)+'h'+'</div></div>';
-          kpis+='</div>';
-          var rows='';
-          empList.forEach(function(emp,ei){
-            var hh=Math.floor(emp.totalMins/60),mm=emp.totalMins%60;
-            var totalLabel=hh+'h'+(mm?mm+'m':'');
-            rows+='<tr style="cursor:pointer" onclick="bmOtToggleEmpRecords('+ei+')">';
-            rows+='<td><div style="font-weight:600">'+bxe(emp.name)+'</div>';
-            rows+='<div style="font-size:10px;color:var(--text-tertiary);font-family:var(--mono)">SAP: '+bxe(emp.sap)+'</div></td>';
-            rows+='<td class="bmono" style="color:#b45309;font-weight:700">'+bxe(totalLabel)+'</td>';
-            rows+='<td style="text-align:center">'+emp.records.length+'</td>';
-            rows+='<td><span style="background:#e6f9f0;color:#065f46;border:1px solid #a7f3d0;border-radius:12px;padding:2px 8px;font-size:10px;font-weight:700">✅ In Timesheet</span></td>';
-            rows+='<td style="text-align:center;color:var(--text-tertiary);font-size:11px">▼</td></tr>';
-            rows+='<tr id="ot-emp-records-'+ei+'" style="display:none"><td colspan="5" style="padding:0">';
-            rows+='<table style="width:100%;border-collapse:collapse;background:var(--surface-2)"><thead><tr>';
-            rows+='<th style="padding:6px 12px;font-size:10px;font-weight:700;color:var(--text-secondary);text-align:left;border-bottom:1px solid var(--border)">Date</th>';
-            rows+='<th style="padding:6px 12px;font-size:10px;font-weight:700;color:var(--text-secondary);text-align:left;border-bottom:1px solid var(--border)">OT Hours</th>';
-            rows+='<th style="padding:6px 12px;font-size:10px;font-weight:700;color:var(--text-secondary);text-align:left;border-bottom:1px solid var(--border)">Note</th>';
-            rows+='<th style="padding:6px 12px;font-size:10px;font-weight:700;color:var(--text-secondary);text-align:left;border-bottom:1px solid var(--border)">Timesheet</th>';
-            rows+='</tr></thead><tbody>';
-            emp.records.sort(function(a,b){return (b.ts||0)-(a.ts||0);}).forEach(function(r){
-              var rhh=Math.floor((r.otMins||0)/60),rmm=(r.otMins||0)%60;
-              rows+='<tr><td style="padding:6px 12px;font-family:var(--mono);font-size:11px;border-bottom:1px solid var(--border)">'+bxe(r.date||'—')+'</td>';
-              rows+='<td style="padding:6px 12px;font-family:var(--mono);font-size:11px;font-weight:700;color:#b45309;border-bottom:1px solid var(--border)">'+rhh+'h'+(rmm?rmm+'m':'')+'</td>';
-              rows+='<td style="padding:6px 12px;font-size:11px;color:var(--text-secondary);border-bottom:1px solid var(--border)">'+bxe(r.note||'—')+'</td>';
-              rows+='<td style="padding:6px 12px;border-bottom:1px solid var(--border)"><span style="font-size:10px;color:#065f46;font-weight:700">✅ Recorded</span></td></tr>';
-            });
-            rows+='</tbody></table></td></tr>';
-          });
-          el2.innerHTML=kpis+'<div class="btw"><div class="btw-s"><table class="btbl"><thead><tr>'+
-            '<th>Employee</th><th>Total OT</th><th style="text-align:center">Records</th><th>Status</th><th style="text-align:center">Details</th></tr></thead>'+
-            '<tbody>'+rows+'</tbody></table></div></div>';
-        }
-      }
-    });
+    setTimeout(function(){ bmOtApplyFilter(); }, 60);
   }
   return h;
 }
@@ -13435,9 +13364,18 @@ function bmOtManualAdd(){
   var sap=staffSel.value;
   var mo=dateVal.slice(0,7);
   var otLabel=Math.floor(otMins/60)+'h'+(otMins%60?otMins%60+'m':'');
-  if(!confirm('Add '+otLabel+' overtime for '+staffName+' on '+dateVal+'?')) return;
+  // Stash params for modal callback
+  window._bmOtPendingAdd = {s:s,sap:sap,staffName:staffName,dateVal:dateVal,otMins:otMins,note:note,mo:mo};
+  openModal('<div class="modal-head"><h2>Confirm OT Addition</h2><button class="modal-close" onclick="closeModalForce()">&#x2715;</button></div>'+
+    '<p style="margin:16px 0">Add <strong>'+otLabel+'</strong> overtime for <strong>'+bxe(staffName)+'</strong> on '+bxe(dateVal)+'?</p>'+
+    '<div style="display:flex;gap:10px;justify-content:flex-end;padding-top:4px">'+
+    '<button class="btn" onclick="closeModalForce()">Cancel</button>'+
+    '<button class="btn btn-primary" onclick="closeModalForce();var p=window._bmOtPendingAdd;_bmOtManualAddExec(p.s,p.sap,p.staffName,p.dateVal,p.otMins,p.note,p.mo)">Add &amp; Approve</button>'+
+    '</div>');
+}
 
-  // Write directly to tsAtt as approved OT
+function _bmOtManualAddExec(s,sap,staffName,dateVal,otMins,note,mo){
+  var otLabel=Math.floor(otMins/60)+'h'+(otMins%60?otMins%60+'m':'');
   var attRef=db.ref('branches/'+s.branchId+'/tsAtt/'+sap+'/'+mo);
   attRef.once('value',function(snap){
     var recs=snap.val()||[];
@@ -13470,6 +13408,482 @@ function bmOtManualAdd(){
     });
   });
 }
+
+
+var _bmOtTypeFilter = 'all';
+
+function bmOtSetTypeFilter(type) {
+  _bmOtTypeFilter = type;
+  ['all','alfa','3p'].forEach(function(t) {
+    var btn = document.getElementById('ot-ftype-'+t);
+    if(btn) { btn.style.background = (t===type) ? 'var(--primary)' : 'var(--surface-2)'; btn.style.color = (t===type) ? '#fff' : 'var(--text-secondary)'; }
+  });
+  bmOtApplyFilter();
+}
+
+function bmOtApplyFilter() {
+  var mo = parseInt((document.getElementById('ot-filter-mo')||{}).value||new Date().getMonth()+1);
+  var yr = (document.getElementById('ot-filter-yr')||{}).value || String(new Date().getFullYear());
+  var moStr = yr + '-' + (mo < 10 ? '0' : '') + mo;
+  var s = NX.session || {};
+  if (!db || !s.branchId) return;
+  db.ref('branches/'+s.branchId+'/otRequests').once('value', function(snap) {
+    var all = snap.val() || {};
+    var staffMap = {};
+    (BS.staff || []).forEach(function(m) { if(m) staffMap[String(m.sap||m.id||'')] = m; });
+    function isAlfa(r) {
+      var key = String(r.staffId||r.sap||'');
+      var m = staffMap[key];
+      if (!m) return true;
+      return !(m.type === '3rd_party' || m.type === '3p' || m.staffType === '3rd_party' || m.staffType === '3p');
+    }
+    var pending = {}, approved = [];
+    Object.keys(all).forEach(function(k) {
+      var r = all[k];
+      var rMo = (r.date||'').slice(0,7);
+      if (rMo !== moStr) return;
+      if (_bmOtTypeFilter === 'alfa' && !isAlfa(r)) return;
+      if (_bmOtTypeFilter === '3p' && isAlfa(r)) return;
+      if ((r.status||'pending') === 'pending') pending[k] = r;
+      else if (r.status === 'approved') approved.push(Object.assign({_key:k}, r));
+    });
+    var el = document.getElementById('bm-ot-list');
+    if (el) {
+      var keys = Object.keys(pending).sort(function(a,b){return (pending[b].ts||0)-(pending[a].ts||0);});
+      if (!keys.length) {
+        el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-tertiary)"><div style="font-size:32px;margin-bottom:8px">&#x2705;</div>No pending OT requests for this period</div>';
+      } else {
+        el.innerHTML = '<div class="btw"><div class="btw-s"><table class="btbl"><thead><tr>'+
+          '<th>Employee</th><th>Type</th><th>Date</th><th>OT Hours</th><th>Note</th><th style="text-align:center">Action</th></tr></thead><tbody>'+
+          keys.map(function(k){
+            var r = pending[k];
+            var hh = Math.floor((r.otMins||0)/60), mm = (r.otMins||0)%60;
+            var m = staffMap[String(r.staffId||r.sap||'')];
+            var isA = !(m && (m.type==='3rd_party'||m.type==='3p'||m.staffType==='3rd_party'||m.staffType==='3p'));
+            var typeBadge = isA
+              ? '<span style="background:#e0f2fe;color:#0369a1;border:1px solid #bae6fd;border-radius:10px;padding:1px 7px;font-size:9px;font-weight:700">ALFA</span>'
+              : '<span style="background:#fef3c7;color:#92400e;border:1px solid #fde68a;border-radius:10px;padding:1px 7px;font-size:9px;font-weight:700">3rd Party</span>';
+            return '<tr>'+
+              '<td><div style="font-weight:600">'+bxe(r.staffName||'&#x2014;')+'</div>'+
+              '<div style="font-size:10px;color:var(--text-tertiary);font-family:var(--mono)">'+bxe(r.sap||r.staffId||'')+'</div></td>'+
+              '<td>'+typeBadge+'</td>'+
+              '<td class="bmono">'+bxe(r.date||'&#x2014;')+'</td>'+
+              '<td><span style="color:#b45309;font-weight:700;font-family:var(--mono)">+'+hh+'h'+(mm?mm+'m':'')+'</span></td>'+
+              '<td style="font-size:11px">'+bxe(r.note||'&#x2014;')+'</td>'+
+              '<td style="text-align:center;white-space:nowrap">'+
+              '<button class="btn btn-sm" style="background:#065f46;color:#fff;border-color:#065f46;margin-right:4px"'+
+              ' data-k="'+bxe(k)+'" data-sid="'+bxe(r.staffId||r.sap||'')+'" data-dt="'+bxe(r.date||'')+'" data-ot="'+(r.otMins||0)+'" data-nm="'+bxe(r.staffName||'')+'"'+
+              ' onclick="bmOtApprove(this.dataset.k,this.dataset.sid,this.dataset.dt,parseInt(this.dataset.ot),this.dataset.nm)">&#x2713; Approve</button>'+
+              '<button class="btn btn-sm" style="color:var(--danger)"'+
+              ' data-k="'+bxe(k)+'" onclick="bmOtReject(this.dataset.k)">&#x2715; Reject</button></td></tr>';
+          }).join('')+
+          '</tbody></table></div></div>';
+        var nb = document.getElementById('nb-bm-ot-pending');
+        if(nb){nb.style.display='';nb.textContent=keys.length;}
+      }
+    }
+    var el2 = document.getElementById('bm-ot-approved-list');
+    if (el2) {
+      if (!approved.length) {
+        el2.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-tertiary)"><div style="font-size:32px;margin-bottom:8px">&#x1F4CB;</div>No approved OT for this period</div>';
+      } else {
+        var empMap = {};
+        approved.forEach(function(r) {
+          var key = r.staffId||r.sap||r.staffName||'unknown';
+          if (!empMap[key]) {
+            var m = staffMap[String(r.staffId||r.sap||'')];
+            var isA = !(m && (m.type==='3rd_party'||m.type==='3p'||m.staffType==='3rd_party'||m.staffType==='3p'));
+            empMap[key] = {name:r.staffName||'&#x2014;',sap:r.sap||r.staffId||'',records:[],totalMins:0,isAlfa:isA};
+          }
+          empMap[key].records.push(r);
+          empMap[key].totalMins += (r.otMins||0);
+        });
+        var empList = Object.values(empMap).sort(function(a,b){return b.totalMins-a.totalMins;});
+        var totalAllMins = empList.reduce(function(s,e){return s+e.totalMins;},0);
+        var alfaMins = empList.filter(function(e){return e.isAlfa;}).reduce(function(s,e){return s+e.totalMins;},0);
+        var tpMins = empList.filter(function(e){return !e.isAlfa;}).reduce(function(s,e){return s+e.totalMins;},0);
+        var kpis = '<div class="bgrid-4" style="margin-bottom:14px">';
+        kpis += '<div class="bsc"><div class="bsc-lbl">Employees with OT</div><div class="bsc-val bmono" style="color:var(--primary)">'+empList.length+'</div></div>';
+        kpis += '<div class="bsc"><div class="bsc-lbl">Total OT Hours</div><div class="bsc-val bmono" style="color:#b45309">'+Math.floor(totalAllMins/60)+'h'+(totalAllMins%60?(totalAllMins%60)+'m':'')+'</div></div>';
+        kpis += '<div class="bsc"><div class="bsc-lbl">ALFA Staff OT</div><div class="bsc-val bmono" style="color:#0369a1">'+Math.floor(alfaMins/60)+'h'+(alfaMins%60?(alfaMins%60)+'m':'')+'</div></div>';
+        kpis += '<div class="bsc"><div class="bsc-lbl">3rd Party OT</div><div class="bsc-val bmono" style="color:#92400e">'+Math.floor(tpMins/60)+'h'+(tpMins%60?(tpMins%60)+'m':'')+'</div></div>';
+        kpis += '</div>';
+        var rows = '';
+        empList.forEach(function(emp, ei) {
+          var hh = Math.floor(emp.totalMins/60), mm = emp.totalMins%60;
+          var typeBadge = emp.isAlfa
+            ? '<span style="background:#e0f2fe;color:#0369a1;border:1px solid #bae6fd;border-radius:10px;padding:1px 7px;font-size:9px;font-weight:700">ALFA</span>'
+            : '<span style="background:#fef3c7;color:#92400e;border:1px solid #fde68a;border-radius:10px;padding:1px 7px;font-size:9px;font-weight:700">3rd Party</span>';
+          rows += '<tr style="cursor:pointer" onclick="bmOtToggleEmpRecords('+ei+')">';
+          rows += '<td><div style="font-weight:600">'+bxe(emp.name)+'</div>';
+          rows += '<div style="font-size:10px;color:var(--text-tertiary);font-family:var(--mono)">SAP: '+bxe(emp.sap)+'</div></td>';
+          rows += '<td>'+typeBadge+'</td>';
+          rows += '<td class="bmono" style="color:#b45309;font-weight:700">'+hh+'h'+(mm?mm+'m':'')+'</td>';
+          rows += '<td style="text-align:center">'+emp.records.length+'</td>';
+          rows += '<td><span style="background:#e6f9f0;color:#065f46;border:1px solid #a7f3d0;border-radius:12px;padding:2px 8px;font-size:10px;font-weight:700">&#x2705; In Timesheet</span></td>';
+          rows += '<td style="text-align:center;color:var(--text-tertiary);font-size:11px">&#x25BC;</td></tr>';
+          rows += '<tr id="ot-emp-records-'+ei+'" style="display:none"><td colspan="6" style="padding:0">';
+          rows += '<table style="width:100%;border-collapse:collapse;background:var(--surface-2)"><thead><tr>';
+          rows += '<th style="padding:6px 12px;font-size:10px;font-weight:700;color:var(--text-secondary);text-align:left;border-bottom:1px solid var(--border)">Date</th>';
+          rows += '<th style="padding:6px 12px;font-size:10px;font-weight:700;color:var(--text-secondary);text-align:left;border-bottom:1px solid var(--border)">OT Hours</th>';
+          rows += '<th style="padding:6px 12px;font-size:10px;font-weight:700;color:var(--text-secondary);text-align:left;border-bottom:1px solid var(--border)">Note</th>';
+          rows += '</tr></thead><tbody>';
+          emp.records.sort(function(a,b){return (b.ts||0)-(a.ts||0);}).forEach(function(r) {
+            var rhh=Math.floor((r.otMins||0)/60),rmm=(r.otMins||0)%60;
+            rows += '<tr><td style="padding:6px 12px;font-family:var(--mono);font-size:11px;border-bottom:1px solid var(--border)">'+bxe(r.date||'&#x2014;')+'</td>';
+            rows += '<td style="padding:6px 12px;font-family:var(--mono);font-size:11px;font-weight:700;color:#b45309;border-bottom:1px solid var(--border)">'+rhh+'h'+(rmm?rmm+'m':'')+'</td>';
+            rows += '<td style="padding:6px 12px;font-size:11px;color:var(--text-secondary);border-bottom:1px solid var(--border)">'+bxe(r.note||'&#x2014;')+'</td></tr>';
+          });
+          rows += '</tbody></table></td></tr>';
+        });
+        el2.innerHTML = kpis + '<div class="btw"><div class="btw-s"><table class="btbl"><thead><tr>'+
+          '<th>Employee</th><th>Type</th><th>Total OT</th><th style="text-align:center">Records</th><th>Status</th><th style="text-align:center">Details</th></tr></thead>'+
+          '<tbody>'+rows+'</tbody></table></div></div>';
+      }
+    }
+  });
+}
+
+function bmOtPrintMonth() {
+  var mo = parseInt((document.getElementById('ot-filter-mo')||{}).value||new Date().getMonth()+1);
+  var yr = (document.getElementById('ot-filter-yr')||{}).value || String(new Date().getFullYear());
+  var moStr = yr + '-' + (mo < 10 ? '0' : '') + mo;
+  var moLabel = ['January','February','March','April','May','June','July','August','September','October','November','December'][mo-1] + ' ' + yr;
+  var s = NX.session || {};
+  if (!db || !s.branchId) { showToast('Not connected','error'); return; }
+  db.ref('branches/'+s.branchId+'/otRequests').once('value', function(snap) {
+    var all = snap.val() || {};
+    var staffMap = {};
+    (BS.staff || []).forEach(function(m) { if(m) staffMap[String(m.sap||m.id||'')] = m; });
+    var approved = [];
+    Object.keys(all).forEach(function(k) {
+      var r = all[k];
+      if ((r.date||'').slice(0,7) !== moStr) return;
+      if (r.status === 'approved') approved.push(Object.assign({_key:k}, r));
+    });
+    approved.sort(function(a,b){ return (a.staffName||'').localeCompare(b.staffName||'') || (a.date||'').localeCompare(b.date||''); });
+    var totalMins = approved.reduce(function(s,r){return s+(r.otMins||0);},0);
+    var alfaList = [], tpList = [];
+    approved.forEach(function(r) {
+      var m = staffMap[String(r.staffId||r.sap||'')];
+      var isA = !(m && (m.type==='3rd_party'||m.type==='3p'||m.staffType==='3rd_party'||m.staffType==='3p'));
+      if (isA) alfaList.push(r); else tpList.push(r);
+    });
+    function makeRows(list, color) {
+      return list.map(function(r) {
+        var hh=Math.floor((r.otMins||0)/60),mm=(r.otMins||0)%60;
+        return '<tr><td style="padding:7px 10px;font-weight:600">'+bxe(r.staffName||'')+'</td>'+
+          '<td style="padding:7px 10px;font-family:monospace;font-size:11px;color:#64748b">'+bxe(r.sap||r.staffId||'')+'</td>'+
+          '<td style="padding:7px 10px;font-family:monospace;font-size:11px">'+bxe(r.date||'')+'</td>'+
+          '<td style="padding:7px 10px;text-align:center;font-weight:700;font-family:monospace;color:'+color+'">'+hh+'h'+(mm?mm+'m':'')+'</td>'+
+          '<td style="padding:7px 10px;font-size:11px;color:#64748b">'+bxe(r.note||'')+'</td>'+
+          '<td style="padding:7px 10px;font-size:11px;color:#64748b">'+bxe(r.approvedBy||'')+'</td></tr>';
+      }).join('');
+    }
+    var thh=Math.floor(totalMins/60),tmm=totalMins%60;
+    var html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>OT Report</title>';
+    html += '<style>@page{size:A4;margin:10mm}*{box-sizing:border-box;margin:0;padding:0;font-family:Arial,Helvetica,sans-serif}';
+    html += 'body{background:#fff;color:#111;font-size:12px}table{width:100%;border-collapse:collapse}';
+    html += 'th{background:#1a2340;color:#fff;padding:8px 10px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:1px}';
+    html += 'td{border-bottom:1px solid #eee}.section-hdr{background:#f1f5f9;font-size:9px;text-transform:uppercase;letter-spacing:2px;color:#64748b;font-weight:700;padding:6px 10px}';
+    html += '.foot{margin-top:20px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:40px}';
+    html += '.foot-cell{border-top:1px solid #333;padding-top:6px;text-align:center;font-size:9px;color:#64748b}';
+    html += '@media print{button{display:none!important}}</style></head><body>';
+    html += '<div style="display:flex;justify-content:space-between;border-bottom:3px solid #1a2340;padding-bottom:10px;margin-bottom:16px">';
+    html += '<div><img src="https://i.imgur.com/jeqtcE2.png" alt="ALFA.CO" style="height:44px;width:auto;display:block">';
+    html += '<div style="font-size:11px;color:#888">'+bxe(s.branchName||s.entityName||'')+'</div></div>';
+    html += '<div style="text-align:right"><div style="font-size:16px;font-weight:800;color:#1a2340">OVERTIME REPORT</div>';
+    html += '<div style="font-size:11px;color:#64748b">'+moLabel+'</div>';
+    html += '<div style="font-size:11px;font-weight:700;color:#b45309;margin-top:4px">Total: '+thh+'h'+(tmm?tmm+'m':'')+' &mdash; '+approved.length+' records</div></div></div>';
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px">';
+    html += '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;text-align:center"><div style="font-size:22px;font-weight:300;font-family:monospace;color:#1a2340">'+approved.length+'</div><div style="font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:1px">Total Records</div></div>';
+    html += '<div style="background:#e0f2fe;border:1px solid #bae6fd;border-radius:8px;padding:12px;text-align:center"><div style="font-size:22px;font-weight:300;font-family:monospace;color:#0369a1">'+alfaList.length+'</div><div style="font-size:9px;color:#0369a1;text-transform:uppercase;letter-spacing:1px">ALFA Staff</div></div>';
+    html += '<div style="background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:12px;text-align:center"><div style="font-size:22px;font-weight:300;font-family:monospace;color:#92400e">'+tpList.length+'</div><div style="font-size:9px;color:#92400e;text-transform:uppercase;letter-spacing:1px">3rd Party</div></div>';
+    html += '</div>';
+    html += '<table><thead><tr><th>Name</th><th>SAP</th><th>Date</th><th style="text-align:center">OT Hours</th><th>Note</th><th>Approved By</th></tr></thead><tbody>';
+    html += '<tr><td colspan="6" class="section-hdr">ALFA Staff ('+alfaList.length+' records)</td></tr>';
+    if(alfaList.length){
+      html += makeRows(alfaList,'#b45309');
+      var am=alfaList.reduce(function(s,r){return s+(r.otMins||0);},0);
+      html += '<tr style="background:#f8f8f8;font-weight:700"><td colspan="3" style="padding:7px 10px">ALFA SUBTOTAL</td><td style="padding:7px 10px;text-align:center;font-family:monospace;color:#0369a1">'+Math.floor(am/60)+'h'+(am%60?am%60+'m':'')+'</td><td colspan="2"></td></tr>';
+    } else { html += '<tr><td colspan="6" style="text-align:center;padding:16px;color:#94a3b8">No ALFA staff OT</td></tr>'; }
+    html += '<tr><td colspan="6" class="section-hdr">3rd Party Staff ('+tpList.length+' records)</td></tr>';
+    if(tpList.length){
+      html += makeRows(tpList,'#92400e');
+      var tm=tpList.reduce(function(s,r){return s+(r.otMins||0);},0);
+      html += '<tr style="background:#f8f8f8;font-weight:700"><td colspan="3" style="padding:7px 10px">3RD PARTY SUBTOTAL</td><td style="padding:7px 10px;text-align:center;font-family:monospace;color:#92400e">'+Math.floor(tm/60)+'h'+(tm%60?tm%60+'m':'')+'</td><td colspan="2"></td></tr>';
+    } else { html += '<tr><td colspan="6" style="text-align:center;padding:16px;color:#94a3b8">No 3rd party OT</td></tr>'; }
+    html += '</tbody></table>';
+    html += '<div class="foot"><div class="foot-cell">Prepared by</div><div class="foot-cell">HR / Operations Manager</div><div class="foot-cell">Date &amp; Stamp</div></div>';
+    html += '<div style="text-align:center;margin-top:16px"><button onclick="window.print()" style="background:#1a2340;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:13px;font-weight:700;cursor:pointer">Print / Save PDF</button></div>';
+    html += '</body></html>';
+    var w = window.open('','_blank','width=900,height=700');
+    if(w){w.document.write(html);w.document.close();}
+    else showToast('Allow pop-ups to print','error');
+  });
+}
+
+// COMPETITION TRACKING - BM MODULE
+// Firebase: branches/{branchId}/competitions/{compId}
+// branches/{branchId}/compSales/{compId}/{staffSap}/{date}
+
+function pBmCompetition() {
+  attachBranchListeners();
+  var s = NX.session || {};
+  var tab = BS.compTab || 'tracking';
+  var h = '<div class="page-header"><h1>&#x1F3C6; Competition Tracking</h1><p>Set sales categories, track server performance, rank staff by category contribution</p></div>';
+  h += '<div style="display:flex;gap:0;margin-bottom:20px;border-radius:10px;overflow:hidden;border:1px solid var(--border);background:var(--surface)">';
+  h += '<button onclick="BS.compTab=\'tracking\';navTo(\'bm-competition\')" style="flex:1;padding:10px;border:none;font-size:12px;font-weight:700;cursor:pointer;background:'+(tab==='tracking'?'var(--primary)':'var(--surface-2)')+';color:'+(tab==='tracking'?'#fff':'var(--text-secondary)')+'">\uD83D\uDCCA Tracking</button>';
+  h += '<button onclick="BS.compTab=\'setup\';navTo(\'bm-competition\')" style="flex:1;padding:10px;border:none;font-size:12px;font-weight:700;cursor:pointer;background:'+(tab==='setup'?'var(--primary)':'var(--surface-2)')+';color:'+(tab==='setup'?'#fff':'var(--text-secondary)')+'">\u2699\uFE0F Setup</button>';
+  h += '</div>';
+  if (tab === 'setup') { h += bmCompSetupHtml(s); }
+  else { h += bmCompTrackingHtml(s); }
+  return h;
+}
+
+function bmCompSetupHtml(s) {
+  var h = '';
+  h += '<div class="bcard" style="margin-bottom:16px">';
+  h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">';
+  h += '<div style="font-size:13px;font-weight:700">Active Competitions</div>';
+  h += '<button class="btn btn-primary btn-sm" onclick="bmContestShowCreate()">+ New Competition</button>';
+  h += '</div>';
+  h += '<div id="bm-comp-list"><div style="text-align:center;padding:30px;color:var(--text-tertiary)">Loading\u2026</div></div>';
+  h += '</div>';
+  h += '<div id="bm-comp-create-wrap" class="bcard" style="display:none;margin-bottom:16px">';
+  h += '<div style="font-size:13px;font-weight:700;margin-bottom:14px">\u2795 New Competition</div>';
+  h += '<div style="display:grid;grid-template-columns:2fr 1fr 1fr;gap:10px;margin-bottom:12px">';
+  h += '<div><label class="form-label">Competition Title</label><input class="bfi" id="comp-title" placeholder="e.g. July Sales Battle"></div>';
+  h += '<div><label class="form-label">Period</label><select class="bfi" id="comp-period"><option value="week">Weekly</option><option value="month">Monthly</option></select></div>';
+  h += '<div><label class="form-label">Start Date</label><input class="bfi" type="date" id="comp-start" value="'+bxe(TODAY_BS)+'"></div>';
+  h += '</div>';
+  h += '<div style="font-size:12px;font-weight:700;margin-bottom:10px;color:var(--text-secondary)">Sales Categories</div>';
+  h += '<div id="comp-cats-wrap"></div>';
+  h += '<button class="btn btn-sm" style="margin-bottom:12px" onclick="bmContestAddCatRow()">+ Add Category</button>';
+  h += '<div style="display:flex;gap:8px">';
+  h += '<button class="btn btn-primary" onclick="bmContestSave()">\uD83D\uDCBE Save Competition</button>';
+  h += '<button class="btn" onclick="document.getElementById(\'bm-comp-create-wrap\').style.display=\'none\'">Cancel</button>';
+  h += '</div></div>';
+  setTimeout(function() { bmContestLoadList(); }, 50);
+  return h;
+}
+
+function bmContestShowCreate() {
+  var wrap = document.getElementById('bm-comp-create-wrap');
+  if (wrap) { wrap.style.display = ''; document.getElementById('comp-cats-wrap').innerHTML = ''; _contestCatIdx=0; bmContestAddCatRow(); }
+}
+
+var _contestCatIdx = 0;
+function bmContestAddCatRow() {
+  var wrap = document.getElementById('comp-cats-wrap');
+  if (!wrap) return;
+  var idx = _contestCatIdx++;
+  var row = document.createElement('div');
+  row.id = 'comp-cat-row-'+idx;
+  row.style.cssText = 'display:grid;grid-template-columns:2fr 1fr auto;gap:8px;margin-bottom:8px;align-items:center';
+  row.innerHTML = '<input class="bfi" placeholder="Category name (e.g. Soft Drinks, Steaks)" data-cat-name="1">'+
+    '<input class="bfi" type="number" min="0" step="0.01" placeholder="Target SAR (optional)" data-cat-target="1">'+
+    '<button class="btn btn-sm" style="color:var(--danger);padding:7px 12px" onclick="this.closest(\'div\').remove()">\u2715</button>';
+  wrap.appendChild(row);
+}
+
+function bmContestSave() {
+  var s = NX.session || {};
+  if (!db || !s.branchId) { showToast('Not connected','error'); return; }
+  var title = (document.getElementById('comp-title')||{}).value||'';
+  var period = (document.getElementById('comp-period')||{}).value||'week';
+  var start = (document.getElementById('comp-start')||{}).value||TODAY_BS;
+  if (!title.trim()) { showToast('Enter a competition title','error'); return; }
+  var cats = [];
+  document.querySelectorAll('#comp-cats-wrap > div').forEach(function(row) {
+    var name = (row.querySelector('[data-cat-name]')||{}).value||'';
+    var target = parseFloat((row.querySelector('[data-cat-target]')||{}).value||0)||0;
+    if (name.trim()) cats.push({id:'cat_'+Date.now()+'_'+Math.random().toString(36).slice(2,6), name:name.trim(), target:target});
+  });
+  if (!cats.length) { showToast('Add at least one category','error'); return; }
+  var comp = {title:title.trim(), categories:cats, period:period, startDate:start, active:true, createdAt:Date.now()};
+  db.ref('branches/'+s.branchId+'/competitions').push(comp, function(err) {
+    if (err) { showToast('Error: '+err.message,'error'); return; }
+    showToast('Competition created \u2713','success');
+    document.getElementById('bm-comp-create-wrap').style.display = 'none';
+    bmContestLoadList();
+  });
+}
+
+function bmContestLoadList() {
+  var s = NX.session || {};
+  var el = document.getElementById('bm-comp-list');
+  if (!el || !db || !s.branchId) return;
+  db.ref('branches/'+s.branchId+'/competitions').limitToLast(20).once('value', function(snap) {
+    var all = snap.val() || {};
+    var keys = Object.keys(all).reverse();
+    if (!keys.length) { el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-tertiary)">No competitions yet. Create one above.</div>'; return; }
+    el.innerHTML = '<div class="btw"><div class="btw-s"><table class="btbl"><thead><tr>'+
+      '<th>Title</th><th>Period</th><th>Categories</th><th>Start</th><th>Status</th><th style="text-align:center">Action</th></tr></thead><tbody>'+
+      keys.map(function(k) {
+        var c = all[k];
+        var activeStr = c.active ? 'true' : 'false';
+        return '<tr>'+
+          '<td style="font-weight:600">'+bxe(c.title||'')+'</td>'+
+          '<td><span style="font-size:10px;background:var(--surface-2);padding:2px 8px;border-radius:8px">'+bxe(c.period||'week')+'</span></td>'+
+          '<td style="font-size:11px;color:var(--text-secondary)">'+(c.categories||[]).map(function(cat){return bxe(cat.name);}).join(', ')+'</td>'+
+          '<td class="bmono" style="font-size:11px">'+bxe(c.startDate||'')+'</td>'+
+          '<td>'+(c.active?'<span style="background:#e6f9f0;color:#065f46;border:1px solid #a7f3d0;border-radius:10px;padding:2px 8px;font-size:10px;font-weight:700">Active</span>':'<span style="background:#f1f5f9;color:#64748b;border-radius:10px;padding:2px 8px;font-size:10px">Closed</span>')+'</td>'+
+          '<td style="text-align:center;white-space:nowrap">'+
+          '<button class="btn btn-sm" style="margin-right:4px" data-k="'+bxe(k)+'" onclick="BS.compTab=\'tracking\';BS.activeCompId=this.dataset.k;navTo(\'bm-competition\')">&#x1F4CA; View</button>'+
+          '<button class="btn btn-sm" style="color:var(--danger)" data-k="'+bxe(k)+'" data-active="'+activeStr+'" onclick="bmContestToggleActive(this.dataset.k,this.dataset.active!==\'true\')">'+(c.active?'\u23F8 Close':'\u25B6 Re-open')+'</button></td></tr>';
+      }).join('')+
+      '</tbody></table></div></div>';
+  });
+}
+
+function bmContestToggleActive(k, val) {
+  var s = NX.session||{};
+  if (!db||!s.branchId) return;
+  db.ref('branches/'+s.branchId+'/competitions/'+k).update({active:!!val}, function() {
+    showToast('Updated','success');
+    bmContestLoadList();
+  });
+}
+
+function bmCompTrackingHtml(s) {
+  var h = '';
+  h += '<div class="bcard" style="margin-bottom:16px;padding:12px 16px">';
+  h += '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">';
+  h += '<div style="font-size:12px;font-weight:700;color:var(--text-secondary)">Competition:</div>';
+  h += '<select class="bfi" id="comp-sel" style="flex:1;max-width:280px;padding:7px 10px" onchange="bmContestLoad()"><option value="">&#x2014; Select Competition &#x2014;</option></select>';
+  h += '<div style="font-size:12px;font-weight:700;color:var(--text-secondary);margin-left:8px">View:</div>';
+  h += '<div style="display:flex;gap:0;border-radius:8px;overflow:hidden;border:1px solid var(--border)">';
+  h += '<button id="comp-view-week" onclick="bmCompSetView(\'week\')" style="padding:7px 14px;border:none;font-size:11px;font-weight:700;cursor:pointer;background:var(--primary);color:#fff">Week</button>';
+  h += '<button id="comp-view-month" onclick="bmCompSetView(\'month\')" style="padding:7px 14px;border:none;font-size:11px;font-weight:700;cursor:pointer;background:var(--surface-2);color:var(--text-secondary)">Month</button>';
+  h += '</div>';
+  h += '</div></div>';
+  h += '<div id="bm-comp-results"><div style="text-align:center;padding:40px;color:var(--text-tertiary)"><div style="font-size:40px;margin-bottom:8px">&#x1F3C6;</div>Select a competition to see results</div></div>';
+  setTimeout(function() { bmContestLoadSelector(); }, 50);
+  return h;
+}
+
+var _contestView = 'week';
+function bmContestSetView(v) {
+  _contestView = v;
+  ['week','month'].forEach(function(t) {
+    var btn = document.getElementById('comp-view-'+t);
+    if(btn){btn.style.background=(t===v)?'var(--primary)':'var(--surface-2)';btn.style.color=(t===v)?'#fff':'var(--text-secondary)';}
+  });
+  bmContestLoad();
+}
+
+function bmContestLoadSelector() {
+  var s = NX.session||{};
+  var sel = document.getElementById('comp-sel');
+  if (!sel||!db||!s.branchId) return;
+  db.ref('branches/'+s.branchId+'/competitions').limitToLast(20).once('value', function(snap) {
+    var all = snap.val()||{};
+    var keys = Object.keys(all).reverse();
+    sel.innerHTML = '<option value="">&#x2014; Select Competition &#x2014;</option>'+
+      keys.map(function(k){return '<option value="'+bxe(k)+'"'+(BS.activeCompId===k?' selected':'')+'>'+bxe(all[k].title||k)+(all[k].active?'':' [Closed]')+'</option>';}).join('');
+    if (BS.activeCompId) { sel.value = BS.activeCompId; bmContestLoad(); }
+  });
+}
+
+function bmContestLoad() {
+  var s = NX.session||{};
+  var sel = document.getElementById('comp-sel');
+  var compId = sel ? sel.value : (BS.activeCompId||'');
+  var el = document.getElementById('bm-comp-results');
+  if (!compId) {
+    if(el) el.innerHTML='<div style="text-align:center;padding:40px;color:var(--text-tertiary)"><div style="font-size:40px;margin-bottom:8px">&#x1F3C6;</div>Select a competition to see results</div>';
+    return;
+  }
+  BS.activeCompId = compId;
+  if (!el) return;
+  el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-tertiary)">Loading\u2026</div>';
+  db.ref('branches/'+s.branchId+'/competitions/'+compId).once('value', function(csnap) {
+    var comp = csnap.val();
+    if (!comp) { el.innerHTML='<div style="text-align:center;padding:30px;color:var(--text-tertiary)">Competition not found</div>'; return; }
+    db.ref('branches/'+s.branchId+'/compSales/'+compId).once('value', function(dsnap) {
+      var allData = dsnap.val()||{};
+      var cutoff = '';
+      if (_contestView === 'week') {
+        var d = new Date(); d.setDate(d.getDate() - ((d.getDay()+6)%7));
+        cutoff = d.toISOString().slice(0,10);
+      } else {
+        cutoff = new Date().toISOString().slice(0,7);
+      }
+      var staffAgg = {};
+      Object.keys(allData).forEach(function(sap) {
+        var dates = allData[sap];
+        Object.keys(dates||{}).forEach(function(dt) {
+          var rec = dates[dt];
+          if (_contestView==='week' && dt < cutoff) return;
+          if (_contestView==='month' && dt.slice(0,7) < cutoff.slice(0,7)) return;
+          if (!staffAgg[sap]) staffAgg[sap] = {name:rec.staffName||sap, sap:sap, cats:{}, grandTotal:0};
+          Object.keys(rec.entries||{}).forEach(function(catId) {
+            var amt = parseFloat(rec.entries[catId])||0;
+            staffAgg[sap].cats[catId] = (staffAgg[sap].cats[catId]||0) + amt;
+            staffAgg[sap].grandTotal += amt;
+          });
+        });
+      });
+      var staffList = Object.values(staffAgg).sort(function(a,b){return b.grandTotal-a.grandTotal;});
+      var cats = comp.categories||[];
+      var periodLabel = _contestView==='week' ? 'This Week' : 'This Month';
+      var topStaff = staffList[0];
+      var html = '';
+      html += '<div class="bgrid-4" style="margin-bottom:16px">';
+      html += '<div class="bsc"><div class="bsc-lbl">&#x1F451; Leader</div><div class="bsc-val" style="font-size:14px;color:#b45309">'+(topStaff?bxe(topStaff.name):'&#x2014;')+'</div></div>';
+      html += '<div class="bsc"><div class="bsc-lbl">Participants</div><div class="bsc-val bmono" style="color:var(--primary)">'+staffList.length+'</div></div>';
+      html += '<div class="bsc"><div class="bsc-lbl">Categories</div><div class="bsc-val bmono" style="color:#065f46">'+cats.length+'</div></div>';
+      html += '<div class="bsc"><div class="bsc-lbl">Period</div><div class="bsc-val" style="font-size:12px;color:var(--text-secondary)">'+periodLabel+'</div></div>';
+      html += '</div>';
+      if (!staffList.length) {
+        html += '<div style="text-align:center;padding:40px;color:var(--text-tertiary)"><div style="font-size:32px;margin-bottom:8px">&#x1F4CA;</div>No sales entries yet for '+periodLabel+'</div>';
+      } else {
+        html += '<div class="bcard" style="margin-bottom:16px">';
+        html += '<div style="font-size:13px;font-weight:700;margin-bottom:14px">&#x1F3C5; Leaderboard &#x2014; '+bxe(comp.title)+'</div>';
+        html += '<div class="btw"><div class="btw-s"><table class="btbl"><thead><tr>';
+        html += '<th style="width:40px">#</th><th>Staff</th>';
+        cats.forEach(function(cat){html+='<th style="text-align:center;min-width:90px">'+bxe(cat.name)+'</th>';});
+        html += '<th style="text-align:right">Total SAR</th></tr></thead><tbody>';
+        staffList.forEach(function(st, idx) {
+          var medal = idx===0?'&#x1F947;':idx===1?'&#x1F948;':idx===2?'&#x1F949;':String(idx+1);
+          var rowBg = idx===0?'background:#fffbeb;':'';
+          html += '<tr style="'+rowBg+'">';
+          html += '<td style="text-align:center;font-size:16px">'+medal+'</td>';
+          html += '<td><div style="font-weight:600">'+bxe(st.name)+'</div><div style="font-size:10px;color:var(--text-tertiary);font-family:var(--mono)">'+bxe(st.sap)+'</div></td>';
+          cats.forEach(function(cat) {
+            var amt = st.cats[cat.id]||0;
+            var grandForCat = staffList.reduce(function(s2,st2){return s2+(st2.cats[cat.id]||0);},0);
+            var pct = grandForCat > 0 ? Math.round(amt/grandForCat*100) : 0;
+            html += '<td style="text-align:center">';
+            if (amt > 0) {
+              html += '<div style="font-weight:700;font-family:var(--mono)">'+amt.toFixed(0)+'</div>';
+              html += '<div style="font-size:9px;color:var(--primary);font-weight:700">'+pct+'%</div>';
+              html += '<div style="height:4px;background:#e2e8f0;border-radius:2px;margin-top:3px"><div style="height:4px;background:var(--primary);border-radius:2px;width:'+pct+'%"></div></div>';
+            } else {
+              html += '<span style="color:var(--text-tertiary)">&#x2014;</span>';
+            }
+            html += '</td>';
+          });
+          html += '<td style="text-align:right;font-weight:700;font-family:var(--mono);color:#b45309">'+st.grandTotal.toFixed(2)+'</td>';
+          html += '</tr>';
+        });
+        html += '</tbody></table></div></div></div>';
+        // Bottom: lowest performers
+        if (staffList.length > 2) {
+          var lowest = staffList[staffList.length-1];
+          html += '<div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:12px">';
+          html += '<div style="font-size:28px">&#x1F4C9;</div><div>';
+          html += '<div style="font-size:11px;font-weight:700;color:#92400e">Needs Improvement</div>';
+          html += '<div style="font-size:12px;font-weight:600">'+bxe(lowest.name)+' &mdash; '+lowest.grandTotal.toFixed(2)+' SAR total</div>';
+          html += '</div></div>';
+        }
+      }
+      el.innerHTML = html;
+    });
+  });
+}
+
 
 // ── Missing branch helper stubs ──
 function clNxGetItem(clId,di,itemId){ clNxEnsureST(); try{return clNxState[clNxWk()][clId][di][itemId]||{};}catch(e){return {};} }
