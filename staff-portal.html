@@ -3830,56 +3830,153 @@ function spRenderCompForm(comp, compId) {
   var el = document.getElementById('comp-portal-active');
   if (!el) return;
   var today = new Date().toISOString().slice(0,10);
+  var cats = comp.categories || [];
   var h = '';
-  h += '<div class="ctitle"><div class="cdot" style="background:var(--accent)"></div>'+comp.title+'</div>';
+  h += '<div class="ctitle"><div class="cdot" style="background:var(--accent)"></div>'+escHtml(comp.title)+'</div>';
   h += '<div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap">';
-  h += '<span style="background:rgba(0,102,102,.10);color:var(--primary);border-radius:8px;padding:3px 10px;font-size:9px;font-family:var(--mono);font-weight:700;text-transform:uppercase">'+comp.period+'</span>';
+  h += '<span style="background:rgba(0,102,102,.10);color:var(--primary);border-radius:8px;padding:3px 10px;font-size:9px;font-family:var(--mono);font-weight:700;text-transform:uppercase">'+escHtml(comp.period)+'</span>';
   h += '<span style="background:rgba(0,166,61,.10);color:var(--success);border-radius:8px;padding:3px 10px;font-size:9px;font-family:var(--mono);font-weight:700">&#x1F7E2; ACTIVE</span>';
   h += '</div>';
-  h += '<div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:10px">Enter your sales for today:</div>';
+
+  // Date
   h += '<div class="fg"><label class="fl">Date</label><input class="fi" type="date" id="comp-entry-date" value="'+today+'"></div>';
-  var cats = comp.categories || [];
-  cats.forEach(function(cat) {
-    h += '<div class="fg"><label class="fl">'+escHtml(cat.name)+(cat.target?' &mdash; <span style="color:#b45309;font-size:9px">Target: '+cat.target.toFixed(0)+' SAR</span>':'')+'</label>';
-    h += '<input class="fi" type="number" min="0" step="0.01" placeholder="SAR amount" id="comp-cat-'+cat.id+'" oninput="spCompUpdateTotal()"></div>';
-  });
-  h += '<div style="background:rgba(0,102,102,.06);border-radius:10px;padding:10px 14px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center">';
-  h += '<div style="font-size:11px;font-weight:700;color:var(--text2)">Total Sales</div>';
-  h += '<div id="comp-entry-total" style="font-size:16px;font-weight:700;font-family:var(--mono);color:var(--primary)">0.00 SAR</div>';
+
+  // ── Total Sales field ──
+  h += '<div class="fg">';
+  h += '<label class="fl">Total Sales (SAR) <span style="color:var(--text3);font-size:9px;font-weight:400">— enter this first, then category % will auto-calculate</span></label>';
+  h += '<input class="fi" type="number" min="0" step="0.01" placeholder="e.g. 3500.00" id="comp-entry-grand-total" oninput="spCompOnTotalChange()">';
   h += '</div>';
+
+  // ── Category rows ──
+  h += '<div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin:14px 0 10px">Categories</div>';
+  cats.forEach(function(cat) {
+    h += '<div style="margin-bottom:12px">';
+    h += '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px">';
+    h += '<label class="fl" style="margin:0">'+escHtml(cat.name)+(cat.target?' <span style="color:#b45309;font-size:9px">Target: '+cat.target.toFixed(0)+' SAR</span>':'')+'</label>';
+    h += '<span id="comp-pct-'+cat.id+'" style="font-size:11px;font-weight:700;font-family:var(--mono);color:var(--primary)">0%</span>';
+    h += '</div>';
+    // Two inputs side by side: SAR | %
+    h += '<div style="display:grid;grid-template-columns:1fr 100px;gap:8px">';
+    h += '<input class="fi" type="number" min="0" step="0.01" placeholder="SAR amount" id="comp-cat-'+cat.id+'" oninput="spCompOnAmtChange(\''+cat.id+'\')">';
+    h += '<input class="fi" type="number" min="0" max="100" step="0.1" placeholder="%" id="comp-pct-inp-'+cat.id+'" oninput="spCompOnPctChange(\''+cat.id+'\')" style="text-align:center">';
+    h += '</div>';
+    // Progress bar
+    h += '<div style="height:4px;background:rgba(0,0,0,.07);border-radius:2px;margin-top:5px"><div id="comp-bar-'+cat.id+'" style="height:4px;background:var(--primary);border-radius:2px;width:0%;transition:width .2s"></div></div>';
+    h += '</div>';
+  });
+
+  // ── Summary row ──
+  h += '<div style="background:rgba(0,102,102,.07);border-radius:12px;padding:12px 14px;margin:16px 0 14px">';
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">';
+  h += '<div style="font-size:11px;font-weight:700;color:var(--text2)">Categories Total</div>';
+  h += '<div id="comp-cats-sum" style="font-size:15px;font-weight:700;font-family:var(--mono);color:var(--primary)">0.00 SAR</div>';
+  h += '</div>';
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
+  h += '<div style="font-size:11px;font-weight:700;color:var(--text2)">Grand Total (entered)</div>';
+  h += '<div id="comp-grand-display" style="font-size:15px;font-weight:700;font-family:var(--mono);color:#b45309">0.00 SAR</div>';
+  h += '</div>';
+  h += '<div id="comp-pct-alloc" style="font-size:10px;font-family:var(--mono);color:var(--text3);text-align:center">0% of total allocated to categories</div>';
+  h += '<div style="height:6px;background:rgba(0,0,0,.07);border-radius:3px;margin-top:8px"><div id="comp-alloc-bar" style="height:6px;background:var(--success);border-radius:3px;width:0%;transition:width .3s"></div></div>';
+  h += '</div>';
+
   h += '<button class="btnp" onclick="spCompSubmit()">&#x2713; Submit My Sales</button>';
   el.innerHTML = h;
 }
 
-function spCompUpdateTotal() {
+function spCompOnTotalChange() {
+  // When grand total changes, update % display and recalc any % inputs
+  var grand = parseFloat((document.getElementById('comp-entry-grand-total')||{}).value||0)||0;
+  var el = document.getElementById('comp-grand-display');
+  if(el) el.textContent = grand.toFixed(2) + ' SAR';
+  // Update pct display for each cat based on current SAR input
   if (!_spCompData) return;
-  var total = 0;
   (_spCompData.categories||[]).forEach(function(cat) {
-    var inp = document.getElementById('comp-cat-'+cat.id);
-    total += parseFloat((inp||{}).value||0)||0;
+    var amt = parseFloat((document.getElementById('comp-cat-'+cat.id)||{}).value||0)||0;
+    _spCompSyncCatPct(cat.id, amt, grand);
   });
-  var el = document.getElementById('comp-entry-total');
-  if(el) el.textContent = total.toFixed(2) + ' SAR';
+  _spCompUpdateSummary();
 }
+
+function spCompOnAmtChange(catId) {
+  // SAR typed → update % display
+  var grand = parseFloat((document.getElementById('comp-entry-grand-total')||{}).value||0)||0;
+  var amt = parseFloat((document.getElementById('comp-cat-'+catId)||{}).value||0)||0;
+  _spCompSyncCatPct(catId, amt, grand);
+  _spCompUpdateSummary();
+}
+
+function spCompOnPctChange(catId) {
+  // % typed → calculate SAR from grand total
+  var grand = parseFloat((document.getElementById('comp-entry-grand-total')||{}).value||0)||0;
+  var pct = parseFloat((document.getElementById('comp-pct-inp-'+catId)||{}).value||0)||0;
+  if (grand > 0 && pct > 0) {
+    var amt = grand * pct / 100;
+    var amtEl = document.getElementById('comp-cat-'+catId);
+    if(amtEl) amtEl.value = amt.toFixed(2);
+  }
+  var amt2 = parseFloat((document.getElementById('comp-cat-'+catId)||{}).value||0)||0;
+  _spCompSyncCatPct(catId, amt2, grand);
+  _spCompUpdateSummary();
+}
+
+function _spCompSyncCatPct(catId, amt, grand) {
+  var pct = (grand > 0 && amt > 0) ? Math.round(amt / grand * 1000) / 10 : 0;
+  // Update badge label
+  var badge = document.getElementById('comp-pct-'+catId);
+  if(badge) badge.textContent = pct.toFixed(1) + '%';
+  // Update % input field (only if not focused)
+  var pctInp = document.getElementById('comp-pct-inp-'+catId);
+  if(pctInp && document.activeElement !== pctInp) pctInp.value = pct > 0 ? pct.toFixed(1) : '';
+  // Update bar (as % of grand total)
+  var bar = document.getElementById('comp-bar-'+catId);
+  if(bar) bar.style.width = Math.min(pct, 100) + '%';
+}
+
+function _spCompUpdateSummary() {
+  if (!_spCompData) return;
+  var grand = parseFloat((document.getElementById('comp-entry-grand-total')||{}).value||0)||0;
+  var catsTotal = 0;
+  (_spCompData.categories||[]).forEach(function(cat) {
+    catsTotal += parseFloat((document.getElementById('comp-cat-'+cat.id)||{}).value||0)||0;
+  });
+  var sumEl = document.getElementById('comp-cats-sum');
+  if(sumEl) sumEl.textContent = catsTotal.toFixed(2) + ' SAR';
+  var allocPct = grand > 0 ? Math.round(catsTotal / grand * 100) : 0;
+  var allocEl = document.getElementById('comp-pct-alloc');
+  if(allocEl) allocEl.textContent = allocPct + '% of total allocated to categories';
+  var allocBar = document.getElementById('comp-alloc-bar');
+  if(allocBar) {
+    allocBar.style.width = Math.min(allocPct, 100) + '%';
+    allocBar.style.background = allocPct >= 95 ? 'var(--success)' : allocPct > 50 ? 'var(--primary)' : 'var(--warning)';
+  }
+}
+
+// Keep old name as alias for backward compat
+function spCompUpdateTotal() { _spCompUpdateSummary(); }
 
 function spCompSubmit() {
   var u = CU;
   if (!u || !u.branchId || !_spCompId || !_spCompData) { showToast('Not connected','error'); return; }
   var date = (document.getElementById('comp-entry-date')||{}).value||'';
   if (!date) { showToast('Select a date','error'); return; }
+  var grandTotal = parseFloat((document.getElementById('comp-entry-grand-total')||{}).value||0)||0;
   var entries = {};
-  var total = 0;
+  var catsTotal = 0;
   (_spCompData.categories||[]).forEach(function(cat) {
     var amt = parseFloat((document.getElementById('comp-cat-'+cat.id)||{}).value||0)||0;
     entries[cat.id] = amt;
-    total += amt;
+    catsTotal += amt;
   });
-  if (total <= 0) { showToast('Enter at least one sales amount','error'); return; }
+  // Use whichever is larger as the "total" — grand total or sum of categories
+  var total = Math.max(grandTotal, catsTotal);
+  if (total <= 0) { showToast('Enter your total sales or at least one category amount','error'); return; }
   var sap = String(u.sap || u.staffId || '');
   var rec = {
     staffName: u.name||'Staff',
     sap: sap,
     entries: entries,
+    catsTotal: catsTotal,
+    grandTotal: grandTotal || catsTotal,
     total: total,
     ts: Date.now()
   };

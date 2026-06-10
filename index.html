@@ -13821,8 +13821,11 @@ function bmContestLoad() {
           Object.keys(rec.entries||{}).forEach(function(catId) {
             var amt = parseFloat(rec.entries[catId])||0;
             staffAgg[sap].cats[catId] = (staffAgg[sap].cats[catId]||0) + amt;
-            staffAgg[sap].grandTotal += amt;
           });
+          // Use stored grandTotal if available (more accurate than sum of cats)
+          var recGrand = parseFloat(rec.grandTotal||rec.total||0)||0;
+          var catSum = Object.values(rec.entries||{}).reduce(function(s,v){return s+(parseFloat(v)||0);},0);
+          staffAgg[sap].grandTotal += Math.max(recGrand, catSum);
         });
       });
       var staffList = Object.values(staffAgg).sort(function(a,b){return b.grandTotal-a.grandTotal;});
@@ -13840,11 +13843,12 @@ function bmContestLoad() {
         html += '<div style="text-align:center;padding:40px;color:var(--text-tertiary)"><div style="font-size:32px;margin-bottom:8px">&#x1F4CA;</div>No sales entries yet for '+periodLabel+'</div>';
       } else {
         html += '<div class="bcard" style="margin-bottom:16px">';
-        html += '<div style="font-size:13px;font-weight:700;margin-bottom:14px">&#x1F3C5; Leaderboard &#x2014; '+bxe(comp.title)+'</div>';
+        html += '<div style="font-size:13px;font-weight:700;margin-bottom:6px">&#x1F3C5; Leaderboard &#x2014; '+bxe(comp.title)+'</div>';
+        html += '<div style="font-size:10px;color:var(--text-tertiary);margin-bottom:14px">SAR &bull; <span style="color:var(--primary)">% of own total</span> &bull; <span style="color:#b45309">% vs category best</span></div>';
         html += '<div class="btw"><div class="btw-s"><table class="btbl"><thead><tr>';
         html += '<th style="width:40px">#</th><th>Staff</th>';
-        cats.forEach(function(cat){html+='<th style="text-align:center;min-width:90px">'+bxe(cat.name)+'</th>';});
-        html += '<th style="text-align:right">Total SAR</th></tr></thead><tbody>';
+        cats.forEach(function(cat){html+='<th style="text-align:center;min-width:100px">'+bxe(cat.name)+'</th>';});
+        html += '<th style="text-align:right">Grand Total</th></tr></thead><tbody>';
         staffList.forEach(function(st, idx) {
           var medal = idx===0?'&#x1F947;':idx===1?'&#x1F948;':idx===2?'&#x1F949;':String(idx+1);
           var rowBg = idx===0?'background:#fffbeb;':'';
@@ -13853,15 +13857,22 @@ function bmContestLoad() {
           html += '<td><div style="font-weight:600">'+bxe(st.name)+'</div><div style="font-size:10px;color:var(--text-tertiary);font-family:var(--mono)">'+bxe(st.sap)+'</div></td>';
           cats.forEach(function(cat) {
             var amt = st.cats[cat.id]||0;
-            var grandForCat = staffList.reduce(function(s2,st2){return s2+(st2.cats[cat.id]||0);},0);
-            var pct = grandForCat > 0 ? Math.round(amt/grandForCat*100) : 0;
-            html += '<td style="text-align:center">';
+            // % of this staff's own grand total
+            var pctOfOwn = st.grandTotal > 0 ? Math.round(amt / st.grandTotal * 1000) / 10 : 0;
+            // best in category across all staff
+            var catBest = staffList.reduce(function(b,st2){return Math.max(b, st2.cats[cat.id]||0);}, 0);
+            // % vs best in this category
+            var pctVsBest = catBest > 0 ? Math.round(amt / catBest * 100) : 0;
+            html += '<td style="text-align:center;padding:6px 4px">';
             if (amt > 0) {
-              html += '<div style="font-weight:700;font-family:var(--mono)">'+amt.toFixed(0)+'</div>';
-              html += '<div style="font-size:9px;color:var(--primary);font-weight:700">'+pct+'%</div>';
-              html += '<div style="height:4px;background:#e2e8f0;border-radius:2px;margin-top:3px"><div style="height:4px;background:var(--primary);border-radius:2px;width:'+pct+'%"></div></div>';
+              html += '<div style="font-weight:700;font-family:var(--mono);font-size:12px">'+amt.toFixed(0)+'</div>';
+              html += '<div style="display:flex;justify-content:center;gap:6px;margin-top:2px">';
+              html += '<span style="font-size:9px;font-weight:700;color:var(--primary);background:rgba(0,102,102,.08);border-radius:6px;padding:1px 5px">'+pctOfOwn.toFixed(1)+'%</span>';
+              html += '<span style="font-size:9px;font-weight:700;color:#b45309;background:rgba(180,83,9,.08);border-radius:6px;padding:1px 5px">'+pctVsBest+'%&#x2605;</span>';
+              html += '</div>';
+              html += '<div style="height:3px;background:#e2e8f0;border-radius:2px;margin-top:4px"><div style="height:3px;background:var(--primary);border-radius:2px;width:'+Math.min(pctVsBest,100)+'%"></div></div>';
             } else {
-              html += '<span style="color:var(--text-tertiary)">&#x2014;</span>';
+              html += '<span style="color:var(--text-tertiary);font-size:12px">&#x2014;</span>';
             }
             html += '</td>';
           });
