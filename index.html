@@ -13754,8 +13754,8 @@ function bmCompTrackingHtml(s) {
   h += '<select class="bfi" id="comp-sel" style="flex:1;max-width:280px;padding:7px 10px" onchange="bmContestLoad()"><option value="">&#x2014; Select Competition &#x2014;</option></select>';
   h += '<div style="font-size:12px;font-weight:700;color:var(--text-secondary);margin-left:8px">View:</div>';
   h += '<div style="display:flex;gap:0;border-radius:8px;overflow:hidden;border:1px solid var(--border)">';
-  h += '<button id="comp-view-week" onclick="bmCompSetView(\'week\')" style="padding:7px 14px;border:none;font-size:11px;font-weight:700;cursor:pointer;background:var(--primary);color:#fff">Week</button>';
-  h += '<button id="comp-view-month" onclick="bmCompSetView(\'month\')" style="padding:7px 14px;border:none;font-size:11px;font-weight:700;cursor:pointer;background:var(--surface-2);color:var(--text-secondary)">Month</button>';
+  h += '<button id="comp-view-week" onclick="bmContestSetView(\'week\')" style="padding:7px 14px;border:none;font-size:11px;font-weight:700;cursor:pointer;background:var(--primary);color:#fff">Week</button>';
+  h += '<button id="comp-view-month" onclick="bmContestSetView(\'month\')" style="padding:7px 14px;border:none;font-size:11px;font-weight:700;cursor:pointer;background:var(--surface-2);color:var(--text-secondary)">Month</button>';
   h += '</div>';
   h += '</div></div>';
   h += '<div id="bm-comp-results"><div style="text-align:center;padding:40px;color:var(--text-tertiary)"><div style="font-size:40px;margin-bottom:8px">&#x1F3C6;</div>Select a competition to see results</div></div>';
