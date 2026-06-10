@@ -280,8 +280,84 @@ textarea.fi{resize:vertical;min-height:80px}
 .mni{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;font-size:9px;font-family:var(--mono);color:var(--text3);transition:color .15s;border:none;background:transparent;padding:6px 0}
 .mni.active{color:var(--primary)}
 .mnico{font-size:20px}
-@media(max-width:640px){.sidebar{display:none}#mobnav{display:flex}.main-content{padding-bottom:72px}.ltg{grid-template-columns:repeat(2,1fr)}.g3{grid-template-columns:1fr 1fr}}
-@media(min-width:641px){#mobnav{display:none}}
+@media(max-width:640px){
+  .sidebar{display:none}
+  #mobnav{display:flex}
+  .main-content{padding-bottom:72px}
+  .ltg{grid-template-columns:repeat(2,1fr)}
+  .g3{grid-template-columns:1fr 1fr}
+  .mob-menu-btn{display:flex!important}
+}
+@media(min-width:641px){#mobnav{display:none}.mob-menu-btn{display:none!important}}
+
+/* Mobile nav drawer */
+#mob-nav-drawer{
+  display:none;
+  position:fixed;inset:0;z-index:500;
+  flex-direction:column;
+}
+#mob-nav-drawer.open{display:flex}
+#mob-nav-backdrop{
+  position:absolute;inset:0;
+  background:rgba(0,0,0,.35);
+  backdrop-filter:blur(2px);
+}
+#mob-nav-sheet{
+  position:absolute;
+  bottom:0;left:0;right:0;
+  background:var(--base);
+  border-radius:22px 22px 0 0;
+  box-shadow:0 -8px 40px rgba(0,0,0,.18);
+  max-height:82vh;
+  display:flex;flex-direction:column;
+  animation:sheetUp .22s cubic-bezier(.22,1,.36,1);
+}
+@keyframes sheetUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+#mob-nav-sheet .drag-bar{
+  width:40px;height:4px;border-radius:2px;
+  background:rgba(0,0,0,.12);
+  margin:12px auto 4px;flex-shrink:0;
+}
+#mob-nav-sheet .sheet-hdr{
+  padding:4px 20px 12px;
+  font-size:9px;font-weight:700;color:var(--text3);
+  font-family:var(--mono);text-transform:uppercase;letter-spacing:.14em;
+  flex-shrink:0;
+}
+#mob-nav-inner{
+  overflow-y:auto;
+  padding:0 12px 24px;
+  flex:1;
+}
+#mob-nav-inner .mob-sb-item{
+  display:flex;align-items:center;gap:14px;
+  padding:13px 14px;border-radius:14px;
+  cursor:pointer;font-size:13px;font-weight:700;
+  color:var(--text2);font-family:var(--font);
+  border:none;background:transparent;
+  width:100%;text-align:left;
+  transition:all .12s;
+}
+#mob-nav-inner .mob-sb-item .msi{font-size:20px;width:28px;text-align:center;flex-shrink:0}
+#mob-nav-inner .mob-sb-item:active{background:rgba(0,102,102,.08);transform:scale(.98)}
+#mob-nav-inner .mob-sb-item.active{background:var(--base);box-shadow:var(--raise-sm);color:var(--primary)}
+#mob-nav-inner .mob-sb-sec{
+  font-size:8px;font-weight:700;color:var(--text3);
+  text-transform:uppercase;letter-spacing:.16em;
+  font-family:var(--mono);padding:14px 14px 6px;
+}
+#mob-nav-inner .mob-sb-div{height:1px;background:rgba(0,0,0,.06);margin:6px 0}
+/* Hamburger button in header */
+.mob-menu-btn{
+  display:none;
+  background:var(--base);border:none;border-radius:10px;
+  box-shadow:var(--raise-sm);padding:8px 11px;cursor:pointer;
+  flex-direction:column;gap:4px;align-items:center;justify-content:center;
+  flex-shrink:0;transition:all .15s;
+}
+.mob-menu-btn:active{box-shadow:var(--inset-sm)}
+.mob-menu-btn span{display:block;width:16px;height:2px;background:var(--text);border-radius:2px;transition:all .2s}
+
 </style>
 </head>
 <body>
@@ -361,6 +437,9 @@ textarea.fi{resize:vertical;min-height:80px}
 <!-- APP -->
 <div id="app">
   <div class="app-hdr">
+    <button class="mob-menu-btn" onclick="mobNavOpen()" aria-label="Menu">
+      <span></span><span></span><span></span>
+    </button>
     <div class="hdr-ico" id="hdr-ico">👤</div>
     <div>
       <div class="hdr-title" id="hdr-name">—</div>
@@ -384,6 +463,7 @@ textarea.fi{resize:vertical;min-height:80px}
       <button class="sb-item" onclick="showPage('training')" id="si-training"><span class="si">📚</span>Training</button>
       <button class="sb-item" onclick="showPage('briefing')" id="si-briefing"><span class="si">📋</span>Briefing & Tasks</button>
       <button class="sb-item" onclick="showPage('competition')" id="si-competition"><span class="si">🏆</span>Competition</button>
+      <button class="sb-item" onclick="showPage('server-drop')" id="si-server-drop"><span class="si">💰</span>Server Drop</button>
       <button class="sb-item" onclick="showPage('id-status')" id="si-id-status"><span class="si">🪪</span>ID & Documents</button>
       <div class="sb-div"></div>
       <div class="sb-sec" id="cap-sec" style="display:none">Captain Tools</div>
@@ -750,16 +830,146 @@ textarea.fi{resize:vertical;min-height:80px}
         </div>
       </div>
 
+
+      <!-- SERVER DROP PAGE -->
+      <div class="page" id="page-server-drop">
+        <div style="padding:20px 0 0">
+          <div class="sechdr">
+            <div><h2>&#x1F4B0; Server Drop</h2><div class="sechdr-sub">DAILY SALES &amp; DROP ENTRY</div></div>
+            <span id="sd-status-badge" style="margin-left:auto;display:none"></span>
+          </div>
+
+          <!-- Already Submitted Banner -->
+          <div id="sd-submitted-banner" style="display:none" class="card" style="background:rgba(0,166,61,.07);border:1px solid rgba(0,166,61,.25)">
+            <div style="display:flex;align-items:center;gap:12px;padding:4px 0">
+              <div style="font-size:28px">&#x2705;</div>
+              <div>
+                <div style="font-size:13px;font-weight:700;color:var(--success)">Drop Submitted</div>
+                <div id="sd-submitted-time" style="font-size:10px;color:var(--text3);font-family:var(--mono)"></div>
+              </div>
+              <button class="btnp" style="margin-left:auto;padding:8px 16px;font-size:11px;background:var(--primary)" onclick="sdResubmit()">Re-submit</button>
+            </div>
+          </div>
+
+          <!-- Entry Form -->
+          <div id="sd-form-wrap">
+            <!-- Date -->
+            <div class="card">
+              <div class="ctitle"><div class="cdot" style="background:var(--primary)"></div>Date</div>
+              <div class="fg"><label class="fl">Drop Date</label>
+                <input class="fi" type="date" id="sd-date" onchange="sdCheckExisting(this.value)">
+              </div>
+            </div>
+
+            <!-- Sales Summary -->
+            <div class="card">
+              <div class="ctitle"><div class="cdot" style="background:var(--primary)"></div>Sales Summary</div>
+              <div class="fg"><label class="fl">Total Sales (System) <span style="color:var(--text3);font-size:9px">— from POS</span></label>
+                <input class="fi" type="number" id="sd-total" step="0.01" placeholder="0.00" oninput="sdCalcBal()">
+              </div>
+              <div class="fg"><label class="fl">Cash Sales <span style="color:var(--text3);font-size:9px">— cash in hand</span></label>
+                <input class="fi" type="number" id="sd-cash" step="0.01" placeholder="0.00" oninput="sdCalcBal()">
+              </div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                <div class="fg"><label class="fl">MADA</label><input class="fi" type="number" id="sd-mada" step="0.01" placeholder="0.00" oninput="sdCalcBal()"></div>
+                <div class="fg"><label class="fl">VISA</label><input class="fi" type="number" id="sd-visa" step="0.01" placeholder="0.00" oninput="sdCalcBal()"></div>
+                <div class="fg"><label class="fl">Master Card</label><input class="fi" type="number" id="sd-mc" step="0.01" placeholder="0.00" oninput="sdCalcBal()"></div>
+                <div class="fg"><label class="fl">AMEX</label><input class="fi" type="number" id="sd-amex" step="0.01" placeholder="0.00" oninput="sdCalcBal()"></div>
+                <div class="fg"><label class="fl">Qlub</label><input class="fi" type="number" id="sd-qlub" step="0.01" placeholder="0.00" oninput="sdCalcBal()"></div>
+                <div class="fg"><label class="fl">Loyalty</label><input class="fi" type="number" id="sd-loyalty" step="0.01" placeholder="0.00" oninput="sdCalcBal()"></div>
+                <div class="fg"><label class="fl">Delivery Sales</label><input class="fi" type="number" id="sd-delivery" step="0.01" placeholder="0.00" oninput="sdCalcBal()"></div>
+                <div class="fg"><label class="fl">VAT on Alfa</label><input class="fi" type="number" id="sd-vat" step="0.01" placeholder="0.00" oninput="sdCalcBal()"></div>
+              </div>
+            </div>
+
+            <!-- Balance Bar -->
+            <div class="card" style="background:rgba(0,102,102,.06);border:1px solid rgba(0,102,102,.15)">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+                <div style="text-align:center">
+                  <div style="font-size:9px;font-family:var(--mono);color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px">Cash Tips Deducted</div>
+                  <div id="sd-tips-total" style="font-size:16px;font-weight:700;font-family:var(--mono);color:var(--accent)">0.00</div>
+                </div>
+                <div style="text-align:center">
+                  <div style="font-size:9px;font-family:var(--mono);color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px">Cash to Drop</div>
+                  <div id="sd-drop-total" style="font-size:20px;font-weight:700;font-family:var(--mono);color:var(--primary)">0.00</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Tips -->
+            <div class="card">
+              <div class="ctitle" style="display:flex;align-items:center;justify-content:space-between">
+                <div style="display:flex;align-items:center;gap:8px"><div class="cdot" style="background:var(--accent)"></div><span>Credit Card Tips</span></div>
+                <button class="btnp" style="padding:6px 14px;font-size:10px;background:var(--accent)" onclick="sdAddTip()">+ Add Tip</button>
+              </div>
+              <div id="sd-tips-list"><div style="text-align:center;padding:12px;color:var(--text3);font-size:11px;font-family:var(--mono)">No tips added yet</div></div>
+            </div>
+
+            <!-- Voids -->
+            <div class="card">
+              <div class="ctitle" style="display:flex;align-items:center;justify-content:space-between">
+                <div style="display:flex;align-items:center;gap:8px"><div class="cdot" style="background:var(--danger)"></div><span>Voids</span></div>
+                <button class="btnp" style="padding:6px 14px;font-size:10px;background:var(--danger)" onclick="sdAddVoid()">+ Add Void</button>
+              </div>
+              <div id="sd-voids-list"><div style="text-align:center;padding:12px;color:var(--text3);font-size:11px;font-family:var(--mono)">No voids added</div></div>
+            </div>
+
+            <!-- Returns -->
+            <div class="card">
+              <div class="ctitle" style="display:flex;align-items:center;justify-content:space-between">
+                <div style="display:flex;align-items:center;gap:8px"><div class="cdot" style="background:var(--warning)"></div><span>Returns</span></div>
+                <button class="btnp" style="padding:6px 14px;font-size:10px;background:var(--warning);color:var(--text)" onclick="sdAddReturn()">+ Add Return</button>
+              </div>
+              <div id="sd-returns-list"><div style="text-align:center;padding:12px;color:var(--text3);font-size:11px;font-family:var(--mono)">No returns added</div></div>
+            </div>
+
+            <!-- Submit -->
+            <button class="btnp" id="sd-submit-btn" onclick="sdSubmit()" style="margin-bottom:24px">
+              &#x2713; Submit Drop
+            </button>
+          </div>
+
+        </div>
+      </div>
+
     </div><!-- /main-content -->
   </div><!-- /app-layout -->
 
   <div id="mobnav">
     <button class="mni active" onclick="showPage('dashboard')" id="mn-dashboard"><div class="mnico">📊</div>Home</button>
     <button class="mni" onclick="showPage('checkin')" id="mn-checkin"><div class="mnico">📍</div>Check-In</button>
-    <button class="mni" onclick="showPage('schedule')" id="mn-schedule"><div class="mnico">📅</div>Schedule</button>
-    <button class="mni" onclick="showPage('payslip')" id="mn-payslip"><div class="mnico">💵</div>Pay</button>
     <button class="mni" onclick="showPage('leave')" id="mn-leave"><div class="mnico">🏖️</div>Leave</button>
-    <button class="mni" onclick="showPage('training')" id="mn-training"><div class="mnico">📚</div>Training</button>
+    <button class="mni" onclick="showPage('server-drop')" id="mn-server-drop"><div class="mnico">💰</div>Drop</button>
+    <button class="mni" onclick="mobNavOpen()" id="mn-more"><div class="mnico">☰</div>More</button>
+  </div>
+
+  <!-- Mobile full nav drawer -->
+  <div id="mob-nav-drawer">
+    <div id="mob-nav-backdrop" onclick="mobNavClose()"></div>
+    <div id="mob-nav-sheet">
+      <div class="drag-bar"></div>
+      <div class="sheet-hdr">Navigation</div>
+      <div id="mob-nav-inner">
+        <div class="mob-sb-sec">My Workspace</div>
+        <button class="mob-sb-item" id="msi-dashboard"    onclick="mobNavGo('dashboard')">   <span class="msi">📊</span>Dashboard</button>
+        <button class="mob-sb-item" id="msi-checkin"      onclick="mobNavGo('checkin')">     <span class="msi">📍</span>Check-In</button>
+        <button class="mob-sb-item" id="msi-schedule"     onclick="mobNavGo('schedule')">    <span class="msi">📅</span>My Schedule</button>
+        <button class="mob-sb-item" id="msi-payslip"      onclick="mobNavGo('payslip')">     <span class="msi">💵</span>Pay Slips</button>
+        <button class="mob-sb-item" id="msi-history"      onclick="mobNavGo('history')">     <span class="msi">📂</span>History File</button>
+        <button class="mob-sb-item" id="msi-incidents"    onclick="mobNavGo('incidents')">   <span class="msi">⚠️</span>Incident Report</button>
+        <button class="mob-sb-item" id="msi-leave"        onclick="mobNavGo('leave')">       <span class="msi">🏖️</span>Annual Leave</button>
+        <button class="mob-sb-item" id="msi-training"     onclick="mobNavGo('training')">    <span class="msi">📚</span>Training</button>
+        <button class="mob-sb-item" id="msi-briefing"     onclick="mobNavGo('briefing')">    <span class="msi">📋</span>Briefing &amp; Tasks</button>
+        <button class="mob-sb-item" id="msi-competition"  onclick="mobNavGo('competition')"> <span class="msi">🏆</span>Competition</button>
+        <button class="mob-sb-item" id="msi-server-drop"  onclick="mobNavGo('server-drop')"> <span class="msi">💰</span>Server Drop</button>
+        <button class="mob-sb-item" id="msi-id-status"    onclick="mobNavGo('id-status')">   <span class="msi">🪪</span>ID &amp; Documents</button>
+        <div class="mob-sb-div"></div>
+        <div class="mob-sb-sec" id="msi-cap-sec" style="display:none">Captain Tools</div>
+        <button class="mob-sb-item" id="msi-cap-staff"    onclick="mobNavGo('cap-staff')"    style="display:none"><span class="msi">👥</span>Staff Overview</button>
+        <button class="mob-sb-item" id="msi-cap-training" onclick="mobNavGo('cap-training')" style="display:none"><span class="msi">🎓</span>Build Training</button>
+        <button class="mob-sb-item" id="msi-cap-notifs"   onclick="mobNavGo('cap-notifs')"   style="display:none"><span class="msi">🔔</span>Notifications</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -1151,6 +1361,7 @@ function launchPortal(sap, staffData) {
     document.getElementById('si-cap-staff').style.display = '';
     document.getElementById('si-cap-training').style.display = '';
     document.getElementById('si-cap-notifs').style.display = '';
+    mobNavSyncCaptain(true);
   }
 
   startClock();
@@ -1271,8 +1482,9 @@ function showPage(id) {
   var si = document.getElementById('si-' + id); if (si) si.classList.add('active');
   document.querySelectorAll('.mni').forEach(function(b) { b.classList.remove('active'); });
   var mi = document.getElementById('mn-' + id); if (mi) mi.classList.add('active');
-  document.querySelectorAll('.mni').forEach(function(i) { i.classList.remove('active'); });
-  var mn = document.getElementById('mn-' + id); if (mn) mn.classList.add('active');
+  // Sync drawer items
+  document.querySelectorAll('.mob-sb-item').forEach(function(b) { b.classList.remove('active'); });
+  var di = document.getElementById('msi-' + id); if (di) di.classList.add('active');
   // Page-specific on-navigate renders
   if (id === 'checkin') renderCheckIn();
   if (id === 'training') renderTraining();
@@ -1282,7 +1494,34 @@ function showPage(id) {
   if (id === 'briefing') renderBriefing();
   if (id === 'id-status') renderIdStatus();
   if (id === 'competition') spLoadCompetition();
+  if (id === 'server-drop') sdInit();
 }
+
+function mobNavOpen() {
+  var drawer = document.getElementById('mob-nav-drawer');
+  if (drawer) drawer.classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function mobNavClose() {
+  var drawer = document.getElementById('mob-nav-drawer');
+  if (drawer) drawer.classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+function mobNavGo(id) {
+  mobNavClose();
+  showPage(id);
+}
+
+// Sync captain items visibility in drawer
+function mobNavSyncCaptain(show) {
+  ['msi-cap-sec','msi-cap-staff','msi-cap-training','msi-cap-notifs'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.style.display = show ? '' : 'none';
+  });
+}
+
 
 /* ═══════════════════════════════════════════════════════
    DASHBOARD
@@ -4082,6 +4321,251 @@ function spLoadLeaderboard(compId) {
 }
 
 function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+
+// ═══════════════════════════════════════════════════════
+// SERVER DROP — STAFF PORTAL
+// Firebase: branches/{branchId}/dsr/{date}/server_drops/{id}
+//           branches/{branchId}/dsr/{date}/pending_drops/{id}
+// ═══════════════════════════════════════════════════════
+
+var _sdTips = [];
+var _sdVoids = [];
+var _sdReturns = [];
+var _sdSubmittedId = null;
+
+var SD_CARD_METHODS = ['MADA','VISA','Master Card','AMEX','Qlub','Other'];
+var SD_VOID_REASONS = ['Wrong item','Duplicate','Customer change','Quality issue','Out of stock','Manager discretion','Other'];
+
+function sdInit() {
+  var u = CU;
+  if (!u || !u.branchId) return;
+  // Set today's date
+  var today = new Date().toISOString().slice(0,10);
+  var dateEl = document.getElementById('sd-date');
+  if (dateEl) dateEl.value = today;
+  // Reset state
+  _sdTips = []; _sdVoids = []; _sdReturns = []; _sdSubmittedId = null;
+  sdRenderTips(); sdRenderVoids(); sdRenderReturns(); sdCalcBal();
+  sdClearFields();
+  // Check if already submitted today
+  sdCheckExisting(today);
+}
+
+function sdClearFields() {
+  ['sd-total','sd-cash','sd-mada','sd-visa','sd-mc','sd-amex','sd-qlub','sd-loyalty','sd-delivery','sd-vat'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  sdCalcBal();
+}
+
+function sdCheckExisting(date) {
+  var u = CU;
+  if (!db || !u.branchId) return;
+  var sap = String(u.sap || u.staffId || '');
+  var banner = document.getElementById('sd-submitted-banner');
+  var formWrap = document.getElementById('sd-form-wrap');
+  if (!banner || !formWrap) return;
+  db.ref('branches/'+u.branchId+'/dsr/'+date+'/server_drops').once('value', function(snap) {
+    var all = snap.val() || {};
+    var existing = Object.values(all).find(function(d) { return String(d.sap||d.name||'') === sap || d.name === u.name; });
+    if (existing) {
+      _sdSubmittedId = existing.id;
+      banner.style.display = '';
+      var timeEl = document.getElementById('sd-submitted-time');
+      if (timeEl) timeEl.textContent = 'Submitted at ' + new Date(existing.submittedAt||0).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+      // Pre-fill form for re-editing
+      sdPrefillForm(existing);
+    } else {
+      banner.style.display = 'none';
+    }
+  });
+}
+
+function sdPrefillForm(drop) {
+  var fields = {
+    'sd-total':drop.totalSales,'sd-cash':drop.cashSales,'sd-mada':drop.madaSales,
+    'sd-visa':drop.visaSales,'sd-mc':drop.mcSales,'sd-amex':drop.amexSales,
+    'sd-qlub':drop.qlubSales,'sd-loyalty':drop.loyaltySales,
+    'sd-delivery':drop.deliverySales,'sd-vat':drop.vatAlfaSales
+  };
+  Object.keys(fields).forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el && fields[id]) el.value = fields[id];
+  });
+  _sdTips = (drop.tips||[]).map(function(t){return Object.assign({},t);});
+  _sdVoids = (drop.voids||[]).map(function(v){return Object.assign({},v);});
+  _sdReturns = (drop.returns||[]).map(function(r){return Object.assign({},r);});
+  sdRenderTips(); sdRenderVoids(); sdRenderReturns(); sdCalcBal();
+}
+
+function sdResubmit() {
+  var banner = document.getElementById('sd-submitted-banner');
+  if (banner) banner.style.display = 'none';
+  _sdSubmittedId = null;
+}
+
+function sdUid() { return Date.now() + '' + Math.random().toString(36).substr(2,5); }
+function sdN(id) { return parseFloat((document.getElementById(id)||{}).value||0)||0; }
+
+function sdCalcBal() {
+  var cash = sdN('sd-cash');
+  var cardTips = _sdTips.reduce(function(a,t){ return a + (parseFloat(t.amount)||0); }, 0);
+  var drop = cash - cardTips;
+  var tipsEl = document.getElementById('sd-tips-total');
+  var dropEl = document.getElementById('sd-drop-total');
+  if (tipsEl) tipsEl.textContent = cardTips.toFixed(2);
+  if (dropEl) {
+    dropEl.textContent = drop.toFixed(2);
+    dropEl.style.color = drop < 0 ? 'var(--danger)' : 'var(--primary)';
+  }
+}
+
+// ── Tips ──
+function sdAddTip() {
+  _sdTips.push({id:sdUid(), method:'MADA', amount:'', approval:'', guest:''});
+  sdRenderTips();
+}
+function sdRmTip(id) {
+  _sdTips = _sdTips.filter(function(t){ return t.id !== id; });
+  sdRenderTips(); sdCalcBal();
+}
+function sdRenderTips() {
+  var list = document.getElementById('sd-tips-list');
+  if (!list) return;
+  if (!_sdTips.length) { list.innerHTML = '<div style="text-align:center;padding:12px;color:var(--text3);font-size:11px;font-family:var(--mono)">No tips added yet</div>'; return; }
+  list.innerHTML = _sdTips.map(function(t, i) {
+    var opts = SD_CARD_METHODS.map(function(m){ return '<option'+(t.method===m?' selected':'')+'>'+m+'</option>'; }).join('');
+    return '<div style="background:rgba(200,134,10,.06);border-radius:10px;padding:12px;margin-bottom:10px;border:1px solid rgba(200,134,10,.15)">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
+      '<div style="font-size:10px;font-weight:700;color:var(--accent);font-family:var(--mono)">TIP #'+(i+1)+'</div>' +
+      '<button style="background:none;border:none;color:var(--danger);font-size:16px;cursor:pointer;padding:0 4px" onclick="sdRmTip(\''+t.id+'\')">&#x2715;</button></div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
+      '<div class="fg"><label class="fl">Card Method</label><select class="fi" style="padding:10px" onchange="_sdTips['+i+'].method=this.value">'+opts+'</select></div>' +
+      '<div class="fg"><label class="fl">Amount SAR</label><input class="fi" type="number" step="0.01" placeholder="0.00" value="'+(t.amount||'')+'" oninput="_sdTips['+i+'].amount=this.value;sdCalcBal()"></div>' +
+      '<div class="fg"><label class="fl">Approval Code</label><input class="fi" placeholder="123456" value="'+escHtml(t.approval||'')+'" oninput="_sdTips['+i+'].approval=this.value"></div>' +
+      '<div class="fg"><label class="fl">Guest #</label><input class="fi" placeholder="Guest" value="'+escHtml(t.guest||'')+'" oninput="_sdTips['+i+'].guest=this.value"></div>' +
+      '</div></div>';
+  }).join('');
+}
+
+// ── Voids ──
+function sdAddVoid() {
+  _sdVoids.push({id:sdUid(), item:'', reason:'', check:'', manager:'', amount:''});
+  sdRenderVoids();
+}
+function sdRmVoid(id) {
+  _sdVoids = _sdVoids.filter(function(v){ return v.id !== id; });
+  sdRenderVoids();
+}
+function sdRenderVoids() {
+  var list = document.getElementById('sd-voids-list');
+  if (!list) return;
+  if (!_sdVoids.length) { list.innerHTML = '<div style="text-align:center;padding:12px;color:var(--text3);font-size:11px;font-family:var(--mono)">No voids added</div>'; return; }
+  list.innerHTML = _sdVoids.map(function(v, i) {
+    var rr = SD_VOID_REASONS.map(function(r){ return '<option'+(v.reason===r?' selected':'')+'>'+r+'</option>'; }).join('');
+    return '<div style="background:rgba(255,33,87,.05);border-radius:10px;padding:12px;margin-bottom:10px;border:1px solid rgba(255,33,87,.15)">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
+      '<div style="font-size:10px;font-weight:700;color:var(--danger);font-family:var(--mono)">VOID #'+(i+1)+'</div>' +
+      '<button style="background:none;border:none;color:var(--danger);font-size:16px;cursor:pointer;padding:0 4px" onclick="sdRmVoid(\''+v.id+'\')">&#x2715;</button></div>' +
+      '<div class="fg"><label class="fl">Item Name</label><input class="fi" placeholder="Item name" value="'+escHtml(v.item||'')+'" oninput="_sdVoids['+i+'].item=this.value"></div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
+      '<div class="fg"><label class="fl">Reason</label><select class="fi" style="padding:10px" onchange="_sdVoids['+i+'].reason=this.value"><option value="">Select\u2026</option>'+rr+'</select></div>' +
+      '<div class="fg"><label class="fl">Check #</label><input class="fi" placeholder="Check #" value="'+escHtml(v.check||'')+'" oninput="_sdVoids['+i+'].check=this.value"></div>' +
+      '<div class="fg"><label class="fl">Mgr Approved</label><input class="fi" placeholder="Manager name" value="'+escHtml(v.manager||'')+'" oninput="_sdVoids['+i+'].manager=this.value"></div>' +
+      '<div class="fg"><label class="fl">Amount SAR</label><input class="fi" type="number" step="0.01" placeholder="0.00" value="'+(v.amount||'')+'" oninput="_sdVoids['+i+'].amount=this.value"></div>' +
+      '</div></div>';
+  }).join('');
+}
+
+// ── Returns ──
+function sdAddReturn() {
+  _sdReturns.push({id:sdUid(), item:'', reason:'', check:'', manager:'', amount:''});
+  sdRenderReturns();
+}
+function sdRmReturn(id) {
+  _sdReturns = _sdReturns.filter(function(v){ return v.id !== id; });
+  sdRenderReturns();
+}
+function sdRenderReturns() {
+  var list = document.getElementById('sd-returns-list');
+  if (!list) return;
+  if (!_sdReturns.length) { list.innerHTML = '<div style="text-align:center;padding:12px;color:var(--text3);font-size:11px;font-family:var(--mono)">No returns added</div>'; return; }
+  list.innerHTML = _sdReturns.map(function(v, i) {
+    var rr = SD_VOID_REASONS.map(function(r){ return '<option'+(v.reason===r?' selected':'')+'>'+r+'</option>'; }).join('');
+    return '<div style="background:rgba(254,153,0,.06);border-radius:10px;padding:12px;margin-bottom:10px;border:1px solid rgba(254,153,0,.2)">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
+      '<div style="font-size:10px;font-weight:700;color:var(--warning);font-family:var(--mono)">RETURN #'+(i+1)+'</div>' +
+      '<button style="background:none;border:none;color:var(--danger);font-size:16px;cursor:pointer;padding:0 4px" onclick="sdRmReturn(\''+v.id+'\')">&#x2715;</button></div>' +
+      '<div class="fg"><label class="fl">Item Name</label><input class="fi" placeholder="Item name" value="'+escHtml(v.item||'')+'" oninput="_sdReturns['+i+'].item=this.value"></div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
+      '<div class="fg"><label class="fl">Reason</label><select class="fi" style="padding:10px" onchange="_sdReturns['+i+'].reason=this.value"><option value="">Select\u2026</option>'+rr+'</select></div>' +
+      '<div class="fg"><label class="fl">Check #</label><input class="fi" placeholder="Check #" value="'+escHtml(v.check||'')+'" oninput="_sdReturns['+i+'].check=this.value"></div>' +
+      '<div class="fg"><label class="fl">Mgr Approved</label><input class="fi" placeholder="Manager name" value="'+escHtml(v.manager||'')+'" oninput="_sdReturns['+i+'].manager=this.value"></div>' +
+      '<div class="fg"><label class="fl">Amount SAR</label><input class="fi" type="number" step="0.01" placeholder="0.00" value="'+(v.amount||'')+'" oninput="_sdReturns['+i+'].amount=this.value"></div>' +
+      '</div></div>';
+  }).join('');
+}
+
+// ── Submit ──
+function sdSubmit() {
+  var u = CU;
+  if (!u || !u.branchId) { showToast('Not logged in','error'); return; }
+  if (!db) { showToast('Not connected','error'); return; }
+  var date = (document.getElementById('sd-date')||{}).value || new Date().toISOString().slice(0,10);
+  var total = sdN('sd-total'), cash = sdN('sd-cash');
+  if (!total && !cash) { showToast('Enter at least your total or cash sales','error'); return; }
+  var btn = document.getElementById('sd-submit-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Submitting\u2026'; }
+  var dropId = _sdSubmittedId || sdUid();
+  var drop = {
+    id: dropId,
+    name: u.name || 'Staff',
+    sap: String(u.sap || u.staffId || ''),
+    date: date,
+    totalSales: (document.getElementById('sd-total')||{}).value||'0',
+    cashSales:  (document.getElementById('sd-cash')||{}).value||'0',
+    madaSales:    (document.getElementById('sd-mada')||{}).value||'',
+    visaSales:    (document.getElementById('sd-visa')||{}).value||'',
+    mcSales:      (document.getElementById('sd-mc')||{}).value||'',
+    amexSales:    (document.getElementById('sd-amex')||{}).value||'',
+    qlubSales:    (document.getElementById('sd-qlub')||{}).value||'',
+    loyaltySales: (document.getElementById('sd-loyalty')||{}).value||'',
+    deliverySales:(document.getElementById('sd-delivery')||{}).value||'',
+    vatAlfaSales: (document.getElementById('sd-vat')||{}).value||'',
+    tips:    _sdTips.map(function(t){ return Object.assign({},t,{status:'pending'}); }),
+    voids:   _sdVoids.map(function(v){ return Object.assign({},v,{status:'pending'}); }),
+    returns: _sdReturns.map(function(r){ return Object.assign({},r,{status:'pending'}); }),
+    submittedAt: Date.now()
+  };
+  var path = 'branches/'+u.branchId+'/dsr/'+date+'/server_drops/'+dropId;
+  db.ref(path).set(drop, function(err) {
+    if (btn) { btn.disabled = false; btn.textContent = '\u2713 Submit Drop'; }
+    if (err) { showToast('Submit failed: '+err.message,'error'); return; }
+    // Write pending_drops entry for BM
+    db.ref('branches/'+u.branchId+'/dsr/'+date+'/pending_drops/'+dropId).set({
+      id: dropId, name: drop.name, sap: drop.sap,
+      submittedAt: drop.submittedAt, status: 'pending'
+    });
+    // Notify BM
+    db.ref('branches/'+u.branchId+'/notifications').push({
+      type: 'server_drop',
+      staffName: u.name||'Staff',
+      sap: drop.sap,
+      body: 'Server drop submitted for ' + date + ' \u2014 SAR ' + parseFloat(drop.totalSales||0).toFixed(2),
+      time: new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}),
+      ts: Date.now()
+    });
+    _sdSubmittedId = dropId;
+    showToast('Drop submitted \u2713','success');
+    // Show success state
+    var banner = document.getElementById('sd-submitted-banner');
+    if (banner) { banner.style.display = ''; }
+    var timeEl = document.getElementById('sd-submitted-time');
+    if (timeEl) timeEl.textContent = 'Submitted at ' + new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+  });
+}
 
 
 </script>
