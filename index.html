@@ -12644,7 +12644,7 @@ function _dsrD(){var today=_dsrActiveDate();if(!BS.dsrState)BS.dsrState={};if(!B
 function dsrChangeDate(val){if(!val)return;BS.dsrActiveDate=val;BS._dsrLoaded=false;dsrLoadFromFirebase(function(){navTo('dsr');});}
 function dsrFbPath(dateStr){return 'branches/'+(NX.session&&NX.session.branchId)+'/dsr/'+(dateStr||_dsrActiveDate());}
 function dsrNav(tab){var D=_dsrD();D.tab=tab;navTo('dsr');}
-function dsrUp(k,v){var D=_dsrD();D[k]=v;dsrAutoSave();}
+function dsrUp(k,v){var D=_dsrD();D[k]=v;dsrAutoSave();if(k==='mfCompany'&&db&&NX.session&&NX.session.branchId){db.ref('branches/'+NX.session.branchId+'/dsr_master_file/mfCompany').set(v||'');}}
 function dsrRecalc(si){
   // If si provided, update just that server card; otherwise update all
   var D=_dsrD();
@@ -12685,9 +12685,9 @@ function dsrRecalc(si){
     var fs=document.getElementById('srv-fs-'+i);if(fs){fs.textContent=dl;fs.style.color=dc;}
   });
 }
-function dsrUpdArr(arr,idx,key,val){var D=_dsrD();if(D[arr]&&D[arr][idx])D[arr][idx][key]=val;dsrAutoSave();}
-function dsrRmArr(arr,idx){var D=_dsrD();if(D[arr])D[arr].splice(idx,1);navTo('dsr');}
-function dsrAddArr(arr){var D=_dsrD();var defaults={closedPetty:{id:buid(),desc:'',amount:''},ongoingPetty:{id:buid(),desc:'',amount:''},safeItems:{id:buid(),item:'',remark:''}};D[arr].push(defaults[arr]||{id:buid()});navTo('dsr');}
+function dsrUpdArr(arr,idx,key,val){var D=_dsrD();if(D[arr]&&D[arr][idx])D[arr][idx][key]=val;dsrAutoSave();if((arr==='closedPetty'||arr==='ongoingPetty'||arr==='safeItems')&&db&&NX.session&&NX.session.branchId){db.ref('branches/'+NX.session.branchId+'/dsr_master_file/'+arr).set(D[arr]||[]);}}
+function dsrRmArr(arr,idx){var D=_dsrD();if(D[arr])D[arr].splice(idx,1);if((arr==='closedPetty'||arr==='ongoingPetty'||arr==='safeItems')&&db&&NX.session&&NX.session.branchId){db.ref('branches/'+NX.session.branchId+'/dsr_master_file/'+arr).set(D[arr]||[]);}navTo('dsr');}
+function dsrAddArr(arr){var D=_dsrD();var defaults={closedPetty:{id:buid(),desc:'',amount:''},ongoingPetty:{id:buid(),desc:'',amount:''},safeItems:{id:buid(),item:'',remark:''}};D[arr].push(defaults[arr]||{id:buid()});if((arr==='closedPetty'||arr==='ongoingPetty'||arr==='safeItems')&&db&&NX.session&&NX.session.branchId){db.ref('branches/'+NX.session.branchId+'/dsr_master_file/'+arr).set(D[arr]||[]);}navTo('dsr');}
 function dsrAddDisc(){var D=_dsrD();D.discounts.push({id:buid(),type:'',amount:''});navTo('dsr');}
 function dsrAddPay(){var D=_dsrD();D.payments.push({id:buid(),method:'Cash',amount:''});navTo('dsr');}
 function dsrAddDeliv(){var D=_dsrD();D.delivery.push({id:buid(),platform:'',amount:'',orders:''});navTo('dsr');}
@@ -12711,6 +12711,11 @@ function dsrUpdDenom(k,v){
   if(!D.denoms)D.denoms={};
   D.denoms[k]=parseFloat(v)||0;
   dsrAutoSave();
+  // On Master File denom change — also persist to backup path
+  if((k.indexOf('mfh_')===0||k.indexOf('mfc_')===0)&&db&&NX.session&&NX.session.branchId){
+    var mfDenoms=Object.keys(D.denoms||{}).reduce(function(o,dk){if(dk.indexOf('mfh_')===0||dk.indexOf('mfc_')===0)o[dk]=D.denoms[dk];return o;},{});
+    db.ref('branches/'+NX.session.branchId+'/dsr_master_file/denoms').set(mfDenoms);
+  }
   // Deposit tab running total
   if(k.indexOf('dep_')===0){
     var tot=Object.keys(D.denoms).filter(function(dk){return dk.indexOf('dep_')===0;}).reduce(function(s,dk){
@@ -12799,6 +12804,18 @@ function dsrEndShiftConfirmed(){
   var activeDate=_dsrActiveDate();
   var D=BS.dsrState[activeDate]||{};
   {
+  // Save Master File data to persistent path BEFORE End Shift
+  var mfPersist={
+    mfCompany:D.mfCompany||'',
+    closedPetty:D.closedPetty||[],
+    ongoingPetty:D.ongoingPetty||[],
+    safeItems:D.safeItems||[],
+    denoms:Object.keys(D.denoms||{}).reduce(function(o,k){if(k.indexOf('mfh_')===0||k.indexOf('mfc_')===0)o[k]=(D.denoms||{})[k];return o;},{}),
+    _savedAt:new Date().toISOString()
+  };
+  if(db&&NX.session&&NX.session.branchId){
+    db.ref('branches/'+NX.session.branchId+'/dsr_master_file').set(mfPersist);
+  }
   // Mark shift as closed
   D.shiftClosed=true;
   D.shiftClosedAt=new Date().toISOString();
@@ -12887,6 +12904,26 @@ function dsrLoadFromFirebase(cb){
     if(data.date){
       // Always load from Firebase when explicitly called (date change or page load)
       BS.dsrState[activeDate]=Object.assign({tab:(BS.dsrState[activeDate]&&BS.dsrState[activeDate].tab)||'overview'},data);
+    }
+    // Restore Master File from persistent path if current date has empty MF data
+    var D2=BS.dsrState[activeDate]||{};
+    var hasMF=D2.mfCompany||(D2.closedPetty&&D2.closedPetty.length)||(D2.ongoingPetty&&D2.ongoingPetty.length)||(D2.safeItems&&D2.safeItems.length)||Object.keys(D2.denoms||{}).some(function(k){return k.indexOf('mfh_')===0||k.indexOf('mfc_')===0;});
+    if(!hasMF&&db&&NX.session&&NX.session.branchId){
+      db.ref('branches/'+NX.session.branchId+'/dsr_master_file').once('value',function(mfSnap){
+        var mf=mfSnap.val();
+        if(mf&&(mf.mfCompany||(mf.closedPetty&&mf.closedPetty.length)||(mf.ongoingPetty&&mf.ongoingPetty.length)||(mf.safeItems&&mf.safeItems.length)||Object.keys(mf.denoms||{}).length)){
+          var D3=BS.dsrState[activeDate];
+          if(D3){
+            if(mf.mfCompany&&!D3.mfCompany) D3.mfCompany=mf.mfCompany;
+            if(mf.closedPetty&&!D3.closedPetty.length) D3.closedPetty=mf.closedPetty;
+            if(mf.ongoingPetty&&!D3.ongoingPetty.length) D3.ongoingPetty=mf.ongoingPetty;
+            if(mf.safeItems&&!D3.safeItems.length) D3.safeItems=mf.safeItems;
+            if(mf.denoms){if(!D3.denoms)D3.denoms={};Object.keys(mf.denoms).forEach(function(k){if(!D3.denoms[k])D3.denoms[k]=mf.denoms[k];});}
+            // Save the restored state to Firebase so it persists
+            db.ref(dsrFbPath(activeDate)).update({mfCompany:D3.mfCompany,closedPetty:D3.closedPetty,ongoingPetty:D3.ongoingPetty,safeItems:D3.safeItems,denoms:D3.denoms});
+          }
+        }
+      });
     }
     // Merge server drops from standalone server-drop.html
     var drops=data.server_drops?Object.values(data.server_drops):[];
@@ -13768,7 +13805,8 @@ function bmContestLoadList() {
           '<td>'+(c.active?'<span style="background:#e6f9f0;color:#065f46;border:1px solid #a7f3d0;border-radius:10px;padding:2px 8px;font-size:10px;font-weight:700">Active</span>':'<span style="background:#f1f5f9;color:#64748b;border-radius:10px;padding:2px 8px;font-size:10px">Closed</span>')+'</td>'+
           '<td style="text-align:center;white-space:nowrap">'+
           '<button class="btn btn-sm" style="margin-right:4px" data-k="'+bxe(k)+'" onclick="BS.compTab=\'tracking\';BS.activeCompId=this.dataset.k;navTo(\'bm-competition\')">&#x1F4CA; View</button>'+
-          '<button class="btn btn-sm" style="color:var(--danger)" data-k="'+bxe(k)+'" data-active="'+activeStr+'" onclick="bmContestToggleActive(this.dataset.k,this.dataset.active!==\'true\')">'+(c.active?'\u23F8 Close':'\u25B6 Re-open')+'</button></td></tr>';
+          '<button class="btn btn-sm" style="margin-right:4px" data-k="'+bxe(k)+'" data-active="'+activeStr+'" onclick="bmContestToggleActive(this.dataset.k,this.dataset.active!==\'true\')">'+(c.active?'\u23F8 Close':'\u25B6 Re-open')+'</button>'+
+          '<button class="btn btn-sm" style="color:var(--danger)" data-k="'+bxe(k)+'" data-title="'+bxe(c.title||'')+'" onclick="bmContestDelete(this.dataset.k,this.dataset.title)">&#x1F5D1; Delete</button></td></tr>';
       }).join('')+
       '</tbody></table></div></div>';
   });
@@ -13779,6 +13817,30 @@ function bmContestToggleActive(k, val) {
   if (!db||!s.branchId) return;
   db.ref('branches/'+s.branchId+'/competitions/'+k).update({active:!!val}, function() {
     showToast('Updated','success');
+    bmContestLoadList();
+  });
+}
+
+function bmContestDelete(k, title) {
+  var s = NX.session||{};
+  if (!db||!s.branchId) return;
+  openModal('<div class="modal-head"><h2>&#x1F5D1; Delete Competition</h2><button class="modal-close" onclick="closeModalForce()">&#x2715;</button></div>'+
+    '<p style="margin:14px 0">Delete <strong>'+bxe(title||'this competition')+'</strong>?<br>'+
+    '<span style="font-size:11px;color:var(--text-tertiary)">This will also remove all sales entries for this competition. This cannot be undone.</span></p>'+
+    '<div style="display:flex;gap:8px;justify-content:flex-end">'+
+    '<button class="btn" onclick="closeModalForce()">Cancel</button>'+
+    '<button class="btn" style="background:var(--danger);color:#fff;border-color:var(--danger)" onclick="closeModalForce();bmContestDeleteConfirm(\''+bxe(k)+'\')">Delete</button>'+
+    '</div>');
+}
+
+function bmContestDeleteConfirm(k) {
+  var s = NX.session||{};
+  if (!db||!s.branchId) return;
+  db.ref('branches/'+s.branchId+'/competitions/'+k).remove(function(err) {
+    if (err) { showToast('Error: '+err.message,'error'); return; }
+    db.ref('branches/'+s.branchId+'/compSales/'+k).remove();
+    showToast('Competition deleted','success');
+    if (BS.activeCompId === k) BS.activeCompId = null;
     bmContestLoadList();
   });
 }
