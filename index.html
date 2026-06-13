@@ -12981,6 +12981,7 @@ function pBmBriefing() {
     h += '</div>';
 
     // Floor grid
+    h += '<div id="fm-status-banner" style="display:none;background:rgba(180,83,9,.07);border:1px solid rgba(180,83,9,.2);border-radius:10px;padding:9px 13px;margin-bottom:10px"></div>';
     h += '<div id="fm-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;min-height:80px"></div>';
 
     // Bulk assign panel
@@ -13008,43 +13009,38 @@ function pBmBriefing() {
     BS._fmFohOpts = fohOpts;
     BS._fmFohStaff = fohStaff;
     if(!BS._fmTables) BS._fmTables = [];
+    // _fmLoaded controls whether we fetch from Firebase on this tab open
+    // Reset it only if explicitly cleared — otherwise tables persist in memory
 
     setTimeout(function(){
-      bmFmRenderGrid();
-      bmFmUpdateBulkList();
-      // Load published floor maps
       var s2 = NX.session||{};
-      if(db && s2.branchId){
-        db.ref('branches/'+s2.branchId+'/floorMaps').limitToLast(5).once('value', function(snap){
-          var all = snap.val()||{};
-          var el = document.getElementById('fm-pub-list');
-          if(!el) return;
-          var days = Object.keys(all).sort().reverse();
-          if(!days.length){ el.innerHTML='<div style="text-align:center;color:var(--text-tertiary);font-size:12px;padding:20px">No floor maps published yet</div>'; return; }
-          var h2='';
-          days.forEach(function(d){
-            var maps = all[d]||{};
-            Object.values(maps).sort(function(a,b){return (b.ts||0)-(a.ts||0);}).forEach(function(m){
-              var shifts = m.tables||[];
-              var dt = m.ts ? new Date(m.ts).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : d;
-              h2 += '<div style="border-bottom:1px solid var(--border);padding:10px 0">';
-              h2 += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">';
-              h2 += '<span style="font-size:12px;font-weight:700;color:var(--text-primary)">'+xe(dt)+'</span>';
-              h2 += '<span style="font-size:10px;color:var(--text-tertiary)">by '+xe(m.by||'Manager')+'</span></div>';
-              h2 += '<div style="display:flex;flex-wrap:wrap;gap:5px">';
-              shifts.forEach(function(t){
-                var bg = t.staffName ? 'rgba(0,102,102,.1)' : 'rgba(0,0,0,.04)';
-                var bdr = t.staffName ? 'var(--primary)' : 'rgba(0,0,0,.2)';
-                h2 += '<div style="background:'+bg+';border:1.5px solid '+bdr+';border-radius:8px;padding:5px 9px;min-width:80px;text-align:center">';
-                h2 += '<div style="font-size:10px;font-weight:700;color:var(--text)">T'+xe(String(t.num||t.label||''))+'</div>';
-                h2 += '<div style="font-size:9px;color:var(--text2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px">'+(t.staffName?xe(t.staffName):'Empty')+'</div>';
-                h2 += '</div>';
-              });
-              h2 += '</div></div>';
+      // ── Load the latest published floor map into the editor on first open ──
+      if (!BS._fmLoaded && db && s2.branchId) {
+        BS._fmLoaded = true;
+        db.ref('branches/'+s2.branchId+'/latestFloorMap').once('value', function(snap){
+          var fm = snap.val();
+          if (fm && fm.tables && fm.tables.length && fm._pushKey) {
+            // Restore tables from last published map
+            BS._fmTables = fm.tables.map(function(t){
+              return { num: t.num, label: t.label||String(t.num||''), staffName: t.staffName||'' };
             });
-          });
-          el.innerHTML = h2 || '<div style="text-align:center;color:var(--text-tertiary);font-size:12px;padding:20px">None</div>';
+            BS._fmPushKey = fm._pushKey;  // remember key so we overwrite
+            BS._fmPushDate = fm._pushDate || TODAY_BS;
+            var banner = document.getElementById('fm-status-banner');
+            if (banner) {
+              var dt = fm.ts ? new Date(fm.ts).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : '';
+              banner.innerHTML = '<span style="font-size:12px;font-weight:600;color:#b45309">&#x270F;&#xFE0F; Editing published map from '+dt+' — changes will overwrite when you publish</span>';
+              banner.style.display='';
+            }
+          }
+          bmFmRenderGrid();
+          bmFmUpdateBulkList();
+          bmFmLoadHistory(s2);
         });
+      } else {
+        bmFmRenderGrid();
+        bmFmUpdateBulkList();
+        bmFmLoadHistory(s2);
       }
     }, 80);
 
@@ -13224,7 +13220,12 @@ function bmFmDelTable(i) {
 function bmFmClear() {
   nxConfirm('Clear all tables from the floor map?', function() {
     BS._fmTables = [];
+    BS._fmPushKey = null;
+    BS._fmPushDate = null;
+    var banner = document.getElementById('fm-status-banner');
+    if (banner) banner.style.display='none';
     bmFmRenderGrid();
+    bmFmUpdateBulkList();
   }, { yesLabel: 'Clear All' });
 }
 
@@ -13262,11 +13263,100 @@ function bmFmUpdateBulkList() {
   });
 }
 
+function bmFmLoadHistory(s2) {
+  var el = document.getElementById('fm-pub-list');
+  if (!el || !s2 || !s2.branchId || !db) return;
+  db.ref('branches/'+s2.branchId+'/floorMaps').limitToLast(7).once('value', function(snap){
+    var all = snap.val()||{};
+    var days = Object.keys(all).sort().reverse();
+    if (!days.length) {
+      el.innerHTML='<div style="text-align:center;color:var(--text-tertiary);font-size:12px;padding:20px">No floor maps published yet</div>';
+      return;
+    }
+    var h2='';
+    days.forEach(function(d){
+      var maps = all[d]||{};
+      var entries = Object.entries(maps).sort(function(a,b){return (b[1].ts||0)-(a[1].ts||0);});
+      entries.forEach(function(entry){
+        var pushKey = entry[0], m = entry[1];
+        var tables = m.tables||[];
+        var dt = m.ts ? new Date(m.ts).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : d;
+        var isActive = BS._fmPushKey === pushKey;
+        h2 += '<div style="border-bottom:1px solid var(--border);padding:10px 0">';
+        h2 += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">';
+        h2 += '<span style="font-size:12px;font-weight:700;color:var(--text-primary)">'+xe(dt)+'</span>';
+        h2 += '<span style="font-size:10px;color:var(--text-tertiary)">by '+xe(m.by||'Manager')+'</span>';
+        if (isActive) h2 += '<span style="background:rgba(0,102,102,.12);color:var(--primary);font-size:9px;font-weight:700;border-radius:4px;padding:2px 7px;font-family:var(--mono)">ACTIVE</span>';
+        h2 += '<div style="margin-left:auto;display:flex;gap:5px">';
+        h2 += '<button class="btn btn-sm" data-d="'+bxe(d)+'" data-k="'+bxe(pushKey)+'" onclick="bmFmLoadIntoEditor(this.dataset.d,this.dataset.k)">✏️ Edit</button>';
+        h2 += '<button class="btn btn-sm" style="color:var(--danger)" data-d="'+bxe(d)+'" data-k="'+bxe(pushKey)+'" onclick="bmFmDeletePub(this.dataset.d,this.dataset.k)">✕ Delete</button>';
+        h2 += '</div></div>';
+        h2 += '<div style="display:flex;flex-wrap:wrap;gap:5px">';
+        tables.forEach(function(t){
+          var bg  = t.staffName ? 'rgba(0,102,102,.1)' : 'rgba(0,0,0,.04)';
+          var bdr = t.staffName ? 'var(--primary)'      : 'rgba(0,0,0,.2)';
+          h2 += '<div style="background:'+bg+';border:1.5px solid '+bdr+';border-radius:8px;padding:5px 9px;min-width:80px;text-align:center">';
+          h2 += '<div style="font-size:10px;font-weight:700;color:var(--text)">'+xe(String(t.label||t.num||''))+'</div>';
+          h2 += '<div style="font-size:9px;color:var(--text2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px">'+(t.staffName?xe(t.staffName):'Empty')+'</div>';
+          h2 += '</div>';
+        });
+        h2 += '</div></div>';
+      });
+    });
+    el.innerHTML = h2 || '<div style="text-align:center;color:var(--text-tertiary);font-size:12px;padding:20px">None</div>';
+  });
+}
+
+function bmFmLoadIntoEditor(dateStr, pushKey) {
+  var s = NX.session||{};
+  if (!db || !s.branchId) return;
+  db.ref('branches/'+s.branchId+'/floorMaps/'+dateStr+'/'+pushKey).once('value', function(snap){
+    var m = snap.val();
+    if (!m || !m.tables) { showToast('Could not load map','error'); return; }
+    BS._fmTables = m.tables.map(function(t){
+      return { num: t.num, label: t.label||String(t.num||''), staffName: t.staffName||'' };
+    });
+    BS._fmPushKey   = pushKey;
+    BS._fmPushDate  = dateStr;
+    var banner = document.getElementById('fm-status-banner');
+    if (banner) {
+      var dt = m.ts ? new Date(m.ts).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : dateStr;
+      banner.innerHTML = '<span style="font-size:12px;font-weight:600;color:#b45309">&#x270F;&#xFE0F; Editing published map from '+dt+' — click Publish to overwrite</span>';
+      banner.style.display='';
+    }
+    bmFmRenderGrid();
+    bmFmUpdateBulkList();
+    showToast('Floor map loaded into editor','success');
+  });
+}
+
+function bmFmDeletePub(dateStr, pushKey) {
+  var s = NX.session||{};
+  if (!db || !s.branchId) return;
+  nxConfirm('Delete this published floor map?', function(){
+    db.ref('branches/'+s.branchId+'/floorMaps/'+dateStr+'/'+pushKey).remove(function(err){
+      if (err) { showToast('Delete failed','error'); return; }
+      // If it was the active map, clear latestFloorMap
+      if (BS._fmPushKey === pushKey) {
+        db.ref('branches/'+s.branchId+'/latestFloorMap').remove();
+        BS._fmPushKey = null; BS._fmPushDate = null;
+        var banner = document.getElementById('fm-status-banner');
+        if (banner) banner.style.display='none';
+      }
+      showToast('Deleted ✓','success');
+      bmFmLoadHistory(s);
+    });
+  }, { yesLabel: 'Delete' });
+}
+
 function bmFmPublish() {
   var s = NX.session || {};
   if (!db || !s.branchId) { showToast('Not connected', 'error'); return; }
   var tables = BS._fmTables || [];
   if (!tables.length) { showToast('Add at least one table', 'error'); return; }
+  var dateStr  = BS._fmPushDate || TODAY_BS;
+  var pushKey  = BS._fmPushKey || null;   // null = new entry, string = overwrite
+
   var rec = {
     ts: Date.now(),
     by: s.branchName || s.entityName || 'Manager',
@@ -13275,13 +13365,34 @@ function bmFmPublish() {
       return { num: t.num, label: t.label || String(t.num), staffName: t.staffName || '' };
     })
   };
-  db.ref('branches/'+s.branchId+'/floorMaps/'+TODAY_BS).push(rec, function(err) {
-    if (err) { showToast('Publish failed: '+err.message, 'error'); return; }
-    db.ref('branches/'+s.branchId+'/latestFloorMap').set(rec);
-    showToast('Floor map published to staff ✓', 'success');
-    BS.briefingTab = 'floor-map';
-    navTo('bm-briefing');
-  });
+
+  function afterSave(key) {
+    // Store key so next publish also overwrites
+    BS._fmPushKey  = key;
+    BS._fmPushDate = dateStr;
+    // Always write to latestFloorMap with the key reference for easy lookup
+    var lf = Object.assign({}, rec, { _pushKey: key, _pushDate: dateStr });
+    db.ref('branches/'+s.branchId+'/latestFloorMap').set(lf, function(){
+      showToast('Floor map published ✓','success');
+      BS.briefingTab = 'floor-map';
+      BS._fmLoaded = false; // force re-load on next open so banner is fresh
+      navTo('bm-briefing');
+    });
+  }
+
+  if (pushKey) {
+    // Overwrite existing record
+    db.ref('branches/'+s.branchId+'/floorMaps/'+dateStr+'/'+pushKey).set(rec, function(err){
+      if (err) { showToast('Publish failed: '+err.message,'error'); return; }
+      afterSave(pushKey);
+    });
+  } else {
+    // New record — push and remember the key
+    var ref = db.ref('branches/'+s.branchId+'/floorMaps/'+TODAY_BS).push(rec, function(err){
+      if (err) { showToast('Publish failed: '+err.message,'error'); return; }
+      afterSave(ref.key);
+    });
+  }
 }
 
 function bmBrfPublish(){
