@@ -1163,8 +1163,6 @@ function clNormWk(){
   return sun.getFullYear()+'-'+String(sun.getMonth()+1).padStart(2,'0')+'-'+String(sun.getDate()).padStart(2,'0');
 }
 function clWk(){return clNormWk();}
-function clBranch(){return ((document.getElementById('cl-branch')||{}).value||'MOA').toUpperCase().replace(/[.#$\/\[\]]/g,'_');}
-
 // ── FIREBASE ──
 function clEnsureST(){
   var w=clWk();if(!clST[w])clST[w]={};
@@ -1418,29 +1416,6 @@ function clDayStatusForCl(cl,di){
   if(ok>0)return'progress';
   return'pending';
 }
-function getOverdueStatus(cl,di){
-  // Overdue = not done & past the check time (AM=noon, PM=10pm)
-  var now=new Date(),hour=now.getHours();
-  var todayIdx=now.getDay();
-  if(di!==todayIdx)return false; // only today can be overdue
-  var amS=clS(cl.id,di,CL_DATA[clFindSec(cl.id)+''] && true, 'AM');
-  // simplified: if it's past 14:00 and AM not done → overdue
-  var amDone=(function(){
-    var sec=clFindSec(cl.id);
-    var tot=0,ok=0;
-    (cl.groups||[]).forEach(function(g){(g.items||[]).forEach(function(item){tot++;var s=clS(cl.id,di,item.id,'AM');if(s.v==='ok'||s.v==='yes')ok++;});});
-    return tot>0&&ok===tot;
-  })();
-  if(!amDone&&hour>=14)return true;
-  var pmDone=(function(){
-    var tot=0,ok=0;
-    (cl.groups||[]).forEach(function(g){(g.items||[]).forEach(function(item){tot++;var s=clS(cl.id,di,item.id,'PM');if(s.v==='ok'||s.v==='yes')ok++;});});
-    return tot>0&&ok===tot;
-  })();
-  if(!pmDone&&hour>=22)return true;
-  return false;
-}
-
 function getClStatus(cl, di){
   var base = clDayStatusForCl(cl, di);
   if(base!=='done' && base!=='progress'){
@@ -1953,13 +1928,6 @@ function clLoadBTItems(){
     clEnsureST();
   });
 }
-function clSaveBTItems(){
-  if(!db)return;
-  db.ref(bPath('cl_bt_items')).set({chiller:CL_BT_ITEMS.chiller,bases:CL_BT_ITEMS.bases},function(err){
-    if(!err)toast('Bartender items saved ✓','success');else toast('Save error','error');
-  });
-}
-
 // ── FORMS ──
 function renderForms(){
   var grid=document.getElementById('forms-grid');if(!grid)return;
@@ -2179,12 +2147,6 @@ function openBartenderEdit(){
 }
 function clBTAddItem(lKey){CL_BT_ITEMS[lKey].push('New Item');openBartenderEdit();}
 function clBTDelItem(lKey,idx){CL_BT_ITEMS[lKey].splice(idx,1);clEnsureST();openBartenderEdit();}
-function clSaveBTEdits(){
-  var body=document.getElementById('edit-body');
-  if(body)body.querySelectorAll('input[data-btlist]').forEach(function(inp){CL_BT_ITEMS[inp.dataset.btlist][parseInt(inp.dataset.bti)]=inp.value;});
-  clSaveBTItems();clEnsureST();closeModal('edit-modal');renderCL('foh');
-}
-
 // ── PRINT ──
 function clOpenPrint(){
   var sec=clSec,ci=clCl[sec]||0,cl=(CL_DATA[sec]||[])[ci];if(!cl)return;
@@ -2214,9 +2176,6 @@ function clOpenPrint(){
   document.getElementById('print-modal').classList.add('show');
 }
 function clPrintMonthly(){toast('Loading monthly report…','info');}
-function clWeekRef(){if(!db)return null;return db.ref(bPath('cl_weeks')+'/'+clNormWk());}
-function clWeekInMonth(wk,my){if(!wk||!wk.match(/^\d{4}-\d{2}-\d{2}$/))return false;var sun=new Date(wk+'T00:00:00'),sat=new Date(sun.getTime()+6*86400000),mS=new Date(my+'-01T00:00:00'),mE=new Date(mS.getFullYear(),mS.getMonth()+1,0,23,59,59);return sun<=mE&&sat>=mS;}
-
 // ── INIT ──
 window.onload = function(){
   try{

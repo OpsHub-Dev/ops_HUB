@@ -1011,25 +1011,6 @@ function initFirebase() {
     return false;
   }
 }
-
-function showLoginUI() {
-  var ov = document.getElementById('loading-overlay');
-  var ls = document.getElementById('login-screen');
-  if (ov) ov.classList.add('gone');
-  if (ls) ls.classList.remove('gone');
-  var idxSAP = sessionStorage.getItem('alfa_staff_sap') || '';
-  if (idxSAP) {
-    var sapInp = document.getElementById('sap-inp');
-    if (sapInp) sapInp.value = idxSAP;
-    var banner = document.getElementById('idx-banner');
-    var idxName = sessionStorage.getItem('alfa_staff_name') || idxSAP;
-    var idxBranch = sessionStorage.getItem('alfa_staff_branch') || '';
-    var bn = document.getElementById('idx-name'); if (bn) bn.textContent = idxName;
-    var bs = document.getElementById('idx-sub');  if (bs) bs.textContent = (idxBranch || 'ALFA.CO') + ' · Enter PIN to continue';
-    if (banner) banner.style.display = 'flex';
-  }
-}
-
 /* ═══════════════════════════════════════════════════════
    FIREBASE PATHS
    staff/pins/{sap}                  → { pinHash }
@@ -2133,22 +2114,6 @@ function renderPayslip() {
     loadPayAtt(attKey);
   } else { tryRender(); }
 }
-function renderPayslip_UNUSED_REMOVED() {
-  // Deprecated - now using live branch staff data
-  var unused = true;
-  if(unused) return;
-  db.ref('dead').once('value', function(snap) {
-    var base = 0;
-    var housing = Math.round(base * 0.25);
-    var transport = Math.round(base * 0.10);
-    var gross = base + housing + transport;
-    var gosi = Math.round(gross * 0.09);
-    var net = gross - gosi;
-    var month = document.getElementById('payslip-month')?.value || '2025-04';
-    var mn = {'2025-04':'April 2025','2025-03':'March 2025','2025-02':'February 2025','2025-01':'January 2025'}[month] || month;
-    // This old version used staff/sessions for salary — replaced by live branch read above
-  });
-}
 function pr(l, v) { return '<div class="prow"><span style="color:var(--text2)">' + l + '</span><span style="font-family:var(--mono)">' + v + '</span></div>'; }
 
 /* ═══════════════════════════════════════════════════════
@@ -2237,9 +2202,10 @@ function submitIncident() {
 }
 function loadIncidents() {
   if (!CU) return;
-  db.ref('staff/incidents/' + CU.sap).orderByChild('date').limitToLast(20).once('value', function(snap) {
+  db.ref('staff/incidents/' + CU.sap).limitToLast(20).once('value', function(snap) {
     var list = [];
-    snap.forEach(function(c) { list.unshift(Object.assign({ _key: c.key }, c.val())); });
+    snap.forEach(function(c) { list.push(Object.assign({ _key: c.key }, c.val())); });
+    list.sort(function(a,b){ return String(b.date||'').localeCompare(String(a.date||'')); });
     var sc = { low: 'bg-g', medium: 'bg-a', high: 'bg-r' };
     document.getElementById('inc-list').innerHTML = list.length ? list.map(function(i) {
       return '<div class="tli" style="padding-left:0;margin-bottom:10px"><div class="tlc">' +
@@ -2470,13 +2436,6 @@ function checkRetroOT(){
 }
 // Auto-refresh check-in button state every 30s (for early-lock countdown)
 var _ciButtonRefreshTimer = null;
-function startCIButtonRefresh() {
-  if (_ciButtonRefreshTimer) clearInterval(_ciButtonRefreshTimer);
-  _ciButtonRefreshTimer = setInterval(function() {
-    if (_ciState === 'out') updateCIButtons();
-  }, 30000);
-}
-
 function renderCheckIn() {
   var u = CU; if (!u) return;
 
@@ -2929,9 +2888,9 @@ function renderCapNotifs() {
   var today = ciTodayStr();
 
   // Attendance notifications
-  db.ref('branches/' + u.branchId + '/notifications').orderByChild('date').equalTo(today).once('value', function(snap) {
+  db.ref('branches/' + u.branchId + '/notifications').limitToLast(150).once('value', function(snap) {
     var all = [];
-    snap.forEach(function(c) { all.unshift(Object.assign({ _key: c.key }, c.val())); });
+    snap.forEach(function(c) { var v = Object.assign({ _key: c.key }, c.val()); if (v.date === today) all.unshift(v); });
     var attList = document.getElementById('notif-att-list');
     if (!attList) return;
     if (!all.length) {
@@ -2994,9 +2953,9 @@ function renderCapNotifs() {
 function startNotifListener() {
   var u = CU; if (!u || !u.branchId) return;
   if (_notifListener) return;
-  _notifListener = db.ref('branches/' + u.branchId + '/notifications').orderByChild('read').equalTo(false);
+  _notifListener = db.ref('branches/' + u.branchId + '/notifications').limitToLast(150);
   _notifListener.on('value', function(snap) {
-    var count = 0; snap.forEach(function() { count++; });
+    var count = 0; snap.forEach(function(c) { var v = c.val(); if (v && v.read === false) count++; });
     var sbBadge = document.getElementById('notif-sb-badge');
     if (sbBadge) { sbBadge.textContent = count; sbBadge.style.display = count ? '' : 'none'; }
   });
@@ -3447,9 +3406,10 @@ function publishModule() {
 
 function renderCapTraining() {
   var u = CU; if (!u || !u.branchId) return;
-  db.ref('staff/modules/' + u.branchId).orderByChild('date').once('value', function(snap) {
+  db.ref('staff/modules/' + u.branchId).once('value', function(snap) {
     var mods = [];
-    snap.forEach(function(c) { mods.unshift(Object.assign({ _key: c.key }, c.val())); });
+    snap.forEach(function(c) { mods.push(Object.assign({ _key: c.key }, c.val())); });
+    mods.sort(function(a,b){ return String(b.date||'').localeCompare(String(a.date||'')); });
     document.getElementById('cap-modules').innerHTML = mods.length ? mods.map(function(m) {
       var qCount = (m.questions && m.questions.length) || m.questionCount || 0;
       var assignLabel = m.assignMode === 'select' && m.assignedTo
@@ -3985,54 +3945,6 @@ function submitOtManual(){
     });
   });
 }
-function submitOtRequest(otMins){
-  var u=CU;
-  if(!u||!u.branchId||!otMins||otMins<=0) return;
-  var dateStr=_ciLockedDate||(_ciTodayRec&&_ciTodayRec.date)||todayKey();
-  var staffKey=_ciAttKey||u.staffId||u.sap||'';
-  // Deduplicate: load last 50 requests and filter in JS (no index needed)
-  db.ref('branches/'+u.branchId+'/otRequests').limitToLast(50).once('value', function(existSnap){
-    var ex=existSnap.val()||{};
-    var alreadyExists=Object.values(ex).some(function(r){
-      return r&&r.date===dateStr&&String(r.staffId||r.sap||'')===String(staffKey)&&
-        (r.status==='pending'||r.status==='approved');
-    });
-    if(alreadyExists){ console.log('[OT] Request already exists for',staffKey,dateStr); return; }
-    _doSubmitOtRequest(otMins);
-  });
-  return;
-}
-function _doSubmitOtRequest(otMins){
-  var u=CU;
-  if(!u||!u.branchId||!otMins||otMins<=0) return;
-  var dateStr=_ciLockedDate||(_ciTodayRec&&_ciTodayRec.date)||todayKey();
-  var schLabel=_ciScheduledShift?(_ciScheduledShift.label||''):(_ciTodayRec&&_ciTodayRec.scheduledShift)||'';
-  var rec={
-    staffName:u.name||'Staff',
-    staffId:_ciAttKey||u.staffId||u.sap||'',
-    sap:u.sap||'',
-    date:dateStr,
-    otMins:otMins,
-    scheduledShift:schLabel,
-    ci:_ciTodayRec&&_ciTodayRec.ci||'',
-    co:_ciTodayRec&&_ciTodayRec.co||'',
-    status:'pending',
-    note:'Auto-submitted at checkout',
-    ts:Date.now()
-  };
-  db.ref('branches/'+u.branchId+'/otRequests').push(rec, function(err){
-    if(err) console.warn('[OT] push failed:', err.message);
-  });
-  // Notify BM
-  var otLabel=Math.floor(otMins/60)+'h'+(otMins%60?otMins%60+'m':'');
-  db.ref('branches/'+u.branchId+'/notifications').push({
-    type:'ot_request', staffName:u.name||'Staff', sap:u.sap||'',
-    body:'OT +'+otLabel+' ('+schLabel+')',
-    time:new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}),
-    ts:Date.now()
-  });
-}
-
 // ═══════════════════════════════════════════════════════
 // COMPETITION — STAFF PORTAL
 // ═══════════════════════════════════════════════════════
@@ -4191,8 +4103,6 @@ function _spCompUpdateSummary() {
 }
 
 // Keep old name as alias for backward compat
-function spCompUpdateTotal() { _spCompUpdateSummary(); }
-
 function spCompSubmit() {
   var u = CU;
   if (!u || !u.branchId || !_spCompId || !_spCompData) { showToast('Not connected','error'); return; }

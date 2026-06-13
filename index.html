@@ -3996,27 +3996,6 @@ function loadBranchRegistry(cb) {
 // Load sales for one branch into NX_BRANCH_SALES
 
 // ── OFFLINE / CONNECTION STATUS ──
-function initConnectionMonitor() {
-  if (!db) return;
-  db.ref('.info/connected').on('value', function(snap) {
-    var connected = snap.val();
-    var banner = document.getElementById('nx-offline-banner');
-    if (!banner) {
-      banner = document.createElement('div');
-      banner.id = 'nx-offline-banner';
-      banner.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);padding:10px 20px;border-radius:20px;font-size:12px;font-weight:700;font-family:var(--font);z-index:9999;transition:all .4s;pointer-events:none;display:none';
-      document.body.appendChild(banner);
-    }
-    if (connected) {
-      banner.style.display = 'none';
-    } else {
-      banner.style.cssText += ';display:block;background:#c0392b;color:#fff;box-shadow:0 4px 20px rgba(248,113,113,.4)';
-      banner.innerHTML = '&#x26A0;&#xFE0F; Offline — Firebase disconnected';
-    }
-  });
-}
-
-
 function loadBranchSalesData(branchId, cb) {
   if (!db) return;
   if (NX_LOADED_SALES[branchId]) { if (cb) cb(); return; }
@@ -4097,21 +4076,6 @@ function loadAllBranchesSales(cb) {
 }
 
 // Real-time KPI aggregation from live Firebase data
-function calcExecKPIs() {
-  var branches = getAccessibleBranches();
-  var totalToday = 0, totalMTD = 0;
-  branches.forEach(function(b) {
-    totalToday += branchSalesToday(b.id);
-    totalMTD   += branchSalesMTD(b.id);
-  });
-  return {
-    totalToday: totalToday,
-    totalMTD: totalMTD,
-    branchCount: branches.length,
-    branchesOnline: branches.length
-  };
-}
-
 // DEMO_METRICS kept as fallback when sales data not yet loaded
 var DEMO_METRICS = {
   totalToday: 0, totalMTD: 0, staffTotal: 0, branchesOnline: 0,
@@ -4277,18 +4241,6 @@ function toggleNotifPanel() {
 }
 
 // ── THEME ──
-function toggleTheme() {
-  NX.theme = NX.theme === 'dark' ? 'light' : 'dark';
-  document.documentElement.setAttribute('data-theme', NX.theme);
-  localStorage.setItem('alfa_theme', NX.theme);
-  var btn = document.getElementById('theme-btn');
-  if (btn) btn.textContent = NX.theme === 'dark' ? '🌙' : '☀️';
-  // Update all chart backgrounds
-  Object.keys(NX.charts).forEach(function(k) {
-    if (NX.charts[k]) { try { NX.charts[k].update(); } catch(e){} }
-  });
-}
-
 // ── TOAST ──
 function showToast(msg, type) {
   type = type || 'info';
@@ -4317,6 +4269,43 @@ function closeModal(ev) {
 
 function closeModalForce() {
   document.getElementById('modal-overlay').classList.remove('open');
+}
+
+/* ── Confirm modal — window.confirm() is blocked on Safari/iPad, so all
+      confirmations go through the app's existing modal system. ── */
+window._nxConfirmCb = null;
+window._nxConfirmPrev = null;
+function _nxCEsc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function nxConfirm(msg, onYes, opts) {
+  opts = opts || {};
+  var ov = document.getElementById('modal-overlay');
+  var mb = document.getElementById('modal-body');
+  window._nxConfirmPrev = (ov && ov.classList.contains('open') && mb) ? mb.innerHTML : null;
+  window._nxConfirmCb = onYes;
+  var title = opts.title || 'Please Confirm';
+  var yesLabel = opts.yesLabel || 'Confirm';
+  var danger = opts.danger !== false;
+  var msgHtml = _nxCEsc(msg).replace(/\n/g,'<br>');
+  openModal(
+    '<div class="modal-head"><h2>' + _nxCEsc(title) + '</h2><button class="modal-close" onclick="_nxConfirmNo()">&#x2715;</button></div>' +
+    '<div style="padding:6px 2px 18px;font-size:13px;line-height:1.6">' + msgHtml + '</div>' +
+    '<div style="display:flex;gap:10px;justify-content:flex-end">' +
+      '<button class="btn" onclick="_nxConfirmNo()">Cancel</button>' +
+      '<button class="btn ' + (danger ? 'btn-danger' : 'btn-primary') + '" onclick="_nxConfirmYes()">' + _nxCEsc(yesLabel) + '</button>' +
+    '</div>'
+  );
+}
+function _nxConfirmYes() {
+  var cb = window._nxConfirmCb;
+  window._nxConfirmCb = null; window._nxConfirmPrev = null;
+  closeModalForce();
+  if (typeof cb === 'function') cb();
+}
+function _nxConfirmNo() {
+  window._nxConfirmCb = null;
+  var prev = window._nxConfirmPrev; window._nxConfirmPrev = null;
+  if (prev != null) { var mb = document.getElementById('modal-body'); if (mb) mb.innerHTML = prev; }
+  else closeModalForce();
 }
 
 // ── CLOCK ──
@@ -4592,7 +4581,9 @@ function lumSaveEdit(uid) {
 }
 
 function lumDelUser(uid, name) {
-  if (!confirm('Delete user "'+(name||uid)+'"? This cannot be undone.')) return;
+  nxConfirm('Delete user "'+(name||uid)+'"? This cannot be undone.', function(){ _lumDelUserGo(uid, name); }, {yesLabel:'Delete'});
+}
+function _lumDelUserGo(uid, name) {
   if (!db) { _lumToast('Firebase not connected',true); return; }
   db.ref('admin/users/'+uid).remove(function(err) {
     if (err) { _lumToast('Error: '+err.message,true); return; }
@@ -4806,19 +4797,6 @@ function renderLoginPIN(card) {
       '</div>'
     );
 }
-
-function pinPress(n) {
-  if (loginState.pin.length >= 4) return;
-  loginState.pin += n;
-  updatePinDots();
-  if (loginState.pin.length === 4) verifyPIN();
-}
-
-function pinDel() {
-  loginState.pin = loginState.pin.slice(0,-1);
-  updatePinDots();
-}
-
 function pinDigit(d) {
   if (loginState.pin.length >= 8) return;
   loginState.pin += String(d);
@@ -5270,12 +5248,6 @@ function buildStockAlerts() {
     return '<div class="alert-item"><div class="alert-dot" style="background:'+(n.type==='danger'?'var(--danger)':'var(--warning)')+'"></div><div class="alert-content"><div class="alert-title">' + xe(n.title) + '</div><div class="alert-meta">' + xe(n.msg) + '</div></div></div>';
   }).join('');
 }
-
-function drillBrand(brand) {
-  showToast('Drilling into ' + brand + ' data...', 'info');
-}
-
-function sortLB(col) { showToast('Sorted by ' + col, 'info'); }
 function exportLeaderboard() { showToast('Exporting leaderboard CSV...', 'success'); }
 function sortLeaderboard(val) { showToast('Sorting by ' + val, 'info'); }
 function changeSalesChart(brand, btn) {
@@ -5405,31 +5377,6 @@ function buildBrandPerfTable() {
     '</tr>';
   }).join('') || '<tr><td colspan="8" style="text-align:center;color:var(--text-tertiary);padding:20px">No data yet</td></tr>';
 }
-
-function buildSparkline(branchId) {
-  // Get last 7 days of real sales for the given branch (or aggregate all)
-  var bars;
-  if (branchId) {
-    bars = getSalesData30(branchId).slice(-7);
-  } else {
-    // Aggregate all accessible branches
-    var totals = Array(7).fill(0);
-    getAccessibleBranches().forEach(function(b) {
-      var d = getSalesData30(b.id).slice(-7);
-      d.forEach(function(v, i) { totals[i] += v; });
-    });
-    bars = totals;
-  }
-  var max = Math.max.apply(null, bars) || 1;
-  return '<div class="sparkline">' +
-    bars.map(function(v) {
-      var h = Math.round(v / max * 20) + 2;
-      var col = v / max > .7 ? 'var(--success)' : v / max > .3 ? 'var(--warning)' : 'var(--danger)';
-      return '<div class="spark-bar" style="height:' + h + 'px;background:' + col + '"></div>';
-    }).join('') +
-  '</div>';
-}
-
 function exportBrandPerf() {
   var branches = getAccessibleBranches();
   var brandMap = {};
@@ -5952,12 +5899,6 @@ function revExportCSV() {
 }
 
 // Stubs for backward compat
-function setRevPeriod(p, btn) { revSetPeriod(p); }
-function setRevGroup(v) { revSetGroup(v === 'By Brand' ? 'brand' : v === 'By Region' ? 'region' : 'branch'); }
-function toggleYoY(on) { revToggleYoY(on); }
-
-
-
 // ── PAGE: HEADCOUNT ──
 function pHeadcount() {
   var branches = getAccessibleBranches();
@@ -6425,14 +6366,6 @@ function pAlerts() {
   h += '<div style="text-align:center;padding:20px"><button class="btn" onclick="NX.notifications=[];_updateBadge();renderNotifications();navTo(\'alerts-center\')">Clear All Alerts</button></div>';
   return h;
 }
-
-function filterAlerts(level, btn) {
-  var items = document.querySelectorAll('#alerts-list .alert-item');
-  items.forEach(function(el) {
-    el.style.display = (level === 'all' || el.dataset.level === level) ? '' : 'none';
-  });
-}
-
 // ── PAGE: BRAND MANAGEMENT ──
 function pBrandMgmt() {
   var branches = Object.values(NX_BRANCHES);
@@ -6591,19 +6524,6 @@ function saveNewBrandWithBranch() {
     navTo('brand-mgmt');
   }
 }
-
-function editBrand(k) {
-  var b = SEED.brands[k];
-  openModal('<div class="modal-head"><h2>Edit ' + xe(b.config.name) + '</h2><button class="modal-close" onclick="closeModalForce()">✕</button></div>' +
-    '<div class="form-group"><label class="form-label">Brand Name</label><input class="form-input" value="' + xe(b.config.name) + '"></div>' +
-    '<div class="form-group"><label class="form-label">Cuisine</label><input class="form-input" value="' + xe(b.config.cuisine) + '"></div>' +
-    '<div class="form-group"><label class="form-label">Director</label><input class="form-input" value="' + xe(b.config.director) + '"></div>' +
-    '<button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="showToast(\'Brand updated!\',\'success\');closeModalForce()">Save Changes</button>');
-}
-
-function openBrandDetail(k) { navTo('brand-dash'); }
-function manageBranches(k) { showToast('Managing ' + SEED.brands[k].config.name + ' branches', 'info'); }
-
 // ── PAGE: ACCESS CONTROL ──
 
 function saveNewUser() {
@@ -6681,12 +6601,13 @@ function updateUser(userId) {
 }
 
 function confirmDeleteUser(userId, name) {
-  if (!confirm('Delete user "' + name + '"? They will no longer be able to log in.')) return;
-  deleteUser(userId, function() {
-    closeModalForce();
-    showToast('"' + name + '" deleted','success');
-    navTo('access-ctrl');
-  });
+  nxConfirm('Delete user "' + name + '"? They will no longer be able to log in.', function() {
+    deleteUser(userId, function() {
+      closeModalForce();
+      showToast('"' + name + '" deleted','success');
+      navTo('access-ctrl');
+    });
+  }, {yesLabel:'Delete'});
 }
 
 function openAddBranchModal() {
@@ -6797,12 +6718,13 @@ function saveEditBranch(branchId) {
 function deleteBranch(branchId) {
   var b = NX_BRANCHES[branchId];
   if (!b) return;
-  if (!confirm('Delete branch "' + b.name + '"? This only removes access — branch data remains in Firebase.')) return;
-  if (db) db.ref('admin/branches/' + branchId).remove();
-  delete NX_BRANCHES[branchId];
-  closeModalForce();
-  showToast('Branch removed', 'success');
-  navTo('brand-mgmt');
+  nxConfirm('Delete branch "' + b.name + '"? This only removes access — branch data remains in Firebase.', function() {
+    if (db) db.ref('admin/branches/' + branchId).remove();
+    delete NX_BRANCHES[branchId];
+    closeModalForce();
+    showToast('Branch removed', 'success');
+    navTo('brand-mgmt');
+  }, {yesLabel:'Delete'});
 }
 
 function pAccessCtrl() {
@@ -7364,7 +7286,9 @@ function importPricesFromBranch() {
 
 function delSharedIng(code) {
   var it=(window._SI_ITEMS||[]).find(function(i){return String(i.code)===String(code);});
-  if(!confirm('Delete '+((it&&it.name)||code)+' from shared catalog?'))return;
+  nxConfirm('Delete '+((it&&it.name)||code)+' from shared catalog?', function(){ _delSharedIngGo(code); }, {yesLabel:'Delete'});
+}
+function _delSharedIngGo(code) {
   var k=String(code).replace(/[.#$\[\]\/]/g,'_');
   db.ref('shared/inv_items/'+k).remove(function(err){
     if(err){showToast('Error: '+err,'error');return;}
@@ -7424,11 +7348,12 @@ function auditExportCSV() {
 }
 
 function auditClearOld() {
-  if(!confirm('Remove all notifications older than 30 days? This only clears the in-memory list.'))return;
-  var cutoff=Date.now()-30*24*3600000;
-  NX.notifications=(NX.notifications||[]).filter(function(n){return (n.ts||0)>cutoff;});
-  showToast('Old entries cleared','success');
-  navTo('audit-log');
+  nxConfirm('Remove all notifications older than 30 days? This only clears the in-memory list.', function(){
+    var cutoff=Date.now()-30*24*3600000;
+    NX.notifications=(NX.notifications||[]).filter(function(n){return (n.ts||0)>cutoff;});
+    showToast('Old entries cleared','success');
+    navTo('audit-log');
+  }, {yesLabel:'Clear'});
 }
 
 
@@ -7845,81 +7770,7 @@ function defStaff() {
 }
 
 // Seed staff to Firebase if branch has no staff yet
-function seedIfEmpty() {
-  if (!db || !NX.session || !NX.session.branchId) return;
-  db.ref(bPath('staff')).once('value', function(snap) {
-    if (!snap.val()) {
-      var obj = {};
-      defStaff().forEach(function(m) { obj[m.id] = m; });
-      db.ref(bPath('staff')).set(obj);
-      console.log('Staff seeded from defStaff for branch:', NX.session.branchId);
-    }
-  });
-}
-
-
 // ── SAP-first attendance resolution helper ──────────────────────────
-function hrResolveAttId(m, att, tsEmps) {
-  var mSap = String(m.sap || '').trim();
-  var mName = (m.name || '').toLowerCase().trim();
-  var tsArr = Array.isArray(tsEmps) ? tsEmps : Object.values(tsEmps || {});
-
-  // 1. Scan actual att records for matching SAP field (most reliable — set by staff.html)
-  if (mSap) {
-    var attKeys = Object.keys(att);
-    for (var ai = 0; ai < attKeys.length; ai++) {
-      var ak = attKeys[ai];
-      if (/^\d{4}-\d{2}$/.test(ak)) continue; // skip YYYY-MM keys
-      var entry = att[ak];
-      if (!entry || typeof entry !== 'object') continue;
-      var monthKeys = Object.keys(entry);
-      for (var mi2 = 0; mi2 < monthKeys.length; mi2++) {
-        var recs = entry[monthKeys[mi2]];
-        if (!Array.isArray(recs) || !recs.length) continue;
-        for (var ri = 0; ri < recs.length; ri++) {
-          if (recs[ri] && String(recs[ri].sap || '').trim() === mSap) return ak;
-        }
-        break; // only check first month's records for speed
-      }
-    }
-  }
-
-  // 2. SAP match via tsEmps list
-  if (mSap) {
-    for (var i = 0; i < tsArr.length; i++) {
-      var e = tsArr[i];
-      if (e && String(e.sap || '').trim() === mSap) return String(e.id || '');
-    }
-  }
-
-  // 3. Direct ID match in att
-  if (att[String(m.id)]) return String(m.id);
-
-  // 4. Name match via tsEmps
-  for (var j = 0; j < tsArr.length; j++) {
-    var e2 = tsArr[j];
-    if (e2 && e2.name && e2.name.toLowerCase().trim() === mName) return String(e2.id || '');
-  }
-
-  // 5. Name match in att records
-  var attKeys2 = Object.keys(att);
-  for (var ai2 = 0; ai2 < attKeys2.length; ai2++) {
-    var ak2 = attKeys2[ai2];
-    if (/^\d{4}-\d{2}$/.test(ak2)) continue;
-    var entry2 = att[ak2];
-    if (!entry2 || typeof entry2 !== 'object') continue;
-    var mKeys2 = Object.keys(entry2);
-    for (var mi3 = 0; mi3 < mKeys2.length; mi3++) {
-      var recs2 = entry2[mKeys2[mi3]];
-      if (!Array.isArray(recs2) || !recs2.length) continue;
-      var r0 = recs2[0];
-      if (r0 && r0.empName && r0.empName.toLowerCase().trim() === mName) return ak2;
-      break;
-    }
-  }
-
-  return String(m.id);
-}
 function bsyncTSFromStaff() {
   BS.staff.forEach(function(m){
     var sid=String(m.id),ex=null;
@@ -7937,20 +7788,6 @@ function bSaveColl(key,arr) {
   if(!db) return;
   var obj={};arr.forEach(function(item,idx){var k=item.id?String(item.id).replace(/[.#$\[\]\/]/g,'_'):'item_'+idx;obj[k]=item;});
   db.ref(bPath(key)).set(obj);
-}
-function bSaveItems() {
-  if(!db) return;
-  var branchPath = NX.session && NX.session.branchId ? 'branches/' + NX.session.branchId : null;
-  if(!branchPath) return;
-  var catObj={},stockObj={};
-  bItems.forEach(function(item){
-    var k=String(item.code||'').replace(/[.#$\[\]\/]/g,'_');if(!k)return;
-    catObj[k]={code:item.code,name:item.name,unit:item.unit||'EA',location:item.location||'Dry Storage',min:parseFloat(item.min)||0,price:parseFloat(item.price)||0,supplier:item.supplier||''};
-    stockObj[k]={qty:parseFloat(item.qty)||0};
-  });
-  // Save catalog per-branch — each branch is fully independent
-  db.ref(branchPath+'/inv_items').set(catObj);
-  db.ref(branchPath+'/stock').set(stockObj);
 }
 function bSaveStock(code,qty) {
   if(!db||!NX.session) return;
@@ -8893,7 +8730,9 @@ function nxDelLocationModal(){
 function nxConfirmDelLocation(){
   var name=bgv('nx-del-loc');
   if(!name){showToast('Select a location','warning');return;}
-  if(!confirm('Delete location "'+name+'"? Items will move to Dry Storage.'))return;
+  nxConfirm('Delete location "'+name+'"? Items will move to Dry Storage.', function(){ _nxDelLocationGo(name); }, {yesLabel:'Delete'});
+}
+function _nxDelLocationGo(name){
   if(!BS.locations)BS.locations=getLocations().slice();
   var i=BS.locations.indexOf(name);
   if(i<0){showToast('Not found','error');return;}
@@ -8944,7 +8783,9 @@ function nxDelSupplierModal(){
 function nxConfirmDelSupplier(){
   var name=bgv('nx-del-sup');
   if(!name){showToast('Select a supplier','warning');return;}
-  if(!confirm('Delete supplier "'+name+'"?'))return;
+  nxConfirm('Delete supplier "'+name+'"?', function(){ _nxDelSupplierGo(name); }, {yesLabel:'Delete'});
+}
+function _nxDelSupplierGo(name){
   if(!BS.suppliers)BS.suppliers=getSuppliers().slice();
   var i=BS.suppliers.indexOf(name);
   if(i<0){showToast('Not found','error');return;}
@@ -8954,7 +8795,8 @@ function nxConfirmDelSupplier(){
   showToast('"'+name+'" deleted','success');
 }
 function saveBranchItem(origCode){var code=bgv('bi-code'),name=bgv('bi-name');if(!code||!name){showToast('Code and name required','error');return;}var unit=bgv('bi-unit')||'EA',loc=bgv('bi-loc')||'Dry Storage',min=parseFloat(bgv('bi-min'))||0,price=parseFloat(bgv('bi-price'))||0,sup=bgv('bi-sup')||'';var bPath_='branches/'+(NX.session&&NX.session.branchId)+'/inv_items/';if(origCode){var it=bfindItem(origCode);if(!it)return;it.code=code;it.name=name;it.unit=unit;it.location=loc;it.min=min;it.price=price;it.supplier=sup;if(db)db.ref(bPath_+code.replace(/[.#$\[\]\/]/g,'_')).set({code:code,name:name,unit:unit,location:loc,min:min,price:price,supplier:sup});}else{if(bfindItem(code)){showToast('Duplicate code','error');return;}var qty=parseFloat(bgv('bi-qty'))||0;bItems.push({code:code,name:name,unit:unit,location:loc,min:min,price:price,qty:qty,supplier:sup});if(db){db.ref(bPath_+code.replace(/[.#$\[\]\/]/g,'_')).set({code:code,name:name,unit:unit,location:loc,min:min,price:price,supplier:sup});if(qty>0)bSaveStock(code,qty);}}closeModalForce();showToast('Item saved','success');navTo('inv-items');}
-function delBranchItem(code){if(!confirm('Delete '+code+'?'))return;bItems=bItems.filter(function(x){return x.code!==code;});if(db){var bPath_='branches/'+(NX.session&&NX.session.branchId)+'/inv_items/';db.ref(bPath_+code.replace(/[.#$\[\]\/]/g,'_')).remove();db.ref('branches/'+(NX.session&&NX.session.branchId)+'/stock/'+code.replace(/[.#$\[\]\/]/g,'_')).remove();}showToast('Deleted');navTo('inv-items');}
+function delBranchItem(code){nxConfirm('Delete '+code+'?',function(){_delBranchItemGo(code);},{yesLabel:'Delete'});}
+function _delBranchItemGo(code){bItems=bItems.filter(function(x){return x.code!==code;});if(db){var bPath_='branches/'+(NX.session&&NX.session.branchId)+'/inv_items/';db.ref(bPath_+code.replace(/[.#$\[\]\/]/g,'_')).remove();db.ref('branches/'+(NX.session&&NX.session.branchId)+'/stock/'+code.replace(/[.#$\[\]\/]/g,'_')).remove();}showToast('Deleted');navTo('inv-items');}
 
 // ── Inventory Diagnostic Tool ──
 function diagInventory(){
@@ -9127,8 +8969,12 @@ function runInvImport(){
   var ta=document.getElementById('inv-csv-data');if(!ta){showToast('No data','error');return;}
   var res=_parseInvCSV(ta.value);
   if(!res.items.length){showToast('Nothing to import','error');return;}
-  if(res.errors.length){if(!confirm(res.items.length+' items will be imported, '+res.errors.length+' lines will be skipped due to errors. Proceed?'))return;}
-  else {if(!confirm('Import '+res.items.length+' items into this branch catalog?\n\nDuplicates (matching code) will be overwritten.'))return;}
+  var impMsg=res.errors.length
+    ? (res.items.length+' items will be imported, '+res.errors.length+' lines will be skipped due to errors. Proceed?')
+    : ('Import '+res.items.length+' items into this branch catalog?\n\nDuplicates (matching code) will be overwritten.');
+  nxConfirm(impMsg, function(){ _runInvImportGo(res); }, {yesLabel:'Import', danger:false});
+}
+function _runInvImportGo(res){
   if(!db){showToast('Firebase not connected','error');return;}
   var branchId=NX.session&&NX.session.branchId;
   var bImportPath='branches/'+branchId+'/inv_items/';
@@ -9260,8 +9106,7 @@ function pInvMoves() {
       var item=bfindItem(code);
       if(!item){showToast('Item not found','error');return;}
       if(item.qty<qty){showToast('Not enough stock (have: '+item.qty+' '+item.unit+')','error');return;}
-      if(!confirm('Transfer '+qty+' '+item.unit+' of "'+item.name+'" to selected branch?'))return;
-      doNXTransferStock(code,item,qty,dest,note);
+      nxConfirm('Transfer '+qty+' '+item.unit+' of "'+item.name+'" to selected branch?', function(){ doNXTransferStock(code,item,qty,dest,note); }, {yesLabel:'Transfer', danger:false});
     };
     renderNXIncomingTransfers();
   },50);
@@ -9339,11 +9184,12 @@ function nxAcceptTransfer(id,tEncoded){
 
 function nxRejectTransfer(id){
   if(!db||!NX.session)return;
-  if(!confirm('Reject this transfer?'))return;
-  db.ref('branches/'+NX.session.branchId+'/transfer_requests/'+id+'/status').set('rejected',function(){
-    showToast('Transfer rejected','warning');
-    renderNXIncomingTransfers();
-  });
+  nxConfirm('Reject this transfer?', function(){
+    db.ref('branches/'+NX.session.branchId+'/transfer_requests/'+id+'/status').set('rejected',function(){
+      showToast('Transfer rejected','warning');
+      renderNXIncomingTransfers();
+    });
+  }, {yesLabel:'Reject'});
 }
 function invSearch(inp,hiddenId,dropId){
   var q=(inp.value||'').toLowerCase().trim();
@@ -9562,7 +9408,9 @@ function bktRemove(code) { delete _basket[code]; navTo('inv-orders'); }
 function deleteOrder(ordId) {
   var o = bOrders.find(function(x){ return x.id === ordId; });
   if (!o) return;
-  if (!confirm('Delete order ' + ordId + '?\n\nThis cannot be undone.')) return;
+  nxConfirm('Delete order ' + ordId + '?\n\nThis cannot be undone.', function(){ _deleteOrderGo(ordId); }, {yesLabel:'Delete'});
+}
+function _deleteOrderGo(ordId) {
   bOrders = bOrders.filter(function(x){ return x.id !== ordId; });
   if (db) {
     var key = String(ordId).replace(/[.#$\[\]\/]/g, '_');
@@ -9751,53 +9599,8 @@ function submitBasketNX(){
   showToast('✅ '+created+' purchase order'+(created!==1?'s':'')+' created!','success');
   navTo('inv-orders');
 }
-function openBranchOrderModal(){bOrdItems=[];var html='<div class="modal-head"><h2>New Purchase Order</h2><button class="modal-close" onclick="closeModalForce()">&#x2715;</button></div>';html+='<div class="bfg"><label class="form-label">Supplier *</label><select class="form-input form-select" id="bord-sup" onchange="bOrdSupChange(this.value)"><option value="">Select supplier</option>'+DEFAULT_SUPPLIERS.map(function(s2){return '<option>'+bxe(s2)+'</option>';}).join('')+'</select></div>';html+='<div id="bord-sup-chips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;min-height:4px"></div>';html+='<div class="form-row"><div class="bfg"><label class="form-label">Add Any Item</label><div style="position:relative"><input class="form-input" id="bord-item-search" placeholder="Search item code or name..." oninput="invSearch(this,&apos;bord-item-sel&apos;,&apos;bord-item-drop&apos;)" autocomplete="off"><input type="hidden" id="bord-item-sel"><div id="bord-item-drop" style="position:absolute;top:100%;left:0;right:0;z-index:300;background:var(--body-bg);border:1px solid var(--border);border-radius:8px;max-height:200px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.5);display:none"></div></div></div><div class="bfg"><label class="form-label">Qty</label><input class="form-input" type="number" id="bord-qty" value="1" min="1"></div></div>';html+='<button class="btn" style="width:100%;margin-bottom:12px" onclick="bOrdAddItem()">+ Add to Order</button>';html+='<div class="bfg"><label class="form-label">Note</label><input class="form-input" id="bord-note" placeholder="Order note..."></div>';html+='<div id="bord-items-wrap" style="margin-bottom:14px"><div style="color:var(--text-tertiary);font-size:12px;text-align:center;padding:12px" id="bord-empty">No items added yet</div><table class="btbl" id="bord-tbl" style="display:none"><thead><tr><th>Code</th><th>Name</th><th>Unit</th><th>Qty</th><th></th></tr></thead><tbody id="bord-tbody"></tbody></table></div>';html+='<button class="btn btn-primary" style="width:100%" onclick="submitBranchOrder()">Create Purchase Order</button>';openModal(html);}
-function bOrdSupChange(sup){var chips=document.getElementById('bord-sup-chips');if(!chips)return;chips.innerHTML='';bItems.filter(function(i){return i.supplier===sup;}).forEach(function(it){var btn=document.createElement('button');btn.className='chip';btn.style.cursor='pointer';btn.textContent=it.code+' \u2014 '+it.name;btn.onclick=function(){bOrdItems.push({code:it.code,name:it.name,unit:it.unit,qty:1,price:it.price||0,received:0});bOrdRenderTable();showToast(it.name+' added','success');};chips.appendChild(btn);});}
-function bOrdAddItem(){var code=bgv('bord-item-sel'),qty=parseInt(bgv('bord-qty'))||1;var it=bfindItem(code);if(!it){showToast('Select an item first','error');return;}var ex=bOrdItems.find(function(o2){return o2.code===code;});if(ex)ex.qty+=qty;else bOrdItems.push({code:it.code,name:it.name,unit:it.unit,qty:qty,price:it.price||0,received:0});bOrdRenderTable();}
 function bOrdRenderTable(){var tbl=document.getElementById('bord-tbl'),em=document.getElementById('bord-empty'),tbody=document.getElementById('bord-tbody');if(!tbl||!tbody)return;if(!bOrdItems.length){tbl.style.display='none';if(em)em.style.display='';return;}tbl.style.display='';if(em)em.style.display='none';tbody.innerHTML=bOrdItems.map(function(it,i){return '<tr><td class="bmono" style="font-size:10px;color:#228b22">'+bxe(it.code)+'</td><td>'+bxe(it.name)+'</td><td class="bmono">'+bxe(it.unit)+'</td><td class="bmono" style="font-weight:700">'+it.qty+'</td><td><button class="btn btn-sm" style="color:var(--danger)" onclick="bOrdRemove('+i+')">&#x2715;</button></td></tr>';}).join('');}
 function bOrdRemove(i){bOrdItems.splice(i,1);bOrdRenderTable();}
-function submitBranchOrder(){if(!bOrdItems.length){showToast('Add at least one item','error');return;}var sup=bgv('bord-sup');if(!sup){showToast('Select a supplier','error');return;}var o={id:bGenOrdId(),supplier:sup,note:bgv('bord-note'),date:TODAY_BS,status:'pending',items:bOrdItems.slice()};bOrders.unshift(o);bSaveOrders();closeModalForce();showToast('Order '+o.id+' created','success');navTo('inv-orders');}
-function viewBranchOrder(id){var o=bfindOrder(id);if(!o)return;var html='<div class="modal-head"><h2>'+bxe(o.id)+'</h2><button class="modal-close" onclick="closeModalForce()">&#x2715;</button></div>';html+='<div style="margin-bottom:14px"><strong>Supplier:</strong> '+bxe(o.supplier)+'&nbsp;&nbsp;<strong>Date:</strong> '+bxe(o.date)+'&nbsp;&nbsp;'+bpl(o.status,'var(--warning)')+'</div>';html+='<table class="btbl"><thead><tr><th>Code</th><th>Name</th><th>Unit</th><th>Qty</th><th>Received</th></tr></thead><tbody>';(o.items||[]).forEach(function(it){html+='<tr><td class="bmono" style="font-size:10px;color:var(--ceo)">'+bxe(it.code)+'</td><td>'+bxe(it.name)+'</td><td class="bmono">'+bxe(it.unit)+'</td><td class="bmono" style="font-weight:700">'+it.qty+'</td><td class="bmono">'+(it.received||0)+'</td></tr>';});html+='</tbody></table>';if(o.status==='pending')html+='<button class="btn btn-primary" style="width:100%;margin-top:14px" onclick="markBranchOrderDone(\''+bxe(o.id)+'\')">Mark as Received</button>';openModal(html);}
-function markBranchOrderDone(id){
-  var o=bfindOrder(id);if(!o)return;
-  o.status='done';
-  o.completedAt=new Date().toISOString();
-  (o.items||[]).forEach(function(it){it.received=it.qty;var inv=bfindItem(it.code);if(inv){inv.qty=(parseFloat(inv.qty)||0)+it.qty;bSaveStock(it.code,inv.qty);}});
-  bSaveOrders();
-  // ── Send to Finance: push a finance-pending invoice record ──
-  if(db&&NX.session&&NX.session.branchId){
-    var s=NX.session||{};
-    var totalValue=0;
-    (o.items||[]).forEach(function(it){
-      var inv=bfindItem(it.code);
-      var price=inv?parseFloat(inv.price||0):0;
-      totalValue+=price*it.qty;
-    });
-    var finRec={
-      id:o.id,
-      type:'purchase_order',
-      branchId:s.branchId,
-      branchName:s.branchName||s.entityName||'',
-      supplier:o.supplier||'',
-      orderDate:o.date||TODAY_BS,
-      receivedAt:o.completedAt,
-      receivedBy:s.entityName||s.userName||'',
-      items:(o.items||[]).map(function(it){var inv=bfindItem(it.code);return{code:it.code,name:it.name,unit:it.unit,qty:it.qty,price:inv?parseFloat(inv.price||0):0,total:(inv?parseFloat(inv.price||0):0)*it.qty};}),
-      totalValue:totalValue,
-      status:'pending_finance_review',
-      note:o.note||''
-    };
-    db.ref('shared/finance_invoices/'+o.id).set(finRec,function(err){
-      if(err){console.warn('Finance push failed:',err);}
-    });
-  }
-  closeModalForce();
-  showToast('Order received \u2192 stock updated \u2192 sent to Finance \u2713','success');
-  navTo('inv-orders');
-}
-function delBranchOrder(id){if(!confirm('Delete order '+id+'?'))return;bOrders=bOrders.filter(function(o){return o.id!==id;});bSaveOrders();showToast('Deleted');navTo('inv-orders');}
-function printBranchOrderPDF(id){var o=bfindOrder(id);if(!o)return;var s=NX.session||{};var rows=(o.items||[]).map(function(it,i){return '<tr style="background:'+(i%2===0?'#f9f9f9':'#fff')+'"><td style="padding:8px 10px;border:1px solid #ddd;font-family:monospace;font-size:11px">'+bxe(it.code)+'</td><td style="padding:8px 10px;border:1px solid #ddd;font-weight:600">'+bxe(it.name)+'</td><td style="padding:8px 10px;border:1px solid #ddd;text-align:center">'+bxe(it.unit)+'</td><td style="padding:8px 10px;border:1px solid #ddd;text-align:center;font-weight:700;color:#1a56c4">'+it.qty+'</td></tr>';}).join('');var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>PO '+bxe(o.id)+'</title><style>*{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;padding:20px;color:#111}@media print{button{display:none!important}@page{size:A4;margin:10mm}}</style></head><body><div style="display:flex;justify-content:space-between;border-bottom:3px solid #1a2340;padding-bottom:12px;margin-bottom:20px"><div><img src="https://i.imgur.com/jeqtcE2.png" alt="ALFA.CO" style="height:44px;width:auto;display:block"><div style="font-size:11px;color:#888">'+bxe(s.branchName||s.entityName||'')+'</div></div><div style="text-align:right"><div style="font-size:18px;font-weight:700;color:#1a56c4">PURCHASE ORDER</div><div style="font-family:monospace;font-size:13px">'+bxe(o.id)+'</div></div></div><p style="margin-bottom:16px"><strong>Supplier:</strong> '+bxe(o.supplier)+'&nbsp;&nbsp;<strong>Date:</strong> '+bxe(o.date)+'</p><table style="width:100%;border-collapse:collapse;margin-bottom:20px"><thead><tr style="background:#1a2340;color:#fff"><th style="padding:8px 10px;text-align:left">Code</th><th style="padding:8px 10px;text-align:left">Item</th><th style="padding:8px 10px;text-align:center">Unit</th><th style="padding:8px 10px;text-align:center">Qty</th></tr></thead><tbody>'+rows+'</tbody></table><div style="margin-top:30px;display:grid;grid-template-columns:1fr 1fr;gap:40px"><div style="border-top:1px solid #333;padding-top:6px;text-align:center;font-size:10px;color:#64748b">Received By / Date</div><div style="border-top:1px solid #333;padding-top:6px;text-align:center;font-size:10px;color:#64748b">Authorized By</div></div><div style="text-align:center;margin-top:20px"><button onclick="window.print()" style="background:#1a2340;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:13px;font-weight:700;cursor:pointer">Print / Save PDF</button></div></body></html>';var w=window.open('','_blank','width=900,height=700');if(w){w.document.write(html);w.document.close();}else showToast('Allow pop-ups to print','error');}
-
 // ── Low Stock ────────────────────────────────────────
 function pLowStock(){attachBranchListeners();var low=bItems.filter(function(i){return i.min>0&&i.qty<=i.min;}).sort(function(a,b){return a.qty-b.qty;});var h='<div class="page-header"><h1>Low Stock Alerts</h1><p>'+low.length+' items at or below minimum</p></div>';if(!low.length)return h+'<div class="empty-state"><div class="es-icon">\u2705</div><h3>All stock levels OK</h3></div>';var rows=low.map(function(it){var isCrit=it.qty===0;return '<tr><td style="font-weight:600;color:var(--text-primary)">'+bxe(it.name)+'</td><td class="bmono" style="color:var(--ceo);font-size:11px">'+bxe(it.code)+'</td><td class="bmono" style="font-size:16px;font-weight:700;color:'+(isCrit?'var(--danger)':'var(--warning)')+'">'+it.qty+'</td><td class="bmono" style="color:var(--text-secondary)">'+it.min+'</td><td class="bmono">'+bxe(it.unit)+'</td><td>'+bxe(it.location||'\u2014')+'</td><td>'+bpl(isCrit?'Out':'Low',isCrit?'#c0392b':'#b45309')+'</td><td><button class="btn btn-sm btn-primary" onclick="navTo(\'inv-orders\')">Order</button></td></tr>';}).join('');return h+'<div class="btw"><div class="btw-s"><table class="btbl"><thead><tr><th>Name</th><th>Code</th><th>Qty</th><th>Min</th><th>Unit</th><th>Location</th><th>Status</th><th>Action</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';}
 
@@ -10059,7 +9862,7 @@ function saveBranchWastage(){
   navTo('wastage');
 }
 
-function delBranchWaste(id){if(!confirm('Delete this wastage entry?'))return;BS.waste=BS.waste.filter(function(w){return w.id!==id;});bSaveColl('waste',BS.waste);showToast('Deleted');navTo('wastage');}
+function delBranchWaste(id){nxConfirm('Delete this wastage entry?',function(){BS.waste=BS.waste.filter(function(w){return w.id!==id;});bSaveColl('waste',BS.waste);showToast('Deleted');navTo('wastage');},{yesLabel:'Delete'});}
 
 // ── Staff ─────────────────────────────────────────────
 function pStaff() {
@@ -10148,7 +9951,10 @@ function fbStaffMgrLoad(){
 function fbStaffMgrDel(empId,empName){
   var sess=NX.session||{};
   if(!sess.branchId||!db)return;
-  if(!confirm('Remove '+empName+' from the Check-In and Leave Request portal?\n\nThis does NOT delete them from the Staff Directory.'))return;
+  nxConfirm('Remove '+empName+' from the Check-In and Leave Request portal?\n\nThis does NOT delete them from the Staff Directory.', function(){ _fbStaffMgrDelGo(empId, empName); }, {yesLabel:'Remove'});
+}
+function _fbStaffMgrDelGo(empId, empName){
+  var sess=NX.session||{};
   db.ref('branches/'+sess.branchId+'/tsEmps').once('value',function(snap){
     var raw=snap.val();
     var emps=!raw?[]:(Array.isArray(raw)?raw.filter(Boolean):Object.values(raw).filter(Boolean));
@@ -10254,7 +10060,9 @@ function saveBranchStaff(id){
 
   closeModalForce();navTo('staff');
 }
-function delBranchStaff(id){var sess=NX.session||{};var allowedRoles=['hr_manager','super_admin','ceo','branch_mgr'];if(allowedRoles.indexOf(sess.role)<0){showToast('You do not have permission to delete staff','error');return;}var staffMember=BS.staff.find(function(m){return m.id===id;});var staffName=staffMember?staffMember.name:'this staff member';if(!confirm('Delete '+staffName+'?\n\nThis will also remove them from Check-In and Leave Request lists.'))return;
+function delBranchStaff(id){var sess=NX.session||{};var allowedRoles=['hr_manager','super_admin','ceo','branch_mgr'];if(allowedRoles.indexOf(sess.role)<0){showToast('You do not have permission to delete staff','error');return;}var staffMember=BS.staff.find(function(m){return m.id===id;});var staffName=staffMember?staffMember.name:'this staff member';nxConfirm('Delete '+staffName+'?\n\nThis will also remove them from Check-In and Leave Request lists.', function(){ _delBranchStaffGo(id); }, {yesLabel:'Delete'});}
+function _delBranchStaffGo(id){
+  var sess=NX.session||{};
   // Remove from main staff list
   BS.staff=BS.staff.filter(function(m){return m.id!==id;});
   bSaveColl('staff',BS.staff);
@@ -10336,7 +10144,9 @@ function approveStaffTransfer(reqId, reqEncoded) {
   if (!db) { showToast('Not connected','error'); return; }
   var req; try { req = JSON.parse(decodeURIComponent(reqEncoded)); } catch(e) { showToast('Invalid data','error'); return; }
   var toName = req.toBranchName || (NX_BRANCHES[req.toBranch] && NX_BRANCHES[req.toBranch].name) || req.toBranch;
-  if (!confirm('Approve transfer of "' + req.staffName + '" to ' + toName + '?')) return;
+  nxConfirm('Approve transfer of "' + req.staffName + '" to ' + toName + '?', function(){ _approveStaffTransferGo(reqId, req, toName); }, {yesLabel:'Approve', danger:false});
+}
+function _approveStaffTransferGo(reqId, req, toName) {
   var srcBase = 'branches/' + req.fromBranch;
   var destBase = 'branches/' + req.toBranch;
   var staffKey = String(req.staffId).replace(/[.#$[\]\/]/g, '_');
@@ -10471,13 +10281,14 @@ function approveStaffTransfer(reqId, reqEncoded) {
 
 function rejectStaffTransfer(reqId) {
   if (!db) return;
-  if (!confirm('Reject this transfer request?')) return;
-  db.ref('admin/transfer_requests/' + reqId + '/status').set('rejected', function() {
-    showToast('Transfer rejected','warning');
-    if (typeof amUpdateTransferBadge === 'function') amUpdateTransferBadge();
-    var role = (NX.session||{}).role;
-    navTo(role === 'regional' ? 'headcount' : 'access-ctrl');
-  });
+  nxConfirm('Reject this transfer request?', function(){
+    db.ref('admin/transfer_requests/' + reqId + '/status').set('rejected', function() {
+      showToast('Transfer rejected','warning');
+      if (typeof amUpdateTransferBadge === 'function') amUpdateTransferBadge();
+      var role = (NX.session||{}).role;
+      navTo(role === 'regional' ? 'headcount' : 'access-ctrl');
+    });
+  }, {yesLabel:'Reject'});
 }
 
 
@@ -10628,18 +10439,6 @@ function btsPgAtt(){
   },0);
 
   return h;
-}
-function nxSetTsSt(st) {
-  BS.tsSt = st;
-  Object.keys(TS_ST_BRANCH).forEach(function(k) {
-    var btn=document.getElementById('tsst-'+k);
-    if(!btn)return;
-    var c=TS_ST_BRANCH[k], isAct=(k===st);
-    btn.style.borderColor=isAct?c.c:'var(--border)';
-    btn.style.background=isAct?c.c+'22':'transparent';
-    btn.style.color=isAct?c.c:'var(--text-secondary)';
-    btn.style.fontWeight=isAct?'700':'500';
-  });
 }
 function saveBranchAttendance(){
   var eid=bgv('bts-emp'),dt=bgv('bts-date')||TODAY_BS;
@@ -10862,32 +10661,6 @@ function runBranchTsReport(){var eid=bgv('bts-r-emp'),mo=parseInt(bgv('bts-r-mo'
   return;
 }var emp=BS.tsEmps.find(function(e){return e.id===eid;});if(!emp){out.innerHTML='<div style="color:var(--danger);padding:12px">Employee not found.</div>';return;}var recs=getRecs(emp.id),cnt=countSt(recs),tot=recs.length,worked=cnt.present+cnt.late,pct=tot?Math.round(worked/tot*100)+'%':'\u2014';if(pb)pb.style.display='';var totalEmpOtMins=recs.reduce(function(s,r){return s+(r.otApproved&&r.overtimeMins?r.overtimeMins:0);},0);var rows=recs.map(function(r){var otMins=r.otApproved&&r.overtimeMins?r.overtimeMins:0;var otCell=otMins>0?'<span style="background:#fef3c7;color:#b45309;border-radius:4px;padding:1px 5px;font-size:10px;font-weight:700">'+Math.floor(otMins/60)+'h'+(otMins%60?otMins%60+'m':'')+'</span>':'<span style="color:var(--text-tertiary)">—</span>';return '<tr><td class="bmono">'+bxe(r.date)+'</td><td class="bmono" style="text-align:center">'+(r.ci||'\u2014')+'</td><td class="bmono" style="text-align:center">'+(r.co||'\u2014')+'</td><td class="bmono" style="text-align:center;color:var(--info);font-weight:600">'+(r.brk||'\u2014')+'</td><td class="bmono" style="text-align:center">'+btsHrs(r.ci,r.co)+'</td><td>'+btsBadge(r.st)+'</td><td style="text-align:center">'+otCell+'</td><td style="font-size:11px;color:var(--text-secondary)">'+(r.note||'')+'</td></tr>';}).join('');var otSummary=totalEmpOtMins>0?'<div class="bcard" style="margin-bottom:14px;border-left:4px solid #b45309"><div style="display:flex;align-items:center;gap:12px"><div class="bmono" style="font-size:28px;font-weight:300;color:#b45309">'+Math.floor(totalEmpOtMins/60)+'h'+(totalEmpOtMins%60?totalEmpOtMins%60+'m':'')+'</div><div><div style="font-size:13px;font-weight:700">Approved Overtime</div><div style="font-size:11px;color:var(--text-secondary)">'+recs.filter(function(r){return r.otApproved&&r.overtimeMins;}).length+' day(s) with OT recorded in timesheet</div></div></div></div>':'';out.innerHTML='<div class="bcard" style="margin-bottom:14px"><div style="font-size:15px;font-weight:700">'+bxe(emp.name)+'</div><div style="font-size:11px;color:var(--ceo);margin-top:3px">'+bxe(emp.dept||'')+' \u00b7 '+(mo===0?'Full Year':MONTHS_FULL[mo-1])+' '+yr+'</div></div><div class="bgrid-4" style="margin-bottom:14px">'+[['Total',tot,'var(--text-primary)'],['Present',cnt.present,'#00875a'],['Absent',cnt.absent,'#c0392b'],['Rate',pct,'#00875a']].map(function(x){return '<div style="text-align:center;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:12px"><div class="bmono" style="font-size:22px;font-weight:300;color:'+x[2]+'">'+bxe(String(x[1]))+'</div><div style="font-size:9px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:1px;margin-top:3px">'+x[0]+'</div></div>';}).join('')+'</div>'+otSummary+(recs.length?'<div class="btw"><div class="btw-s"><table class="btbl"><thead><tr><th>Date</th><th style="text-align:center">In</th><th style="text-align:center">Out</th><th style="text-align:center">Break</th><th style="text-align:center">Hours</th><th>Status</th><th style="text-align:center;color:#b45309">OT</th><th>Note</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>':'<div style="color:var(--text-tertiary);text-align:center;padding:28px;font-style:italic">No records for this period.</div>');}
 function printBranchTsReport(){var eid=bgv('bts-r-emp'),mo=parseInt(bgv('bts-r-mo')),yr=bgv('bts-r-yr');if(!eid){showToast('Select an employee first','error');return;}var emp=BS.tsEmps.find(function(e){return e.id===eid;});if(!emp)return;var recs=[];if(mo===0){for(var mi=1;mi<=12;mi++){var k=yr+'-'+(mi<10?'0':'')+mi;recs=recs.concat((BS.tsAtt[emp.id]&&BS.tsAtt[emp.id][k])||[]);}}else{var k=yr+'-'+(mo<10?'0':'')+mo;recs=(BS.tsAtt[emp.id]&&BS.tsAtt[emp.id][k])||[];}var cnt={present:0,late:0,absent:0,sick:0,holiday:0,dayoff:0};recs.forEach(function(r){if(cnt[r.st]!==undefined)cnt[r.st]++;});var tot=recs.length,worked=cnt.present+cnt.late,pct=tot?Math.round(worked/tot*100)+'%':'\u2014';var TC={present:'#00875a',late:'#b45309',absent:'#c0392b',sick:'#b45309',holiday:'#5b21b6',dayoff:'#b45309'};var TL={present:'Present',late:'Late',absent:'Absent',sick:'Sick Leave',holiday:'Holiday',dayoff:'OFF'};var rows=recs.map(function(r,i){var col=TC[r.st]||'#888';return '<tr style="background:'+(i%2===0?'#fff':'#f8fafc')+'"><td style="padding:7px 10px;font-family:monospace;font-size:11px;color:#64748b">'+bxe(r.date)+'</td><td style="padding:7px 10px;text-align:center;font-weight:600;font-family:monospace">'+(r.ci||'\u2014')+'</td><td style="padding:7px 10px;text-align:center;font-weight:600;font-family:monospace">'+(r.co||'\u2014')+'</td><td style="padding:7px 10px;text-align:center;font-weight:600;font-family:monospace;color:#0057ff">'+(r.brk||'\u2014')+'</td><td style="padding:7px 10px;text-align:center;font-weight:700;font-family:monospace">'+btsHrs(r.ci,r.co)+'</td><td style="padding:7px 10px;text-align:center"><span style="background:'+col+'20;color:'+col+';border:1px solid '+col+'40;border-radius:20px;padding:2px 9px;font-size:10px;font-weight:700">'+(TL[r.st]||r.st)+'</span></td><td style="padding:7px 10px;font-size:11px;color:#64748b">'+(r.note||'')+'</td></tr>';}).join('');var s=NX.session||{};var moLabel=mo===0?'Full Year '+yr:MONTHS_FULL[mo-1]+' '+yr;var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Timesheet \u2014 '+bxe(emp.name)+'</title><style>@page{size:A4;margin:10mm}*{box-sizing:border-box;margin:0;padding:0;font-family:Arial,Helvetica,sans-serif}body{background:#fff;color:#111;font-size:12px}table{width:100%;border-collapse:collapse}th{background:#1a2340;color:#fff;padding:8px 10px;text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:1px}.c{text-align:center}.stats{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:16px}.stat{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 8px;text-align:center}.stat-n{font-size:22px;font-weight:300;font-family:monospace}.stat-l{font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-top:3px}.foot{margin-top:20px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:30px}.foot-cell{border-top:1px solid #333;padding-top:5px;text-align:center;font-size:9px;color:#64748b}@media print{.np{display:none!important}}</style></head><body>';html+='<div style="display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:10px;margin-bottom:16px;border-bottom:3px solid #1a2340"><div><img src="https://i.imgur.com/jeqtcE2.png" alt="ALFA.CO" style="height:44px;width:auto;display:block"><div style="font-size:10px;color:#64748b">'+bxe(s.branchName||s.entityName||'')+'</div></div><div style="text-align:center"><h1 style="font-size:16px;font-weight:800;color:#1a2340">Employee Timesheet</h1><p style="font-size:11px;color:#64748b">'+bxe(emp.name)+' \u00b7 '+bxe(emp.dept||'')+' \u00b7 '+bxe(moLabel)+'</p></div><div style="text-align:right;font-size:10px;color:#64748b"><div>Printed: '+new Date().toLocaleDateString('en-GB')+'</div><div>Work Rate: '+pct+'</div></div></div>';html+='<div class="stats"><div class="stat"><div class="stat-n" style="color:#1a2340">'+tot+'</div><div class="stat-l">Total</div></div><div class="stat"><div class="stat-n" style="color:#00875a">'+cnt.present+'</div><div class="stat-l">Present</div></div><div class="stat"><div class="stat-n" style="color:#b45309">'+cnt.late+'</div><div class="stat-l">Late</div></div><div class="stat"><div class="stat-n" style="color:#c0392b">'+cnt.absent+'</div><div class="stat-l">Absent</div></div><div class="stat"><div class="stat-n" style="color:#b45309">'+cnt.sick+'</div><div class="stat-l">Sick</div></div><div class="stat"><div class="stat-n" style="color:#00875a">'+pct+'</div><div class="stat-l">Rate</div></div></div>';html+=(recs.length?'<table><thead><tr><th>Date</th><th class="c">In</th><th class="c">Out</th><th class="c">Break</th><th class="c">Hours</th><th class="c">Status</th><th>Note</th></tr></thead><tbody>'+rows+'</tbody></table>':'<div style="text-align:center;padding:30px;color:#94a3b8;font-style:italic">No records.</div>');html+='<div class="foot"><div class="foot-cell">Employee Signature</div><div class="foot-cell">HR / Manager</div><div class="foot-cell">Date &amp; Stamp</div></div><div class="np" style="text-align:center;margin-top:20px"><button onclick="window.print()" style="background:#1a2340;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:13px;font-weight:700;cursor:pointer">Print / Save PDF</button></div></body></html>';var w=window.open('','_blank','width=900,height=700');if(w){w.document.write(html);w.document.close();}else showToast('Allow pop-ups to print','error');}
-function btsPgLeave(){var filt=BS.tsLTab==='all'?BS.tsLeaves:BS.tsLeaves.filter(function(l){return l.type===BS.tsLTab;});var pend=0,appr=0,rej=0;filt.forEach(function(l){if(l.status==='pending')pend++;else if(l.status==='approved')appr++;else rej++;});var eo='<option value="">Select</option>'+BS.tsEmps.slice().sort(function(a,b){return a.name.localeCompare(b.name);}).map(function(e){return '<option value="'+bxe(e.id)+'">'+bxe(e.name)+' ('+bxe(e.dept||'')+')</option>';}).join('');var lbar='<div style="display:flex;gap:6px;margin-bottom:16px">'+['all','sick','holiday','dayoff'].map(function(t){var l={all:'All',sick:'Sick',holiday:'Holiday',dayoff:'OFF'};return '<button class="bfbt'+(BS.tsLTab===t?' on':'')+'" onclick="BS.tsLTab=\''+t+'\';navTo(\'timesheet\')">'+l[t]+'</button>';}).join('')+'</div>';var rows=filt.slice().sort(function(a,b){return(b.start||'').localeCompare(a.start||'');}).map(function(l){var lt=TS_LT_BRANCH[l.type]||{l:l.type,c:'#888'};var emp=BS.tsEmps.find(function(e){return e.id===l.empId;});var sc=l.status==='approved'?'#00875a':l.status==='rejected'?'#c0392b':'#b45309';return '<tr><td style="font-weight:600;color:var(--text-primary)">'+bxe(emp?emp.name:'Unknown')+'</td><td>'+bpl(lt.l,lt.c)+'</td><td class="bmono">'+bxe(l.start)+'</td><td class="bmono">'+bxe(l.end)+'</td><td class="bmono" style="font-weight:600">'+bxe(l.days)+'d</td><td>'+bpl(l.status,sc)+'</td><td><div style="display:flex;gap:4px">'+(l.status==='pending'?'<button class="btn btn-sm" style="color:var(--success)" onclick="approveBranchLeave(\''+bxe(l.id)+'\')">Approve</button><button class="btn btn-sm" style="color:var(--danger)" onclick="rejectBranchLeave(\''+bxe(l.id)+'\')">Reject</button>':'')+'<button class="btn btn-sm" style="color:var(--danger)" onclick="delBranchLeave(\''+bxe(l.id)+'\')">Del</button></div></td></tr>';}).join('');var h='<div class="bcard" style="margin-bottom:16px"><div style="font-size:13px;font-weight:700;color:var(--ceo);margin-bottom:14px">New Leave Request</div><div class="bgrid-2" style="margin-bottom:12px"><div class="bfg" style="margin-bottom:0"><label class="form-label">Employee *</label><select class="form-input form-select" id="blf-emp">'+eo+'</select></div><div class="bfg" style="margin-bottom:0"><label class="form-label">Leave Type *</label><select class="form-input form-select" id="blf-type"><option value="sick">Sick Leave</option><option value="holiday">Annual Holiday</option><option value="dayoff">Day Off</option></select></div><div class="bfg" style="margin-bottom:0"><label class="form-label">Start Date *</label><input class="form-input" type="date" id="blf-start"></div><div class="bfg" style="margin-bottom:0"><label class="form-label">End Date *</label><input class="form-input" type="date" id="blf-end"></div></div><div class="bfg"><label class="form-label">Notes</label><input class="form-input" id="blf-note" placeholder="Optional reason"></div><button class="btn btn-primary" onclick="saveBranchLeave()">Submit Leave Request</button></div>'+lbar;h+='<div class="bgrid-4" style="margin-bottom:16px">'+[['Pending',pend,'#b45309'],['Approved',appr,'#00875a'],['Rejected',rej,'#c0392b'],['Total',filt.length,'var(--text-primary)']].map(function(x){return '<div style="text-align:center;background:var(--surface-2);border:1px solid '+x[2]+'30;border-radius:9px;padding:12px"><div class="bmono" style="font-size:24px;font-weight:300;color:'+x[2]+'">'+x[1]+'</div><div style="font-size:9px;color:var(--text-tertiary);margin-top:3px;text-transform:uppercase;letter-spacing:1px">'+x[0]+'</div></div>';}).join('')+'</div>';return h+'<div class="btw"><div class="btw-s"><table class="btbl"><thead><tr><th>Employee</th><th>Type</th><th>Start</th><th>End</th><th>Days</th><th>Status</th><th>Actions</th></tr></thead><tbody>'+(rows||'<tr><td colspan="7" style="text-align:center;color:var(--text-tertiary);padding:24px">No leave requests yet</td></tr>')+'</tbody></table></div></div>';}
-function saveBranchLeave(){var eid=bgv('blf-emp'),type=bgv('blf-type'),start=bgv('blf-start'),end=bgv('blf-end');if(!eid||!start||!end){showToast('Fill all required fields','error');return;}var days=Math.max(1,Math.ceil((new Date(end+'T00:00:00')-new Date(start+'T00:00:00'))/86400000)+1);BS.tsLeaves.push({id:buid(),empId:eid,type:type,start:start,end:end,days:days,note:bgv('blf-note'),status:'pending'});bSaveColl('tsLeaves',BS.tsLeaves);showToast('Leave request submitted','success');BS.tsTab='leave';navTo('timesheet');}
-function approveBranchLeave(id){var l=BS.tsLeaves.find(function(x){return x.id===id;});if(l)l.status='approved';bSaveColl('tsLeaves',BS.tsLeaves);showToast('Leave approved','success');navTo('timesheet');}
-function rejectBranchLeave(id){var l=BS.tsLeaves.find(function(x){return x.id===id;});if(l)l.status='rejected';bSaveColl('tsLeaves',BS.tsLeaves);showToast('Leave rejected');navTo('timesheet');}
-function delBranchLeave(id){if(!confirm('Delete this leave request?'))return;BS.tsLeaves=BS.tsLeaves.filter(function(x){return x.id!==id;});bSaveColl('tsLeaves',BS.tsLeaves);navTo('timesheet');}
-function btsEditLeave(empId){
-  var e=BS.tsEmps.find(function(x){return x.id===empId;});
-  if(!e)return;
-  var cur=e.leaveBalance||21;
-  var v=prompt('Edit annual leave balance for '+e.name+'\nCurrent: '+cur+' days\n\nEnter new total (annual entitlement in days):',cur);
-  if(v===null)return;
-  var n=parseInt(v);
-  if(isNaN(n)||n<0||n>365){showToast('Invalid value (must be 0–365)','error');return;}
-  e.leaveBalance=n;
-  if(db&&NX.session&&NX.session.branchId){
-    db.ref(bPath('tsEmps')+'/'+empId+'/leaveBalance').set(n,function(err){
-      if(err)showToast('Save failed','error');
-      else showToast('Leave balance updated to '+n+' days ✓','success');
-    });
-  } else {
-    showToast('Leave balance updated locally to '+n+' days','success');
-  }
-  navTo(NX.page);
-}
-function btsPgEmps(){var sorted=BS.tsEmps.slice().sort(function(a,b){return(a.dept||'').localeCompare(b.dept||'')||a.name.localeCompare(b.name);});var rows=sorted.map(function(e){var used=0;BS.tsLeaves.forEach(function(l){if(l.empId===e.id&&l.type==='holiday'&&l.status==='approved')used+=l.days;});var rem=(e.leaveBalance||21)-used;return '<tr><td><div style="display:flex;align-items:center;gap:10px"><div class="bav">'+bini(e.name)+'</div><div><div style="font-weight:600;font-size:12px">'+bxe(e.name)+'</div><div class="bmono" style="font-size:10px;color:var(--text-tertiary)">'+bxe(e.id)+'</div></div></div></td><td>'+bpl(e.dept||'\u2014',bdc(e.dept||'FOH'))+'</td><td style="font-size:11px">'+(e.phone?'<a href="tel:'+bxe(e.phone)+'" style="color:var(--ceo);text-decoration:none">'+bxe(e.phone)+'</a>':'<span style="color:var(--text-tertiary)">\u2014</span>')+'</td><td class="bmono" style="font-weight:600;color:'+(rem>5?'#00875a':rem>0?'#b45309':'#c0392b')+'">'+rem+' / '+(e.leaveBalance||21)+' days</td><td><button data-eid=\"'+bxe(e.id)+'\" onclick=\"btsEditLeave(this.dataset.eid)\" style=\"padding:3px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);color:var(--text-secondary);font-size:11px;cursor:pointer\">✏ Edit</button></td></tr>';}).join('');return '<div class="bcard" style="margin-bottom:16px;border-color:rgba(52,211,153,.2)"><div style="font-weight:600;color:#b45309;margin-bottom:6px">Auto-Sync with Staff Page</div><div style="font-size:11px;color:var(--text-secondary)">'+BS.tsEmps.length+' / '+BS.staff.length+' staff synced.</div></div><div class="btw"><div class="btw-s"><table class="btbl"><thead><tr><th>Employee</th><th>Department</th><th>Phone</th><th>Leave Balance</th><th></th></tr></thead><tbody>'+(rows||'<tr><td colspan="5" style="text-align:center;color:var(--text-tertiary);padding:24px">No employees yet</td></tr>')+'</tbody></table></div></div>';}
-
 // ── Health Cards ──────────────────────────────────────
 function pHealthCards(){
   attachBranchListeners();
@@ -10994,7 +10767,7 @@ function saveBranchHealth(id){
   else BS.health.push(e);
   bSaveColl('health',BS.health);closeModalForce();showToast('Health card saved','success');navTo('health-cards');
 }
-function delBranchHealth(id){if(!confirm('Delete this health card?'))return;BS.health=BS.health.filter(function(x){return x.id!==id;});bSaveColl('health',BS.health);showToast('Deleted');navTo('health-cards');}
+function delBranchHealth(id){nxConfirm('Delete this health card?',function(){BS.health=BS.health.filter(function(x){return x.id!==id;});bSaveColl('health',BS.health);showToast('Deleted');navTo('health-cards');},{yesLabel:'Delete'});}
 
 // ── Health Cards Export ──────────────────────────────
 function exportHealthCards(){
@@ -11628,7 +11401,7 @@ function saveBranchSales(id){
   }
   bSaveColl('sales',BS.sales);closeModalForce();showToast('Sales saved','success');navTo('sales');
 }
-function delBranchSales(id){if(!confirm('Delete this sales entry?'))return;BS.sales=BS.sales.filter(function(x){return x.id!==id;});bSaveColl('sales',BS.sales);showToast('Deleted');navTo('sales');}
+function delBranchSales(id){nxConfirm('Delete this sales entry?',function(){BS.sales=BS.sales.filter(function(x){return x.id!==id;});bSaveColl('sales',BS.sales);showToast('Deleted');navTo('sales');},{yesLabel:'Delete'});}
 
 // ── Petty Cash ────────────────────────────────────────
 function pPettyCash(){
@@ -11769,15 +11542,20 @@ function saveBranchPC(id){
     var i=BS.pc.findIndex(function(x){return x.id===id;});
     if(i>=0){BS.pc[i].date=dt;BS.pc[i].description=desc;BS.pc[i].forwhat=forw;BS.pc[i].category=bgv('bpc-cat');BS.pc[i].gl=bgv('bpc-gl');BS.pc[i].remarks=bgv('bpc-rem');BS.pc[i].amount=parseFloat(amt)||0;BS.pc[i].cycleNo=BS.pcCycleNo||1;BS.pc[i].invoices=window._pcModalInvoices||[];}
   } else {
+    var _bpcNew={id:buid(),date:dt,description:desc,forwhat:forw,category:bgv('bpc-cat'),gl:bgv('bpc-gl'),remarks:bgv('bpc-rem'),amount:parseFloat(amt)||0,cycleNo:BS.pcCycleNo||1,invoices:window._pcModalInvoices||[]};
     // Duplicate guard — same date + same description
     if(BS.pc.find(function(p){return p.date===dt&&(p.description||'').toLowerCase()===desc.toLowerCase();})){
-      if(!confirm('A similar entry exists for this date. Add anyway?'))return;
+      nxConfirm('A similar entry exists for this date. Add anyway?', function(){ BS.pc.push(_bpcNew); _bpcFinishSave(); }, {yesLabel:'Add', danger:false});
+      return;
     }
-    BS.pc.push({id:buid(),date:dt,description:desc,forwhat:forw,category:bgv('bpc-cat'),gl:bgv('bpc-gl'),remarks:bgv('bpc-rem'),amount:parseFloat(amt)||0,cycleNo:BS.pcCycleNo||1,invoices:window._pcModalInvoices||[]});
+    BS.pc.push(_bpcNew);
   }
+  _bpcFinishSave();
+}
+function _bpcFinishSave(){
   bSaveColl('pc',BS.pc);closeModalForce();showToast('Entry saved','success');navTo('petty-cash');
 }
-function delBranchPC(id){if(!confirm('Delete this petty cash entry?'))return;BS.pc=BS.pc.filter(function(x){return x.id!==id;});bSaveColl('pc',BS.pc);showToast('Deleted');navTo('petty-cash');}
+function delBranchPC(id){nxConfirm('Delete this petty cash entry?',function(){BS.pc=BS.pc.filter(function(x){return x.id!==id;});bSaveColl('pc',BS.pc);showToast('Deleted');navTo('petty-cash');},{yesLabel:'Delete'});}
 
 // ── Cost Center CRUD ──
 function openPCCostCenterMgr(){
@@ -11809,7 +11587,10 @@ function renamePCCostCenter(cc){
 }
 function deletePCCostCenter(cc){
   var inUse=BS.pc.filter(function(p){return p.category===cc;}).length;
-  if(inUse>0){if(!confirm(cc+' is used by '+inUse+' entries. Delete anyway? (entries will keep the name)'))return;}
+  if(inUse>0){nxConfirm(cc+' is used by '+inUse+' entries. Delete anyway? (entries will keep the name)', function(){_deletePCCostCenterGo(cc);}, {yesLabel:'Delete'});return;}
+  _deletePCCostCenterGo(cc);
+}
+function _deletePCCostCenterGo(cc){
   BS.pcCostCenters=BS.pcCostCenters.filter(function(x){return x!==cc;});
   if(db&&NX.session&&NX.session.branchId)db.ref('branches/'+NX.session.branchId+'/pcCostCenters').set(BS.pcCostCenters);
   showToast('Deleted','success');openPCCostCenterMgr();
@@ -11845,7 +11626,10 @@ function renamePCGL(gl){
 }
 function deletePCGL(gl){
   var inUse=BS.pc.filter(function(p){return p.gl===gl;}).length;
-  if(inUse>0){if(!confirm(gl+' is used by '+inUse+' entries. Delete anyway? (entries will keep the name)'))return;}
+  if(inUse>0){nxConfirm(gl+' is used by '+inUse+' entries. Delete anyway? (entries will keep the name)', function(){_deletePCGLGo(gl);}, {yesLabel:'Delete'});return;}
+  _deletePCGLGo(gl);
+}
+function _deletePCGLGo(gl){
   BS.pcGLs=BS.pcGLs.filter(function(x){return x!==gl;});
   if(db&&NX.session&&NX.session.branchId)db.ref('branches/'+NX.session.branchId+'/pcGLs').set(BS.pcGLs);
   showToast('Deleted','success');openPCGLMgr();
@@ -11855,11 +11639,12 @@ function deletePCGL(gl){
 function pcStartNewCycle(){
   var curNo=BS.pcCycleNo||1;
   var entries=(BS.pc||[]).filter(function(p){return (p.cycleNo||1)===curNo;});
-  if(!entries.length){
-    if(!confirm('No entries in cycle #'+curNo+'. Start a new cycle anyway?'))return;
-  } else {
-    if(!confirm('Close cycle #'+curNo+' with '+entries.length+' entries ('+bfsar(entries.reduce(function(s,p){return s+(+p.amount||0);},0))+')?\n\nThe current cycle will be archived and a new cycle # will start.\nClosed cycle will appear in DSR Closed Petty Cash.'))return;
-  }
+  var cycMsg=!entries.length
+    ? ('No entries in cycle #'+curNo+'. Start a new cycle anyway?')
+    : ('Close cycle #'+curNo+' with '+entries.length+' entries ('+bfsar(entries.reduce(function(s,p){return s+(+p.amount||0);},0))+')?\n\nThe current cycle will be archived and a new cycle # will start.\nClosed cycle will appear in DSR Closed Petty Cash.');
+  nxConfirm(cycMsg, function(){ _pcStartNewCycleGo(curNo, entries); }, {yesLabel:entries.length?'Close Cycle':'Start New', danger:false});
+}
+function _pcStartNewCycleGo(curNo, entries){
   // Archive current cycle
   if(!BS.pcArchive)BS.pcArchive=[];
   var total=entries.reduce(function(s,p){return s+(+p.amount||0);},0);
@@ -12043,7 +11828,9 @@ function pcExportCyclePDF(cycleId){
 
 // Confirm received — Branch Manager marks money received
 function pcConfirmReceived(cycleId){
-  if(!confirm('Confirm that you have received the cash for this cycle?'))return;
+  nxConfirm('Confirm that you have received the cash for this cycle?', function(){_pcConfirmReceivedGo(cycleId);}, {yesLabel:'Confirm', danger:false});
+}
+function _pcConfirmReceivedGo(cycleId){
   var idx=(BS.pcArchive||[]).findIndex(function(c){return c.id===cycleId;});
   if(idx<0){showToast('Cycle not found','error');return;}
   BS.pcArchive[idx].status='received';
@@ -12063,7 +11850,9 @@ function pcConfirmReceived(cycleId){
 
 // ── AM Petty Cash Approve/Reject ──────────────────────────────────────────
 function pcAMApprove(cycleId){
-  if(!confirm('Approve this petty cash cycle and forward to Finance?'))return;
+  nxConfirm('Approve this petty cash cycle and forward to Finance?', function(){_pcAMApproveGo(cycleId);}, {yesLabel:'Approve', danger:false});
+}
+function _pcAMApproveGo(cycleId){
   if(db){
     db.ref('admin/petty_cash_reviews/'+cycleId+'/status').set('pending_finance');
     db.ref('admin/petty_cash_reviews/'+cycleId+'/amApprovedAt').set(new Date().toISOString());
@@ -12138,7 +11927,9 @@ function pcFinanceMarkProcessing(cycleId){
   setTimeout(function(){navTo(NX.page||'hrf-approvals');},800);
 }
 function pcFinanceMarkSent(cycleId){
-  if(!confirm('Confirm that money has been sent to the branch?'))return;
+  nxConfirm('Confirm that money has been sent to the branch?', function(){_pcFinanceMarkSentGo(cycleId);}, {yesLabel:'Confirm', danger:false});
+}
+function _pcFinanceMarkSentGo(cycleId){
   if(db){
     db.ref('admin/petty_cash_reviews/'+cycleId+'/status').set('money_sent');
     db.ref('admin/petty_cash_reviews/'+cycleId+'/sentAt').set(new Date().toISOString());
@@ -12193,7 +11984,7 @@ function saveReminder(id){
   bSaveColl('rem',BS.rem);closeModalForce();showToast('Reminder saved','success');
   if(NX.page==='branch-dash')navTo('branch-dash');
 }
-function delReminder(id){if(!confirm('Delete this reminder?'))return;BS.rem=(BS.rem||[]).filter(function(r){return r.id!==id;});bSaveColl('rem',BS.rem);showToast('Reminder deleted','success');if(NX.page==='branch-dash')navTo('branch-dash');}
+function delReminder(id){nxConfirm('Delete this reminder?',function(){BS.rem=(BS.rem||[]).filter(function(r){return r.id!==id;});bSaveColl('rem',BS.rem);showToast('Reminder deleted','success');if(NX.page==='branch-dash')navTo('branch-dash');},{yesLabel:'Delete'});}
 function toggleReminder(id){var r=(BS.rem||[]).find(function(x){return x.id===id;});if(!r)return;r.done=!r.done;bSaveColl('rem',BS.rem);if(NX.page==='branch-dash')navTo('branch-dash');}
 
 
@@ -12692,7 +12483,7 @@ function dsrAddDisc(){var D=_dsrD();D.discounts.push({id:buid(),type:'',amount:'
 function dsrAddPay(){var D=_dsrD();D.payments.push({id:buid(),method:'Cash',amount:''});navTo('dsr');}
 function dsrAddDeliv(){var D=_dsrD();D.delivery.push({id:buid(),platform:'',amount:'',orders:''});navTo('dsr');}
 function dsrAddServer(){var D=_dsrD();D.servers.push({id:buid(),name:'',sap:'',totalSales:'',cashSales:'',madaSales:'',visaSales:'',mcSales:'',amexSales:'',qlubSales:'',loyaltySales:'',deliverySales:'',vatAlfaSales:'',tips:[],voids:[],returns:[]});navTo('dsr');}
-function dsrRmServer(si){var D=_dsrD();if(!confirm('Remove this server?'))return;D.servers.splice(si,1);var activeDate=_dsrActiveDate();if(db&&NX.session&&NX.session.branchId){db.ref(dsrFbPath(activeDate)).set(D,function(err){if(err)showToast('Save failed','error');});}navTo('dsr');}
+function dsrRmServer(si){nxConfirm('Remove this server?',function(){var D=_dsrD();D.servers.splice(si,1);var activeDate=_dsrActiveDate();if(db&&NX.session&&NX.session.branchId){db.ref(dsrFbPath(activeDate)).set(D,function(err){if(err)showToast('Save failed','error');});}navTo('dsr');},{yesLabel:'Remove'});}
 function dsrUpdSrv(si,k,v){var D=_dsrD();if(D.servers[si])D.servers[si][k]=v;}
 function dsrAddTip(si){var D=_dsrD();if(!D.servers[si])return;D.servers[si].tips.push({id:buid(),method:'MADA',amount:'',approval:'',guest:'',status:'pending'});navTo('dsr');}
 function dsrRmTip(si,id){var D=_dsrD();if(!D.servers[si])return;D.servers[si].tips=D.servers[si].tips.filter(function(t){return t.id!==id;});navTo('dsr');}
@@ -13297,11 +13088,12 @@ function bmBrfPublish(){
 function bmBrfDelete(dateStr, key){
   var s=NX.session||{};
   if(!db||!s.branchId) return;
-  if(!confirm('Delete this briefing?')) return;
-  db.ref('branches/'+s.branchId+'/briefings/'+dateStr+'/'+key).remove(function(){
-    showToast('Deleted ✓','success');
-    navTo('bm-briefing');
-  });
+  nxConfirm('Delete this briefing?', function(){
+    db.ref('branches/'+s.branchId+'/briefings/'+dateStr+'/'+key).remove(function(){
+      showToast('Deleted ✓','success');
+      navTo('bm-briefing');
+    });
+  }, {yesLabel:'Delete'});
 }
 
 // ══════════════════════════════════════════════════════
@@ -13996,9 +13788,6 @@ function bmContestLoad() {
 
 
 // ── Missing branch helper stubs ──
-function clNxGetItem(clId,di,itemId){ clNxEnsureST(); try{return clNxState[clNxWk()][clId][di][itemId]||{};}catch(e){return {};} }
-function clNxLogin(role){ clNxRole=role; navTo('checklists'); }
-
 // ── pTimesheet now delegates to btsPg* which exist ──
 // ── pStaff role filter is handled inline ──
 // ── pSales uses openBranchSalesModal which is defined below pSales ──
@@ -15090,103 +14879,12 @@ function updateMobileNavStyle() {
 // ══════════════════════════════════════════════════════
 // ANIMATED NUMBER COUNTER
 // ══════════════════════════════════════════════════════
-function animateNumber(el, target, duration, prefix, suffix) {
-  if (!el) return;
-  prefix = prefix || '';
-  suffix = suffix || '';
-  duration = duration || 800;
-  var start = 0;
-  var startTime = null;
-  function step(ts) {
-    if (!startTime) startTime = ts;
-    var progress = Math.min((ts - startTime) / duration, 1);
-    var ease = 1 - Math.pow(1 - progress, 3);
-    el.textContent = prefix + formatNum(Math.round(start + (target - start) * ease)) + suffix;
-    if (progress < 1) requestAnimationFrame(step);
-  }
-  requestAnimationFrame(step);
-}
-
 // ══════════════════════════════════════════════════════
 // DATA HELPER FUNCTIONS (spec requirement)
 // ══════════════════════════════════════════════════════
-function getCompanyData() {
-  return {
-    brands: SEED.brands,
-    metrics: DEMO_METRICS
-  };
-}
-
-function getBrandSales(brandId, period) {
-  var b = DEMO_METRICS.brands[brandId];
-  if (!b) return 0;
-  if (period === 'today') return b.todaySales;
-  if (period === 'mtd') return b.mtdSales;
-  if (period === 'week') return Math.round(b.mtdSales * 0.23);
-  return b.mtdSales;
-}
-
-function getCompanyHeadcount() {
-  return Object.values(DEMO_METRICS.brands).reduce(function(s, b) { return s + b.staff; }, 0);
-}
-
-function getCompanyFoodCost() {
-  var brands = Object.values(DEMO_METRICS.brands);
-  return (brands.reduce(function(s, b) { return s + b.foodCostPct; }, 0) / brands.length).toFixed(1);
-}
-
-function getAlerts(role, entityId) {
-  return DEMO_NOTIFICATIONS.filter(function(n) {
-    if (role === 'ceo' || role === 'super_admin') return true;
-    if (role === 'brand_dir') return n.branch.toLowerCase().includes(entityId || '');
-    return true;
-  });
-}
-
-function aggregateSales(branchIds, dateRange) {
-  var total = 0;
-  branchIds.forEach(function(bid) {
-    Object.keys(DEMO_METRICS.brands).forEach(function(bk) {
-      if (DEMO_METRICS.brands[bk].branches[bid]) {
-        total += DEMO_METRICS.brands[bk].branches[bid].todaySales;
-      }
-    });
-  });
-  return total;
-}
-
-function getEntityPath(role, id) {
-  // Uses OpsHub-compatible flat Firebase paths
-  if (role === 'super_admin' || role === 'ceo') return 'admin';
-  if (role === 'branch_mgr' || role === 'staff') {
-    return id ? 'branches/' + id : 'admin';
-  }
-  // For brand_dir and regional, we read from admin/branches filtered by brand/region
-  return 'admin/branches';
-}
-
 // ══════════════════════════════════════════════════════
 // OFFLINE BANNER
 // ══════════════════════════════════════════════════════
-function showOfflineBanner() {
-  var existing = document.getElementById('offline-banner');
-  if (existing) return;
-  var banner = document.createElement('div');
-  banner.id = 'offline-banner';
-  banner.style.cssText = [
-    'position:fixed','top:' + getComputedStyle(document.documentElement).getPropertyValue('--topbar-h'),
-    'left:0','right:0','z-index:200',
-    'background:rgba(248,113,113,.15)',
-    'border-bottom:1px solid rgba(248,113,113,.3)',
-    'padding:8px 20px',
-    'display:flex','align-items:center','justify-content:center','gap:10px',
-    'font-size:12px','color:#c0392b',
-    'backdrop-filter:blur(10px)'
-  ].join(';');
-  banner.innerHTML = '⚡ Offline mode — showing demo data. Changes will not be saved. <button onclick="document.getElementById(\'offline-banner\').remove()" style="background:none;border:none;color:#c0392b;cursor:pointer;margin-left:10px;font-size:16px;line-height:1">✕</button>';
-  document.getElementById('app').insertBefore(banner, document.querySelector('.body-wrap'));
-}
-
 // ══════════════════════════════════════════════════════
 // KEYBOARD SHORTCUTS
 // ══════════════════════════════════════════════════════
@@ -15391,7 +15089,6 @@ function hrfLoadAll(coll, cacheKey, cb) {
 
 function hxe(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function hfsar(n) { return 'SAR ' + parseFloat(n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
-function hfnum(n) { return parseFloat(n||0).toLocaleString('en-US',{minimumFractionDigits:0,maximumFractionDigits:0}); }
 function hini(name) { return String(name||'').split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase(); }
 
 function hrfKpi(icon, label, value, sub, color) {
@@ -16389,7 +16086,7 @@ function openHrfRolesMgr(){
 }
 function addHrfRole(){var v=bgv('hrf-role-new');if(!v){showToast('Enter a role name','error');return;}if(HRF_ROLES.indexOf(v)>=0){showToast('Already exists','error');return;}HRF_ROLES.push(v);db.ref('shared/hr_roles').set(HRF_ROLES);showToast('Role added','success');openHrfRolesMgr();}
 function renameHrfRole(i){var v=prompt('Rename "'+HRF_ROLES[i]+'" to:',HRF_ROLES[i]);if(!v||v===HRF_ROLES[i])return;HRF_ROLES[i]=v;db.ref('shared/hr_roles').set(HRF_ROLES);showToast('Renamed','success');openHrfRolesMgr();}
-function deleteHrfRole(i){if(!confirm('Delete role "'+HRF_ROLES[i]+'"?'))return;HRF_ROLES.splice(i,1);db.ref('shared/hr_roles').set(HRF_ROLES);showToast('Deleted','success');openHrfRolesMgr();}
+function deleteHrfRole(i){nxConfirm('Delete role "'+HRF_ROLES[i]+'"?',function(){HRF_ROLES.splice(i,1);db.ref('shared/hr_roles').set(HRF_ROLES);showToast('Deleted','success');openHrfRolesMgr();},{yesLabel:'Delete'});}
 
 // ── Managed Departments CRUD ──
 // Stored at shared/departments — same array feeds DEPTS used by HR + Branch Manager schedule
@@ -16443,10 +16140,11 @@ function renameHrfDept(i){
   _saveDepts(function(){showToast('Renamed','success');openHrfDeptsMgr();_refreshDeptDropdown();});
 }
 function deleteHrfDept(i,isCore){
-  if(isCore&&!confirm('"'+DEPTS[i]+'" is a core department used by the schedule. Deleting it may affect existing staff grouping.\n\nContinue?'))return;
-  if(!isCore&&!confirm('Delete "'+DEPTS[i]+'"?'))return;
-  DEPTS.splice(i,1);
-  _saveDepts(function(){showToast('Deleted','success');openHrfDeptsMgr();_refreshDeptDropdown();});
+  var dMsg=isCore?('"'+DEPTS[i]+'" is a core department used by the schedule. Deleting it may affect existing staff grouping.\n\nContinue?'):('Delete "'+DEPTS[i]+'"?');
+  nxConfirm(dMsg, function(){
+    DEPTS.splice(i,1);
+    _saveDepts(function(){showToast('Deleted','success');openHrfDeptsMgr();_refreshDeptDropdown();});
+  }, {yesLabel:'Delete'});
 }
 // Refresh the dept dropdown in the open employee modal (if visible)
 function _refreshDeptDropdown(){
@@ -16505,7 +16203,7 @@ function editHrfCompany(i){
   HRF_COMPANIES[i]=Object.assign({},c,{name:name,contact:contact||''});
   db.ref('shared/hr_companies').set(HRF_COMPANIES);showToast('Updated','success');openHrfCompaniesMgr();
 }
-function deleteHrfCompany(i){if(!confirm('Delete "'+HRF_COMPANIES[i].name+'"?'))return;HRF_COMPANIES.splice(i,1);db.ref('shared/hr_companies').set(HRF_COMPANIES);showToast('Deleted','success');openHrfCompaniesMgr();}
+function deleteHrfCompany(i){nxConfirm('Delete "'+HRF_COMPANIES[i].name+'"?',function(){HRF_COMPANIES.splice(i,1);db.ref('shared/hr_companies').set(HRF_COMPANIES);showToast('Deleted','success');openHrfCompaniesMgr();},{yesLabel:'Delete'});}
 
 // ── Branch Add-Employee Access Control ──
 // HR can grant/revoke per-branch permission to add staff
@@ -16627,7 +16325,9 @@ function hrfDoReassign(empId,fromBranchId){
   });
 }
 function hrfDeleteEmp(empId,branchId){
-  if(!confirm('Delete this employee permanently?\n\nThis removes them from the branch staff list.'))return;
+  nxConfirm('Delete this employee permanently?\n\nThis removes them from the branch staff list.', function(){_hrfDeleteEmpGo(empId,branchId);}, {yesLabel:'Delete'});
+}
+function _hrfDeleteEmpGo(empId,branchId){
   if(!db){showToast('Not connected','error');return;}
   // Try _key from cache first (set by hrfLoadAll), fallback to full Firebase scan
   var cached=(HRF.staff[branchId]||[]);
@@ -17832,7 +17532,9 @@ function pHrfPurchaseOrders(){
 }
 function hrfApprovePO(poId){
   if(!db||!poId)return;
-  if(!confirm('Approve this PO and mark as finance-verified?'))return;
+  nxConfirm('Approve this PO and mark as finance-verified?', function(){_hrfApprovePOGo(poId);}, {yesLabel:'Approve', danger:false});
+}
+function _hrfApprovePOGo(poId){
   var updates={};
   updates['shared/finance_invoices/'+poId+'/status']='finance_approved';
   updates['shared/finance_invoices/'+poId+'/financeApprovedAt']=new Date().toISOString();
@@ -18681,11 +18383,12 @@ function bmCompSave(type,idx){
   else{closeModalForce();showToast('Saved','success');navTo('bm-compliance');}
 }
 function bmCompDel(type,idx){
-  if(!confirm('Delete this record?'))return;
-  BS._compData[type].splice(idx,1);
-  var s=NX.session||{};
-  if(db&&s.branchId)db.ref('branches/'+s.branchId+'/compliance/'+type).set(BS._compData[type]);
-  navTo('bm-compliance');
+  nxConfirm('Delete this record?', function(){
+    BS._compData[type].splice(idx,1);
+    var s=NX.session||{};
+    if(db&&s.branchId)db.ref('branches/'+s.branchId+'/compliance/'+type).set(BS._compData[type]);
+    navTo('bm-compliance');
+  }, {yesLabel:'Delete'});
 }
 function bmCompSendToFinance(){
   var s=NX.session||{};if(!db||!s.branchId){showToast('No connection','error');return;}
@@ -18758,11 +18461,12 @@ function bmAssetSave(idx){
   else{closeModalForce();showToast('Saved','success');navTo('bm-assets');}
 }
 function bmAssetDel(idx){
-  if(!confirm('Delete this asset?'))return;
-  BS._assetData.splice(idx,1);
-  var s=NX.session||{};
-  if(db&&s.branchId)db.ref('branches/'+s.branchId+'/assets').set(BS._assetData);
-  navTo('bm-assets');
+  nxConfirm('Delete this asset?', function(){
+    BS._assetData.splice(idx,1);
+    var s=NX.session||{};
+    if(db&&s.branchId)db.ref('branches/'+s.branchId+'/assets').set(BS._assetData);
+    navTo('bm-assets');
+  }, {yesLabel:'Delete'});
 }
 function bmAssetToFinance(){
   var s=NX.session||{};if(!db||!s.branchId){showToast('No connection','error');return;}
@@ -18863,11 +18567,12 @@ function bmSubmitInvoice(id) {
 }
 
 function bmDeleteInvoice(id) {
-  if(!confirm('Delete this invoice?'))return;
-  BS.invoices = BS.invoices.filter(function(i){return i.id!==id;});
-  bSaveColl('invoices',BS.invoices);
-  showToast('Deleted');
-  navTo('bm-invoices');
+  nxConfirm('Delete this invoice?', function(){
+    BS.invoices = BS.invoices.filter(function(i){return i.id!==id;});
+    bSaveColl('invoices',BS.invoices);
+    showToast('Deleted');
+    navTo('bm-invoices');
+  }, {yesLabel:'Delete'});
 }
 
 // ── 2. LEAVE MANAGEMENT ──────────────────────────────────────
@@ -19071,7 +18776,9 @@ function bmSubmitPayroll(branchId,monthKey) {
   if(!db||!NX.session)return;
   var staff = BS.staff.filter(function(m){return m.status==='Active'||m.status==='active';});
   if(!staff.length){showToast('No active staff','error');return;}
-  if(!confirm('Submit payroll for '+monthKey+' to HR?'))return;
+  nxConfirm('Submit payroll for '+monthKey+' to HR?', function(){_bmSubmitPayrollGo(branchId,monthKey,staff);}, {yesLabel:'Submit', danger:false});
+}
+function _bmSubmitPayrollGo(branchId,monthKey,staff){
   var updates={};
   staff.forEach(function(m){
     var base=parseFloat((document.getElementById('bpay-base-'+m.id)||{}).value)||0;
@@ -19157,7 +18864,9 @@ function bmAcceptTransfer(transferId) {
   var t = (BS._bmTransfers||[]).find(function(x){return x.id===transferId;});
   if(!t)return;
   var s = NX.session||{};
-  if(!confirm('Accept '+t.qty+' '+bxe(t.unit||'units')+' of "'+bxe(t.name||t.code)+'" from '+bxe(t.fromBranchName||t.fromBranch)+'?'))return;
+  nxConfirm('Accept '+t.qty+' '+bxe(t.unit||'units')+' of "'+bxe(t.name||t.code)+'" from '+bxe(t.fromBranchName||t.fromBranch)+'?', function(){_bmAcceptTransferGo(transferId,t,s);}, {yesLabel:'Accept', danger:false});
+}
+function _bmAcceptTransferGo(transferId,t,s){
   // Update transfer status
   db.ref('branches/'+s.branchId+'/transfer_requests/'+transferId).update({status:'accepted',acceptedAt:Date.now(),acceptedBy:s.entityName||'Branch Manager'},function(err){
     if(err){showToast('Failed: '+err.message,'error');return;}
@@ -19181,7 +18890,9 @@ function bmRejectTransfer(transferId) {
   var t = (BS._bmTransfers||[]).find(function(x){return x.id===transferId;});
   if(!t)return;
   var s = NX.session||{};
-  if(!confirm('Reject this transfer request?'))return;
+  nxConfirm('Reject this transfer request?', function(){_bmRejectTransferGo(transferId,t,s);}, {yesLabel:'Reject'});
+}
+function _bmRejectTransferGo(transferId,t,s){
   db.ref('branches/'+s.branchId+'/transfer_requests/'+transferId).update({status:'rejected',rejectedAt:Date.now()},function(err){
     if(!err){
       t.status='rejected';
