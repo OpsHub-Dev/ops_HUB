@@ -429,6 +429,10 @@ textarea.fi{resize:vertical;min-height:80px}
       </div>
       <div class="pin-pad" id="pin-pad"></div>
       <div class="lerr" id="pin-err"></div>
+      <label style="display:flex;align-items:center;justify-content:center;gap:8px;margin:10px 0 2px;cursor:pointer;font-size:11px;font-weight:600;color:var(--text2);font-family:var(--font)">
+        <input type="checkbox" id="remember-me-chk" style="width:13px;height:13px;accent-color:var(--primary);cursor:pointer;flex-shrink:0">
+        Remember me on this device
+      </label>
       <button class="btns" onclick="showStep('step-sap')">← Different SAP</button>
     </div>
   </div>
@@ -465,6 +469,7 @@ textarea.fi{resize:vertical;min-height:80px}
       <button class="sb-item" onclick="showPage('competition')" id="si-competition"><span class="si">🏆</span>Competition</button>
       <button class="sb-item" onclick="showPage('server-drop')" id="si-server-drop"><span class="si">💰</span>Server Drop</button>
       <button class="sb-item" onclick="showPage('id-status')" id="si-id-status"><span class="si">🪪</span>ID & Documents</button>
+      <button class="sb-item" onclick="showPage(&apos;announcements&apos;)" id="si-announcements" style="position:relative"><span class="si">📢</span>Announcements<span id="ann-sb-badge" style="display:none;position:absolute;top:6px;right:8px;background:var(--danger);color:#fff;border-radius:8px;font-size:8px;padding:1px 5px;font-family:var(--mono);font-weight:700"></span></button>
       <div class="sb-div"></div>
       <div class="sb-sec" id="cap-sec" style="display:none">Captain Tools</div>
       <button class="sb-item" onclick="showPage('cap-staff')" id="si-cap-staff" style="display:none"><span class="si">👥</span>Staff Overview</button>
@@ -481,6 +486,8 @@ textarea.fi{resize:vertical;min-height:80px}
           <div class="g2" style="margin-bottom:14px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px" id="kpi-row"></div>
           <div class="card"><div class="ctitle"><div class="cdot" style="background:var(--primary)"></div>Today's Briefing</div><div id="dash-briefing-preview"><div style="text-align:center;padding:16px;color:var(--text3);font-size:11px;font-family:var(--mono)">Loading…</div></div></div>
           <div class="card"><div class="ctitle"><div class="cdot"></div>Today's Shift</div><div id="today-shift"></div></div>
+          <div id="dash-ann-preview"></div>
+          <div id="dash-doc-preview"></div>
         </div>
       </div>
 
@@ -619,6 +626,16 @@ textarea.fi{resize:vertical;min-height:80px}
           <div class="sechdr"><div><h2>🪪 ID & Documents</h2><div class="sechdr-sub">Validity status</div></div></div>
           <div id="id-status-cards">
             <div style="text-align:center;padding:30px;color:var(--text3);font-size:12px">Loading…</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ANNOUNCEMENTS -->
+      <div class="page" id="page-announcements">
+        <div style="padding:20px 0 0">
+          <div class="sechdr"><div><h2>&#x1F4E2; Announcements</h2><div class="sechdr-sub">FROM BRANCH MANAGER</div></div></div>
+          <div id="ann-list-cards">
+            <div style="text-align:center;padding:30px;color:var(--text3);font-size:12px;font-family:var(--mono)">Loading&#x2026;</div>
           </div>
         </div>
       </div>
@@ -963,6 +980,7 @@ textarea.fi{resize:vertical;min-height:80px}
         <button class="mob-sb-item" id="msi-competition"  onclick="mobNavGo('competition')"> <span class="msi">🏆</span>Competition</button>
         <button class="mob-sb-item" id="msi-server-drop"  onclick="mobNavGo('server-drop')"> <span class="msi">💰</span>Server Drop</button>
         <button class="mob-sb-item" id="msi-id-status"    onclick="mobNavGo('id-status')">   <span class="msi">🪪</span>ID &amp; Documents</button>
+        <button class="mob-sb-item" id="msi-announcements" onclick="mobNavGo('announcements')">   <span class="msi">📢</span>Announcements</button>
         <div class="mob-sb-div"></div>
         <div class="mob-sb-sec" id="msi-cap-sec" style="display:none">Captain Tools</div>
         <button class="mob-sb-item" id="msi-cap-staff"    onclick="mobNavGo('cap-staff')"    style="display:none"><span class="msi">👥</span>Staff Overview</button>
@@ -1026,6 +1044,34 @@ function initFirebase() {
 /* ═══════════════════════════════════════════════════════
    STATE
 ═══════════════════════════════════════════════════════ */
+/* ── Staff Portal localStorage session ──────────────────── */
+var SP_KEY = 'sp_sess_v1';
+var SP_REM  = 'sp_rem_v1';
+
+function spSave(sap, data) {
+  try { localStorage.setItem(SP_KEY, JSON.stringify(Object.assign({sap:sap,_exp:Date.now()+8*3600000}, data))); } catch(e){}
+}
+function spLoad() {
+  try {
+    var r = JSON.parse(localStorage.getItem(SP_KEY)||'null');
+    if (!r||!r.sap||(r._exp&&r._exp<Date.now())) { localStorage.removeItem(SP_KEY); return null; }
+    return r;
+  } catch(e){ return null; }
+}
+function spClear() { try { localStorage.removeItem(SP_KEY); } catch(e){} }
+function spSaveRem(sap, hash) {
+  try { localStorage.setItem(SP_REM, JSON.stringify({sap:sap,h:hash,_exp:Date.now()+30*86400000})); } catch(e){}
+}
+function spLoadRem() {
+  try {
+    var r = JSON.parse(localStorage.getItem(SP_REM)||'null');
+    if (!r||!r.sap||(r._exp&&r._exp<Date.now())) { localStorage.removeItem(SP_REM); return null; }
+    return r;
+  } catch(e){ return null; }
+}
+function spClearRem() { try { localStorage.removeItem(SP_REM); } catch(e){} }
+/* ─────────────────────────────────────────────────────── */
+
 var loginSt = { sap: '', newPin: '', staffData: null };
 var CU = null; // currentUser
 var pinBuf = { ss: '', cf: '', pd: '' };
@@ -1053,11 +1099,51 @@ function showLoginUINow() {
 }
 
 function bootStaffPortal() {
-  try {
-    initFirebase();
-  } catch (e) {
-    console.error('[StaffPortal] init error:', e);
+  try { initFirebase(); } catch (e) { console.error('[StaffPortal] init error:', e); }
+
+  var sess = spLoad();
+  if (sess && sess.sap && db) {
+    var ov2 = document.getElementById('loading-overlay');
+    if (ov2) ov2.style.display = '';
+    db.ref('staff/sessions/' + sess.sap).once('value', function(snap) {
+      var live = snap.val();
+      launchPortal(sess.sap, live ? Object.assign({}, sess, live) : sess);
+    }, function() { launchPortal(sess.sap, sess); });
+    attachSAPEnterListener();
+    return;
   }
+
+  var rem = spLoadRem();
+  if (rem && rem.sap) {
+    showLoginUINow();
+    var sapInp = document.getElementById('sap-inp');
+    if (sapInp) sapInp.value = rem.sap;
+    setTimeout(function() {
+      if (!db) return;
+      loginSt.sap = rem.sap;
+      db.ref('staff/sessions/' + rem.sap).once('value', function(snap) {
+        var sd = snap.val(); if (!sd) return;
+        loginSt.staffData = sd;
+        var el;
+        el = document.getElementById('ret-ico');  if (el) el.textContent = sd.icon||'👤';
+        el = document.getElementById('ret-name'); if (el) el.textContent = sd.name||('SAP '+rem.sap);
+        el = document.getElementById('ret-sub');  if (el) el.textContent = (sd.branch||'ALFA.CO')+' · Enter PIN';
+        showStep('step-pin');
+        buildPad('pin-pad', 'pd', function(pin) {
+          if (simpleHash(pin+rem.sap) !== rem.h) {
+            var err = document.getElementById('pin-err');
+            if (err) { err.textContent='Incorrect PIN'; setTimeout(function(){ err.textContent=''; }, 2000); }
+            return;
+          }
+          spSave(rem.sap, sd);
+          launchPortal(rem.sap, sd);
+        });
+      });
+    }, 350);
+    attachSAPEnterListener();
+    return;
+  }
+
   showLoginUINow();
   attachSAPEnterListener();
 }
@@ -1293,6 +1379,9 @@ function onLoginPin(pin, storedHash) {
     setTimeout(function() { document.getElementById('pin-err').textContent = ''; }, 2000);
     return;
   }
+  var remChk = document.getElementById('remember-me-chk');
+  if (remChk && remChk.checked) spSaveRem(loginSt.sap, storedHash);
+  else spClearRem();
   launchPortal(loginSt.sap, loginSt.staffData);
 }
 
@@ -1308,6 +1397,7 @@ function simpleHash(str) {
 ═══════════════════════════════════════════════════════ */
 function launchPortal(sap, staffData) {
   CU = Object.assign({ sap: sap }, staffData);
+  spSave(sap, staffData);
   // Always load schedule after login — retro OT check will run via checkRetroOT
   setTimeout(function(){
     if(typeof ciLoadSchedule==='function') ciLoadSchedule();
@@ -1417,6 +1507,7 @@ function launchPortal(sap, staffData) {
     });
   } else {
     renderDashboard();
+    setTimeout(function(){ renderDashAnnPreview(); renderDashDocPreview(); }, 700);
     renderSchedule();
     renderPayslip();
     renderHistory();
@@ -1432,6 +1523,7 @@ function launchPortal(sap, staffData) {
 }
 
 function logout() {
+  spClear();
   CU = null;
   var ls = document.getElementById('login-screen');
   ls.classList.remove('gone'); ls.style.display = 'flex';
@@ -1474,6 +1566,7 @@ function showPage(id) {
   if (id === 'cap-staff') renderCapStaff();
   if (id === 'briefing') renderBriefing();
   if (id === 'id-status') renderIdStatus();
+  if (id === 'announcements') renderAnnouncements();
   if (id === 'competition') spLoadCompetition();
   if (id === 'server-drop') sdInit();
 }
@@ -3761,6 +3854,132 @@ function todayKey(){
 //   Passport   → branches/{branchId}/staff  → m.passportExpiry, m.passportNo
 //   Health Card→ branches/{branchId}/health → h.medExp (matched by name/SAP)
 // ══════════════════════════════════════════════════════
+/* ══ BRANCH ANNOUNCEMENTS ══════════════════════════════ */
+function showAnnPage() { showPage('announcements'); }
+function showIdStatusPage() { showPage('id-status'); }
+function escH(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function renderAnnouncements() {
+  var el = document.getElementById('ann-list-cards');
+  if (!el) return;
+  var u = CU;
+  if (!u||!u.branchId) { el.innerHTML='<div style="text-align:center;padding:30px;color:var(--text3);font-size:12px">No branch linked.</div>'; return; }
+  el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text3);font-size:12px;font-family:var(--mono)">&#x23F3; Loading&#x2026;</div>';
+  db.ref('branches/'+u.branchId+'/bmAnnouncements').once('value', function(snap) {
+    var raw=snap.val()||{};
+    var anns=Object.values(raw).filter(Boolean).sort(function(a,b){ return (b.ts||0)-(a.ts||0); });
+    db.ref('staff/annAcks/'+u.sap).once('value', function(asnap) {
+      var acks=asnap.val()||{};
+      var unread=anns.filter(function(a){ return !acks[a.id]; }).length;
+      var sb=document.getElementById('ann-sb-badge');
+      if (sb) { sb.style.display=unread?'inline':'none'; sb.textContent=unread; }
+      if (!anns.length) {
+        el.innerHTML='<div style="text-align:center;padding:48px 20px"><div style="font-size:40px;margin-bottom:10px">&#x1F4EC;</div><div style="font-size:13px;font-weight:700;color:var(--text2)">No Announcements</div><div style="font-size:11px;color:var(--text3);margin-top:4px">Your Branch Manager hasn&#39;t posted any yet.</div></div>';
+        return;
+      }
+      var h='';
+      anns.forEach(function(a) {
+        var isRead=!!acks[a.id], isUrgent=a.priority==='urgent';
+        var bColor=isUrgent?'#c0392b':isRead?'rgba(0,0,0,.12)':'var(--primary)';
+        h+='<div style="background:var(--base);box-shadow:'+(isRead?'none':'var(--raise-sm)')+';border:1px solid rgba(0,0,0,.07);border-left:4px solid '+bColor+';border-radius:0 14px 14px 0;padding:14px 16px;margin-bottom:10px;opacity:'+(isRead?.65:1)+'">';
+        h+='<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">';
+        h+='<div style="flex:1;min-width:0">';
+        h+='<div style="display:flex;align-items:center;gap:7px;margin-bottom:5px;flex-wrap:wrap">';
+        h+='<span style="font-size:13px;font-weight:700;color:var(--text)">'+escH(a.title||'')+'</span>';
+        if (isUrgent) h+='<span style="background:rgba(192,57,43,.12);color:#c0392b;border:1px solid rgba(192,57,43,.3);font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;font-family:var(--mono)">URGENT</span>';
+        if (!isRead)  h+='<span style="background:rgba(0,102,102,.1);color:var(--primary);border:1px solid rgba(0,102,102,.25);font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;font-family:var(--mono)">NEW</span>';
+        h+='</div>';
+        h+='<div style="font-size:12px;color:var(--text2);line-height:1.6;margin-bottom:7px">'+escH(a.body||'')+'</div>';
+        var dt=a.ts?new Date(a.ts).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}):'';
+        h+='<div style="font-size:10px;color:var(--text3);font-family:var(--mono)">From '+escH(a.senderName||'Branch Manager')+' &middot; '+dt+'</div>';
+        h+='</div>';
+        if (!isRead) {
+          h+='<button data-id="'+escH(a.id)+'" onclick="annAck(this.dataset.id)" style="flex-shrink:0;background:var(--primary);color:#fff;border:none;border-radius:10px;padding:7px 12px;font-size:10px;font-weight:700;cursor:pointer;font-family:var(--font)">&#x2713; Read</button>';
+        } else {
+          h+='<span style="flex-shrink:0;color:#065f46;font-size:10px;font-weight:700;font-family:var(--mono)">&#x2713; READ</span>';
+        }
+        h+='</div></div>';
+      });
+      el.innerHTML=h;
+    });
+  });
+}
+function annAck(annId) {
+  var u=CU; if (!u||!u.sap) return;
+  db.ref('staff/annAcks/'+u.sap+'/'+annId).set(Date.now(), function(err) {
+    if (!err) { renderAnnouncements(); renderDashAnnPreview(); }
+  });
+}
+function renderDashAnnPreview() {
+  var el=document.getElementById('dash-ann-preview');
+  if (!el||!CU||!CU.branchId) return;
+  db.ref('branches/'+CU.branchId+'/bmAnnouncements').limitToLast(10).once('value', function(snap) {
+    var raw=snap.val()||{};
+    var anns=Object.values(raw).filter(Boolean).sort(function(a,b){ return (b.ts||0)-(a.ts||0); });
+    if (!anns.length) return;
+    db.ref('staff/annAcks/'+CU.sap).once('value', function(asnap) {
+      var acks=asnap.val()||{};
+      var unread=anns.filter(function(a){ return !acks[a.id]; });
+      var count=unread.length;
+      var sb=document.getElementById('ann-sb-badge');
+      if (sb) { sb.style.display=count?'inline':'none'; sb.textContent=count; }
+      if (!count) { el.innerHTML=''; return; }
+      var h='<div class="card" style="border-left:3px solid var(--primary)">';
+      h+='<div class="ctitle" style="margin-bottom:8px"><div class="cdot" style="background:var(--primary)"></div>Announcements <span style="background:rgba(255,33,87,.12);color:var(--danger);font-size:9px;font-weight:700;border-radius:6px;padding:2px 6px;font-family:var(--mono)">'+count+' NEW</span></div>';
+      unread.slice(0,2).forEach(function(a) {
+        h+='<div style="padding:8px 10px;background:rgba(0,102,102,.05);border-radius:10px;margin-bottom:6px">';
+        h+='<div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:2px">'+escH(a.title||'')+'</div>';
+        var body=a.body||''; if (body.length>90) body=body.substring(0,90)+'…';
+        h+='<div style="font-size:11px;color:var(--text2);line-height:1.5">'+escH(body)+'</div></div>';
+      });
+      h+='<button onclick="showAnnPage()" style="width:100%;background:none;border:1px solid rgba(0,102,102,.25);border-radius:10px;padding:7px;font-size:11px;font-weight:700;color:var(--primary);cursor:pointer;margin-top:4px;font-family:var(--font)">View All Announcements &#x2192;</button>';
+      h+='</div>';
+      el.innerHTML=h;
+    });
+  });
+}
+function renderDashDocPreview() {
+  var el=document.getElementById('dash-doc-preview');
+  if (!el||!CU||!CU.branchId) return;
+  var now=new Date(), results=[], pending=2;
+  function tryShow() {
+    pending--; if (pending>0) return;
+    var urgent=results.filter(function(d){ return d.daysLeft!==null&&d.daysLeft<=30; });
+    if (!urgent.length) { el.innerHTML=''; return; }
+    var h='<div class="card" style="border-left:3px solid var(--warning)">';
+    h+='<div class="ctitle" style="margin-bottom:8px"><div class="cdot" style="background:var(--warning)"></div>Documents Expiring Soon</div>';
+    urgent.forEach(function(d) {
+      var c=d.daysLeft<0?'var(--danger)':d.daysLeft<=14?'var(--danger)':'var(--warning)';
+      var lbl=d.daysLeft<0?'EXPIRED':d.daysLeft+'d left';
+      h+='<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;background:rgba(254,153,0,.06);border-radius:10px;margin-bottom:5px">';
+      h+='<div style="font-size:12px;font-weight:600;color:var(--text)">'+escH(d.label)+(d.number?'<span style="font-size:9px;color:var(--text3);font-family:var(--mono);margin-left:5px">'+escH(d.number)+'</span>':'')+'</div>';
+      h+='<span style="font-size:10px;font-weight:700;color:'+c+';font-family:var(--mono)">'+lbl+'</span></div>';
+    });
+    h+='<button onclick="showIdStatusPage()" style="width:100%;background:none;border:1px solid rgba(180,83,9,.3);border-radius:10px;padding:7px;font-size:11px;font-weight:700;color:#b45309;cursor:pointer;margin-top:4px;font-family:var(--font)">View ID &amp; Documents &#x2192;</button>';
+    h+='</div>';
+    el.innerHTML=h;
+  }
+  var sid=CU.staffId||CU.sap;
+  if (sid) {
+    db.ref('branches/'+CU.branchId+'/staff/'+sid).once('value', function(snap) {
+      var m=snap.val()||{};
+      [['Iqama',m.iqama||'',m.iqamaExpiry||''],['Passport',m.passportNo||'',m.passportExpiry||'']].forEach(function(row){
+        if (row[2]) { var d=new Date(row[2]+'T00:00:00'); results.push({label:row[0],number:row[1],daysLeft:Math.ceil((d-now)/86400000)}); }
+      });
+      tryShow();
+    }, function(){ tryShow(); });
+  } else { tryShow(); }
+  db.ref('health/'+CU.branchId).once('value', function(snap) {
+    var raw=snap.val()||{};
+    var hcard=Object.values(raw).filter(Boolean).find(function(h){
+      return h&&(String(h.sap||'')===String(CU.sap||'')||(CU.name&&h.name&&h.name.toLowerCase()===CU.name.toLowerCase()));
+    });
+    if (hcard&&hcard.medExp) { var d=new Date(hcard.medExp+'T00:00:00'); results.push({label:'Health Card',number:hcard.cardNo||'',daysLeft:Math.ceil((d-now)/86400000)}); }
+    tryShow();
+  }, function(){ tryShow(); });
+}
+
 function renderIdStatus(){
   var u=CU;
   var el=document.getElementById('id-status-cards');

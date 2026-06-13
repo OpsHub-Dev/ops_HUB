@@ -18910,42 +18910,53 @@ function pBmAnnouncements() {
   bmLoadAnnouncements(function(){
     var area = document.getElementById('page-area');
     if(!area)return;
+    var tab = BS._annTab || 'received';
     var anns = BS._bmAnns||[];
     var acks = BS._bmAcks||{};
     var unread = anns.filter(function(a){return !acks[a.id];});
-    var h = '<div class="page-header"><h1>&#x1F4E2; Announcements</h1><p>'+anns.length+' total &mdash; '+unread.length+' unread</p></div>';
-    h += '<div class="bgrid-3" style="margin-bottom:16px">';
-    h += '<div class="bsc"><div class="bsc-lbl">Total</div><div class="bsc-val bca">'+anns.length+'</div></div>';
-    h += '<div class="bsc"><div class="bsc-lbl">Unread</div><div class="bsc-val" style="color:#c0392b">'+unread.length+'</div></div>';
-    h += '<div class="bsc"><div class="bsc-lbl">Acknowledged</div><div class="bsc-val" style="color:#00875a">'+Object.keys(acks).length+'</div></div>';
+    var h = '<div class="page-header"><h1>&#x1F4E2; Announcements</h1><p>Manage branch communications</p></div>';
+    // Tabs
+    h += '<div class="tab-bar" style="display:flex;gap:6px;margin-bottom:16px">';
+    h += '<button class="tab-btn'+(tab==='received'?' active':'')+'" onclick="bmAnnTabReceived()">&#x1F4E5; Received from HR <span style="background:rgba(0,0,0,.1);border-radius:6px;padding:1px 7px;font-size:10px;margin-left:4px">'+anns.length+'</span></button>';
+    h += '<button class="tab-btn'+(tab==='send'?' active':'')+'" onclick="bmAnnTabSend()">&#x1F4E4; Branch Announcements</button>';
     h += '</div>';
-    if(!anns.length){
-      h += '<div style="text-align:center;padding:48px;color:var(--text-tertiary)"><div style="font-size:48px;margin-bottom:12px">&#x1F4EC;</div><div style="font-size:14px;font-weight:600;margin-bottom:6px">No Announcements</div><div style="font-size:12px">HR announcements will appear here.</div></div>';
+
+    if (tab === 'received') {
+      // ── HR announcements (existing) ──────────────────────────
+      h += '<div class="bgrid-3" style="margin-bottom:16px">';
+      h += '<div class="bsc"><div class="bsc-lbl">Total</div><div class="bsc-val bca">'+anns.length+'</div></div>';
+      h += '<div class="bsc"><div class="bsc-lbl">Unread</div><div class="bsc-val" style="color:#f87171">'+unread.length+'</div></div>';
+      h += '<div class="bsc"><div class="bsc-lbl">Acknowledged</div><div class="bsc-val" style="color:#065f46">'+Object.keys(acks).length+'</div></div>';
+      h += '</div>';
+      if(!anns.length){
+        h += '<div style="text-align:center;padding:48px;color:var(--text-tertiary)"><div style="font-size:48px;margin-bottom:12px">&#x1F4EC;</div><div style="font-size:14px;font-weight:600;margin-bottom:6px">No Announcements</div><div style="font-size:12px">HR announcements will appear here.</div></div>';
+      } else {
+        anns.forEach(function(a){
+          var isRead = !!acks[a.id];
+          var isUrgent = a.priority==='urgent';
+          var borderCol = isUrgent?'#f87171':isRead?'var(--border)':'#a78bfa';
+          h += '<div style="background:var(--surface-2);border:1px solid '+borderCol+';border-left:3px solid '+borderCol+';border-radius:0 10px 10px 0;padding:14px 16px;margin-bottom:10px;opacity:'+(isRead?0.7:1)+'">';
+          h += '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">';
+          h += '<div style="flex:1"><div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'+
+            '<strong style="font-size:13px">'+bxe(a.title||'')+'</strong>'+
+            (isUrgent?'<span style="background:rgba(248,113,113,.15);color:#f87171;border:1px solid rgba(248,113,113,.3);font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;text-transform:uppercase">URGENT</span>':'')+
+            (a.requiresAck&&!isRead?'<span style="background:rgba(167,139,250,.15);color:#5b21b6;border:1px solid rgba(167,139,250,.3);font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;text-transform:uppercase">ACK REQUIRED</span>':'')+
+            '</div>';
+          h += '<div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;line-height:1.6">'+bxe(a.body||'')+'</div>';
+          h += '<div style="font-size:11px;color:var(--text-tertiary)">Posted by '+bxe(a.postedBy||'HR')+' &middot; '+bxe(a.date||'')+'</div>';
+          h += '</div>';
+          if(!isRead){ h += '<button class="btn btn-sm btn-primary" data-id="'+bxe(a.id)+'" onclick="bmAcknowledgeById(this.dataset.id)">&#x2713; Acknowledge</button>'; }
+          else { h += '<span style="color:#065f46;font-size:11px;font-weight:700;white-space:nowrap">&#x2713; Read</span>'; }
+          h += '</div></div>';
+        });
+      }
     } else {
-      anns.forEach(function(a){
-        var isRead = !!acks[a.id];
-        var isUrgent = a.priority==='urgent';
-        var borderCol = isUrgent?'#c0392b':isRead?'var(--border)':'#5b21b6';
-        h += '<div style="background:var(--surface-2);border:1px solid '+borderCol+';border-left:3px solid '+borderCol+';border-radius:0 10px 10px 0;padding:14px 16px;margin-bottom:10px;opacity:'+(isRead?0.7:1)+'">';
-        h += '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">';
-        h += '<div style="flex:1">';
-        h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'+
-          '<strong style="font-size:13px">'+bxe(a.title||'')+'</strong>'+
-          (isUrgent?'<span style="background:rgba(248,113,113,.15);color:#c0392b;border:1px solid rgba(248,113,113,.3);font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;text-transform:uppercase">URGENT</span>':'')+
-          (a.requiresAck&&!isRead?'<span style="background:rgba(167,139,250,.15);color:#5b21b6;border:1px solid rgba(167,139,250,.3);font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;text-transform:uppercase">ACK REQUIRED</span>':'')+
-          '</div>';
-        h += '<div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;line-height:1.6">'+bxe(a.body||'')+'</div>';
-        h += '<div style="font-size:11px;color:var(--text-tertiary)">Posted by '+bxe(a.postedBy||'HR')+' &middot; '+bxe(a.date||'')+'</div>';
-        h += '</div>';
-        if(!isRead){
-          h += '<button class="btn btn-sm btn-primary" onclick="bmAcknowledge(\''+bxe(a.id)+'\')">&#x2713; Acknowledge</button>';
-        } else {
-          h += '<span style="color:#00875a;font-size:11px;font-weight:700;white-space:nowrap">&#x2713; Read</span>';
-        }
-        h += '</div></div>';
-      });
+      // ── Branch Announcements (BM sends to staff) ─────────────
+      h += bmBranchAnnHTML(s);
     }
+
     area.innerHTML = h;
+    if (tab === 'send') bmLoadBranchAnns(s);
     bmUpdateBadges();
   });
   return '<div class="page-header"><h1>&#x1F4E2; Announcements</h1></div>'+
@@ -18953,6 +18964,93 @@ function pBmAnnouncements() {
     '<div style="font-size:24px">&#x1F504;</div> Loading announcements...</div>';
 }
 
+function bmAnnTabReceived(){ bmAnnTab('received'); }
+function bmAnnTabSend(){ bmAnnTab('send'); }
+function bmAnnTab(tab) {
+  BS._annTab = tab;
+  pBmAnnouncements();
+}
+
+function bmBranchAnnHTML(s) {
+  var h = '';
+  // Send form
+  h += '<div class="bcard" style="margin-bottom:16px">';
+  h += '<div class="bcard-hdr"><span>&#x270F;&#xFE0F; Post Announcement to Staff</span></div>';
+  h += '<div class="fg"><label class="fl">Title</label><input class="fi" id="bm-ann-title" maxlength="120" placeholder="e.g. Shift change this Friday"></div>';
+  h += '<div class="fg"><label class="fl">Message</label><textarea class="fi" id="bm-ann-body" rows="3" placeholder="Type your announcement here…" maxlength="600"></textarea></div>';
+  h += '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">';
+  h += '<label class="fl" style="margin:0;min-width:80px">Priority</label>';
+  h += '<select class="fi" id="bm-ann-priority" style="flex:1;min-width:120px"><option value="normal">Normal</option><option value="urgent">Urgent &#x1F6A8;</option></select>';
+  h += '</div>';
+  h += '<button class="btn btn-primary" style="margin-top:10px" onclick="bmSendBranchAnn()">&#x1F4E4; Send to All Staff</button>';
+  h += '</div>';
+  // List placeholder
+  h += '<div class="bcard-hdr" style="margin-bottom:8px"><span>&#x1F4CB; Sent Announcements</span></div>';
+  h += '<div id="bm-branch-ann-list"><div style="text-align:center;padding:24px;color:var(--text-tertiary);font-size:12px">Loading&#x2026;</div></div>';
+  return h;
+}
+
+function bmSendBranchAnn() {
+  var s = NX.session||{};
+  if (!s.branchId) { showToast('No branch linked','error'); return; }
+  var title = (document.getElementById('bm-ann-title')||{}).value||'';
+  var body  = (document.getElementById('bm-ann-body')||{}).value||'';
+  var pri   = (document.getElementById('bm-ann-priority')||{}).value||'normal';
+  if (!title.trim()) { showToast('Title is required','error'); return; }
+  if (!body.trim())  { showToast('Message is required','error'); return; }
+  var id = db.ref('branches/'+s.branchId+'/bmAnnouncements').push().key;
+  var ann = { id:id, title:title.trim(), body:body.trim(), priority:pri,
+    senderName: s.entityName||'Branch Manager', branchId:s.branchId,
+    ts: Date.now(), date: new Date().toISOString().split('T')[0] };
+  db.ref('branches/'+s.branchId+'/bmAnnouncements/'+id).set(ann, function(err) {
+    if (err) { showToast('Failed: '+err.message,'error'); return; }
+    showToast('Announcement sent to staff &#x2713;','success');
+    var ti = document.getElementById('bm-ann-title'); if (ti) ti.value='';
+    var bi = document.getElementById('bm-ann-body');  if (bi) bi.value='';
+    bmLoadBranchAnns(s);
+  });
+}
+
+function bmDeleteBranchAnn(annId) {
+  var s = NX.session||{};
+  if (!s.branchId||!annId) return;
+  db.ref('branches/'+s.branchId+'/bmAnnouncements/'+annId).remove(function(err) {
+    if (!err) { showToast('Deleted','success'); bmLoadBranchAnns(s); }
+  });
+}
+
+function bmLoadBranchAnns(s) {
+  var el = document.getElementById('bm-branch-ann-list');
+  if (!el||!s.branchId) return;
+  db.ref('branches/'+s.branchId+'/bmAnnouncements').once('value', function(snap) {
+    var raw = snap.val()||{};
+    var anns = Object.values(raw).filter(Boolean).sort(function(a,b){ return (b.ts||0)-(a.ts||0); });
+    if (!anns.length) {
+      el.innerHTML='<div style="text-align:center;padding:24px;color:var(--text-tertiary);font-size:12px">No announcements sent yet.</div>';
+      return;
+    }
+    var h='';
+    anns.forEach(function(a) {
+      var isUrgent=a.priority==='urgent';
+      var bColor=isUrgent?'#f87171':'var(--primary)';
+      var dt=a.ts?new Date(a.ts).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'';
+      h+='<div style="background:var(--surface-2);border:1px solid rgba(0,0,0,.07);border-left:3px solid '+bColor+';border-radius:0 10px 10px 0;padding:12px 14px;margin-bottom:8px">';
+      h+='<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">';
+      h+='<div style="flex:1"><div style="display:flex;align-items:center;gap:7px;margin-bottom:4px">';
+      h+='<strong style="font-size:13px">'+bxe(a.title||'')+'</strong>';
+      if(isUrgent) h+='<span style="background:rgba(248,113,113,.15);color:#f87171;border:1px solid rgba(248,113,113,.3);font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px">URGENT</span>';
+      h+='</div>';
+      h+='<div style="font-size:12px;color:var(--text-secondary);margin-bottom:5px">'+bxe(a.body||'')+'</div>';
+      h+='<div style="font-size:10px;color:var(--text-tertiary);font-family:var(--mono)">Sent: '+dt+'</div></div>';
+      h+='<button data-id="'+bxe(a.id)+'" onclick="bmDeleteBranchAnn(this.dataset.id)" style="flex-shrink:0;background:rgba(248,113,113,.15);color:#f87171;border:1px solid rgba(248,113,113,.3);border-radius:8px;padding:5px 10px;font-size:10px;font-weight:700;cursor:pointer">Delete</button>';
+      h+='</div></div>';
+    });
+    el.innerHTML=h;
+  });
+}
+
+
+function bmAcknowledgeById(id){ bmAcknowledge(id); }
 function bmAcknowledge(annId) {
   var s = NX.session||{};
   if(!s.branchId||!db)return;
