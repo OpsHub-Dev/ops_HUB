@@ -12830,9 +12830,8 @@ function pBmBriefing() {
 
   var h = '<div class="page-header"><h1>📋 Briefing & Tasks</h1><p>'+xe(s.branchName||'Branch')+'</p></div>';
   h += '<div class="bstb">';
-  ['today','history'].forEach(function(t){
-    var l={today:'Today\'s Briefing',history:'History'};
-    h += '<button class="'+(tab===t?'on':'')+'" onclick="BS.briefingTab=\''+t+'\';navTo(\'bm-briefing\')">'+l[t]+'</button>';
+  [{k:'today',l:"Today's Briefing"},{k:'floor-map',l:"🗺 Floor Map"},{k:'history',l:'History'}].forEach(function(item){
+    h += '<button class="'+(tab===item.k?'on':'')+'" onclick="BS.briefingTab=\''+item.k+'\';navTo(\'bm-briefing\')">'+item.l+'</button>';
   });
   h += '</div>';
 
@@ -12947,6 +12946,91 @@ function pBmBriefing() {
         }).join('');
       });
     }
+  } else if(tab==='floor-map') {
+    // ── FLOOR MAP TAB ─────────────────────────────────────────────────────────
+    // FOH staff only (dept contains FOH / Waiter / Captain / Server / Host)
+    var FOH_KEYWORDS = ['foh','waiter','waitress','captain','server','host','service','cashier','runner'];
+    var fohStaff = (BS.staff||[]).filter(function(m){
+      if(!m||!m.name) return false;
+      var dept = (m.dept||m.position||m.role||'').toLowerCase();
+      return FOH_KEYWORDS.some(function(kw){ return dept.indexOf(kw)!=-1; });
+    });
+    // If no FOH found, fallback to all staff
+    if(!fohStaff.length) fohStaff = (BS.staff||[]).filter(function(m){ return m&&m.name; });
+
+    var fohOpts = '<option value="">— Unassigned —</option>';
+    fohStaff.slice().sort(function(a,b){return (a.name||'').localeCompare(b.name||'');}).forEach(function(m){
+      fohOpts += '<option value="'+bxe(m.name||'')+'" data-sap="'+bxe(String(m.sap||m.id||''))+'">'+bxe(m.name||'')+'</option>';
+    });
+
+    h += '<div class="bcard" style="margin-bottom:14px">';
+    // Controls bar
+    h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">';
+    h += '<span style="font-size:13px;font-weight:700;color:var(--text-primary)">🗺 Restaurant Floor Map</span>';
+    h += '<div style="display:flex;align-items:center;gap:6px;margin-left:auto">';
+    h += '<button class="btn btn-sm" onclick="bmFmAddTable()">+ Add Table</button>';
+    h += '<button class="btn btn-sm" onclick="bmFmClear()">🗑 Clear All</button>';
+    h += '<button class="btn btn-primary" style="padding:7px 16px" onclick="bmFmPublish()">📢 Publish Floor Map</button>';
+    h += '</div></div>';
+
+    // Legend
+    h += '<div style="display:flex;align-items:center;gap:14px;margin-bottom:12px;flex-wrap:wrap">';
+    h += '<div style="display:flex;align-items:center;gap:5px"><div style="width:28px;height:22px;background:rgba(0,102,102,.1);border:2px solid var(--primary);border-radius:6px"></div><span style="font-size:10px;color:var(--text2)">Assigned</span></div>';
+    h += '<div style="display:flex;align-items:center;gap:5px"><div style="width:28px;height:22px;background:rgba(0,0,0,.04);border:2px dashed rgba(0,0,0,.2);border-radius:6px"></div><span style="font-size:10px;color:var(--text2)">Empty</span></div>';
+    h += '<span style="font-size:10px;color:var(--text2);margin-left:6px">Showing FOH staff only ('+(fohStaff.length)+' staff)</span>';
+    h += '</div>';
+
+    // Floor grid
+    h += '<div id="fm-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;min-height:80px"></div>';
+    h += '</div>';
+
+    // Today's published floor maps
+    h += '<div class="btw"><div class="bttb"><strong>Published Floor Maps</strong></div>';
+    h += '<div id="fm-pub-list" style="padding:12px"><div style="text-align:center;color:var(--text-tertiary);font-size:12px;padding:20px">Loading…</div></div></div>';
+
+    // Store fohOpts for bmFmAddTable
+    BS._fmFohOpts = fohOpts;
+    BS._fmFohStaff = fohStaff;
+    if(!BS._fmTables) BS._fmTables = [];
+
+    setTimeout(function(){
+      bmFmRenderGrid();
+      // Load published floor maps
+      var s2 = NX.session||{};
+      if(db && s2.branchId){
+        db.ref('branches/'+s2.branchId+'/floorMaps').limitToLast(5).once('value', function(snap){
+          var all = snap.val()||{};
+          var el = document.getElementById('fm-pub-list');
+          if(!el) return;
+          var days = Object.keys(all).sort().reverse();
+          if(!days.length){ el.innerHTML='<div style="text-align:center;color:var(--text-tertiary);font-size:12px;padding:20px">No floor maps published yet</div>'; return; }
+          var h2='';
+          days.forEach(function(d){
+            var maps = all[d]||{};
+            Object.values(maps).sort(function(a,b){return (b.ts||0)-(a.ts||0);}).forEach(function(m){
+              var shifts = m.tables||[];
+              var dt = m.ts ? new Date(m.ts).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : d;
+              h2 += '<div style="border-bottom:1px solid var(--border);padding:10px 0">';
+              h2 += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">';
+              h2 += '<span style="font-size:12px;font-weight:700;color:var(--text-primary)">'+xe(dt)+'</span>';
+              h2 += '<span style="font-size:10px;color:var(--text-tertiary)">by '+xe(m.by||'Manager')+'</span></div>';
+              h2 += '<div style="display:flex;flex-wrap:wrap;gap:5px">';
+              shifts.forEach(function(t){
+                var bg = t.staffName ? 'rgba(0,102,102,.1)' : 'rgba(0,0,0,.04)';
+                var bdr = t.staffName ? 'var(--primary)' : 'rgba(0,0,0,.2)';
+                h2 += '<div style="background:'+bg+';border:1.5px solid '+bdr+';border-radius:8px;padding:5px 9px;min-width:80px;text-align:center">';
+                h2 += '<div style="font-size:10px;font-weight:700;color:var(--text)">T'+xe(String(t.num||t.label||''))+'</div>';
+                h2 += '<div style="font-size:9px;color:var(--text2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px">'+(t.staffName?xe(t.staffName):'Empty')+'</div>';
+                h2 += '</div>';
+              });
+              h2 += '</div></div>';
+            });
+          });
+          el.innerHTML = h2 || '<div style="text-align:center;color:var(--text-tertiary);font-size:12px;padding:20px">None</div>';
+        });
+      }
+    }, 80);
+
   } else {
     // History tab
     h += '<div class="btw"><div id="brf-hist-list" style="padding:14px"><div style="text-align:center;color:var(--text-tertiary);font-size:12px;padding:20px">Loading…</div></div></div>';
@@ -13046,6 +13130,101 @@ function bmBrfCustomTaskRender(){
       '<button onclick="BS._brfCustomTasks.splice('+i+',1);bmBrfCustomTaskRender()" style="margin-left:auto;background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px">×</button>'+
       '</label>';
   }).join('');
+}
+
+/* ══════════════════════════════════════════════════════
+   FLOOR MAP MODULE  –  Branch Manager
+   Firebase: branches/{branchId}/floorMaps/{date}/{pushId}
+══════════════════════════════════════════════════════ */
+
+function bmFmRenderGrid() {
+  var el = document.getElementById('fm-grid');
+  if (!el) return;
+  var tables = BS._fmTables || [];
+  if (!tables.length) {
+    el.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:32px;color:var(--text-tertiary);font-size:12px">No tables yet. Click <strong>+ Add Table</strong> to start building the floor map.</div>';
+    return;
+  }
+  var opts = BS._fmFohOpts || '<option value="">— Unassigned —</option>';
+  var h = '';
+  tables.forEach(function(t, i) {
+    var assigned = !!t.staffName;
+    var bg   = assigned ? 'rgba(0,102,102,.1)' : 'var(--base)';
+    var bdr  = assigned ? '2px solid var(--primary)' : '2px dashed rgba(0,0,0,.2)';
+    h += '<div style="background:'+bg+';border:'+bdr+';border-radius:12px;padding:10px;position:relative">';
+    // Table number label + delete button
+    h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">';
+    h += '<span style="font-size:13px;font-weight:700;color:var(--text)">Table '+bxe(String(t.num||t.label))+'</span>';
+    h += '<button data-i="'+i+'" onclick="bmFmDelTable(+this.dataset.i)" style="background:none;border:none;color:rgba(0,0,0,.3);cursor:pointer;font-size:15px;padding:0;line-height:1" title="Remove">×</button>';
+    h += '</div>';
+    // Staff dropdown (FOH only)
+    h += '<select data-i="'+i+'" onchange="bmFmAssign(+this.dataset.i,this.value,this.options[this.selectedIndex].text)" style="width:100%;font-size:11px;padding:5px;border:1px solid rgba(0,0,0,.12);border-radius:8px;background:var(--base);color:var(--text);font-family:var(--font)">';
+    // rebuild opts with current selection
+    h += '<option value="">— Unassigned —</option>';
+    (BS._fmFohStaff||[]).forEach(function(m) {
+      var sel = t.staffName === (m.name||'') ? ' selected' : '';
+      h += '<option value="'+bxe(m.name||'')+'"'+sel+'>'+bxe(m.name||'')+'</option>';
+    });
+    h += '</select>';
+    if (t.staffName) {
+      h += '<div style="font-size:9px;color:var(--primary);font-weight:700;margin-top:5px;text-align:center">✓ '+bxe(t.staffName)+'</div>';
+    }
+    h += '</div>';
+  });
+  el.innerHTML = h;
+}
+
+function bmFmAssign(i, staffName, staffText) {
+  if (!BS._fmTables || !BS._fmTables[i]) return;
+  BS._fmTables[i].staffName = staffName || '';
+  // Clean the display name (remove "— Unassigned —")
+  if (!staffName) BS._fmTables[i].staffName = '';
+  bmFmRenderGrid();
+}
+
+function bmFmAddTable() {
+  if (!BS._fmTables) BS._fmTables = [];
+  var nums = BS._fmTables.map(function(t){ return +(t.num||0); }).filter(Boolean);
+  var next = nums.length ? Math.max.apply(null, nums) + 1 : 1;
+  BS._fmTables.push({ num: next, label: String(next), staffName: '' });
+  bmFmRenderGrid();
+}
+
+function bmFmDelTable(i) {
+  if (!BS._fmTables) return;
+  BS._fmTables.splice(i, 1);
+  bmFmRenderGrid();
+}
+
+function bmFmClear() {
+  nxConfirm('Clear all tables from the floor map?', function() {
+    BS._fmTables = [];
+    bmFmRenderGrid();
+  }, { yesLabel: 'Clear All' });
+}
+
+function bmFmPublish() {
+  var s = NX.session || {};
+  if (!db || !s.branchId) { showToast('Not connected', 'error'); return; }
+  var tables = BS._fmTables || [];
+  if (!tables.length) { showToast('Add at least one table', 'error'); return; }
+  var rec = {
+    ts: Date.now(),
+    by: s.branchName || s.entityName || 'Manager',
+    branchId: s.branchId,
+    tables: tables.map(function(t) {
+      return { num: t.num, label: t.label || String(t.num), staffName: t.staffName || '' };
+    })
+  };
+  db.ref('branches/'+s.branchId+'/floorMaps/'+TODAY_BS).push(rec, function(err) {
+    if (err) { showToast('Publish failed: '+err.message, 'error'); return; }
+    // Also write as latestFloorMap for staff portal
+    db.ref('branches/'+s.branchId+'/latestFloorMap').set(rec);
+    showToast('Floor map published to staff ✓', 'success');
+    // Reload to show in published list
+    BS.briefingTab = 'floor-map';
+    navTo('bm-briefing');
+  });
 }
 
 function bmBrfPublish(){
@@ -18910,53 +19089,42 @@ function pBmAnnouncements() {
   bmLoadAnnouncements(function(){
     var area = document.getElementById('page-area');
     if(!area)return;
-    var tab = BS._annTab || 'received';
     var anns = BS._bmAnns||[];
     var acks = BS._bmAcks||{};
     var unread = anns.filter(function(a){return !acks[a.id];});
-    var h = '<div class="page-header"><h1>&#x1F4E2; Announcements</h1><p>Manage branch communications</p></div>';
-    // Tabs
-    h += '<div class="tab-bar" style="display:flex;gap:6px;margin-bottom:16px">';
-    h += '<button class="tab-btn'+(tab==='received'?' active':'')+'" onclick="bmAnnTabReceived()">&#x1F4E5; Received from HR <span style="background:rgba(0,0,0,.1);border-radius:6px;padding:1px 7px;font-size:10px;margin-left:4px">'+anns.length+'</span></button>';
-    h += '<button class="tab-btn'+(tab==='send'?' active':'')+'" onclick="bmAnnTabSend()">&#x1F4E4; Branch Announcements</button>';
+    var h = '<div class="page-header"><h1>&#x1F4E2; Announcements</h1><p>'+anns.length+' total &mdash; '+unread.length+' unread</p></div>';
+    h += '<div class="bgrid-3" style="margin-bottom:16px">';
+    h += '<div class="bsc"><div class="bsc-lbl">Total</div><div class="bsc-val bca">'+anns.length+'</div></div>';
+    h += '<div class="bsc"><div class="bsc-lbl">Unread</div><div class="bsc-val" style="color:#c0392b">'+unread.length+'</div></div>';
+    h += '<div class="bsc"><div class="bsc-lbl">Acknowledged</div><div class="bsc-val" style="color:#00875a">'+Object.keys(acks).length+'</div></div>';
     h += '</div>';
-
-    if (tab === 'received') {
-      // ── HR announcements (existing) ──────────────────────────
-      h += '<div class="bgrid-3" style="margin-bottom:16px">';
-      h += '<div class="bsc"><div class="bsc-lbl">Total</div><div class="bsc-val bca">'+anns.length+'</div></div>';
-      h += '<div class="bsc"><div class="bsc-lbl">Unread</div><div class="bsc-val" style="color:#f87171">'+unread.length+'</div></div>';
-      h += '<div class="bsc"><div class="bsc-lbl">Acknowledged</div><div class="bsc-val" style="color:#065f46">'+Object.keys(acks).length+'</div></div>';
-      h += '</div>';
-      if(!anns.length){
-        h += '<div style="text-align:center;padding:48px;color:var(--text-tertiary)"><div style="font-size:48px;margin-bottom:12px">&#x1F4EC;</div><div style="font-size:14px;font-weight:600;margin-bottom:6px">No Announcements</div><div style="font-size:12px">HR announcements will appear here.</div></div>';
-      } else {
-        anns.forEach(function(a){
-          var isRead = !!acks[a.id];
-          var isUrgent = a.priority==='urgent';
-          var borderCol = isUrgent?'#f87171':isRead?'var(--border)':'#a78bfa';
-          h += '<div style="background:var(--surface-2);border:1px solid '+borderCol+';border-left:3px solid '+borderCol+';border-radius:0 10px 10px 0;padding:14px 16px;margin-bottom:10px;opacity:'+(isRead?0.7:1)+'">';
-          h += '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">';
-          h += '<div style="flex:1"><div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'+
-            '<strong style="font-size:13px">'+bxe(a.title||'')+'</strong>'+
-            (isUrgent?'<span style="background:rgba(248,113,113,.15);color:#f87171;border:1px solid rgba(248,113,113,.3);font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;text-transform:uppercase">URGENT</span>':'')+
-            (a.requiresAck&&!isRead?'<span style="background:rgba(167,139,250,.15);color:#5b21b6;border:1px solid rgba(167,139,250,.3);font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;text-transform:uppercase">ACK REQUIRED</span>':'')+
-            '</div>';
-          h += '<div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;line-height:1.6">'+bxe(a.body||'')+'</div>';
-          h += '<div style="font-size:11px;color:var(--text-tertiary)">Posted by '+bxe(a.postedBy||'HR')+' &middot; '+bxe(a.date||'')+'</div>';
-          h += '</div>';
-          if(!isRead){ h += '<button class="btn btn-sm btn-primary" data-id="'+bxe(a.id)+'" onclick="bmAcknowledgeById(this.dataset.id)">&#x2713; Acknowledge</button>'; }
-          else { h += '<span style="color:#065f46;font-size:11px;font-weight:700;white-space:nowrap">&#x2713; Read</span>'; }
-          h += '</div></div>';
-        });
-      }
+    if(!anns.length){
+      h += '<div style="text-align:center;padding:48px;color:var(--text-tertiary)"><div style="font-size:48px;margin-bottom:12px">&#x1F4EC;</div><div style="font-size:14px;font-weight:600;margin-bottom:6px">No Announcements</div><div style="font-size:12px">HR announcements will appear here.</div></div>';
     } else {
-      // ── Branch Announcements (BM sends to staff) ─────────────
-      h += bmBranchAnnHTML(s);
+      anns.forEach(function(a){
+        var isRead = !!acks[a.id];
+        var isUrgent = a.priority==='urgent';
+        var borderCol = isUrgent?'#c0392b':isRead?'var(--border)':'#5b21b6';
+        h += '<div style="background:var(--surface-2);border:1px solid '+borderCol+';border-left:3px solid '+borderCol+';border-radius:0 10px 10px 0;padding:14px 16px;margin-bottom:10px;opacity:'+(isRead?0.7:1)+'">';
+        h += '<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">';
+        h += '<div style="flex:1">';
+        h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'+
+          '<strong style="font-size:13px">'+bxe(a.title||'')+'</strong>'+
+          (isUrgent?'<span style="background:rgba(248,113,113,.15);color:#c0392b;border:1px solid rgba(248,113,113,.3);font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;text-transform:uppercase">URGENT</span>':'')+
+          (a.requiresAck&&!isRead?'<span style="background:rgba(167,139,250,.15);color:#5b21b6;border:1px solid rgba(167,139,250,.3);font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;text-transform:uppercase">ACK REQUIRED</span>':'')+
+          '</div>';
+        h += '<div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px;line-height:1.6">'+bxe(a.body||'')+'</div>';
+        h += '<div style="font-size:11px;color:var(--text-tertiary)">Posted by '+bxe(a.postedBy||'HR')+' &middot; '+bxe(a.date||'')+'</div>';
+        h += '</div>';
+        if(!isRead){
+          h += '<button class="btn btn-sm btn-primary" onclick="bmAcknowledge(\''+bxe(a.id)+'\')">&#x2713; Acknowledge</button>';
+        } else {
+          h += '<span style="color:#00875a;font-size:11px;font-weight:700;white-space:nowrap">&#x2713; Read</span>';
+        }
+        h += '</div></div>';
+      });
     }
-
     area.innerHTML = h;
-    if (tab === 'send') bmLoadBranchAnns(s);
     bmUpdateBadges();
   });
   return '<div class="page-header"><h1>&#x1F4E2; Announcements</h1></div>'+
@@ -18964,93 +19132,6 @@ function pBmAnnouncements() {
     '<div style="font-size:24px">&#x1F504;</div> Loading announcements...</div>';
 }
 
-function bmAnnTabReceived(){ bmAnnTab('received'); }
-function bmAnnTabSend(){ bmAnnTab('send'); }
-function bmAnnTab(tab) {
-  BS._annTab = tab;
-  pBmAnnouncements();
-}
-
-function bmBranchAnnHTML(s) {
-  var h = '';
-  // Send form
-  h += '<div class="bcard" style="margin-bottom:16px">';
-  h += '<div class="bcard-hdr"><span>&#x270F;&#xFE0F; Post Announcement to Staff</span></div>';
-  h += '<div class="fg"><label class="fl">Title</label><input class="fi" id="bm-ann-title" maxlength="120" placeholder="e.g. Shift change this Friday"></div>';
-  h += '<div class="fg"><label class="fl">Message</label><textarea class="fi" id="bm-ann-body" rows="3" placeholder="Type your announcement here…" maxlength="600"></textarea></div>';
-  h += '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">';
-  h += '<label class="fl" style="margin:0;min-width:80px">Priority</label>';
-  h += '<select class="fi" id="bm-ann-priority" style="flex:1;min-width:120px"><option value="normal">Normal</option><option value="urgent">Urgent &#x1F6A8;</option></select>';
-  h += '</div>';
-  h += '<button class="btn btn-primary" style="margin-top:10px" onclick="bmSendBranchAnn()">&#x1F4E4; Send to All Staff</button>';
-  h += '</div>';
-  // List placeholder
-  h += '<div class="bcard-hdr" style="margin-bottom:8px"><span>&#x1F4CB; Sent Announcements</span></div>';
-  h += '<div id="bm-branch-ann-list"><div style="text-align:center;padding:24px;color:var(--text-tertiary);font-size:12px">Loading&#x2026;</div></div>';
-  return h;
-}
-
-function bmSendBranchAnn() {
-  var s = NX.session||{};
-  if (!s.branchId) { showToast('No branch linked','error'); return; }
-  var title = (document.getElementById('bm-ann-title')||{}).value||'';
-  var body  = (document.getElementById('bm-ann-body')||{}).value||'';
-  var pri   = (document.getElementById('bm-ann-priority')||{}).value||'normal';
-  if (!title.trim()) { showToast('Title is required','error'); return; }
-  if (!body.trim())  { showToast('Message is required','error'); return; }
-  var id = db.ref('branches/'+s.branchId+'/bmAnnouncements').push().key;
-  var ann = { id:id, title:title.trim(), body:body.trim(), priority:pri,
-    senderName: s.entityName||'Branch Manager', branchId:s.branchId,
-    ts: Date.now(), date: new Date().toISOString().split('T')[0] };
-  db.ref('branches/'+s.branchId+'/bmAnnouncements/'+id).set(ann, function(err) {
-    if (err) { showToast('Failed: '+err.message,'error'); return; }
-    showToast('Announcement sent to staff &#x2713;','success');
-    var ti = document.getElementById('bm-ann-title'); if (ti) ti.value='';
-    var bi = document.getElementById('bm-ann-body');  if (bi) bi.value='';
-    bmLoadBranchAnns(s);
-  });
-}
-
-function bmDeleteBranchAnn(annId) {
-  var s = NX.session||{};
-  if (!s.branchId||!annId) return;
-  db.ref('branches/'+s.branchId+'/bmAnnouncements/'+annId).remove(function(err) {
-    if (!err) { showToast('Deleted','success'); bmLoadBranchAnns(s); }
-  });
-}
-
-function bmLoadBranchAnns(s) {
-  var el = document.getElementById('bm-branch-ann-list');
-  if (!el||!s.branchId) return;
-  db.ref('branches/'+s.branchId+'/bmAnnouncements').once('value', function(snap) {
-    var raw = snap.val()||{};
-    var anns = Object.values(raw).filter(Boolean).sort(function(a,b){ return (b.ts||0)-(a.ts||0); });
-    if (!anns.length) {
-      el.innerHTML='<div style="text-align:center;padding:24px;color:var(--text-tertiary);font-size:12px">No announcements sent yet.</div>';
-      return;
-    }
-    var h='';
-    anns.forEach(function(a) {
-      var isUrgent=a.priority==='urgent';
-      var bColor=isUrgent?'#f87171':'var(--primary)';
-      var dt=a.ts?new Date(a.ts).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'';
-      h+='<div style="background:var(--surface-2);border:1px solid rgba(0,0,0,.07);border-left:3px solid '+bColor+';border-radius:0 10px 10px 0;padding:12px 14px;margin-bottom:8px">';
-      h+='<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px">';
-      h+='<div style="flex:1"><div style="display:flex;align-items:center;gap:7px;margin-bottom:4px">';
-      h+='<strong style="font-size:13px">'+bxe(a.title||'')+'</strong>';
-      if(isUrgent) h+='<span style="background:rgba(248,113,113,.15);color:#f87171;border:1px solid rgba(248,113,113,.3);font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px">URGENT</span>';
-      h+='</div>';
-      h+='<div style="font-size:12px;color:var(--text-secondary);margin-bottom:5px">'+bxe(a.body||'')+'</div>';
-      h+='<div style="font-size:10px;color:var(--text-tertiary);font-family:var(--mono)">Sent: '+dt+'</div></div>';
-      h+='<button data-id="'+bxe(a.id)+'" onclick="bmDeleteBranchAnn(this.dataset.id)" style="flex-shrink:0;background:rgba(248,113,113,.15);color:#f87171;border:1px solid rgba(248,113,113,.3);border-radius:8px;padding:5px 10px;font-size:10px;font-weight:700;cursor:pointer">Delete</button>';
-      h+='</div></div>';
-    });
-    el.innerHTML=h;
-  });
-}
-
-
-function bmAcknowledgeById(id){ bmAcknowledge(id); }
 function bmAcknowledge(annId) {
   var s = NX.session||{};
   if(!s.branchId||!db)return;
