@@ -12982,6 +12982,22 @@ function pBmBriefing() {
 
     // Floor grid
     h += '<div id="fm-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;min-height:80px"></div>';
+
+    // Bulk assign panel
+    h += '<div style="background:rgba(0,102,102,.05);border:1px solid rgba(0,102,102,.15);border-radius:12px;padding:12px;margin-top:14px">';
+    h += '<div style="font-size:12px;font-weight:700;color:var(--primary);margin-bottom:10px">⚡ Bulk Assign — Select multiple tables to one server</div>';
+    h += '<div style="display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap">';
+    // Staff select
+    h += '<div style="flex:1;min-width:150px"><label style="font-size:10px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">SERVER / STAFF</label>';
+    h += '<select id="fm-bulk-staff" style="width:100%;font-size:12px;padding:6px;border:1px solid rgba(0,0,0,.12);border-radius:8px;background:var(--base);color:var(--text);font-family:var(--font)"><option value="">— Select staff —</option>';
+    (BS._fmFohStaff||[]).forEach(function(m){ h += '<option value="'+bxe(m.name||'')+'">'+bxe(m.name||'')+'</option>'; });
+    h += '</select></div>';
+    // Multi-select tables
+    h += '<div style="flex:2;min-width:200px"><label style="font-size:10px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">TABLES (hold Ctrl/Cmd for multiple)</label>';
+    h += '<select id="fm-bulk-tables" multiple size="4" style="width:100%;font-size:12px;padding:4px;border:1px solid rgba(0,0,0,.12);border-radius:8px;background:var(--base);color:var(--text);font-family:var(--font)"></select></div>';
+    // Assign button
+    h += '<div style="display:flex;align-items:flex-end"><button class="btn btn-primary" onclick="bmFmBulkAssign()" style="padding:7px 16px;white-space:nowrap">Assign Tables</button></div>';
+    h += '</div></div>';
     h += '</div>';
 
     // Today's published floor maps
@@ -12995,6 +13011,7 @@ function pBmBriefing() {
 
     setTimeout(function(){
       bmFmRenderGrid();
+      bmFmUpdateBulkList();
       // Load published floor maps
       var s2 = NX.session||{};
       if(db && s2.branchId){
@@ -13135,6 +13152,7 @@ function bmBrfCustomTaskRender(){
 /* ══════════════════════════════════════════════════════
    FLOOR MAP MODULE  –  Branch Manager
    Firebase: branches/{branchId}/floorMaps/{date}/{pushId}
+             branches/{branchId}/latestFloorMap
 ══════════════════════════════════════════════════════ */
 
 function bmFmRenderGrid() {
@@ -13145,21 +13163,19 @@ function bmFmRenderGrid() {
     el.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:32px;color:var(--text-tertiary);font-size:12px">No tables yet. Click <strong>+ Add Table</strong> to start building the floor map.</div>';
     return;
   }
-  var opts = BS._fmFohOpts || '<option value="">— Unassigned —</option>';
   var h = '';
   tables.forEach(function(t, i) {
     var assigned = !!t.staffName;
     var bg   = assigned ? 'rgba(0,102,102,.1)' : 'var(--base)';
     var bdr  = assigned ? '2px solid var(--primary)' : '2px dashed rgba(0,0,0,.2)';
     h += '<div style="background:'+bg+';border:'+bdr+';border-radius:12px;padding:10px;position:relative">';
-    // Table number label + delete button
+    // Header: editable table label + delete
     h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">';
-    h += '<span style="font-size:13px;font-weight:700;color:var(--text)">Table '+bxe(String(t.num||t.label))+'</span>';
-    h += '<button data-i="'+i+'" onclick="bmFmDelTable(+this.dataset.i)" style="background:none;border:none;color:rgba(0,0,0,.3);cursor:pointer;font-size:15px;padding:0;line-height:1" title="Remove">×</button>';
+    h += '<input type="text" data-i="'+i+'" value="'+bxe(String(t.label||t.num||''))+'" onchange="bmFmEditLabel(+this.dataset.i,this.value)" placeholder="T#" style="width:60px;font-size:13px;font-weight:700;border:none;border-bottom:1.5px solid var(--primary);background:transparent;color:var(--text);font-family:var(--mono);text-align:center;padding:2px 4px;outline:none" title="Click to rename">';
+    h += '<button data-i="'+i+'" onclick="bmFmDelTable(+this.dataset.i)" style="background:none;border:none;color:rgba(0,0,0,.3);cursor:pointer;font-size:15px;padding:0" title="Remove table">×</button>';
     h += '</div>';
     // Staff dropdown (FOH only)
-    h += '<select data-i="'+i+'" onchange="bmFmAssign(+this.dataset.i,this.value,this.options[this.selectedIndex].text)" style="width:100%;font-size:11px;padding:5px;border:1px solid rgba(0,0,0,.12);border-radius:8px;background:var(--base);color:var(--text);font-family:var(--font)">';
-    // rebuild opts with current selection
+    h += '<select data-i="'+i+'" onchange="bmFmAssign(+this.dataset.i,this.value)" style="width:100%;font-size:11px;padding:5px;border:1px solid rgba(0,0,0,.12);border-radius:8px;background:var(--base);color:var(--text);font-family:var(--font)">';
     h += '<option value="">— Unassigned —</option>';
     (BS._fmFohStaff||[]).forEach(function(m) {
       var sel = t.staffName === (m.name||'') ? ' selected' : '';
@@ -13167,18 +13183,27 @@ function bmFmRenderGrid() {
     });
     h += '</select>';
     if (t.staffName) {
-      h += '<div style="font-size:9px;color:var(--primary);font-weight:700;margin-top:5px;text-align:center">✓ '+bxe(t.staffName)+'</div>';
+      h += '<div style="font-size:9px;color:var(--primary);font-weight:700;margin-top:5px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">✓ '+bxe(t.staffName)+'</div>';
     }
     h += '</div>';
   });
   el.innerHTML = h;
 }
 
-function bmFmAssign(i, staffName, staffText) {
+function bmFmEditLabel(i, val) {
+  if (!BS._fmTables || !BS._fmTables[i]) return;
+  var v = val.trim() || String(BS._fmTables[i].num);
+  BS._fmTables[i].label = v;
+  // Don't re-render (avoids losing focus) — just update visual
+  var bg  = BS._fmTables[i].staffName ? 'rgba(0,102,102,.1)' : 'var(--base)';
+  var bdr = BS._fmTables[i].staffName ? '2px solid var(--primary)' : '2px dashed rgba(0,0,0,.2)';
+  var cell = document.querySelectorAll('#fm-grid > div')[i];
+  if (cell) { cell.style.background = bg; cell.style.border = bdr; }
+}
+
+function bmFmAssign(i, staffName) {
   if (!BS._fmTables || !BS._fmTables[i]) return;
   BS._fmTables[i].staffName = staffName || '';
-  // Clean the display name (remove "— Unassigned —")
-  if (!staffName) BS._fmTables[i].staffName = '';
   bmFmRenderGrid();
 }
 
@@ -13203,6 +13228,40 @@ function bmFmClear() {
   }, { yesLabel: 'Clear All' });
 }
 
+/* ── Bulk-assign: assign selected tables to one server ── */
+function bmFmBulkAssign() {
+  var staffSel = document.getElementById('fm-bulk-staff');
+  var tblSel   = document.getElementById('fm-bulk-tables');
+  if (!staffSel || !tblSel) return;
+  var staffName = staffSel.value;
+  if (!staffName) { showToast('Select a staff member', 'error'); return; }
+  var selected = Array.from(tblSel.selectedOptions).map(function(o){ return +o.value; });
+  if (!selected.length) { showToast('Select at least one table', 'error'); return; }
+  selected.forEach(function(idx) {
+    if (BS._fmTables[idx]) BS._fmTables[idx].staffName = staffName;
+  });
+  bmFmRenderGrid();
+  bmFmUpdateBulkList();
+  showToast('Assigned '+selected.length+' table(s) to '+staffName, 'success');
+}
+
+function bmFmUpdateBulkList() {
+  // Refresh the multi-select list to show current labels
+  var tblSel = document.getElementById('fm-bulk-tables');
+  if (!tblSel) return;
+  var prev = Array.from(tblSel.selectedOptions).map(function(o){ return o.value; });
+  tblSel.innerHTML = '';
+  (BS._fmTables||[]).forEach(function(t, i) {
+    var opt = document.createElement('option');
+    opt.value = i;
+    var lbl = 'Table '+(t.label||t.num);
+    if (t.staffName) lbl += ' ✓ '+t.staffName;
+    opt.textContent = lbl;
+    if (prev.indexOf(String(i)) !== -1) opt.selected = true;
+    tblSel.appendChild(opt);
+  });
+}
+
 function bmFmPublish() {
   var s = NX.session || {};
   if (!db || !s.branchId) { showToast('Not connected', 'error'); return; }
@@ -13218,10 +13277,8 @@ function bmFmPublish() {
   };
   db.ref('branches/'+s.branchId+'/floorMaps/'+TODAY_BS).push(rec, function(err) {
     if (err) { showToast('Publish failed: '+err.message, 'error'); return; }
-    // Also write as latestFloorMap for staff portal
     db.ref('branches/'+s.branchId+'/latestFloorMap').set(rec);
     showToast('Floor map published to staff ✓', 'success');
-    // Reload to show in published list
     BS.briefingTab = 'floor-map';
     navTo('bm-briefing');
   });

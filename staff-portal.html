@@ -486,6 +486,7 @@ textarea.fi{resize:vertical;min-height:80px}
           <div class="g2" style="margin-bottom:14px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px" id="kpi-row"></div>
           <div class="card"><div class="ctitle"><div class="cdot" style="background:var(--primary)"></div>Today's Briefing</div><div id="dash-briefing-preview"><div style="text-align:center;padding:16px;color:var(--text3);font-size:11px;font-family:var(--mono)">Loading…</div></div></div>
           <div class="card"><div class="ctitle"><div class="cdot"></div>Today's Shift</div><div id="today-shift"></div></div>
+          <div id="dash-floor-map"></div>
           <div id="dash-ann-preview"></div>
           <div id="dash-doc-preview"></div>
         </div>
@@ -1507,7 +1508,7 @@ function launchPortal(sap, staffData) {
     });
   } else {
     renderDashboard();
-    setTimeout(function(){ renderDashAnnPreview(); renderDashDocPreview(); }, 700);
+    setTimeout(function(){ renderDashFloorMap(); renderDashAnnPreview(); renderDashDocPreview(); }, 700);
     renderSchedule();
     renderPayslip();
     renderHistory();
@@ -3911,6 +3912,40 @@ function annAck(annId) {
     if (!err) { renderAnnouncements(); renderDashAnnPreview(); }
   });
 }
+/* ══ MY TABLE ASSIGNMENT (from BM Floor Map) ══════════ */
+function renderDashFloorMap() {
+  var el = document.getElementById('dash-floor-map');
+  if (!el || !CU || !CU.branchId) return;
+
+  db.ref('branches/'+CU.branchId+'/latestFloorMap').once('value', function(snap) {
+    var fm = snap.val();
+    if (!fm || !fm.tables || !fm.tables.length) { el.innerHTML=''; return; }
+
+    // Find this staff's assigned tables (match by name)
+    var myName = (CU.name||'').trim().toLowerCase();
+    var myTables = fm.tables.filter(function(t) {
+      return t.staffName && t.staffName.trim().toLowerCase() === myName;
+    });
+    if (!myTables.length) { el.innerHTML=''; return; }
+
+    var dt = fm.ts ? new Date(fm.ts).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : 'Today';
+    var h = '<div class="card" style="border-left:3px solid var(--primary)">';
+    h += '<div class="ctitle" style="margin-bottom:8px"><div class="cdot" style="background:var(--primary)"></div>';
+    h += '&#x1F5FA;&#xFE0F; My Table Assignment</div>';
+    h += '<div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:10px">';
+    myTables.forEach(function(t) {
+      h += '<div style="background:rgba(0,102,102,.1);border:2px solid var(--primary);border-radius:10px;padding:8px 14px;text-align:center">';
+      h += '<div style="font-size:18px;font-weight:700;color:var(--primary);font-family:var(--mono)">'+escH(String(t.label||t.num||''))+'</div>';
+      h += '<div style="font-size:9px;color:var(--text3);margin-top:2px;font-family:var(--mono)">TABLE</div>';
+      h += '</div>';
+    });
+    h += '</div>';
+    h += '<div style="font-size:10px;color:var(--text3);font-family:var(--mono)">Published by Branch Manager &middot; '+escH(dt)+'</div>';
+    h += '</div>';
+    el.innerHTML = h;
+  }, function() { el.innerHTML=''; });
+}
+
 function renderDashAnnPreview() {
   var el=document.getElementById('dash-ann-preview');
   if (!el||!CU||!CU.branchId) return;
