@@ -11002,15 +11002,20 @@ function handleHealthPdfImport(input,id){
   reader.readAsArrayBuffer(file);
 }
 function parseAndFillHealthCard(text,id){
+  console.log('[HealthPDF] Raw text:', text);
+
   // ── Card number ──────────────────────────────────────────────────────────────
-  // Health card no. (رقم الشهادة الصحية) = 12 digits; ID (رقم الهوية) = 10 digits
+  // رقم الشهادة الصحية = 12 digits; رقم الهوية = 10 digits
   var cardNo='';
   (function(){
-    var kws=['\u0631\u0642\u0645 \u0627\u0644\u0634\u0647\u0627\u062f\u0629 \u0627\u0644\u0635\u062d\u064a\u0629','\u0631\u0642\u0645 \u0627\u0644\u0634\u0647\u0627\u062f\u0629'];
+    var kws=[
+      '\u0631\u0642\u0645 \u0627\u0644\u0634\u0647\u0627\u062f\u0629 \u0627\u0644\u0635\u062d\u064a\u0629',
+      '\u0631\u0642\u0645 \u0627\u0644\u0634\u0647\u0627\u062f\u0629'
+    ];
     for(var ki=0;ki<kws.length;ki++){
       var idx=text.indexOf(kws[ki]);
       if(idx<0)continue;
-      var sub=text.substring(idx,idx+100);
+      var sub=text.substring(Math.max(0,idx-60),idx+120);
       var mn=sub.match(/\b(\d{10,13})\b/);
       if(mn){cardNo=mn[1];return;}
     }
@@ -11021,75 +11026,103 @@ function parseAndFillHealthCard(text,id){
     if(twelve.length)cardNo=twelve[0];
     else{var elev=allNums.filter(function(n){return n.length>=11;});if(elev.length)cardNo=elev[0];}
   }
-  // ── Hijri date extraction ─────────────────────────────────────────────────────
+
+  // ── Hijri date extraction — dual direction ────────────────────────────────────
+  // Pattern A: YYYY/MM/DD (standard)
+  // Pattern B: DD/MM/YYYY (RTL reversal by PDF.js)
+  var seen={};
   var hijriDates=[];
-  var dp=/(1[4-5]\d{2})[\/\-](\d{1,2})[\/\-](\d{1,2})/g;
-  var m;
-  while((m=dp.exec(text))!==null){
-    var hy=parseInt(m[1]),hmo=parseInt(m[2]),hd2=parseInt(m[3]);
-    if(hmo>=1&&hmo<=12&&hd2>=1&&hd2<=30)hijriDates.push({y:hy,mo:hmo,d:hd2,idx:m.index});
+  function addHijri(hy,hmo,hd2){
+    if(hmo<1||hmo>12||hd2<1||hd2>30)return;
+    if(hy<1400||hy>1600)return;
+    var key=hy+'-'+hmo+'-'+hd2;
+    if(seen[key])return;
+    seen[key]=true;
+    var g=hijriToGregorian(hy,hmo,hd2);
+    var gs=g.y+'-'+String(g.m).padStart(2,'0')+'-'+String(g.d).padStart(2,'0');
+    hijriDates.push({y:hy,mo:hmo,d:hd2,greg:gs});
   }
-  function toGreg(hd){
-    var g=hijriToGregorian(hd.y,hd.mo,hd.d);
-    return g.y+'-'+String(g.m).padStart(2,'0')+'-'+String(g.d).padStart(2,'0');
-  }
-  var gregDates=hijriDates.map(toGreg);
-  // ── Find the ISSUE date first so we can exclude it from expiry assignment ────
-  // تاريخ إصدار الشهادة الصحية — the label for the ISSUE date
-  function dateNearKeyword(txt,keyword){
-    var idx=txt.indexOf(keyword);
-    if(idx<0)return'';
-    // RTL PDFs: value may appear BEFORE the label in text stream, so look both ways
-    var start2=Math.max(0,idx-80);
-    var sub=txt.substring(start2,idx+150);
+  var pa=/(1[4-5]\d{2})[\/\-](\d{1,2})[\/\-](\d{1,2})/g,m;
+  while((m=pa.exec(text))!==null)addHijri(parseInt(m[1]),parseInt(m[2]),parseInt(m[3]));
+  var pb=/(\d{1,2})[\/\-](\d{1,2})[\/\-](1[4-5]\d{2})/g;
+  while((m=pb.exec(text))!==null)addHijri(parseInt(m[3]),parseInt(m[2]),parseInt(m[1]));
+
+  var gregDates=hijriDates.map(function(h){return h.greg;});
+  console.log('[HealthPDF] Hijri dates found:',hijriDates.map(function(h){return h.y+'/'+h.mo+'/'+h.d+' \u2192 '+h.greg;}));
+
+  // ── Label-based date search — bidirectional window ───────────────────────────
+  function dateNearKeyword(txt,keyword,windowSize){
+    windowSize=windowSize||200;
+    var kidx=txt.indexOf(keyword);
+    if(kidx<0)return'';
+    var start2=Math.max(0,kidx-windowSize);
+    var sub=txt.substring(start2,kidx+windowSize);
+    // Try YYYY/MM/DD first, then DD/MM/YYYY
     var dm=sub.match(/(1[4-5]\d{2})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+    if(!dm){dm=sub.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](1[4-5]\d{2})/);}
     if(!dm)return'';
-    var g=hijriToGregorian(parseInt(dm[1]),parseInt(dm[2]),parseInt(dm[3]));
+    var hy,hmo,hd2;
+    if(parseInt(dm[1])>1000){hy=parseInt(dm[1]);hmo=parseInt(dm[2]);hd2=parseInt(dm[3]);}
+    else{hd2=parseInt(dm[1]);hmo=parseInt(dm[2]);hy=parseInt(dm[3]);}
+    if(hmo<1||hmo>12||hd2<1||hd2>30)return'';
+    var g=hijriToGregorian(hy,hmo,hd2);
     return g.y+'-'+String(g.m).padStart(2,'0')+'-'+String(g.d).padStart(2,'0');
   }
-  // Issue date label: تاريخ إصدار الشهادة الصحية
-  var issueDate=dateNearKeyword(text,'\u062a\u0627\u0631\u064a\u062e \u0625\u0635\u062f\u0627\u0631 \u0627\u0644\u0634\u0647\u0627\u062f\u0629 \u0627\u0644\u0635\u062d\u064a\u0629');
-  if(!issueDate)issueDate=dateNearKeyword(text,'\u0625\u0635\u062f\u0627\u0631 \u0627\u0644\u0634\u0647\u0627\u062f\u0629');
-  // ── Med expiry: تاريخ نهاية الشهادة الصحية ──────────────────────────────────
+
+  // ── Identify issue date so we can exclude it ──────────────────────────────────
+  var issueDate='';
+  var ISSUE_KW=[
+    '\u062a\u0627\u0631\u064a\u062e \u0625\u0635\u062f\u0627\u0631 \u0627\u0644\u0634\u0647\u0627\u062f\u0629 \u0627\u0644\u0635\u062d\u064a\u0629',
+    '\u0625\u0635\u062f\u0627\u0631 \u0627\u0644\u0634\u0647\u0627\u062f\u0629'
+  ];
+  for(var ii=0;ii<ISSUE_KW.length&&!issueDate;ii++)issueDate=dateNearKeyword(text,ISSUE_KW[ii]);
+  // Fallback: issue date is always the earliest
+  if(!issueDate&&gregDates.length){var s0=gregDates.slice().sort();issueDate=s0[0];}
+
+  // ── Med expiry: تاريخ نهاية الشهادة الصحية ───────────────────────────────────
   var medExp='',trainExp='';
-  // Use the FULL label — never a partial that could match إصدار context
   var MED_KW=[
-    '\u062a\u0627\u0631\u064a\u062e \u0646\u0647\u0627\u064a\u0629 \u0627\u0644\u0634\u0647\u0627\u062f\u0629 \u0627\u0644\u0635\u062d\u064a\u0629', // تاريخ نهاية الشهادة الصحية  ← EXACT label from card
-    '\u0646\u0647\u0627\u064a\u0629 \u0627\u0644\u0634\u0647\u0627\u062f\u0629 \u0627\u0644\u0635\u062d\u064a\u0629'                              // نهاية الشهادة الصحية
+    '\u0646\u0647\u0627\u064a\u0629 \u0627\u0644\u0634\u0647\u0627\u062f\u0629 \u0627\u0644\u0635\u062d\u064a\u0629',
+    '\u0646\u0647\u0627\u064a\u0629 \u0627\u0644\u0634\u0647\u0627\u062f\u0629',
+    '\u062a\u0627\u0631\u064a\u062e \u0646\u0647\u0627\u064a\u0629'
   ];
   var TRAIN_KW=[
-    '\u062a\u0627\u0631\u064a\u062e \u0627\u0646\u062a\u0647\u0627\u0621 \u0627\u0644\u0628\u0631\u0646\u0627\u0645\u062c \u0627\u0644\u062a\u062b\u0642\u064a\u0641\u064a', // تاريخ انتهاء البرنامج التثقيفي ← EXACT label
-    '\u0627\u0646\u062a\u0647\u0627\u0621 \u0627\u0644\u0628\u0631\u0646\u0627\u0645\u062c \u0627\u0644\u062a\u062b\u0642\u064a\u0641\u064a',                             // انتهاء البرنامج التثقيفي
-    '\u0627\u0646\u062a\u0647\u0627\u0621 \u0627\u0644\u0628\u0631\u0646\u0627\u0645\u062c'                                                                             // انتهاء البرنامج
+    '\u0627\u0646\u062a\u0647\u0627\u0621 \u0627\u0644\u0628\u0631\u0646\u0627\u0645\u062c \u0627\u0644\u062a\u062b\u0642\u064a\u0641\u064a',
+    '\u0627\u0646\u062a\u0647\u0627\u0621 \u0627\u0644\u0628\u0631\u0646\u0627\u0645\u062c',
+    '\u0627\u0644\u0628\u0631\u0646\u0627\u0645\u062c \u0627\u0644\u062a\u062b\u0642\u064a\u0641\u064a'
   ];
   for(var mi2=0;mi2<MED_KW.length&&!medExp;mi2++){
     var d=dateNearKeyword(text,MED_KW[mi2]);
-    // Reject if it matches the issue date
     if(d&&d!==issueDate)medExp=d;
   }
   for(var ti=0;ti<TRAIN_KW.length&&!trainExp;ti++){
     var d2=dateNearKeyword(text,TRAIN_KW[ti]);
     if(d2&&d2!==issueDate&&d2!==medExp)trainExp=d2;
   }
+
+  console.log('[HealthPDF] Label search \u2014 med:',medExp,' train:',trainExp);
+
   // ── Positional fallback ───────────────────────────────────────────────────────
-  // Balady card date order: issue (earliest) → med expiry → training expiry (latest)
+  // Balady order after removing issue date: training (earlier) then medical (later)
   if(!medExp||!trainExp){
     var sorted=gregDates.slice().sort();
-    // Remove issue date from candidates
-    var candidates=sorted.filter(function(d){return d!==issueDate;});
-    // Remove duplicates
-    candidates=candidates.filter(function(d,i){return candidates.indexOf(d)===i;});
+    var nonIssue=sorted.filter(function(d){return d!==issueDate;});
+    nonIssue=nonIssue.filter(function(d,i){return nonIssue.indexOf(d)===i;});
     if(!medExp&&!trainExp){
-      if(candidates.length>=2){medExp=candidates[0];trainExp=candidates[candidates.length-1];}
-      else if(candidates.length===1){medExp=candidates[0];}
+      // training = earlier, medical = later (per Balady card structure)
+      if(nonIssue.length>=2){trainExp=nonIssue[0];medExp=nonIssue[nonIssue.length-1];}
+      else if(nonIssue.length===1){medExp=nonIssue[0];}
     }else if(medExp&&!trainExp){
-      var rem=candidates.filter(function(d){return d!==medExp;});
-      if(rem.length)trainExp=rem[rem.length-1];
+      var rem=nonIssue.filter(function(d){return d!==medExp;});
+      if(rem.length)trainExp=rem[0];
     }else if(!medExp&&trainExp){
-      var rem2=candidates.filter(function(d){return d!==trainExp;});
-      if(rem2.length)medExp=rem2[0];
+      var rem2=nonIssue.filter(function(d){return d!==trainExp;});
+      if(rem2.length)medExp=rem2[rem2.length-1];
     }
   }
+
+  console.log('[HealthPDF] Final \u2014 card:',cardNo,' med:',medExp,' train:',trainExp);
+
   var hc=BS.health.find(function(x){return x.id===id;});
   if(!hc){showToast('Health card not found','error');return;}
   var html='<div class="modal-head"><h2>PDF Import — '+bxe(hc.name)+'</h2><button class="modal-close" onclick="closeModalForce()">✕</button></div>';
