@@ -11005,6 +11005,7 @@ function parseAndFillHealthCard(text,id){
   console.log('[HealthPDF] Raw text:', text);
 
   // ── Card number ───────────────────────────────────────────────────────────────
+  // Health card no. (رقم الشهادة الصحية) = 12 digits; ID = 10 digits
   var cardNo='';
   (function(){
     var kws=['\u0631\u0642\u0645 \u0627\u0644\u0634\u0647\u0627\u062f\u0629 \u0627\u0644\u0635\u062d\u064a\u0629','\u0631\u0642\u0645 \u0627\u0644\u0634\u0647\u0627\u062f\u0629'];
@@ -11023,93 +11024,81 @@ function parseAndFillHealthCard(text,id){
     else{var elev=allNums.filter(function(n){return n.length>=11;});if(elev.length)cardNo=elev[0];}
   }
 
-  // ── Hijri date extraction — dual direction + position tracking ────────────────
-  var seen={};
-  var allDateMatches=[];  // {greg, pos} — position in text for proximity matching
+  // ── Hijri date extraction — dual direction, tracking text position ─────────────
+  // Balady PDFs often don't embed Arabic labels — only numbers are extractable.
+  // Dates always appear in TEXT ORDER: issue date first, med expiry second, training last.
+  var seenKey={};
+  var allDateMatches=[];
   function recordDate(hy,hmo,hd2,pos){
     if(hmo<1||hmo>12||hd2<1||hd2>30||hy<1400||hy>1600)return;
+    var key=hy+'-'+hmo+'-'+hd2;
+    if(seenKey[key])return;  // deduplicate same Hijri date
+    seenKey[key]=true;
     var g=hijriToGregorian(hy,hmo,hd2);
     var gs=g.y+'-'+String(g.m).padStart(2,'0')+'-'+String(g.d).padStart(2,'0');
     allDateMatches.push({greg:gs,pos:pos,hijri:hy+'/'+String(hmo).padStart(2,'0')+'/'+String(hd2).padStart(2,'0')});
-    var key=hy+'-'+hmo+'-'+hd2;
-    seen[key]=gs;
   }
+  // Pattern A: YYYY/MM/DD
   var pa=/(1[4-5]\d{2})[\/\-](\d{1,2})[\/\-](\d{1,2})/g,m;
   while((m=pa.exec(text))!==null)recordDate(parseInt(m[1]),parseInt(m[2]),parseInt(m[3]),m.index);
+  // Pattern B: DD/MM/YYYY (RTL reversal)
   var pb=/(\d{1,2})[\/\-](\d{1,2})[\/\-](1[4-5]\d{2})/g;
   while((m=pb.exec(text))!==null)recordDate(parseInt(m[3]),parseInt(m[2]),parseInt(m[1]),m.index);
 
-  // Unique greg dates for display
-  var hijriDates=[];
-  var _seen2={};
-  allDateMatches.forEach(function(x){if(!_seen2[x.hijri]){_seen2[x.hijri]=true;hijriDates.push({y:parseInt(x.hijri.split('/')[0]),mo:parseInt(x.hijri.split('/')[1]),d:parseInt(x.hijri.split('/')[2])});}});
-  var gregDates=Object.values(seen);
-  console.log('[HealthPDF] Dates found:',allDateMatches.map(function(x){return x.hijri+' \u2192 '+x.greg+' @'+x.pos;}));
+  // Sort by position in text — this gives us the natural reading order
+  allDateMatches.sort(function(a,b){return a.pos-b.pos;});
 
-  // ── Core: find the date CLOSEST AFTER a keyword position ─────────────────────
-  // This is the most reliable method for RTL PDFs — find where the label is,
-  // then grab the nearest date match that appears after it in the text stream.
+  var hijriDates=allDateMatches.map(function(x){
+    var parts=x.hijri.split('/');
+    return{y:parseInt(parts[0]),mo:parseInt(parts[1]),d:parseInt(parts[2])};
+  });
+  var gregDates=allDateMatches.map(function(x){return x.greg;});
+  console.log('[HealthPDF] Dates found (by position):',allDateMatches.map(function(x){return x.hijri+' \u2192 '+x.greg+' @'+x.pos;}));
+
+  // ── Try Arabic label search first (works if PDF embeds Arabic text) ───────────
+  var medExp='',trainExp='',issueDate='';
   function dateAfterKeyword(keyword){
     var kidx=text.indexOf(keyword);
     if(kidx<0)return'';
-    // Find all date matches that appear AFTER this keyword
+    // Find the date match closest AFTER this keyword position
     var after=allDateMatches.filter(function(x){return x.pos>kidx;});
-    if(!after.length){
-      // fallback: look before too (RTL reversal) — pick closest
-      var before=allDateMatches.filter(function(x){return x.pos<kidx;});
-      if(!before.length)return'';
-      before.sort(function(a,b){return b.pos-a.pos;}); // closest before
-      return before[0].greg;
-    }
-    after.sort(function(a,b){return a.pos-b.pos;}); // closest after
-    return after[0].greg;
+    if(after.length){return after[0].greg;}
+    // RTL fallback: closest before
+    var before=allDateMatches.filter(function(x){return x.pos<kidx;});
+    if(before.length){return before[before.length-1].greg;}
+    return'';
   }
-
-  // ── Issue date — تاريخ إصدار الشهادة الصحية ──────────────────────────────────
-  var issueDate='';
-  var ISSUE_KW=[
-    '\u062a\u0627\u0631\u064a\u062e \u0625\u0635\u062f\u0627\u0631 \u0627\u0644\u0634\u0647\u0627\u062f\u0629 \u0627\u0644\u0635\u062d\u064a\u0629',
-    '\u0625\u0635\u062f\u0627\u0631 \u0627\u0644\u0634\u0647\u0627\u062f\u0629'
-  ];
+  var ISSUE_KW=['\u062a\u0627\u0631\u064a\u062e \u0625\u0635\u062f\u0627\u0631 \u0627\u0644\u0634\u0647\u0627\u062f\u0629 \u0627\u0644\u0635\u062d\u064a\u0629','\u0625\u0635\u062f\u0627\u0631 \u0627\u0644\u0634\u0647\u0627\u062f\u0629'];
+  var MED_KW=['\u062a\u0627\u0631\u064a\u062e \u0646\u0647\u0627\u064a\u0629 \u0627\u0644\u0634\u0647\u0627\u062f\u0629 \u0627\u0644\u0635\u062d\u064a\u0629','\u0646\u0647\u0627\u064a\u0629 \u0627\u0644\u0634\u0647\u0627\u062f\u0629 \u0627\u0644\u0635\u062d\u064a\u0629','\u0646\u0647\u0627\u064a\u0629 \u0627\u0644\u0634\u0647\u0627\u062f\u0629'];
+  var TRAIN_KW=['\u062a\u0627\u0631\u064a\u062e \u0627\u0646\u062a\u0647\u0627\u0621 \u0627\u0644\u0628\u0631\u0646\u0627\u0645\u062c \u0627\u0644\u062a\u062b\u0642\u064a\u0641\u064a','\u0627\u0646\u062a\u0647\u0627\u0621 \u0627\u0644\u0628\u0631\u0646\u0627\u0645\u062c \u0627\u0644\u062a\u062b\u0642\u064a\u0641\u064a','\u0627\u0646\u062a\u0647\u0627\u0621 \u0627\u0644\u0628\u0631\u0646\u0627\u0645\u062c'];
   for(var ii=0;ii<ISSUE_KW.length&&!issueDate;ii++)issueDate=dateAfterKeyword(ISSUE_KW[ii]);
-
-  // ── Medical expiry — تاريخ نهاية الشهادة الصحية ──────────────────────────────
-  var medExp='',trainExp='';
-  var MED_KW=[
-    '\u062a\u0627\u0631\u064a\u062e \u0646\u0647\u0627\u064a\u0629 \u0627\u0644\u0634\u0647\u0627\u062f\u0629 \u0627\u0644\u0635\u062d\u064a\u0629',
-    '\u0646\u0647\u0627\u064a\u0629 \u0627\u0644\u0634\u0647\u0627\u062f\u0629 \u0627\u0644\u0635\u062d\u064a\u0629',
-    '\u0646\u0647\u0627\u064a\u0629 \u0627\u0644\u0634\u0647\u0627\u062f\u0629'
-  ];
-  // ── Training expiry — تاريخ انتهاء البرنامج التثقيفي ─────────────────────────
-  var TRAIN_KW=[
-    '\u062a\u0627\u0631\u064a\u062e \u0627\u0646\u062a\u0647\u0627\u0621 \u0627\u0644\u0628\u0631\u0646\u0627\u0645\u062c \u0627\u0644\u062a\u062b\u0642\u064a\u0641\u064a',
-    '\u0627\u0646\u062a\u0647\u0627\u0621 \u0627\u0644\u0628\u0631\u0646\u0627\u0645\u062c \u0627\u0644\u062a\u062b\u0642\u064a\u0641\u064a',
-    '\u0627\u0646\u062a\u0647\u0627\u0621 \u0627\u0644\u0628\u0631\u0646\u0627\u0645\u062c',
-    '\u0627\u0644\u0628\u0631\u0646\u0627\u0645\u062c \u0627\u0644\u062a\u062b\u0642\u064a\u0641\u064a'
-  ];
-  for(var mi2=0;mi2<MED_KW.length&&!medExp;mi2++)medExp=dateAfterKeyword(MED_KW[mi2]);
-  for(var ti=0;ti<TRAIN_KW.length&&!trainExp;ti++)trainExp=dateAfterKeyword(TRAIN_KW[ti]);
+  for(var mi2=0;mi2<MED_KW.length&&!medExp;mi2++){var d=dateAfterKeyword(MED_KW[mi2]);if(d&&d!==issueDate)medExp=d;}
+  for(var ti=0;ti<TRAIN_KW.length&&!trainExp;ti++){var d2=dateAfterKeyword(TRAIN_KW[ti]);if(d2&&d2!==issueDate&&d2!==medExp)trainExp=d2;}
 
   console.log('[HealthPDF] Label search \u2014 issue:',issueDate,' med:',medExp,' train:',trainExp);
 
-  // ── Positional fallback (only if label search failed) ────────────────────────
-  // Balady card order by date value: issue \u2264 med < train (training always furthest out)
-  if(!medExp||!trainExp){
-    var uniq={};gregDates.forEach(function(d){uniq[d]=true;});
-    var sorted=Object.keys(uniq).sort();
-    // Remove issue date from pool
-    var pool=sorted.filter(function(d){return d!==issueDate;});
-    if(!medExp&&!trainExp){
-      // med expiry is always BEFORE training expiry on Balady cards
-      if(pool.length>=2){medExp=pool[0];trainExp=pool[pool.length-1];}
-      else if(pool.length===1){medExp=pool[0];}
-    }else if(medExp&&!trainExp){
-      var rem=pool.filter(function(d){return d!==medExp;});
-      if(rem.length)trainExp=rem[rem.length-1];
-    }else if(!medExp&&trainExp){
-      var rem2=pool.filter(function(d){return d!==trainExp;});
-      if(rem2.length)medExp=rem2[0];
+  // ── Positional fallback — PRIMARY method for Balady PDFs ─────────────────────
+  // Arabic labels are NOT embedded in most Balady PDFs (confirmed from console logs).
+  // Dates always appear in this TEXT ORDER: [0]=issue date, [1]=med expiry, [2]=training expiry
+  // Simply use position index — skip [0], assign [1]=med, [2]=train.
+  if(!medExp&&!trainExp){
+    if(allDateMatches.length>=3){
+      medExp=allDateMatches[1].greg;
+      trainExp=allDateMatches[2].greg;
+    }else if(allDateMatches.length===2){
+      // No issue date present — first=med, second=train
+      medExp=allDateMatches[0].greg;
+      trainExp=allDateMatches[1].greg;
+    }else if(allDateMatches.length===1){
+      medExp=allDateMatches[0].greg;
     }
+  }else if(medExp&&!trainExp){
+    // Label found med, find training from remaining by position
+    var rem=allDateMatches.filter(function(x){return x.greg!==medExp&&x.greg!==issueDate;});
+    if(rem.length)trainExp=rem[rem.length-1].greg;
+  }else if(!medExp&&trainExp){
+    var rem2=allDateMatches.filter(function(x){return x.greg!==trainExp&&x.greg!==issueDate;});
+    if(rem2.length)medExp=rem2[0].greg;
   }
 
   console.log('[HealthPDF] Final \u2014 card:',cardNo,' med:',medExp,' train:',trainExp);
