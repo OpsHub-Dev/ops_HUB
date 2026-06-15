@@ -18986,72 +18986,194 @@ function bmDeleteInvoice(id) {
 // ── 2. LEAVE MANAGEMENT ──────────────────────────────────────
 function pBmLeave() {
   attachBranchListeners();
-  var filt = BS._bmLeaveFilt||'all';
-  var data = BS.tsLeaves.filter(function(l){
-    if(filt==='pending') return l.status==='pending';
-    if(filt==='approved') return l.status==='approved';
-    if(filt==='rejected') return l.status==='rejected';
-    return true;
-  }).slice().sort(function(a,b){return (b.start||'').localeCompare(a.start||'');});
+  var s = NX.session||{};
+  var mainTab = BS._bmLeaveMainTab||'requests';
 
-  var pend = BS.tsLeaves.filter(function(l){return l.status==='pending';}).length;
-  var appr = BS.tsLeaves.filter(function(l){return l.status==='approved';}).length;
-  var rej  = BS.tsLeaves.filter(function(l){return l.status==='rejected';}).length;
+  var h = '<div class="page-header"><h1>&#x1F3D6;&#xFE0F; Leave Management</h1><p>Submit requests &amp; grant pending day offs for your team</p></div>';
 
-  var eo = '<option value="">Select employee...</option>'+BS.tsEmps.slice().sort(function(a,b){return a.name.localeCompare(b.name);}).map(function(e){return '<option value="'+bxe(e.id)+'">'+bxe(e.name)+' ('+bxe(e.dept||'')+')</option>';}).join('');
-
-  var h = '<div class="page-header"><h1>&#x1F3D6;&#xFE0F; Leave Management</h1><p>Submit and manage leave requests for your team</p></div>';
-
-  // Submit form
-  h += '<div class="bcard" style="margin-bottom:16px;border-color:rgba(52,211,153,.2)">';
-  h += '<div style="font-size:13px;font-weight:700;color:var(--success);margin-bottom:14px">New Leave Request</div>';
-  h += '<div class="bgrid-2" style="margin-bottom:12px">';
-  h += '<div class="bfg" style="margin-bottom:0"><label class="form-label">Employee *</label><select class="form-input form-select" id="bmlv-emp">'+eo+'</select></div>';
-  h += '<div class="bfg" style="margin-bottom:0"><label class="form-label">Type *</label><select class="form-input form-select" id="bmlv-type"><option value="annual">Annual Leave</option><option value="sick">Sick Leave</option><option value="emergency">Emergency Leave</option><option value="unpaid">Unpaid Leave</option></select></div>';
-  h += '<div class="bfg" style="margin-bottom:0"><label class="form-label">From *</label><input class="form-input" type="date" id="bmlv-from"></div>';
-  h += '<div class="bfg" style="margin-bottom:0"><label class="form-label">To *</label><input class="form-input" type="date" id="bmlv-to"></div>';
-  h += '</div>';
-  h += '<div class="bfg" style="margin-bottom:12px"><label class="form-label">Notes</label><input class="form-input" id="bmlv-note" placeholder="Reason (optional)"></div>';
-  h += '<button class="btn btn-primary" onclick="saveBmLeaveRequest()">Submit Request &#x2192; HR</button>';
+  // ── Main tab bar (neumorphic pill) ──
+  h += '<div style="display:flex;background:var(--body-bg,#E7E5E4);border-radius:14px;box-shadow:inset 3px 3px 8px rgba(0,0,0,.1),inset -3px -3px 6px rgba(255,255,255,.85);padding:4px;margin-bottom:18px;gap:4px">';
+  h += '<button class="bfbt'+(mainTab==='requests'?' on':'')+'" data-t="requests" onclick="BS._bmLeaveMainTab=this.dataset.t;navTo(\'bm-leave\')" style="flex:1;padding:9px 0;border-radius:10px;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px">';
+  h += '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h.01M12 14h.01"/></svg>';
+  h += ' Leave Requests</button>';
+  h += '<button class="bfbt'+(mainTab==='dayoff'?' on':'')+'" data-t="dayoff" onclick="BS._bmLeaveMainTab=this.dataset.t;navTo(\'bm-leave\')" style="flex:1;padding:9px 0;border-radius:10px;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px">';
+  h += '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/></svg>';
+  h += ' Pending Day Off</button>';
   h += '</div>';
 
-  // Filter tabs
-  h += '<div style="display:flex;gap:6px;margin-bottom:14px">';
-  [{k:'all',l:'All'},{k:'pending',l:'Pending'},{k:'approved',l:'Approved'},{k:'rejected',l:'Rejected'}].forEach(function(f){
-    h += '<button class="btn'+(filt===f.k?' btn-primary':'')+'" onclick="BS._bmLeaveFilt=\''+f.k+'\';navTo(\'bm-leave\')">'+f.l+'</button>';
-  });
-  h += '</div>';
+  if (mainTab === 'requests') {
+    // ══════════ TAB 1: LEAVE REQUESTS ══════════
+    var filt = BS._bmLeaveFilt||'all';
+    var data = BS.tsLeaves.filter(function(l){
+      if(filt==='pending') return l.status==='pending';
+      if(filt==='approved') return l.status==='approved';
+      if(filt==='rejected') return l.status==='rejected';
+      return true;
+    }).slice().sort(function(a,b){return (b.start||'').localeCompare(a.start||'');});
 
-  // KPI cards
-  h += '<div class="bgrid-4" style="margin-bottom:16px">';
-  [{l:'Pending',v:pend,c:'#b45309'},{l:'Approved',v:appr,c:'#00875a'},{l:'Rejected',v:rej,c:'#c0392b'},{l:'Total',v:BS.tsLeaves.length,c:'var(--text-primary)'}].forEach(function(x){
-    h += '<div style="text-align:center;background:var(--surface-2);border:1px solid '+x.c+'30;border-radius:9px;padding:12px"><div class="bmono" style="font-size:24px;font-weight:300;color:'+x.c+'">'+x.v+'</div><div style="font-size:9px;color:var(--text-tertiary);margin-top:3px;text-transform:uppercase;letter-spacing:1px">'+x.l+'</div></div>';
-  });
-  h += '</div>';
+    var pend = BS.tsLeaves.filter(function(l){return l.status==='pending';}).length;
+    var appr = BS.tsLeaves.filter(function(l){return l.status==='approved';}).length;
+    var rej  = BS.tsLeaves.filter(function(l){return l.status==='rejected';}).length;
 
-  var typeColors = {annual:'#00875a',sick:'#c0392b',emergency:'#b45309',unpaid:'#94a3b8'};
-  var statusColor = {pending:'#b45309',approved:'#00875a',rejected:'#c0392b'};
-  var rows = data.map(function(l){
-    var emp = BS.tsEmps.find(function(e){return e.id===l.empId;});
-    var tc = typeColors[l.type]||'#888';
-    var sc = statusColor[l.status]||'#888';
-    return '<tr>'+
-      '<td style="font-weight:600;color:var(--text-primary)">'+bxe(emp?emp.name:'Unknown')+'</td>'+
-      '<td>'+bpl((l.type||'').replace(/_/g,' '),tc)+'</td>'+
-      '<td class="bmono">'+bxe(l.start||l.from||'')+'</td>'+
-      '<td class="bmono">'+bxe(l.end||l.to||'')+'</td>'+
-      '<td class="bmono" style="font-weight:600">'+bxe(l.days||1)+'d</td>'+
-      '<td><span style="color:'+sc+';font-weight:700;font-size:11px">'+bxe(l.status||'pending')+'</span></td>'+
-      '<td><div style="display:flex;gap:4px">'+
-        (l.status==='pending'?
-          '<button class="btn btn-sm" style="color:var(--success);background:rgba(52,211,153,.1)" onclick="bmApproveLeave(\''+bxe(l.id)+'\')">&#x2713; Approve</button>'+
-          '<button class="btn btn-sm" style="color:var(--danger);background:rgba(248,113,113,.1)" onclick="bmRejectLeave(\''+bxe(l.id)+'\')">&#x2715; Reject</button>':'')+'</div></td>'+
-    '</tr>';
-  }).join('');
+    var eo = '<option value="">Select employee\u2026</option>'+BS.tsEmps.slice().sort(function(a,b){return a.name.localeCompare(b.name);}).map(function(e){return '<option value="'+bxe(e.id)+'">'+bxe(e.name)+' ('+bxe(e.dept||'')+')</option>';}).join('');
 
-  h += '<div class="btw"><div class="btw-s"><table class="btbl"><thead><tr><th>Employee</th><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Status</th><th>Action</th></tr></thead><tbody>'+
-    (rows||'<tr><td colspan="7" style="text-align:center;color:var(--text-tertiary);padding:28px">No leave requests yet.</td></tr>')+
-    '</tbody></table></div></div>';
+    // Submit form
+    h += '<div class="bcard" style="margin-bottom:16px;border-color:rgba(52,211,153,.2)">';
+    h += '<div style="font-size:11px;font-weight:700;color:var(--success);text-transform:uppercase;letter-spacing:.1em;margin-bottom:14px">&#x2B; New Leave Request</div>';
+    h += '<div class="bgrid-2" style="margin-bottom:12px">';
+    h += '<div class="bfg" style="margin-bottom:0"><label class="form-label">Employee *</label><select class="form-input form-select" id="bmlv-emp">'+eo+'</select></div>';
+    h += '<div class="bfg" style="margin-bottom:0"><label class="form-label">Type *</label><select class="form-input form-select" id="bmlv-type"><option value="annual">Annual Leave</option><option value="sick">Sick Leave</option><option value="emergency">Emergency Leave</option><option value="unpaid">Unpaid Leave</option></select></div>';
+    h += '<div class="bfg" style="margin-bottom:0"><label class="form-label">From *</label><input class="form-input" type="date" id="bmlv-from"></div>';
+    h += '<div class="bfg" style="margin-bottom:0"><label class="form-label">To *</label><input class="form-input" type="date" id="bmlv-to"></div>';
+    h += '</div>';
+    h += '<div class="bfg" style="margin-bottom:12px"><label class="form-label">Notes</label><input class="form-input" id="bmlv-note" placeholder="Reason (optional)"></div>';
+    h += '<button class="btn btn-primary" onclick="saveBmLeaveRequest()">Submit Request &#x2192; HR</button>';
+    h += '</div>';
+
+    // Filter tabs
+    h += '<div style="display:flex;gap:6px;margin-bottom:14px">';
+    [{k:'all',l:'All'},{k:'pending',l:'Pending'},{k:'approved',l:'Approved'},{k:'rejected',l:'Rejected'}].forEach(function(f){
+      h += '<button class="btn'+(filt===f.k?' btn-primary':'')+'" data-fk="'+f.k+'" onclick="BS._bmLeaveFilt=this.dataset.fk;navTo(\'bm-leave\')">'+f.l+'</button>';
+    });
+    h += '</div>';
+
+    // KPI row
+    h += '<div class="bgrid-4" style="margin-bottom:16px">';
+    [{l:'Pending',v:pend,c:'#b45309'},{l:'Approved',v:appr,c:'#00875a'},{l:'Rejected',v:rej,c:'#c0392b'},{l:'Total',v:BS.tsLeaves.length,c:'var(--text-primary)'}].forEach(function(x){
+      h += '<div style="text-align:center;background:var(--surface-2);border:1px solid '+x.c+'30;border-radius:9px;padding:12px"><div class="bmono" style="font-size:24px;font-weight:300;color:'+x.c+'">'+x.v+'</div><div style="font-size:9px;color:var(--text-tertiary);margin-top:3px;text-transform:uppercase;letter-spacing:1px">'+x.l+'</div></div>';
+    });
+    h += '</div>';
+
+    var typeColors = {annual:'#00875a',sick:'#c0392b',emergency:'#b45309',unpaid:'#94a3b8',dayoff:'#0369a1'};
+    var statusColor = {pending:'#b45309',approved:'#00875a',rejected:'#c0392b'};
+    var rows = data.map(function(l){
+      var emp = BS.tsEmps.find(function(e){return e.id===l.empId;});
+      var tc = typeColors[l.type]||'#888';
+      var sc = statusColor[l.status]||'#888';
+      return '<tr>'+
+        '<td style="font-weight:600;color:var(--text-primary)">'+bxe(emp?emp.name:'Unknown')+'</td>'+
+        '<td>'+bpl((l.type||'').replace(/_/g,' '),tc)+'</td>'+
+        '<td class="bmono">'+bxe(l.start||l.from||'')+'</td>'+
+        '<td class="bmono">'+bxe(l.end||l.to||'')+'</td>'+
+        '<td class="bmono" style="font-weight:600">'+bxe(l.days||1)+'d</td>'+
+        '<td><span style="color:'+sc+';font-weight:700;font-size:11px">'+bxe(l.status||'pending')+'</span></td>'+
+        '<td><div style="display:flex;gap:4px">'+
+          (l.status==='pending'?
+            '<button class="btn btn-sm" style="color:var(--success);background:rgba(52,211,153,.1)" data-lid="'+bxe(l.id)+'" onclick="bmApproveLeave(this.dataset.lid)">&#x2713; Approve</button>'+
+            '<button class="btn btn-sm" style="color:var(--danger);background:rgba(248,113,113,.1)" data-lid="'+bxe(l.id)+'" onclick="bmRejectLeave(this.dataset.lid)">&#x2715; Reject</button>':'')+'</div></td>'+
+      '</tr>';
+    }).join('');
+
+    h += '<div class="btw"><div class="btw-s"><table class="btbl"><thead><tr><th>Employee</th><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Status</th><th>Action</th></tr></thead><tbody>'+
+      (rows||'<tr><td colspan="7" style="text-align:center;color:var(--text-tertiary);padding:28px">No leave requests yet.</td></tr>')+
+      '</tbody></table></div></div>';
+
+  } else {
+    // ══════════ TAB 2: PENDING DAY OFF ══════════
+    var eo2 = '<option value="">Select employee\u2026</option>'+BS.tsEmps.slice().sort(function(a,b){return a.name.localeCompare(b.name);}).map(function(e){return '<option value="'+bxe(e.id)+'" data-sap="'+bxe(e.sap||'')+'" data-name="'+bxe(e.name)+'">'+bxe(e.name)+' ('+bxe(e.dept||'')+')</option>';}).join('');
+
+    h += '<div style="background:rgba(3,105,161,.06);border:1px solid rgba(3,105,161,.18);border-radius:12px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:flex-start;gap:10px">';
+    h += '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#0369a1" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="margin-top:1px;flex-shrink:0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>';
+    h += '<div style="font-size:12px;color:#0369a1;line-height:1.5"><strong>Pending Day Off</strong> is a day off you grant directly to an employee \u2014 it shows as <strong style="color:#0369a1">approved</strong> immediately in their leave history on the Staff Portal. Use this for compensatory rest days, operational day-offs, or pre-approved shift-off days.</div>';
+    h += '</div>';
+
+    // Compose form — neumorphic card
+    h += '<div class="bcard" style="margin-bottom:18px;border-color:rgba(3,105,161,.2)">';
+    h += '<div style="font-size:11px;font-weight:700;color:#0369a1;text-transform:uppercase;letter-spacing:.1em;margin-bottom:16px">';
+    h += '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/></svg>';
+    h += ' Grant Day Off</div>';
+
+    h += '<div class="bgrid-2" style="margin-bottom:12px">';
+    h += '<div class="bfg" style="margin-bottom:0"><label class="form-label">Employee *</label><select class="form-input form-select" id="bmdoff-emp">'+eo2+'</select></div>';
+    h += '<div class="bfg" style="margin-bottom:0"><label class="form-label">Day Off Date *</label><input class="form-input" type="date" id="bmdoff-date"></div>';
+    h += '</div>';
+    h += '<div class="bgrid-2" style="margin-bottom:12px">';
+    h += '<div class="bfg" style="margin-bottom:0"><label class="form-label">End Date (multi-day)</label><input class="form-input" type="date" id="bmdoff-date-to" placeholder="Leave blank for single day"></div>';
+    h += '<div class="bfg" style="margin-bottom:0"><label class="form-label">Reason / Note</label><input class="form-input" id="bmdoff-note" placeholder="e.g. Compensatory rest day"></div>';
+    h += '</div>';
+
+    // Employee summary panel (populated via JS)
+    h += '<div id="bmdoff-emp-summary" style="display:none;background:rgba(3,105,161,.05);border:1px solid rgba(3,105,161,.15);border-radius:10px;padding:12px;margin-bottom:12px">';
+    h += '<div style="font-size:11px;font-weight:700;color:#0369a1;margin-bottom:6px">Employee Summary</div>';
+    h += '<div id="bmdoff-emp-details" style="font-size:12px;color:var(--text-secondary)"></div>';
+    h += '</div>';
+
+    h += '<button class="btn btn-primary" style="background:linear-gradient(135deg,#0369a1,#075985);border-color:transparent" onclick="saveBmDayOff()">';
+    h += '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:5px"><polyline points="20 6 9 17 4 12"/></svg>';
+    h += ' Grant Day Off &mdash; Approve Immediately</button>';
+    h += '</div>';
+
+    // History of granted day-offs
+    h += '<div class="card section">';
+    h += '<div style="font-size:11px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.1em;margin-bottom:12px">&#x1F4DC; Granted Day Offs</div>';
+    h += '<div id="bmdoff-history"><div style="text-align:center;padding:24px;color:var(--text-tertiary);font-size:12px;font-family:var(--mono)">&#x23F3; Loading\u2026</div></div>';
+    h += '</div>';
+
+    // Load history + wire employee select
+    if(db && s.branchId){
+      setTimeout(function(){
+        // Wire employee select to show summary
+        var empSel = document.getElementById('bmdoff-emp');
+        if(empSel){
+          empSel.onchange = function(){
+            var opt = empSel.options[empSel.selectedIndex];
+            var empName = opt ? opt.getAttribute('data-name') : '';
+            var sap = opt ? opt.getAttribute('data-sap') : '';
+            var empId = empSel.value;
+            if(!empId){document.getElementById('bmdoff-emp-summary').style.display='none';return;}
+            var emp = BS.tsEmps.find(function(e){return e.id===empId;});
+            var el = document.getElementById('bmdoff-emp-summary');
+            var det = document.getElementById('bmdoff-emp-details');
+            if(el) el.style.display='';
+            if(det && emp){
+              var bal = emp.leaveBalance!=null ? emp.leaveBalance : 21;
+              det.innerHTML = '<span style="font-weight:700">'+bxe(empName||'')+'</span> &nbsp;&middot;&nbsp; '+bxe(emp.dept||'')+(sap?' &nbsp;&middot;&nbsp; SAP: <span style="font-family:var(--mono)">'+bxe(sap)+'</span>':'')+
+                ' &nbsp;&middot;&nbsp; Leave Balance: <span style="font-weight:700;color:var(--primary)">'+bal+' days</span>';
+            }
+          };
+        }
+        // Load granted day-offs from tsLeaves where type===dayoff and grantedByBM===true
+        var el = document.getElementById('bmdoff-history');
+        if(!el) return;
+        db.ref('branches/'+s.branchId+'/tsLeaves').orderByChild('type').equalTo('dayoff').limitToLast(50).once('value', function(snap){
+          var raw = snap.val()||{};
+          var list = Object.values(raw).filter(function(l){return l && l.grantedByBM;}).sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);});
+          if(!list.length){el.innerHTML='<div style="text-align:center;padding:24px;color:var(--text-tertiary);font-size:12px;font-style:italic">No day offs granted yet.</div>';return;}
+          var ih='<div class="btw"><div class="btw-s"><table class="btbl"><thead><tr><th>Employee</th><th>Date</th><th>Days</th><th>Note</th><th>Granted</th><th></th></tr></thead><tbody>';
+          list.forEach(function(l){
+            var emp2 = BS.tsEmps.find(function(e){return e.id===l.empId;})||{};
+            var dt = l.createdAt ? new Date(l.createdAt).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : '';
+            ih += '<tr>';
+            ih += '<td style="font-weight:600">'+bxe(l.empName||emp2.name||'Unknown')+'</td>';
+            ih += '<td class="bmono">'+bxe(l.from||'')+(l.to&&l.to!==l.from?' \u2192 '+bxe(l.to):'')+'</td>';
+            ih += '<td class="bmono" style="font-weight:600">'+bxe(l.days||1)+'d</td>';
+            ih += '<td style="font-size:11px;color:var(--text-secondary)">'+bxe(l.note||'\u2014')+'</td>';
+            ih += '<td style="font-size:10px;color:var(--text-tertiary)">'+bxe(dt)+'</td>';
+            ih += '<td><button class="btn btn-sm" style="color:var(--danger);font-size:10px" data-doffid="'+bxe(l.id||'')+'" onclick="bmDeleteDayOff(this.dataset.doffid)">&#x1F5D1;</button></td>';
+            ih += '</tr>';
+          });
+          ih += '</tbody></table></div></div>';
+          el.innerHTML = ih;
+        }, function(){
+          // Index not available – fallback: load all tsLeaves and filter client-side
+          db.ref('branches/'+s.branchId+'/tsLeaves').limitToLast(100).once('value', function(snap2){
+            var raw2 = snap2.val()||{};
+            var list2 = Object.values(raw2).filter(function(l){return l && l.type==='dayoff' && l.grantedByBM;}).sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);});
+            if(!list2.length){el.innerHTML='<div style="text-align:center;padding:24px;color:var(--text-tertiary);font-size:12px;font-style:italic">No day offs granted yet.</div>';return;}
+            // reuse same render
+            var ih='<div class="btw"><div class="btw-s"><table class="btbl"><thead><tr><th>Employee</th><th>Date</th><th>Days</th><th>Note</th><th>Granted</th><th></th></tr></thead><tbody>';
+            list2.forEach(function(l){
+              var emp2={};BS.tsEmps.forEach(function(e){if(e.id===l.empId)emp2=e;});
+              var dt = l.createdAt ? new Date(l.createdAt).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : '';
+              ih+='<tr><td style="font-weight:600">'+bxe(l.empName||emp2.name||'Unknown')+'</td><td class="bmono">'+bxe(l.from||'')+(l.to&&l.to!==l.from?' \u2192 '+bxe(l.to):'')+'</td><td class="bmono" style="font-weight:600">'+bxe(l.days||1)+'d</td><td style="font-size:11px;color:var(--text-secondary)">'+bxe(l.note||'\u2014')+'</td><td style="font-size:10px;color:var(--text-tertiary)">'+bxe(dt)+'</td><td><button class="btn btn-sm" style="color:var(--danger);font-size:10px" data-doffid="'+bxe(l.id||'')+'" onclick="bmDeleteDayOff(this.dataset.doffid)">&#x1F5D1;</button></td></tr>';
+            });
+            ih+='</tbody></table></div></div>';
+            el.innerHTML=ih;
+          });
+        });
+      }, 150);
+    }
+  }
   return h;
 }
 
@@ -19059,10 +19181,8 @@ function saveBmLeaveRequest() {
   var eid = bgv('bmlv-emp'), type = bgv('bmlv-type'), from = bgv('bmlv-from'), to = bgv('bmlv-to');
   if(!eid||!from||!to){showToast('Select employee and dates','error');return;}
   if(from > to){showToast('Start date cannot be after end date','error');return;}
-  // Guard against double-submit
   if(BS._submittingLeave){return;} BS._submittingLeave=true;
   setTimeout(function(){BS._submittingLeave=false;},2000);
-  // Duplicate guard: same employee + same dates within last 60s
   var nowTs=Date.now();
   var dup=(BS.tsLeaves||[]).find(function(x){return x.empId===eid&&x.from===from&&x.to===to&&(nowTs-(x.createdAt||0)<60000);});
   if(dup){showToast('Duplicate leave request prevented','error');BS._submittingLeave=false;return;}
@@ -19071,8 +19191,6 @@ function saveBmLeaveRequest() {
   var rec = {id:buid(),empId:eid,type:type,start:from,from:from,end:to,to:to,days:days,
     note:bgv('bmlv-note'),status:'pending',branchId:s.branchId||'',branchName:s.branchName||'',
     submittedBy:s.entityName||'Branch Manager',createdAt:nowTs};
-  // Single write path: if Firebase available, push there and let listener update BS.tsLeaves
-  // Otherwise, write locally only
   if(db&&s.branchId){
     db.ref('branches/'+s.branchId+'/tsLeaves/'+rec.id).set(rec,function(err){
       if(err){showToast('Submit failed: '+err.message,'error');BS._submittingLeave=false;return;}
@@ -19089,9 +19207,83 @@ function saveBmLeaveRequest() {
   }
 }
 
+function saveBmDayOff() {
+  var s = NX.session||{};
+  if(!s.branchId||!db){showToast('Not connected','error');return;}
+  var empSel = document.getElementById('bmdoff-emp');
+  var eid = empSel ? empSel.value : '';
+  var from = (document.getElementById('bmdoff-date')||{}).value||'';
+  var to = (document.getElementById('bmdoff-date-to')||{}).value||from;
+  var note = (document.getElementById('bmdoff-note')||{}).value||'';
+  if(!eid){showToast('Select an employee','error');return;}
+  if(!from){showToast('Select a date','error');return;}
+  if(to && to < from){showToast('End date must be on or after start date','error');return;}
+  if(!to) to = from;
+  var emp = BS.tsEmps.find(function(e){return e.id===eid;})||{};
+  var empName = emp.name||'';
+  var sap = emp.sap||'';
+  var days = Math.max(1, Math.ceil((new Date(to+'T00:00:00')-new Date(from+'T00:00:00'))/86400000)+1);
+  var nowTs = Date.now();
+  var id = nowTs.toString(36)+Math.random().toString(36).slice(2,6);
+  var rec = {
+    id:id, empId:eid, empName:empName, sap:sap,
+    type:'dayoff', from:from, to:to, start:from, end:to, days:days,
+    note:note.trim(), status:'approved', grantedByBM:true,
+    branchId:s.branchId, branchName:s.branchName||'',
+    submittedBy:s.entityName||s.name||'Branch Manager',
+    approvedAt:nowTs, createdAt:nowTs
+  };
+  // Write to branch tsLeaves
+  db.ref('branches/'+s.branchId+'/tsLeaves/'+id).set(rec, function(err){
+    if(err){showToast('Error: '+err.message,'error');return;}
+    // Mirror to staff/leave/{sap} so the staff portal shows it
+    if(sap){
+      var portalRec = {
+        type:'dayoff', from:from, to:to, days:days,
+        reason:note||'Granted by Branch Manager',
+        status:'approved', date:new Date(nowTs).toISOString(),
+        staffName:empName, branchId:s.branchId, sap:sap,
+        grantedByBM:true, bmRef:id
+      };
+      db.ref('staff/leave/'+sap+'/'+id).set(portalRec, function(e2){
+        if(e2) console.warn('staff/leave mirror failed:', e2.message);
+      });
+    }
+    showToast('Day off granted to '+empName+' \u2713','success');
+    BS._bmLeaveMainTab = 'dayoff';
+    navTo('bm-leave');
+  });
+}
+
+function bmDeleteDayOff(id) {
+  if(!id) return;
+  var s = NX.session||{};
+  if(!s.branchId||!db) return;
+  openModal('Delete Day Off', '<p style="font-size:14px;color:var(--text-secondary)">Remove this granted day off? The staff member will no longer see it.</p>',
+    function(){
+      // Find record to get sap for mirror delete
+      db.ref('branches/'+s.branchId+'/tsLeaves/'+id).once('value', function(snap){
+        var rec = snap.val();
+        snap.ref.remove(function(err){
+          if(err){showToast('Error: '+err.message,'error');return;}
+          // Remove from staff portal mirror
+          if(rec && rec.sap){
+            db.ref('staff/leave/'+rec.sap+'/'+id).remove();
+          }
+          showToast('Deleted \u2713','success');
+          navTo('bm-leave');
+        });
+      });
+    },{yesLabel:'Delete',yesDanger:true});
+}
+
 function bmApproveLeave(id) {
   var l = BS.tsLeaves.find(function(x){return x.id===id;});
   if(!l)return;
+  if(db&&(NX.session||{}).branchId){
+    db.ref('branches/'+(NX.session.branchId)+'/tsLeaves/'+id+'/status').set('approved');
+    db.ref('branches/'+(NX.session.branchId)+'/tsLeaves/'+id+'/approvedAt').set(Date.now());
+  }
   l.status='approved';l.approvedAt=Date.now();
   bSaveColl('tsLeaves',BS.tsLeaves);
   bmUpdateBadges();
@@ -19102,6 +19294,9 @@ function bmApproveLeave(id) {
 function bmRejectLeave(id) {
   var l = BS.tsLeaves.find(function(x){return x.id===id;});
   if(!l)return;
+  if(db&&(NX.session||{}).branchId){
+    db.ref('branches/'+(NX.session.branchId)+'/tsLeaves/'+id+'/status').set('rejected');
+  }
   l.status='rejected';
   bSaveColl('tsLeaves',BS.tsLeaves);
   bmUpdateBadges();

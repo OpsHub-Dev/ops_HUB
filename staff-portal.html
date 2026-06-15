@@ -2343,31 +2343,60 @@ function renderLeave() {
   if (lt && !lt.value) lt.value = today;
 
   function doRenderLeave(quota) {
-    // Load leave history from Firebase
-    db.ref('staff/leave/' + u.sap).once('value', function(snap) {
-      var leaves = [];
-      snap.forEach(function(c) { leaves.unshift(Object.assign({_key:c.key},c.val())); });
-      var taken = 0, pending = 0;
+    // Load self-submitted leave from staff/leave/{sap}
+    // AND BM-granted day-offs from branches/{branchId}/tsLeaves
+    var selfLeaves = [], bmLeaves = [], pending2 = 2;
+    function mergeAndRender() {
+      pending2--;
+      if (pending2 > 0) return;
+      // Skip BM-granted records already mirrored in selfLeaves via bmRef
+      var bmRefIds = {};
+      selfLeaves.forEach(function(l){ if(l.bmRef) bmRefIds[l.bmRef]=1; });
+      var extraBm = bmLeaves.filter(function(l){ return !bmRefIds[l.id]; });
+      var leaves = selfLeaves.concat(extraBm).sort(function(a,b){ return (b.from||b.date||'').localeCompare(a.from||a.date||''); });
+      var taken = 0, pendingCount = 0;
       leaves.forEach(function(l) {
         if (l.type === 'annual' && l.status !== 'rejected') taken += (l.days||0);
-        if (l.status === 'pending') pending++;
+        if (l.status === 'pending') pendingCount++;
       });
       var bal = quota - taken;
       document.getElementById('leave-kpi').innerHTML =
         '<div class="kpi" style="--kc:var(--primary)"><div class="kpi-l">Balance</div><div class="kpi-v">' + bal + '</div><div class="kpi-s">Annual days left</div></div>' +
         '<div class="kpi" style="--kc:var(--warning)"><div class="kpi-l">Taken</div><div class="kpi-v">' + taken + '</div><div class="kpi-s">Days used</div></div>' +
-        '<div class="kpi" style="--kc:var(--success)"><div class="kpi-l">Pending</div><div class="kpi-v">' + pending + '</div><div class="kpi-s">Requests</div></div>';
+        '<div class="kpi" style="--kc:var(--success)"><div class="kpi-l">Pending</div><div class="kpi-v">' + pendingCount + '</div><div class="kpi-s">Requests</div></div>';
       var el = document.getElementById('lt-bal'); if (el) el.textContent = bal + ' left';
       var sc = { approved: 'bg-g', pending: 'bg-a', rejected: 'bg-r' };
-      var ti = { annual: '🏖️', sick: '🤒', emergency: '🚨', dayoff: '☀️', unpaid: '📋', training: '📚' };
+      var ti = { annual: '\uD83C\uDFD6', sick: '\uD83E\uDD12', emergency: '\uD83D\uDEA8', dayoff: '\u2600', unpaid: '\uD83D\uDCCB', training: '\uD83D\uDCDA', ot: '\u23F1' };
       document.getElementById('lv-history').innerHTML = leaves.length ? leaves.map(function(l) {
-        return '<tr><td><span class="badge bg-t">' + (ti[l.type]||'📋') + ' ' + l.type + '</span></td>' +
-          '<td>' + new Date(l.from + 'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short'}) + '</td>' +
-          '<td>' + new Date(l.to + 'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short'}) + '</td>' +
-          '<td style="font-family:var(--mono)">' + l.days + 'd</td>' +
+        var isBmGranted = !!(l.grantedByBM);
+        var srcTag = isBmGranted ? '<span style="font-size:9px;background:rgba(3,105,161,.1);color:#0369a1;border:1px solid rgba(3,105,161,.2);border-radius:4px;padding:1px 5px;font-family:var(--mono);font-weight:700;margin-left:4px">BM</span>' : '';
+        var fromFmt = l.from ? new Date(l.from + 'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short'}) : '\u2014';
+        var toFmt = l.to ? new Date(l.to + 'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short'}) : fromFmt;
+        return '<tr>' +
+          '<td><span class="badge bg-t">' + (ti[l.type]||'\uD83D\uDCCB') + ' ' + (l.type||'leave') + '</span>' + srcTag + '</td>' +
+          '<td>' + fromFmt + '</td>' +
+          '<td>' + toFmt + '</td>' +
+          '<td style="font-family:var(--mono)">' + (l.days||1) + 'd</td>' +
           '<td><span class="badge ' + (sc[l.status]||'bg-a') + '">' + (l.status||'pending') + '</span></td></tr>';
       }).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:16px">No leave requests yet</td></tr>';
-    });
+    }
+    // 1. Self-submitted leave
+    db.ref('staff/leave/' + u.sap).once('value', function(snap) {
+      snap.forEach(function(c) { selfLeaves.unshift(Object.assign({_key:c.key}, c.val())); });
+      mergeAndRender();
+    }, function(){ mergeAndRender(); });
+    // 2. BM-granted day-offs from branch tsLeaves (filtered by sap or empId)
+    if (u.branchId && (u.sap || u.staffId)) {
+      db.ref('branches/'+u.branchId+'/tsLeaves').limitToLast(100).once('value', function(snap2){
+        snap2.forEach(function(c){
+          var l = c.val();
+          if (l && l.grantedByBM && (String(l.sap||'')===String(u.sap||'') || String(l.empId||'')===String(u.staffId||u.sap||''))) {
+            bmLeaves.push(l);
+          }
+        });
+        mergeAndRender();
+      }, function(){ mergeAndRender(); });
+    } else { pending2--; mergeAndRender(); }
   }
 
   // Fetch leave quota from staff record (same logic as dashboard)
