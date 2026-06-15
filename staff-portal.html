@@ -487,6 +487,7 @@ textarea.fi{resize:vertical;min-height:80px}
           <div class="card"><div class="ctitle"><div class="cdot" style="background:var(--primary)"></div>Today's Briefing</div><div id="dash-briefing-preview"><div style="text-align:center;padding:16px;color:var(--text3);font-size:11px;font-family:var(--mono)">Loading…</div></div></div>
           <div class="card"><div class="ctitle"><div class="cdot"></div>Today's Shift</div><div id="today-shift"></div></div>
           <div id="dash-floor-map"></div>
+          <div id="dash-id-quick"></div>
           <div id="dash-ann-preview"></div>
           <div id="dash-doc-preview"></div>
         </div>
@@ -2343,13 +2344,12 @@ function renderLeave() {
   if (lt && !lt.value) lt.value = today;
 
   function doRenderLeave(quota) {
-    // Load self-submitted leave from staff/leave/{sap}
-    // AND BM-granted day-offs from branches/{branchId}/tsLeaves
+    // Load self-submitted leave AND BM-granted day-offs, then merge
     var selfLeaves = [], bmLeaves = [], pending2 = 2;
     function mergeAndRender() {
       pending2--;
       if (pending2 > 0) return;
-      // Skip BM-granted records already mirrored in selfLeaves via bmRef
+      // Skip BM records already mirrored via bmRef
       var bmRefIds = {};
       selfLeaves.forEach(function(l){ if(l.bmRef) bmRefIds[l.bmRef]=1; });
       var extraBm = bmLeaves.filter(function(l){ return !bmRefIds[l.id]; });
@@ -2371,21 +2371,20 @@ function renderLeave() {
         var isBmGranted = !!(l.grantedByBM);
         var srcTag = isBmGranted ? '<span style="font-size:9px;background:rgba(3,105,161,.1);color:#0369a1;border:1px solid rgba(3,105,161,.2);border-radius:4px;padding:1px 5px;font-family:var(--mono);font-weight:700;margin-left:4px">BM</span>' : '';
         var fromFmt = l.from ? new Date(l.from + 'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short'}) : '\u2014';
-        var toFmt = l.to ? new Date(l.to + 'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short'}) : fromFmt;
+        var toFmt   = l.to   ? new Date(l.to   + 'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short'}) : fromFmt;
         return '<tr>' +
           '<td><span class="badge bg-t">' + (ti[l.type]||'\uD83D\uDCCB') + ' ' + (l.type||'leave') + '</span>' + srcTag + '</td>' +
-          '<td>' + fromFmt + '</td>' +
-          '<td>' + toFmt + '</td>' +
+          '<td>' + fromFmt + '</td><td>' + toFmt + '</td>' +
           '<td style="font-family:var(--mono)">' + (l.days||1) + 'd</td>' +
           '<td><span class="badge ' + (sc[l.status]||'bg-a') + '">' + (l.status||'pending') + '</span></td></tr>';
       }).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:16px">No leave requests yet</td></tr>';
     }
-    // 1. Self-submitted leave
+    // 1. Self-submitted
     db.ref('staff/leave/' + u.sap).once('value', function(snap) {
       snap.forEach(function(c) { selfLeaves.unshift(Object.assign({_key:c.key}, c.val())); });
       mergeAndRender();
     }, function(){ mergeAndRender(); });
-    // 2. BM-granted day-offs from branch tsLeaves (filtered by sap or empId)
+    // 2. BM-granted day-offs from branch tsLeaves
     if (u.branchId && (u.sap || u.staffId)) {
       db.ref('branches/'+u.branchId+'/tsLeaves').limitToLast(100).once('value', function(snap2){
         snap2.forEach(function(c){
@@ -2398,6 +2397,7 @@ function renderLeave() {
       }, function(){ mergeAndRender(); });
     } else { pending2--; mergeAndRender(); }
   }
+
 
   // Fetch leave quota from staff record (same logic as dashboard)
   if (u.branchId) {
@@ -3973,6 +3973,68 @@ function renderDashFloorMap() {
     h += '</div>';
     el.innerHTML = h;
   }, function() { el.innerHTML=''; });
+}
+
+function renderDashIdQuick() {
+  var el = document.getElementById('dash-id-quick');
+  if (!el || !CU || !CU.branchId) return;
+  var u = CU;
+  el.innerHTML = '<div style="text-align:center;padding:12px;color:var(--text3);font-size:11px;font-family:var(--mono)">&#x23F3; Loading ID...</div>';
+  var staffData = null, healthData = null, pending = 2;
+  function tryRender() {
+    pending--;
+    if (pending > 0) return;
+    var now = new Date();
+    var emp = null;
+    if (staffData) {
+      var emps = Array.isArray(staffData) ? staffData.filter(Boolean) : Object.values(staffData).filter(Boolean);
+      emp = emps.find(function(e){ return e && (String(e.id)===String(u.staffId||'') || String(e.sap||'')===String(u.sap||'') || (u.name&&e.name&&e.name.toLowerCase()===u.name.toLowerCase())); });
+    }
+    var hcard = null;
+    if (healthData) {
+      var hcards = Array.isArray(healthData) ? healthData.filter(Boolean) : Object.values(healthData).filter(Boolean);
+      hcard = hcards.find(function(h){ return h && (String(h.sap||'')===String(u.sap||'') || (u.name&&h.name&&h.name.toLowerCase()===u.name.toLowerCase())); });
+    }
+    function statusPill(expiry) {
+      if (!expiry) return '<span style="font-size:9px;font-weight:700;color:var(--text3);font-family:var(--mono)">N/A</span>';
+      var d = new Date(expiry + 'T00:00:00');
+      var days = Math.ceil((d - now) / 86400000);
+      var col = days < 0 ? '#c0392b' : days <= 14 ? '#c0392b' : days <= 30 ? '#b45309' : '#00875a';
+      var lbl = days < 0 ? 'EXPIRED' : days <= 30 ? days + 'd' : 'OK';
+      return '<span style="font-size:9px;font-weight:700;color:'+col+';background:'+col+'18;border-radius:4px;padding:2px 5px;font-family:var(--mono)">'+lbl+'</span>';
+    }
+    var h = '<div class="card" style="margin-bottom:14px">';
+    h += '<div class="ctitle" style="margin-bottom:10px">';
+    h += '<div class="cdot" style="background:var(--primary)"></div>';
+    h += '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M7 9h.5M7 12h.5M7 15h.5M11 9h6M11 12h4M11 15h3"/></svg>';
+    h += ' My ID &amp; Documents</div>';
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">';
+    h += '<div style="background:rgba(0,102,102,.06);border-radius:10px;padding:10px 12px">';
+    h += '<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:3px">SAP #</div>';
+    h += '<div style="font-size:15px;font-weight:700;color:var(--primary);font-family:var(--mono)">'+escH(u.sap||u.staffId||'\u2014')+'</div>';
+    h += '</div>';
+    h += '<div style="background:rgba(0,102,102,.06);border-radius:10px;padding:10px 12px">';
+    h += '<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:3px">Staff ID</div>';
+    h += '<div style="font-size:15px;font-weight:700;color:var(--primary);font-family:var(--mono)">'+escH(u.staffId||u.sap||'\u2014')+'</div>';
+    h += '</div></div>';
+    h += '<div style="display:flex;flex-direction:column;gap:6px">';
+    // Health Card row
+    h += '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--body-bg,#E7E5E4);border-radius:10px;box-shadow:2px 2px 5px rgba(0,0,0,.07),-1px -1px 4px rgba(255,255,255,.8)">';
+    h += '<div style="display:flex;align-items:center;gap:8px"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><line x1="6" y1="15" x2="9" y2="15"/><line x1="12" y1="15" x2="16" y2="15"/></svg><span style="font-size:12px;font-weight:600;color:var(--text)">Health Card</span></div>';
+    h += statusPill(hcard ? hcard.medExp||'' : '') + '</div>';
+    // Iqama row
+    h += '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--body-bg,#E7E5E4);border-radius:10px;box-shadow:2px 2px 5px rgba(0,0,0,.07),-1px -1px 4px rgba(255,255,255,.8)">';
+    h += '<div style="display:flex;align-items:center;gap:8px"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="11" r="2.5"/><path d="M14 9h4M14 12h3M9 16h10"/></svg><span style="font-size:12px;font-weight:600;color:var(--text)">Iqama</span></div>';
+    h += statusPill(emp ? emp.iqamaExpiry||'' : '') + '</div>';
+    // Passport row
+    h += '<div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:var(--body-bg,#E7E5E4);border-radius:10px;box-shadow:2px 2px 5px rgba(0,0,0,.07),-1px -1px 4px rgba(255,255,255,.8)">';
+    h += '<div style="display:flex;align-items:center;gap:8px"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><circle cx="12" cy="11" r="3"/><path d="M8 18h8M8 6h8"/></svg><span style="font-size:12px;font-weight:600;color:var(--text)">Passport</span></div>';
+    h += statusPill(emp ? emp.passportExpiry||'' : '') + '</div>';
+    h += '</div></div>';
+    el.innerHTML = h;
+  }
+  db.ref('branches/'+u.branchId+'/staff').once('value', function(s){ staffData=s.val()||{}; tryRender(); }, function(){ tryRender(); });
+  db.ref('branches/'+u.branchId+'/health').once('value', function(s){ healthData=s.val()||{}; tryRender(); }, function(){ tryRender(); });
 }
 
 function renderDashAnnPreview() {
