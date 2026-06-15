@@ -9898,7 +9898,7 @@ function pStaff() {
     }
     rows+='<tr data-name="'+bxe((m.name||'').toLowerCase())+'" data-role="'+bxe((m.role||'').toLowerCase())+'" data-sap="'+bxe((m.sap||'').toLowerCase())+'"><td><div style="display:flex;align-items:center;gap:10px"><div class="bav">'+bini(m.name)+'</div><div><div style="font-weight:600;font-size:12px">'+bxe(m.name)+'</div><div style="font-size:10px;color:var(--text-tertiary)">'+bxe(m.role||'No role')+'</div></div></div></td><td>'+bpl(m.dept||'\u2014',bdc(m.dept||'FOH'))+'</td><td class="bmono" style="color:'+shCol+';font-size:12px;font-weight:600">'+bxe(todayShift)+'</td><td>'+bpl(m.status,sc)+'</td><td class="bmono" style="color:var(--text-tertiary);font-size:11px">'+bxe(m.sap||'\u2014')+'</td><td style="font-size:11px">'+(m.phone?'<a href="tel:'+bxe(m.phone)+'" style="color:var(--ceo);text-decoration:none">'+bxe(m.phone)+'</a>':'<span style="color:var(--text-tertiary)">\u2014</span>')+'</td><td>'+actionsHtml+'</td></tr>';
   });
-  var h='<div style="background:var(--body-bg,#E7E5E4);border-radius:12px;box-shadow:inset 2px 2px 6px rgba(0,0,0,.08),inset -2px -2px 5px rgba(255,255,255,.8);padding:8px 12px;margin-bottom:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">';  h+='<div style="position:relative;flex:1;min-width:180px">';  h+='<span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-tertiary);pointer-events:none"><svg viewBox=\'0 0 24 24\' width=\'13\' height=\'13\' fill=\'none\' stroke=\'currentColor\' stroke-width=\'1.6\' stroke-linecap=\'round\' stroke-linejoin=\'round\'><circle cx=\'11\' cy=\'11\' r=\'7\'/><line x1=\'16.5\' y1=\'16.5\' x2=\'21\' y2=\'21\'/></svg></span>';  h+='<input class="bfi" id="bstaff-search" placeholder="Search by name, role, SAP…" value="'+bxe(BS.q||'')+'" style="padding-left:32px;width:100%;box-sizing:border-box;font-size:12px">';  h+='</div>';  h+='<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span style="font-size:9px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.14em">DEPT</span>'+dbt+'</div>';
+  var h='<div style="background:var(--body-bg,#E7E5E4);border-radius:12px;box-shadow:inset 2px 2px 6px rgba(0,0,0,.08),inset -2px -2px 5px rgba(255,255,255,.8);padding:8px 12px;margin-bottom:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">';  h+='<div style="position:relative;flex:1;min-width:180px">';  h+='<span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-tertiary);pointer-events:none"><svg viewBox=\'0 0 24 24\' width=\'13\' height=\'13\' fill=\'none\' stroke=\'currentColor\' stroke-width=\'1.6\' stroke-linecap=\'round\' stroke-linejoin=\'round\'><circle cx=\'11\' cy=\'11\' r=\'7\'/><line x1=\'16.5\' y1=\'16.5\' x2=\'21\' y2=\'21\'/></svg></span>';  h+='<input class="bfi" id="bstaff-search" placeholder="Search by name, role, SAP\u2026" value="'+bxe(BS.q||'')+'" style="padding-left:32px;width:100%;box-sizing:border-box;font-size:12px">';  h+='</div>';  h+='<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span style="font-size:9px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.14em">DEPT</span>'+dbt+'</div>';
   h+='<select class="bfi" style="width:auto" id="bstaff-rf"><option value="All">All Roles</option>'+ROLES.map(function(r){return '<option value="'+bxe(r)+'"'+(BS._roleFilter===r?' selected':'')+'>'+bxe(r)+'</option>';}).join('')+'</select>';
   h+='<button class="btn btn-sm" onclick="BS.q=\'\';BS._roleFilter=\'All\';navTo(\'staff\')">&#x2715; Clear</button></div>';
   h+='<div class="bgrid-4" style="margin-bottom:14px"><div class="bsc"><div class="bsc-lbl">Total</div><div class="bsc-val bca">'+BS.staff.length+'</div></div><div class="bsc"><div class="bsc-lbl">Active</div><div class="bsc-val bcg">'+act+'</div></div><div class="bsc"><div class="bsc-lbl">On Leave</div><div class="bsc-val bcr">'+lv+'</div></div><div class="bsc"><div class="bsc-lbl">Other</div><div class="bsc-val" style="color:var(--text-secondary)">'+oth+'</div></div></div>';
@@ -13019,70 +13019,64 @@ function pBmBriefing() {
       });
     }
   } else if(tab==='floor-map') {
-    // ── FLOOR MAP TAB ─────────────────────────────────────────────────────────
-    // FOH staff only (dept contains FOH / Waiter / Captain / Server / Host)
+    // FLOOR MAP TAB - Group/Section based
     var FOH_KEYWORDS = ['foh','waiter','waitress','captain','server','host','service','cashier','runner'];
     var fohStaff = (BS.staff||[]).filter(function(m){
       if(!m||!m.name) return false;
       var dept = (m.dept||m.position||m.role||'').toLowerCase();
       return FOH_KEYWORDS.some(function(kw){ return dept.indexOf(kw)!=-1; });
     });
-    // If no FOH found, fallback to all staff
     if(!fohStaff.length) fohStaff = (BS.staff||[]).filter(function(m){ return m&&m.name; });
-
-    var fohOpts = '<option value="">— Unassigned —</option>';
-    fohStaff.slice().sort(function(a,b){return (a.name||'').localeCompare(b.name||'');}).forEach(function(m){
-      fohOpts += '<option value="'+bxe(m.name||'')+'" data-sap="'+bxe(String(m.sap||m.id||''))+'">'+bxe(m.name||'')+'</option>';
-    });
+    if(!BS._fmTables) BS._fmTables = [];
+    if(!BS._fmGroups) BS._fmGroups = [];
 
     h += '<div class="bcard" style="margin-bottom:14px">';
-    // Controls bar
-    h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">';
-    h += '<span style="font-size:13px;font-weight:700;color:var(--text-primary)">🗺 Restaurant Floor Map</span>';
-    h += '<div style="display:flex;align-items:center;gap:6px;margin-left:auto">';
+    // Controls
+    h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap">';
+    h += '<span style="font-size:13px;font-weight:700;color:var(--text-primary)">&#x1F5FA; Restaurant Floor Map</span>';
+    h += '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-left:auto">';
     h += '<button class="btn btn-sm" onclick="bmFmAddTable()">+ Add Table</button>';
-    h += '<button class="btn btn-sm" onclick="bmFmClear()">🗑 Clear All</button>';
-    h += '<button class="btn btn-primary" style="padding:7px 16px" onclick="bmFmPublish()">📢 Publish Floor Map</button>';
+    h += '<button class="btn btn-sm" style="color:var(--primary);border-color:rgba(0,102,102,.3)" onclick="bmFmAddGroup()">+ Add Group</button>';
+    h += '<button class="btn btn-sm" onclick="bmFmClear()">&#x1F5D1; Clear All</button>';
+    h += '<button class="btn btn-primary" style="padding:7px 16px" onclick="bmFmPublish()">&#x1F4E2; Publish Floor Map</button>';
     h += '</div></div>';
-
+    // Status banner
+    h += '<div id="fm-status-banner" style="display:none;background:rgba(180,83,9,.07);border:1px solid rgba(180,83,9,.2);border-radius:10px;padding:9px 13px;margin-bottom:12px"></div>';
+    // Groups panel
+    h += '<div style="background:rgba(0,102,102,.04);border:1px solid rgba(0,102,102,.1);border-radius:12px;padding:12px;margin-bottom:14px">';
+    h += '<div style="font-size:11px;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px">';
+    h += '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg> Sections / Groups</div>';
+    h += '<div id="fm-groups-panel"></div>';
+    h += '</div>';
     // Legend
     h += '<div style="display:flex;align-items:center;gap:14px;margin-bottom:12px;flex-wrap:wrap">';
     h += '<div style="display:flex;align-items:center;gap:5px"><div style="width:28px;height:22px;background:rgba(0,102,102,.1);border:2px solid var(--primary);border-radius:6px"></div><span style="font-size:10px;color:var(--text2)">Assigned</span></div>';
     h += '<div style="display:flex;align-items:center;gap:5px"><div style="width:28px;height:22px;background:rgba(0,0,0,.04);border:2px dashed rgba(0,0,0,.2);border-radius:6px"></div><span style="font-size:10px;color:var(--text2)">Empty</span></div>';
-    h += '<span style="font-size:10px;color:var(--text2);margin-left:6px">Showing FOH staff only ('+(fohStaff.length)+' staff)</span>';
+    h += '<span style="font-size:10px;color:var(--text2)">FOH staff only ('+fohStaff.length+' staff)</span>';
     h += '</div>';
-
-    // Floor grid
-    h += '<div id="fm-status-banner" style="display:none;background:rgba(180,83,9,.07);border:1px solid rgba(180,83,9,.2);border-radius:10px;padding:9px 13px;margin-bottom:10px"></div>';
-    h += '<div id="fm-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;min-height:80px"></div>';
-
-    // Bulk assign panel
+    // Table grid
+    h += '<div id="fm-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;min-height:80px"></div>';
+    // Bulk assign
     h += '<div style="background:rgba(0,102,102,.05);border:1px solid rgba(0,102,102,.15);border-radius:12px;padding:12px;margin-top:14px">';
-    h += '<div style="font-size:12px;font-weight:700;color:var(--primary);margin-bottom:10px">⚡ Bulk Assign — Select multiple tables to one server</div>';
+    h += '<div style="font-size:11px;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px">';
+    h += '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> Quick Bulk Assign</div>';
     h += '<div style="display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap">';
-    // Staff select
     h += '<div style="flex:1;min-width:150px"><label style="font-size:10px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">SERVER / STAFF</label>';
-    h += '<select id="fm-bulk-staff" style="width:100%;font-size:12px;padding:6px;border:1px solid rgba(0,0,0,.12);border-radius:8px;background:var(--base);color:var(--text);font-family:var(--font)"><option value="">— Select staff —</option>';
-    (BS._fmFohStaff||[]).forEach(function(m){ h += '<option value="'+bxe(m.name||'')+'">'+bxe(m.name||'')+'</option>'; });
+    h += '<select id="fm-bulk-staff" style="width:100%;font-size:12px;padding:6px;border:1px solid rgba(0,0,0,.12);border-radius:8px;background:var(--base);color:var(--text);font-family:var(--font)"><option value="">\u2014 Select staff \u2014</option>';
+    (BS._fmFohStaff||fohStaff).forEach(function(m){ h += '<option value="'+bxe(m.name||'')+'">'+bxe(m.name||'')+'</option>'; });
     h += '</select></div>';
-    // Multi-select tables
-    h += '<div style="flex:2;min-width:200px"><label style="font-size:10px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">TABLES (hold Ctrl/Cmd for multiple)</label>';
+    h += '<div style="flex:2;min-width:200px"><label style="font-size:10px;font-weight:700;color:var(--text2);display:block;margin-bottom:4px">TABLES (Ctrl/Cmd for multiple)</label>';
     h += '<select id="fm-bulk-tables" multiple size="4" style="width:100%;font-size:12px;padding:4px;border:1px solid rgba(0,0,0,.12);border-radius:8px;background:var(--base);color:var(--text);font-family:var(--font)"></select></div>';
-    // Assign button
     h += '<div style="display:flex;align-items:flex-end"><button class="btn btn-primary" onclick="bmFmBulkAssign()" style="padding:7px 16px;white-space:nowrap">Assign Tables</button></div>';
-    h += '</div></div>';
-    h += '</div>';
-
-    // Today's published floor maps
+    h += '</div></div></div>';
     h += '<div class="btw"><div class="bttb"><strong>Published Floor Maps</strong></div>';
-    h += '<div id="fm-pub-list" style="padding:12px"><div style="text-align:center;color:var(--text-tertiary);font-size:12px;padding:20px">Loading…</div></div></div>';
+    h += '<div id="fm-pub-list" style="padding:12px"><div style="text-align:center;color:var(--text-tertiary);font-size:12px;padding:20px">Loading\u2026</div></div></div>';
 
-    // Store fohOpts for bmFmAddTable
-    BS._fmFohOpts = fohOpts;
-    BS._fmFohStaff = fohStaff;
-    if(!BS._fmTables) BS._fmTables = [];
-    // _fmLoaded controls whether we fetch from Firebase on this tab open
-    // Reset it only if explicitly cleared — otherwise tables persist in memory
+    BS._fmFohOpts = '<option value="">\u2014 Unassigned \u2014</option>';
+    fohStaff.slice().sort(function(a,b){return (a.name||'').localeCompare(b.name||'');}).forEach(function(m){
+      BS._fmFohOpts += '<option value="'+bxe(m.name||'')+'">'+bxe(m.name||'')+'</option>';
+    });
+    BS._fmFohStaff = fohStaff
 
     setTimeout(function(){
       var s2 = NX.session||{};
@@ -13105,13 +13099,11 @@ function pBmBriefing() {
               banner.style.display='';
             }
           }
-          bmFmRenderGrid();
-          bmFmUpdateBulkList();
+          bmFmRenderAll();
           bmFmLoadHistory(s2);
         });
       } else {
-        bmFmRenderGrid();
-        bmFmUpdateBulkList();
+        bmFmRenderAll();
         bmFmLoadHistory(s2);
       }
     }, 80);
@@ -13223,112 +13215,257 @@ function bmBrfCustomTaskRender(){
              branches/{branchId}/latestFloorMap
 ══════════════════════════════════════════════════════ */
 
-function bmFmRenderGrid() {
-  var el = document.getElementById('fm-grid');
-  if (!el) return;
-  var tables = BS._fmTables || [];
-  if (!tables.length) {
-    el.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:32px;color:var(--text-tertiary);font-size:12px">No tables yet. Click <strong>+ Add Table</strong> to start building the floor map.</div>';
-    return;
-  }
-  var h = '';
-  tables.forEach(function(t, i) {
-    var assigned = !!t.staffName;
-    var bg   = assigned ? 'rgba(0,102,102,.1)' : 'var(--base)';
-    var bdr  = assigned ? '2px solid var(--primary)' : '2px dashed rgba(0,0,0,.2)';
-    h += '<div style="background:'+bg+';border:'+bdr+';border-radius:12px;padding:10px;position:relative">';
-    // Header: editable table label + delete
-    h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">';
-    h += '<input type="text" data-i="'+i+'" value="'+bxe(String(t.label||t.num||''))+'" onchange="bmFmEditLabel(+this.dataset.i,this.value)" placeholder="T#" style="width:60px;font-size:13px;font-weight:700;border:none;border-bottom:1.5px solid var(--primary);background:transparent;color:var(--text);font-family:var(--mono);text-align:center;padding:2px 4px;outline:none" title="Click to rename">';
-    h += '<button data-i="'+i+'" onclick="bmFmDelTable(+this.dataset.i)" style="background:none;border:none;color:rgba(0,0,0,.3);cursor:pointer;font-size:15px;padding:0" title="Remove table">×</button>';
-    h += '</div>';
-    // Staff dropdown (FOH only)
-    h += '<select data-i="'+i+'" onchange="bmFmAssign(+this.dataset.i,this.value)" style="width:100%;font-size:11px;padding:5px;border:1px solid rgba(0,0,0,.12);border-radius:8px;background:var(--base);color:var(--text);font-family:var(--font)">';
-    h += '<option value="">— Unassigned —</option>';
-    (BS._fmFohStaff||[]).forEach(function(m) {
-      var sel = t.staffName === (m.name||'') ? ' selected' : '';
-      h += '<option value="'+bxe(m.name||'')+'"'+sel+'>'+bxe(m.name||'')+'</option>';
-    });
-    h += '</select>';
-    if (t.staffName) {
-      h += '<div style="font-size:9px;color:var(--primary);font-weight:700;margin-top:5px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">✓ '+bxe(t.staffName)+'</div>';
-    }
-    h += '</div>';
-  });
-  el.innerHTML = h;
+// ═══════════════════════════════════════════════════════
+// FLOOR MAP TAB — Group-based assignment redesign
+// ═══════════════════════════════════════════════════════
+
+// BS._fmTables  = [{num, label, staffName, group}]   (same shape, + group)
+// BS._fmGroups  = [{id, name, color, staffName}]     (NEW)
+// BS._fmFohStaff / BS._fmFohOpts  (unchanged)
+
+var FM_GROUP_COLORS = [
+  { bg:'rgba(0,102,102,.12)',  border:'#006666', text:'#006666'   },  // teal
+  { bg:'rgba(59,130,246,.1)',  border:'#2563eb', text:'#2563eb'   },  // blue
+  { bg:'rgba(168,85,247,.1)',  border:'#7c3aed', text:'#7c3aed'   },  // purple
+  { bg:'rgba(249,115,22,.1)',  border:'#ea580c', text:'#ea580c'   },  // orange
+  { bg:'rgba(236,72,153,.1)',  border:'#db2777', text:'#db2777'   },  // pink
+  { bg:'rgba(16,185,129,.1)',  border:'#059669', text:'#059669'   },  // green
+  { bg:'rgba(245,158,11,.1)',  border:'#d97706', text:'#d97706'   },  // amber
+  { bg:'rgba(239,68,68,.1)',   border:'#dc2626', text:'#dc2626'   },  // red
+];
+
+function bmFmGetGroupColor(idx) {
+  return FM_GROUP_COLORS[idx % FM_GROUP_COLORS.length];
+}
+
+function bmFmGroupIndex(gid) {
+  var gs = BS._fmGroups || [];
+  for (var i = 0; i < gs.length; i++) if (gs[i].id === gid) return i;
+  return -1;
+}
+
+/* ── Add Group ── */
+function bmFmAddGroup() {
+  if (!BS._fmGroups) BS._fmGroups = [];
+  var id = 'g_' + Date.now().toString(36);
+  var idx = BS._fmGroups.length;
+  BS._fmGroups.push({ id: id, name: 'Section ' + String.fromCharCode(65 + idx), color: idx, staffName: '' });
+  bmFmRenderAll();
+}
+
+/* ── Delete Group (ungroup its tables) ── */
+function bmFmDeleteGroup(gid) {
+  if (!BS._fmGroups) return;
+  openModal('Delete Group', '<p style="font-size:14px;color:var(--text-secondary)">Delete this group? Tables will be ungrouped but not removed.</p>', function () {
+    BS._fmGroups = BS._fmGroups.filter(function (g) { return g.id !== gid; });
+    (BS._fmTables || []).forEach(function (t) { if (t.group === gid) { t.group = ''; t.staffName = ''; } });
+    bmFmRenderAll();
+  }, { yesLabel: 'Delete Group', yesDanger: true });
+}
+
+/* ── Rename Group ── */
+function bmFmRenameGroup(gid, val) {
+  var g = (BS._fmGroups || []).find(function (g) { return g.id === gid; });
+  if (g) g.name = val.trim() || g.name;
+}
+
+/* ── Assign staff to group → propagates to its tables ── */
+function bmFmGroupStaff(gid, staffName) {
+  var g = (BS._fmGroups || []).find(function (g) { return g.id === gid; });
+  if (!g) return;
+  g.staffName = staffName;
+  (BS._fmTables || []).forEach(function (t) { if (t.group === gid) t.staffName = staffName; });
+  bmFmRenderAll();
+}
+
+/* ── Assign table to group ── */
+function bmFmTableGroup(idx, gid) {
+  if (!BS._fmTables || !BS._fmTables[idx]) return;
+  BS._fmTables[idx].group = gid;
+  // inherit staff from group
+  var g = gid ? (BS._fmGroups || []).find(function (g) { return g.id === gid; }) : null;
+  BS._fmTables[idx].staffName = g ? (g.staffName || '') : '';
+  bmFmRenderAll();
+}
+
+/* ── Override individual table staff (overrides group inheritance) ── */
+function bmFmAssign(i, staffName) {
+  if (!BS._fmTables || !BS._fmTables[i]) return;
+  BS._fmTables[i].staffName = staffName || '';
+  bmFmRenderAll();
 }
 
 function bmFmEditLabel(i, val) {
   if (!BS._fmTables || !BS._fmTables[i]) return;
   var v = val.trim() || String(BS._fmTables[i].num);
   BS._fmTables[i].label = v;
-  // Don't re-render (avoids losing focus) — just update visual
-  var bg  = BS._fmTables[i].staffName ? 'rgba(0,102,102,.1)' : 'var(--base)';
-  var bdr = BS._fmTables[i].staffName ? '2px solid var(--primary)' : '2px dashed rgba(0,0,0,.2)';
-  var cell = document.querySelectorAll('#fm-grid > div')[i];
-  if (cell) { cell.style.background = bg; cell.style.border = bdr; }
-}
-
-function bmFmAssign(i, staffName) {
-  if (!BS._fmTables || !BS._fmTables[i]) return;
-  BS._fmTables[i].staffName = staffName || '';
-  bmFmRenderGrid();
-}
-
-function bmFmAddTable() {
-  if (!BS._fmTables) BS._fmTables = [];
-  var nums = BS._fmTables.map(function(t){ return +(t.num||0); }).filter(Boolean);
-  var next = nums.length ? Math.max.apply(null, nums) + 1 : 1;
-  BS._fmTables.push({ num: next, label: String(next), staffName: '' });
-  bmFmRenderGrid();
+  // Update bulk list
+  bmFmUpdateBulkList();
 }
 
 function bmFmDelTable(i) {
   if (!BS._fmTables) return;
   BS._fmTables.splice(i, 1);
-  bmFmRenderGrid();
+  bmFmRenderAll();
+}
+
+function bmFmAddTable() {
+  if (!BS._fmTables) BS._fmTables = [];
+  var nums = BS._fmTables.map(function (t) { return +(t.num || 0); }).filter(Boolean);
+  var next = nums.length ? Math.max.apply(null, nums) + 1 : 1;
+  BS._fmTables.push({ num: next, label: String(next), staffName: '', group: '' });
+  bmFmRenderAll();
 }
 
 function bmFmClear() {
-  nxConfirm('Clear all tables from the floor map?', function() {
+  nxConfirm('Clear all tables and groups from the floor map?', function () {
     BS._fmTables = [];
+    BS._fmGroups = [];
     BS._fmPushKey = null;
     BS._fmPushDate = null;
     var banner = document.getElementById('fm-status-banner');
-    if (banner) banner.style.display='none';
-    bmFmRenderGrid();
-    bmFmUpdateBulkList();
+    if (banner) banner.style.display = 'none';
+    bmFmRenderAll();
   }, { yesLabel: 'Clear All' });
 }
 
-/* ── Bulk-assign: assign selected tables to one server ── */
+/* ════ MAIN RENDER ════════════════════════════════════════ */
+function bmFmRenderAll() {
+  bmFmRenderGroups();
+  bmFmRenderGrid();
+  bmFmUpdateBulkList();
+}
+
+/* ── Groups panel ── */
+function bmFmRenderGroups() {
+  var el = document.getElementById('fm-groups-panel');
+  if (!el) return;
+  var groups = BS._fmGroups || [];
+  var fohStaff = BS._fmFohStaff || [];
+
+  if (!groups.length) {
+    el.innerHTML = '<div style="font-size:11px;color:var(--text-tertiary);padding:8px 0;font-style:italic">No groups yet. Click <strong>+ Add Group</strong> to create sections.</div>';
+    return;
+  }
+
+  var h = '';
+  groups.forEach(function (g, gi) {
+    var col = bmFmGetGroupColor(g.color !== undefined ? g.color : gi);
+    var tableCount = (BS._fmTables || []).filter(function (t) { return t.group === g.id; }).length;
+
+    h += '<div style="background:' + col.bg + ';border:1.5px solid ' + col.border + ';border-radius:12px;padding:10px 12px;margin-bottom:8px">';
+    h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
+    // Color dot + editable name
+    h += '<div style="width:10px;height:10px;border-radius:50%;background:' + col.border + ';flex-shrink:0"></div>';
+    h += '<input type="text" value="' + bxe(g.name) + '" data-gid="' + bxe(g.id) + '" onchange="bmFmRenameGroup(this.dataset.gid,this.value)" style="font-size:12px;font-weight:700;border:none;border-bottom:1.5px solid ' + col.border + ';background:transparent;color:' + col.text + ';font-family:var(--font);padding:2px 4px;width:120px;outline:none">';
+    h += '<span style="font-size:10px;color:var(--text-tertiary);white-space:nowrap">' + tableCount + ' table' + (tableCount !== 1 ? 's' : '') + '</span>';
+
+    // Staff dropdown for group
+    h += '<select data-gid="' + bxe(g.id) + '" onchange="bmFmGroupStaff(this.dataset.gid,this.value)" style="font-size:11px;padding:4px 6px;border:1px solid ' + col.border + ';border-radius:7px;background:var(--base);color:var(--text);font-family:var(--font);flex:1;min-width:120px;max-width:200px">';
+    h += '<option value="">— Unassigned —</option>';
+    fohStaff.forEach(function (m) {
+      var sel = g.staffName === (m.name || '') ? ' selected' : '';
+      h += '<option value="' + bxe(m.name || '') + '"' + sel + '>' + bxe(m.name || '') + '</option>';
+    });
+    h += '</select>';
+
+    if (g.staffName) {
+      h += '<span style="font-size:10px;font-weight:700;color:' + col.text + ';white-space:nowrap">✓ ' + bxe(g.staffName) + '</span>';
+    }
+
+    h += '<button data-gid="' + bxe(g.id) + '" onclick="bmFmDeleteGroup(this.dataset.gid)" style="background:none;border:none;color:rgba(0,0,0,.3);cursor:pointer;font-size:16px;padding:0;margin-left:auto" title="Delete group">×</button>';
+    h += '</div></div>';
+  });
+
+  el.innerHTML = h;
+}
+
+/* ── Table grid ── */
+function bmFmRenderGrid() {
+  var el = document.getElementById('fm-grid');
+  if (!el) return;
+  var tables = BS._fmTables || [];
+  var groups = BS._fmGroups || [];
+  var fohStaff = BS._fmFohStaff || [];
+
+  if (!tables.length) {
+    el.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:32px;color:var(--text-tertiary);font-size:12px">No tables yet. Click <strong>+ Add Table</strong> to start building the floor map.</div>';
+    return;
+  }
+
+  var h = '';
+  tables.forEach(function (t, i) {
+    var grp = t.group ? groups.find(function (g) { return g.id === t.group; }) : null;
+    var col = grp ? bmFmGetGroupColor(grp.color !== undefined ? grp.color : groups.indexOf(grp)) : null;
+    var assigned = !!t.staffName;
+    var bg   = col ? col.bg   : (assigned ? 'rgba(0,102,102,.1)' : 'var(--base)');
+    var bdr  = col ? ('1.5px solid ' + col.border) : (assigned ? '2px solid var(--primary)' : '2px dashed rgba(0,0,0,.2)');
+    var textCol = col ? col.text : 'var(--primary)';
+
+    h += '<div style="background:' + bg + ';border:' + bdr + ';border-radius:12px;padding:10px;position:relative">';
+
+    // Header: editable label + delete
+    h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">';
+    h += '<input type="text" data-i="' + i + '" value="' + bxe(String(t.label || t.num || '')) + '" onchange="bmFmEditLabel(+this.dataset.i,this.value)" placeholder="T#" style="width:60px;font-size:13px;font-weight:700;border:none;border-bottom:1.5px solid ' + textCol + ';background:transparent;color:var(--text);font-family:var(--mono);text-align:center;padding:2px 4px;outline:none" title="Click to rename">';
+    h += '<button data-i="' + i + '" onclick="bmFmDelTable(+this.dataset.i)" style="background:none;border:none;color:rgba(0,0,0,.3);cursor:pointer;font-size:15px;padding:0" title="Remove">×</button>';
+    h += '</div>';
+
+    // Group selector
+    h += '<div style="margin-bottom:6px">';
+    h += '<select data-i="' + i + '" onchange="bmFmTableGroup(+this.dataset.i,this.value)" style="width:100%;font-size:10px;padding:4px 5px;border:1px solid rgba(0,0,0,.12);border-radius:6px;background:var(--base);color:var(--text-secondary);font-family:var(--font)">';
+    h += '<option value="">No group</option>';
+    groups.forEach(function (g) {
+      var sel = t.group === g.id ? ' selected' : '';
+      h += '<option value="' + bxe(g.id) + '"' + sel + '>' + bxe(g.name) + '</option>';
+    });
+    h += '</select></div>';
+
+    // Staff override dropdown
+    h += '<select data-i="' + i + '" onchange="bmFmAssign(+this.dataset.i,this.value)" style="width:100%;font-size:11px;padding:5px;border:1px solid rgba(0,0,0,.12);border-radius:8px;background:var(--base);color:var(--text);font-family:var(--font)">';
+    h += '<option value="">— Unassigned —</option>';
+    fohStaff.forEach(function (m) {
+      var sel = t.staffName === (m.name || '') ? ' selected' : '';
+      h += '<option value="' + bxe(m.name || '') + '"' + sel + '>' + bxe(m.name || '') + '</option>';
+    });
+    h += '</select>';
+
+    if (t.staffName) {
+      h += '<div style="font-size:9px;color:' + textCol + ';font-weight:700;margin-top:5px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">✓ ' + bxe(t.staffName) + '</div>';
+    }
+    if (grp) {
+      h += '<div style="font-size:8px;color:' + textCol + ';text-align:center;margin-top:2px;opacity:.7">' + bxe(grp.name) + '</div>';
+    }
+
+    h += '</div>';
+  });
+
+  el.innerHTML = h;
+}
+
+/* ── Bulk assign ── */
 function bmFmBulkAssign() {
   var staffSel = document.getElementById('fm-bulk-staff');
   var tblSel   = document.getElementById('fm-bulk-tables');
   if (!staffSel || !tblSel) return;
   var staffName = staffSel.value;
   if (!staffName) { showToast('Select a staff member', 'error'); return; }
-  var selected = Array.from(tblSel.selectedOptions).map(function(o){ return +o.value; });
+  var selected = Array.from(tblSel.selectedOptions).map(function (o) { return +o.value; });
   if (!selected.length) { showToast('Select at least one table', 'error'); return; }
-  selected.forEach(function(idx) {
-    if (BS._fmTables[idx]) BS._fmTables[idx].staffName = staffName;
-  });
-  bmFmRenderGrid();
-  bmFmUpdateBulkList();
-  showToast('Assigned '+selected.length+' table(s) to '+staffName, 'success');
+  selected.forEach(function (idx) { if (BS._fmTables[idx]) BS._fmTables[idx].staffName = staffName; });
+  bmFmRenderAll();
+  showToast('Assigned ' + selected.length + ' table(s) to ' + staffName, 'success');
 }
 
 function bmFmUpdateBulkList() {
-  // Refresh the multi-select list to show current labels
   var tblSel = document.getElementById('fm-bulk-tables');
   if (!tblSel) return;
-  var prev = Array.from(tblSel.selectedOptions).map(function(o){ return o.value; });
+  var prev = Array.from(tblSel.selectedOptions).map(function (o) { return o.value; });
   tblSel.innerHTML = '';
-  (BS._fmTables||[]).forEach(function(t, i) {
+  (BS._fmTables || []).forEach(function (t, i) {
     var opt = document.createElement('option');
     opt.value = i;
-    var lbl = 'Table '+(t.label||t.num);
-    if (t.staffName) lbl += ' ✓ '+t.staffName;
+    var lbl = 'Table ' + (t.label || t.num);
+    if (t.staffName) lbl += ' ✓ ' + t.staffName;
     opt.textContent = lbl;
     if (prev.indexOf(String(i)) !== -1) opt.selected = true;
     tblSel.appendChild(opt);
@@ -13352,24 +13489,41 @@ function bmFmLoadHistory(s2) {
       entries.forEach(function(entry){
         var pushKey = entry[0], m = entry[1];
         var tables = m.tables||[];
+        var groups = m.groups||[];
         var dt = m.ts ? new Date(m.ts).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : d;
         var isActive = BS._fmPushKey === pushKey;
         h2 += '<div style="border-bottom:1px solid var(--border);padding:10px 0">';
         h2 += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">';
-        h2 += '<span style="font-size:12px;font-weight:700;color:var(--text-primary)">'+xe(dt)+'</span>';
-        h2 += '<span style="font-size:10px;color:var(--text-tertiary)">by '+xe(m.by||'Manager')+'</span>';
+        h2 += '<span style="font-size:12px;font-weight:700;color:var(--text-primary)">'+bxe(dt)+'</span>';
+        h2 += '<span style="font-size:10px;color:var(--text-tertiary)">by '+bxe(m.by||'Manager')+'</span>';
+        if (groups.length) h2 += '<span style="font-size:10px;color:var(--text-tertiary)">· '+groups.length+' group'+( groups.length!==1?'s':'')+'</span>';
         if (isActive) h2 += '<span style="background:rgba(0,102,102,.12);color:var(--primary);font-size:9px;font-weight:700;border-radius:4px;padding:2px 7px;font-family:var(--mono)">ACTIVE</span>';
         h2 += '<div style="margin-left:auto;display:flex;gap:5px">';
         h2 += '<button class="btn btn-sm" data-d="'+bxe(d)+'" data-k="'+bxe(pushKey)+'" onclick="bmFmLoadIntoEditor(this.dataset.d,this.dataset.k)">✏️ Edit</button>';
         h2 += '<button class="btn btn-sm" style="color:var(--danger)" data-d="'+bxe(d)+'" data-k="'+bxe(pushKey)+'" onclick="bmFmDeletePub(this.dataset.d,this.dataset.k)">✕ Delete</button>';
         h2 += '</div></div>';
+        // Group summary
+        if (groups.length) {
+          h2 += '<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:7px">';
+          groups.forEach(function(g, gi){
+            var col = FM_GROUP_COLORS[gi % FM_GROUP_COLORS.length];
+            var tblInGroup = tables.filter(function(t){return t.group===g.id;}).length;
+            h2 += '<div style="background:'+col.bg+';border:1px solid '+col.border+';border-radius:6px;padding:3px 9px;font-size:10px;font-weight:700;color:'+col.text+'">'+bxe(g.name)+(g.staffName?' · '+bxe(g.staffName):'')+(tblInGroup?' ('+tblInGroup+')':'')+'</div>';
+          });
+          h2 += '</div>';
+        }
+        // Table chips
         h2 += '<div style="display:flex;flex-wrap:wrap;gap:5px">';
         tables.forEach(function(t){
-          var bg  = t.staffName ? 'rgba(0,102,102,.1)' : 'rgba(0,0,0,.04)';
-          var bdr = t.staffName ? 'var(--primary)'      : 'rgba(0,0,0,.2)';
+          var grp = t.group ? groups.find(function(g){return g.id===t.group;}) : null;
+          var gi = grp ? groups.indexOf(grp) : -1;
+          var col = gi >= 0 ? FM_GROUP_COLORS[gi % FM_GROUP_COLORS.length] : null;
+          var bg  = col ? col.bg  : (t.staffName ? 'rgba(0,102,102,.1)' : 'rgba(0,0,0,.04)');
+          var bdr = col ? col.border : (t.staffName ? 'var(--primary)' : 'rgba(0,0,0,.2)');
           h2 += '<div style="background:'+bg+';border:1.5px solid '+bdr+';border-radius:8px;padding:5px 9px;min-width:80px;text-align:center">';
-          h2 += '<div style="font-size:10px;font-weight:700;color:var(--text)">'+xe(String(t.label||t.num||''))+'</div>';
-          h2 += '<div style="font-size:9px;color:var(--text2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px">'+(t.staffName?xe(t.staffName):'Empty')+'</div>';
+          h2 += '<div style="font-size:10px;font-weight:700;color:var(--text)">'+bxe(String(t.label||t.num||''))+'</div>';
+          h2 += '<div style="font-size:9px;color:var(--text2);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px">'+(t.staffName?bxe(t.staffName):'Empty')+'</div>';
+          if (grp) h2 += '<div style="font-size:8px;color:'+bdr+';opacity:.7;margin-top:1px">'+bxe(grp.name)+'</div>';
           h2 += '</div>';
         });
         h2 += '</div></div>';
@@ -13386,18 +13540,20 @@ function bmFmLoadIntoEditor(dateStr, pushKey) {
     var m = snap.val();
     if (!m || !m.tables) { showToast('Could not load map','error'); return; }
     BS._fmTables = m.tables.map(function(t){
-      return { num: t.num, label: t.label||String(t.num||''), staffName: t.staffName||'' };
+      return { num: t.num, label: t.label||String(t.num||''), staffName: t.staffName||'', group: t.group||'' };
+    });
+    BS._fmGroups = (m.groups||[]).map(function(g){
+      return { id: g.id, name: g.name, color: g.color||0, staffName: g.staffName||'' };
     });
     BS._fmPushKey   = pushKey;
     BS._fmPushDate  = dateStr;
     var banner = document.getElementById('fm-status-banner');
     if (banner) {
       var dt = m.ts ? new Date(m.ts).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : dateStr;
-      banner.innerHTML = '<span style="font-size:12px;font-weight:600;color:#b45309">&#x270F;&#xFE0F; Editing published map from '+dt+' — click Publish to overwrite</span>';
+      banner.innerHTML = '<span style="font-size:12px;font-weight:600;color:#b45309">✏️ Editing published map from '+dt+' — click Publish to overwrite</span>';
       banner.style.display='';
     }
-    bmFmRenderGrid();
-    bmFmUpdateBulkList();
+    bmFmRenderAll();
     showToast('Floor map loaded into editor','success');
   });
 }
@@ -13408,14 +13564,13 @@ function bmFmDeletePub(dateStr, pushKey) {
   nxConfirm('Delete this published floor map?', function(){
     db.ref('branches/'+s.branchId+'/floorMaps/'+dateStr+'/'+pushKey).remove(function(err){
       if (err) { showToast('Delete failed','error'); return; }
-      // If it was the active map, clear latestFloorMap
       if (BS._fmPushKey === pushKey) {
         db.ref('branches/'+s.branchId+'/latestFloorMap').remove();
         BS._fmPushKey = null; BS._fmPushDate = null;
         var banner = document.getElementById('fm-status-banner');
         if (banner) banner.style.display='none';
       }
-      showToast('Deleted ✓','success');
+      showToast('Deleted \u2713','success');
       bmFmLoadHistory(s);
     });
   }, { yesLabel: 'Delete' });
@@ -13426,46 +13581,43 @@ function bmFmPublish() {
   if (!db || !s.branchId) { showToast('Not connected', 'error'); return; }
   var tables = BS._fmTables || [];
   if (!tables.length) { showToast('Add at least one table', 'error'); return; }
-  var dateStr  = BS._fmPushDate || TODAY_BS;
-  var pushKey  = BS._fmPushKey || null;   // null = new entry, string = overwrite
+  var groups = BS._fmGroups || [];
+  var dateStr = BS._fmPushDate || TODAY_BS;
+  var pushKey = BS._fmPushKey || null;
 
   var rec = {
     ts: Date.now(),
     by: s.branchName || s.entityName || 'Manager',
     branchId: s.branchId,
-    tables: tables.map(function(t) {
-      return { num: t.num, label: t.label || String(t.num), staffName: t.staffName || '' };
-    })
+    groups: groups.map(function(g){ return { id:g.id, name:g.name, color:g.color||0, staffName:g.staffName||'' }; }),
+    tables: tables.map(function(t){ return { num:t.num, label:t.label||String(t.num), staffName:t.staffName||'', group:t.group||'' }; })
   };
 
   function afterSave(key) {
-    // Store key so next publish also overwrites
     BS._fmPushKey  = key;
     BS._fmPushDate = dateStr;
-    // Always write to latestFloorMap with the key reference for easy lookup
     var lf = Object.assign({}, rec, { _pushKey: key, _pushDate: dateStr });
     db.ref('branches/'+s.branchId+'/latestFloorMap').set(lf, function(){
-      showToast('Floor map published ✓','success');
+      showToast('Floor map published \u2713','success');
       BS.briefingTab = 'floor-map';
-      BS._fmLoaded = false; // force re-load on next open so banner is fresh
+      BS._fmLoaded = false;
       navTo('bm-briefing');
     });
   }
 
   if (pushKey) {
-    // Overwrite existing record
     db.ref('branches/'+s.branchId+'/floorMaps/'+dateStr+'/'+pushKey).set(rec, function(err){
       if (err) { showToast('Publish failed: '+err.message,'error'); return; }
       afterSave(pushKey);
     });
   } else {
-    // New record — push and remember the key
     var ref = db.ref('branches/'+s.branchId+'/floorMaps/'+TODAY_BS).push(rec, function(err){
       if (err) { showToast('Publish failed: '+err.message,'error'); return; }
       afterSave(ref.key);
     });
   }
 }
+
 
 function bmBrfPublish(){
   var s=NX.session||{};
