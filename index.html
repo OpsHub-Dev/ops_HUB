@@ -10846,12 +10846,16 @@ function saveBranchHealth(id){
 }
 function delBranchHealth(id){nxConfirm('Delete this health card?',function(){BS.health=BS.health.filter(function(x){return x.id!==id;});bSaveColl('health',BS.health);showToast('Deleted');navTo('health-cards');},{yesLabel:'Delete'});}
 
-// ── Health Card Image Attachment (localStorage) ──────────────────────────────
-function hcLsKey(id){return 'hcImg_'+(NX.session&&NX.session.branchId?NX.session.branchId+'_':'')+id;}
-function hcHasImg(id){try{return !!localStorage.getItem(hcLsKey(id));}catch(e){return false;}}
-function hcGetImg(id){try{return localStorage.getItem(hcLsKey(id))||'';}catch(e){return'';}}
-function hcSaveImg(id,data){try{localStorage.setItem(hcLsKey(id),data);}catch(e){showToast('Storage full — image too large','error');}}
-function hcDelImg(id){try{localStorage.removeItem(hcLsKey(id));}catch(e){}}
+// ── Health Card Attachment (localStorage) ───────────────────────────────────────
+// Stores: hcImg_{branchId}_{id} = JPEG thumbnail (preview)
+//         hcPdf_{branchId}_{id} = raw base64 PDF or image (for printing)
+function hcLsKey(id,type){return (type||'hcImg')+(NX.session&&NX.session.branchId?'_'+NX.session.branchId:'')+'_'+id;}
+function hcHasImg(id){try{return !!localStorage.getItem(hcLsKey(id,'hcImg'));}catch(e){return false;}}
+function hcGetImg(id){try{return localStorage.getItem(hcLsKey(id,'hcImg'))||'';}catch(e){return'';}}
+function hcGetRaw(id){try{return localStorage.getItem(hcLsKey(id,'hcPdf'))||'';}catch(e){return'';}}
+function hcSaveImg(id,data){try{localStorage.setItem(hcLsKey(id,'hcImg'),data);}catch(e){showToast('Preview storage full','warning');}}
+function hcSaveRaw(id,data){try{localStorage.setItem(hcLsKey(id,'hcPdf'),data);}catch(e){showToast('Storage full — file too large','error');return false;}return true;}
+function hcDelImg(id){try{localStorage.removeItem(hcLsKey(id,'hcImg'));localStorage.removeItem(hcLsKey(id,'hcPdf'));}catch(e){}}
 
 function hcAttachCard(id){
   var inp=document.getElementById('hcimg-'+id);
@@ -10861,82 +10865,94 @@ function hcAttachCard(id){
 function hcHandleCardAttach(input,id){
   var file=input.files[0];if(!file)return;
   var isPDF=file.type==='application/pdf';
-  if(isPDF){
-    // Render first page of PDF to canvas, save as image
-    if(!window.pdfjsLib){showToast('PDF.js not loaded','error');return;}
-    window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-    var reader=new FileReader();
-    reader.onload=function(e){
-      var typedArray=new Uint8Array(e.target.result);
-      window.pdfjsLib.getDocument({data:typedArray}).promise.then(function(pdf){
-        return pdf.getPage(1).then(function(page){
-          var viewport=page.getViewport({scale:2});
-          var canvas=document.createElement('canvas');
-          canvas.width=viewport.width;
-          canvas.height=viewport.height;
-          var ctx=canvas.getContext('2d');
-          return page.render({canvasContext:ctx,viewport:viewport}).promise.then(function(){
-            var dataUrl=canvas.toDataURL('image/jpeg',0.85);
-            hcSaveImg(id,dataUrl);
-            showToast('Card image saved ✓','success');
-            navTo('health-cards');
+  // Always read raw data for storage
+  var rawReader=new FileReader();
+  rawReader.onload=function(ev){
+    var rawData=ev.target.result; // base64 data URL (image or PDF)
+    // Save raw for printing
+    if(!hcSaveRaw(id,rawData)){return;}
+    if(isPDF){
+      // Also render thumbnail via PDF.js
+      if(window.pdfjsLib){
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        var ab=rawReader._arrayBuf;
+        window.pdfjsLib.getDocument({data:new Uint8Array(ab)}).promise.then(function(pdf){
+          return pdf.getPage(1).then(function(page){
+            var vp=page.getViewport({scale:1.5});
+            var cv=document.createElement('canvas');
+            cv.width=vp.width;cv.height=vp.height;
+            return page.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise.then(function(){
+              hcSaveImg(id,cv.toDataURL('image/jpeg',0.8));
+            });
           });
-        });
-      }).catch(function(err){showToast('PDF render failed: '+err.message,'error');});
-    };
-    reader.readAsArrayBuffer(file);
-  } else {
-    // Direct image
-    var reader2=new FileReader();
-    reader2.onload=function(e){
-      hcSaveImg(id,e.target.result);
-      showToast('Card image saved ✓','success');
-      navTo('health-cards');
-    };
-    reader2.readAsDataURL(file);
-  }
+        }).catch(function(){hcSaveImg(id,rawData);});
+      } else {
+        // No PDF.js — store raw as preview too
+        hcSaveImg(id,rawData);
+      }
+      // Read as ArrayBuffer for PDF.js in parallel
+      var abReader=new FileReader();
+      abReader.onload=function(e2){rawReader._arrayBuf=e2.target.result;};
+      abReader.readAsArrayBuffer(file);
+    } else {
+      // Image — use directly as preview too
+      hcSaveImg(id,rawData);
+    }
+    showToast((isPDF?'PDF':'Image')+' saved ✓','success');
+    navTo('health-cards');
+  };
+  rawReader.readAsDataURL(file);
 }
 
 function hcPrintCard(id){
-  var img=hcGetImg(id);
-  if(!img){showToast('No card image attached','error');return;}
-  var hc=BS.health.find(function(x){return x.id===id;});
-  var name=hc?hc.name:'',sap=hc?hc.sap:'',medExp=hc?hc.medExp:'',trainExp=hc?hc.trainExp:'';
-  var s=NX.session||{};
+  var raw=hcGetRaw(id)||hcGetImg(id);
+  if(!raw){showToast('No card attached','error');return;}
+  var isPDF=raw.indexOf('data:application/pdf')===0;
   var w=window.open('','_blank','width=900,height=700');
   if(!w){showToast('Allow popups to print','error');return;}
-  var medLabel=medExp?new Date(medExp+'T00:00:00').toLocaleDateString('en-GB'):'\u2014';
-  var trainLabel=trainExp?new Date(trainExp+'T00:00:00').toLocaleDateString('en-GB'):'\u2014';
-  var html='<!doctype html><html><head><meta charset="utf-8"><title>Health Card</title>'
-    +'<style>@page{size:A4;margin:10mm}*{box-sizing:border-box;margin:0;padding:0;font-family:Arial,Helvetica,sans-serif}body{background:#fff;color:#111;font-size:12px}'
-    +'.hdr{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:10px;margin-bottom:16px;border-bottom:3px solid #006666}'
-    +'.card-img{width:100%;max-width:620px;display:block;margin:0 auto;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,.15)}'
-    +'.meta{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:16px}'
-    +'.meta-box{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px}'
-    +'.meta-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:#64748b;margin-bottom:3px}'
-    +'.meta-val{font-size:14px;font-weight:700;color:#1e2938;font-family:monospace}'
-    +'.sig{margin-top:28px;display:grid;grid-template-columns:1fr 1fr;gap:40px}'
-    +'.sig-cell{border-top:1px solid #999;padding-top:5px;text-align:center;font-size:10px;color:#555}'
-    +'@media print{.no-print{display:none!important}}'
-    +'</style></head><body>';
-  html+='<div class="hdr"><div>'
-    +'<img src="https://i.imgur.com/jeqtcE2.png" alt="ALFA.CO" style="height:40px;width:auto;display:block;margin-bottom:4px">'
-    +'<div style="font-size:10px;color:#64748b">'+bxe(s.branchName||s.entityName||'')+'</div></div>'
-    +'<div style="text-align:center"><h1 style="font-size:16px;font-weight:800;color:#006666">HEALTH CARD</h1>'
-    +'<div style="font-size:11px;color:#64748b;margin-top:2px">'+bxe(name)+' &nbsp;&middot;&nbsp; SAP: '+bxe(sap)+'</div></div>'
-    +'<div style="text-align:right;font-size:10px;color:#64748b">Printed: '+new Date().toLocaleDateString('en-GB')+'</div></div>';
-  html+='<img class="card-img" src="'+img+'">'
-    +'<div class="meta">'
-    +'<div class="meta-box"><div class="meta-lbl">Employee Name</div><div class="meta-val" style="font-size:12px">'+bxe(name)+'</div></div>'
-    +'<div class="meta-box"><div class="meta-lbl">Medical Expiry</div><div class="meta-val">'+bxe(medLabel)+'</div></div>'
-    +'<div class="meta-box"><div class="meta-lbl">Training Expiry</div><div class="meta-val">'+bxe(trainLabel)+'</div></div>'
-    +'</div>'
-    +'<div class="sig"><div class="sig-cell">Branch Manager</div><div class="sig-cell">Date &amp; Stamp</div></div>'
-    +'<div class="no-print" style="text-align:center;margin-top:20px">'
-    +'<button onclick="window.print()" style="background:#006666;color:#fff;border:none;border-radius:8px;padding:10px 32px;font-size:14px;font-weight:700;cursor:pointer">&#x1F5A8;&#xFE0F; Print / Save PDF</button></div>';
-  html+='</body></html>';
-  w.document.write(html);
-  w.document.close();
+  if(isPDF){
+    // Embed PDF directly — browser will show its native PDF viewer + print
+    w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>Health Card</title>'
+      +'<style>*{margin:0;padding:0;box-sizing:border-box}body{background:#000}iframe{width:100vw;height:100vh;border:none}@media print{body{background:#fff}}</style>'
+      +'</head><body><iframe src="'+raw+'"></iframe></body></html>');
+    w.document.close();
+  } else {
+    // Image — show in print-ready page
+    var hc=BS.health.find(function(x){return x.id===id;})||{};
+    var name=hc.name||'',sap=hc.sap||'',s=NX.session||{};
+    var medLabel=hc.medExp?new Date(hc.medExp+'T00:00:00').toLocaleDateString('en-GB'):'\u2014';
+    var trainLabel=hc.trainExp?new Date(hc.trainExp+'T00:00:00').toLocaleDateString('en-GB'):'\u2014';
+    var html='<!doctype html><html><head><meta charset="utf-8"><title>Health Card</title>'
+      +'<style>@page{size:A4;margin:10mm}*{box-sizing:border-box;margin:0;padding:0;font-family:Arial,Helvetica,sans-serif}body{background:#fff;color:#111;font-size:12px}'
+      +'.hdr{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:10px;margin-bottom:16px;border-bottom:3px solid #006666}'
+      +'.card-img{width:100%;max-width:620px;display:block;margin:0 auto;border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,.15)}'
+      +'.meta{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:16px}'
+      +'.meta-box{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px}'
+      +'.meta-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:#64748b;margin-bottom:3px}'
+      +'.meta-val{font-size:13px;font-weight:700;color:#1e2938;font-family:monospace}'
+      +'.sig{margin-top:24px;display:grid;grid-template-columns:1fr 1fr;gap:40px}'
+      +'.sig-cell{border-top:1px solid #999;padding-top:5px;text-align:center;font-size:10px;color:#555}'
+      +'@media print{.no-print{display:none!important}}'
+      +'</style></head><body>';
+    html+='<div class="hdr">'
+      +'<div><img src="https://i.imgur.com/jeqtcE2.png" alt="ALFA.CO" style="height:40px;width:auto;display:block;margin-bottom:4px">'
+      +'<div style="font-size:10px;color:#64748b">'+bxe(s.branchName||s.entityName||'')+'</div></div>'
+      +'<div style="text-align:center"><h1 style="font-size:16px;font-weight:800;color:#006666">HEALTH CARD</h1>'
+      +'<div style="font-size:11px;color:#64748b;margin-top:2px">'+bxe(name)+' &nbsp;&middot;&nbsp; SAP: '+bxe(sap)+'</div></div>'
+      +'<div style="text-align:right;font-size:10px;color:#64748b">Printed: '+new Date().toLocaleDateString('en-GB')+'</div></div>';
+    html+='<img class="card-img" src="'+raw+'">'
+      +'<div class="meta">'
+      +'<div class="meta-box"><div class="meta-lbl">Employee</div><div class="meta-val" style="font-size:11px">'+bxe(name)+'</div></div>'
+      +'<div class="meta-box"><div class="meta-lbl">Medical Expiry</div><div class="meta-val">'+bxe(medLabel)+'</div></div>'
+      +'<div class="meta-box"><div class="meta-lbl">Training Expiry</div><div class="meta-val">'+bxe(trainLabel)+'</div></div>'
+      +'</div>'
+      +'<div class="sig"><div class="sig-cell">Branch Manager</div><div class="sig-cell">Date &amp; Stamp</div></div>'
+      +'<div class="no-print" style="text-align:center;margin-top:20px">'
+      +'<button onclick="window.print()" style="background:#006666;color:#fff;border:none;border-radius:8px;padding:10px 32px;font-size:14px;font-weight:700;cursor:pointer">&#x1F5A8;&#xFE0F; Print / Save PDF</button>'
+      +'</div></body></html>';
+    w.document.write(html);
+    w.document.close();
+  }
 }
 
 function hcViewCard(id){
