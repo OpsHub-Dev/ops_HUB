@@ -8595,7 +8595,7 @@ function pInvItems() {
   var filtered=bItems.filter(function(i){if(q&&String(i.code).toLowerCase().indexOf(q)<0&&i.name.toLowerCase().indexOf(q)<0)return false;if(loc&&i.location!==loc)return false;if(sts==='ok'&&i.min>0&&i.qty<=i.min)return false;if(sts==='low'&&!(i.min>0&&i.qty<=i.min))return false;return true;});
   var rows=filtered.map(function(it){var isLow=it.min>0&&it.qty<=it.min;return '<tr><td class="bmono" style="color:var(--ceo);font-size:10px">'+bxe(it.code)+'</td><td style="font-weight:600;color:var(--text-primary)">'+bxe(it.name)+'</td><td><span class="chip">'+bxe(it.location||'\u2014')+'</span></td><td class="bmono" style="font-weight:700;font-size:14px;color:'+(isLow?'var(--danger)':'var(--text-primary)')+'">'+it.qty+'</td><td class="bmono">'+bxe(it.unit)+'</td><td class="bmono" style="color:var(--text-secondary)">'+it.min+'</td><td class="bmono" style="color:var(--text-secondary)">'+parseFloat(it.price||0).toFixed(2)+'</td><td>'+bpl(isLow?'Low':'OK',isLow?'#c0392b':'#00875a')+'</td><td><div style="display:flex;gap:4px"><button class="btn btn-sm" onclick="openBranchItemModal(\''+bxe(it.code)+'\')">Edit</button><button class="btn btn-sm" style="color:var(--danger)" onclick="delBranchItem(\''+bxe(it.code)+'\')">Del</button></div></td></tr>';}).join('');
   var h='<div class="page-header"><h1>Inventory Items</h1><p>'+filtered.length+' of '+bItems.length+' items</p></div>';
-  h+='<div class="bttb" style="border-radius:10px 10px 0 0;border:1px solid var(--border)"><input class="bfi" style="width:200px" id="binv-q" placeholder="Search items\u2026" value="'+bxe(BS.q||'')+'"><select class="bfi" style="width:auto" id="binv-loc"><option value="">All Locations</option>';
+  h+='<div class="bttb" style="border-radius:10px 10px 0 0;border:1px solid var(--border)"><input class="bfi" style="width:200px" id="binv-q" placeholder="Search items\u2026" value=""><select class="bfi" style="width:auto" id="binv-loc"><option value="">All Locations</option>';
   getLocations().slice().sort().forEach(function(l){h+='<option value="'+bxe(l)+'"'+(loc===l?' selected':'')+'>'+bxe(l)+'</option>';});
   h+='</select><select class="bfi" style="width:auto" id="binv-sts"><option value="">All Status</option><option value="ok"'+(sts==='ok'?' selected':'')+'>OK</option><option value="low"'+(sts==='low'?' selected':'')+'>Low</option></select>';
   h+='<div style="margin-left:auto;display:flex;gap:8px"><button class="btn btn-sm" onclick="diagInventory()">\uD83D\uDD0D Debug</button><button class="btn btn-sm btn-primary" onclick="openInvImportModal()">\u2b06 Import CSV</button><button class="btn btn-sm btn-primary" onclick="openBranchItemModal(null)">+ Add Item</button><button class="btn btn-sm" onclick="exportBranchItemsCSV()">\u2b07 CSV</button></div></div>';
@@ -10679,12 +10679,11 @@ function printBranchTsReport(){var eid=bgv('bts-r-emp'),mo=parseInt(bgv('bts-r-m
 // ── Health Cards ──────────────────────────────────────
 function pHealthCards(){
   attachBranchListeners();
-  var data=BS.health.filter(function(h2){return bmatch(h2,['name','sap','cardNo']);})
-    .slice().sort(function(a,b){var da=bdrem(a.medExp),db=bdrem(b.medExp);if(da===null)return 1;if(db===null)return -1;return da-db;});
+  var data=BS.health.slice().sort(function(a,b){var da=bdrem(a.medExp),db=bdrem(b.medExp);if(da===null)return 1;if(db===null)return -1;return da-db;});
   var exp=0,soon=0,ok=0;
   BS.health.forEach(function(h2){var d=bdrem(h2.medExp);if(d===null)return;if(d<0)exp++;else if(d<=30)soon++;else ok++;});
   var rows=data.map(function(h2){
-    return '<tr>'+
+    return '<tr data-name="'+bxe((h2.name||'').toLowerCase())+'" data-sap="'+bxe((h2.sap||'').toLowerCase())+'" data-card="'+bxe((h2.cardNo||'').toLowerCase())+'">'+
       '<td style="font-weight:600;color:var(--text-primary)">'+bxe(h2.name)+'</td>'+
       '<td class="bmono" style="color:var(--text-secondary);font-size:11px">'+bxe(h2.sap||'\u2014')+'</td>'+
       '<td class="bmono" style="color:var(--ceo);font-weight:600">'+bxe(h2.cardNo||'\u2014')+'</td>'+
@@ -10692,13 +10691,15 @@ function pHealthCards(){
       '<td>'+bremBadge(bdrem(h2.medExp))+'</td>'+
       '<td class="bmono" style="color:var(--text-secondary);font-size:11px">'+bfdate(h2.trainExp)+'</td>'+
       '<td>'+bremBadge(bdrem(h2.trainExp))+'</td>'+
-      '<td><div style="display:flex;gap:4px">'+
+      '<td><div style="display:flex;gap:4px;flex-wrap:wrap">'+
         '<button class="btn btn-sm" onclick="openBranchHealthModal(\''+bxe(h2.id)+'\')">Edit</button>'+
         '<button class="btn btn-sm" style="color:var(--danger)" onclick="delBranchHealth(\''+bxe(h2.id)+'\')">Del</button>'+
         '<button class="btn btn-sm" style="background:var(--primary);color:#fff;display:flex;align-items:center;gap:4px" onclick="triggerHealthPdfImport(\''+bxe(h2.id)+'\')">'+
           '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>PDF'+
         '</button>'+
         '<input type="file" id="hpdf-'+bxe(h2.id)+'" accept=".pdf" style="display:none" onchange="handleHealthPdfImport(this,\''+bxe(h2.id)+'\')">'+
+        (hcHasImg(h2.id)?'<button class="btn btn-sm" style="background:#00875a;color:#fff;display:flex;align-items:center;gap:3px" onclick="hcPrintCard(\''+bxe(h2.id)+'\')"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Print</button>':'<button class="btn btn-sm" style="display:flex;align-items:center;gap:3px" onclick="hcAttachCard(\''+bxe(h2.id)+'\')"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>Attach</button>')+
+        '<input type="file" id="hcimg-'+bxe(h2.id)+'" accept="image/*,.pdf" style="display:none" onchange="hcHandleCardAttach(this,\''+bxe(h2.id)+'\')">'+
       '</div></td></tr>';
   }).join('');
   var h='<div class="page-header"><h1>Health Cards</h1></div>';
@@ -10723,7 +10724,7 @@ function pHealthCards(){
   h+='<div style="margin-bottom:14px">';
   h+='<div style="position:relative;max-width:340px">';
   h+='<svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);opacity:.4;pointer-events:none" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
-  h+='<input id="hc-search" type="text" placeholder="Search by name, SAP or card number…" value="'+bxe(BS.q||'')+'" oninput="hcSearchInput(this)" style="width:100%;padding:8px 10px 8px 32px;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;color:var(--text-primary);font-size:13px;outline:none">';
+  h+='<input id="hc-search" type="text" placeholder="Search by name, SAP or card number…" value="" oninput="hcSearchInput(this)" style="width:100%;padding:8px 10px 8px 32px;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;color:var(--text-primary);font-size:13px;outline:none">';
   h+='</div></div>';
   h+='<div class="header-actions"><div></div><div style="display:flex;gap:8px;flex-wrap:wrap">';
   h+='<button class="btn" onclick="exportHealthCards()" style="display:flex;align-items:center;gap:6px">'+
@@ -10736,11 +10737,21 @@ function pHealthCards(){
   h+='<button class="btn btn-primary" onclick="openBranchHealthModal(null)" style="display:flex;align-items:center;gap:6px">'+
     '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Add Card</button>';
   h+='</div></div>';
-  h+='<div class="btw"><div class="btw-s"><table class="btbl"><thead><tr><th>Employee</th><th>SAP #</th><th>Card #</th><th>Med Expiry</th><th>Med Left</th><th>Train Expiry</th><th>Train Left</th><th>Actions</th></tr></thead>'+
+  h+='<div class="btw"><div class="btw-s"><table class="btbl" id="hc-tbl"><thead><tr><th>Employee</th><th>SAP #</th><th>Card #</th><th>Med Expiry</th><th>Med Left</th><th>Train Expiry</th><th>Train Left</th><th>Actions</th></tr></thead>'+
     '<tbody>'+(rows||'<tr><td colspan="8" style="text-align:center;color:var(--text-tertiary);padding:28px">\uD83D\uDCC4 No health cards yet \u2014 add one or bulk-import from staff list</td></tr>')+'</tbody></table></div></div>';
   return h;
 }
-function hcSearchInput(el){BS.q=el.value;navTo('health-cards');}
+function hcSearchInput(el){
+  var q=(el.value||'').toLowerCase().trim();
+  var tbody=document.querySelector('#hc-tbl tbody');
+  if(!tbody)return;
+  Array.from(tbody.querySelectorAll('tr[data-name]')).forEach(function(tr){
+    var name=(tr.dataset.name||'').toLowerCase();
+    var sap=(tr.dataset.sap||'').toLowerCase();
+    var card=(tr.dataset.card||'').toLowerCase();
+    tr.style.display=(q===''||name.includes(q)||sap.includes(q)||card.includes(q))?'':'none';
+  });
+}
 function openBulkHealthModal(){
   var existing=BS.health.map(function(h){return h.name;});
   var missing=BS.staff.filter(function(m){return !existing.includes(m.name);});
@@ -10775,7 +10786,52 @@ function saveBulkHealth(){
   bSaveColl('health',BS.health);closeModalForce();
   showToast(count+' health cards created','success');navTo('health-cards');
 }
-function openBranchHealthModal(id){var h2=id?BS.health.find(function(x){return x.id===id;}):null;var staffOpts='<option value="">Select\u2026</option>'+BS.staff.map(function(s2){return '<option value="'+bxe(s2.name)+'"'+(h2&&h2.name===s2.name?' selected':'')+'>'+bxe(s2.name)+'</option>';}).join('');var html='<div class="modal-head"><h2>'+(h2?'Edit Health Card':'Add Health Card')+'</h2><button class="modal-close" onclick="closeModalForce()">&#x2715;</button></div><div class="bfg"><label class="form-label">Employee *</label><select class="form-input form-select" id="bhc-name">'+staffOpts+'</select></div><div class="form-row"><div class="bfg"><label class="form-label">SAP #</label><input class="form-input" id="bhc-sap" value="'+bxe(h2?h2.sap:'')+'"></div><div class="bfg"><label class="form-label">Card # *</label><input class="form-input" id="bhc-card" value="'+bxe(h2?h2.cardNo:'')+'"></div></div><div class="form-row"><div class="bfg"><label class="form-label">Medical Expiry *</label><input class="form-input" type="date" id="bhc-med" value="'+bxe(h2?h2.medExp:'')+'"></div><div class="bfg"><label class="form-label">Training Expiry</label><input class="form-input" type="date" id="bhc-train" value="'+bxe(h2?h2.trainExp:'')+'"></div></div><button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="saveBranchHealth(\''+bxe(id||'')+'\')">Save</button>';openModal(html);}
+function openBranchHealthModal(id){
+  var h2=id?BS.health.find(function(x){return x.id===id;}):null;
+  var staffOpts='<option value="">Select\u2026</option>'+BS.staff.map(function(s2){return '<option value="'+bxe(s2.name)+'"'+(h2&&h2.name===s2.name?' selected':'')+'>'+bxe(s2.name)+'</option>';}).join('');
+  var existImg=id?hcGetImg(id):'';
+  var imgSection='';
+  if(id){
+    if(existImg){
+      imgSection='<div class="bfg" style="margin-top:8px">'
+        +'<label class="form-label">&#x1F4B3; Card Image</label>'
+        +'<div style="position:relative;border-radius:10px;overflow:hidden;border:1px solid var(--border);margin-top:4px">'
+        +'<img src="'+existImg+'" style="width:100%;max-height:200px;object-fit:contain;display:block;background:#f8fafc">'
+        +'<div style="position:absolute;bottom:0;left:0;right:0;display:flex;gap:6px;padding:8px;background:rgba(0,0,0,.55)">'
+        +'<button type="button" class="btn btn-sm" style="flex:1;background:#fff;color:#1e2938;font-size:11px" onclick="hcPrintCard(\''+bxe(id)+'\')">&#x1F5A8;&#xFE0F; Print</button>'
+        +'<button type="button" class="btn btn-sm" style="background:#c0392b;color:#fff;font-size:11px" onclick="hcDelCardImg(\''+bxe(id)+'\')">Remove</button>'
+        +'</div></div></div>';
+    } else {
+      imgSection='<div class="bfg" style="margin-top:8px">'
+        +'<label class="form-label">&#x1F4B3; Attach Card Image / PDF</label>'
+        +'<div id="hc-drop-zone" ondragover="event.preventDefault();this.style.borderColor=\'var(--primary)\'" ondragleave="this.style.borderColor=\'var(--border)\'"'
+        +' ondrop="event.preventDefault();this.style.borderColor=\'var(--border)\';hcDropCardAttach(event,\''+bxe(id)+'\')";'
+        +' style="border:2px dashed var(--border);border-radius:10px;padding:20px;text-align:center;cursor:pointer;margin-top:4px;transition:border-color .15s"'
+        +' onclick="document.getElementById(\'hcimg-modal-'+bxe(id)+'\').click()">'
+        +'<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="var(--primary)" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="display:block;margin:0 auto 8px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>'
+        +'<div style="font-size:12px;color:var(--text-secondary)">Drop card image or PDF here, or <span style="color:var(--primary);font-weight:700">click to browse</span></div>'
+        +'<div style="font-size:10px;color:var(--text-tertiary);margin-top:4px">JPG, PNG, PDF accepted</div>'
+        +'</div>'
+        +'<input type="file" id="hcimg-modal-'+bxe(id)+'" accept="image/*,.pdf" style="display:none" onchange="hcHandleCardAttach(this,\''+bxe(id)+'\')">'
+        +'</div>';
+    }
+  }
+  var html='<div class="modal-head"><h2>'+(h2?'Edit Health Card':'Add Health Card')+'</h2><button class="modal-close" onclick="closeModalForce()">&#x2715;</button></div>'
+    +'<div class="bfg"><label class="form-label">Employee *</label><select class="form-input form-select" id="bhc-name">'+staffOpts+'</select></div>'
+    +'<div class="form-row"><div class="bfg"><label class="form-label">SAP #</label><input class="form-input" id="bhc-sap" value="'+bxe(h2?h2.sap:'')+'"></div>'
+    +'<div class="bfg"><label class="form-label">Card # *</label><input class="form-input" id="bhc-card" value="'+bxe(h2?h2.cardNo:'')+'"></div></div>'
+    +'<div class="form-row"><div class="bfg"><label class="form-label">Medical Expiry *</label><input class="form-input" type="date" id="bhc-med" value="'+bxe(h2?h2.medExp:'')+'"></div>'
+    +'<div class="bfg"><label class="form-label">Training Expiry</label><input class="form-input" type="date" id="bhc-train" value="'+bxe(h2?h2.trainExp:'')+'"></div></div>'
+    +imgSection
+    +'<button class="btn btn-primary" style="width:100%;margin-top:10px" onclick="saveBranchHealth(\''+bxe(id||'')+'\')">Save</button>';
+  openModal(html);
+}
+function hcDropCardAttach(e,id){
+  var files=e.dataTransfer&&e.dataTransfer.files;
+  if(!files||!files.length)return;
+  var fakeInput={files:files};
+  hcHandleCardAttach(fakeInput,id);
+}
 function saveBranchHealth(id){
   var name=bgv('bhc-name'),card=bgv('bhc-card'),med=bgv('bhc-med');
   if(!name||!card||!med){showToast('Name, card # and expiry required','error');return;}
@@ -10789,6 +10845,119 @@ function saveBranchHealth(id){
   bSaveColl('health',BS.health);closeModalForce();showToast('Health card saved','success');navTo('health-cards');
 }
 function delBranchHealth(id){nxConfirm('Delete this health card?',function(){BS.health=BS.health.filter(function(x){return x.id!==id;});bSaveColl('health',BS.health);showToast('Deleted');navTo('health-cards');},{yesLabel:'Delete'});}
+
+// ── Health Card Image Attachment (localStorage) ──────────────────────────────
+function hcLsKey(id){return 'hcImg_'+(NX.session&&NX.session.branchId?NX.session.branchId+'_':'')+id;}
+function hcHasImg(id){try{return !!localStorage.getItem(hcLsKey(id));}catch(e){return false;}}
+function hcGetImg(id){try{return localStorage.getItem(hcLsKey(id))||'';}catch(e){return'';}}
+function hcSaveImg(id,data){try{localStorage.setItem(hcLsKey(id),data);}catch(e){showToast('Storage full — image too large','error');}}
+function hcDelImg(id){try{localStorage.removeItem(hcLsKey(id));}catch(e){}}
+
+function hcAttachCard(id){
+  var inp=document.getElementById('hcimg-'+id);
+  if(inp){inp.value='';inp.click();}
+}
+
+function hcHandleCardAttach(input,id){
+  var file=input.files[0];if(!file)return;
+  var isPDF=file.type==='application/pdf';
+  if(isPDF){
+    // Render first page of PDF to canvas, save as image
+    if(!window.pdfjsLib){showToast('PDF.js not loaded','error');return;}
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    var reader=new FileReader();
+    reader.onload=function(e){
+      var typedArray=new Uint8Array(e.target.result);
+      window.pdfjsLib.getDocument({data:typedArray}).promise.then(function(pdf){
+        return pdf.getPage(1).then(function(page){
+          var viewport=page.getViewport({scale:2});
+          var canvas=document.createElement('canvas');
+          canvas.width=viewport.width;
+          canvas.height=viewport.height;
+          var ctx=canvas.getContext('2d');
+          return page.render({canvasContext:ctx,viewport:viewport}).promise.then(function(){
+            var dataUrl=canvas.toDataURL('image/jpeg',0.85);
+            hcSaveImg(id,dataUrl);
+            showToast('Card image saved ✓','success');
+            navTo('health-cards');
+          });
+        });
+      }).catch(function(err){showToast('PDF render failed: '+err.message,'error');});
+    };
+    reader.readAsArrayBuffer(file);
+  } else {
+    // Direct image
+    var reader2=new FileReader();
+    reader2.onload=function(e){
+      hcSaveImg(id,e.target.result);
+      showToast('Card image saved ✓','success');
+      navTo('health-cards');
+    };
+    reader2.readAsDataURL(file);
+  }
+}
+
+function hcPrintCard(id){
+  var img=hcGetImg(id);
+  if(!img){showToast('No card image attached','error');return;}
+  var hc=BS.health.find(function(x){return x.id===id;});
+  var name=hc?hc.name:'',sap=hc?hc.sap:'',medExp=hc?hc.medExp:'',trainExp=hc?hc.trainExp:'';
+  var s=NX.session||{};
+  var w=window.open('','_blank','width=900,height=700');
+  if(!w){showToast('Allow popups to print','error');return;}
+  var medLabel=medExp?new Date(medExp+'T00:00:00').toLocaleDateString('en-GB'):'\u2014';
+  var trainLabel=trainExp?new Date(trainExp+'T00:00:00').toLocaleDateString('en-GB'):'\u2014';
+  var html='<!doctype html><html><head><meta charset="utf-8"><title>Health Card</title>'
+    +'<style>@page{size:A4;margin:10mm}*{box-sizing:border-box;margin:0;padding:0;font-family:Arial,Helvetica,sans-serif}body{background:#fff;color:#111;font-size:12px}'
+    +'.hdr{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:10px;margin-bottom:16px;border-bottom:3px solid #006666}'
+    +'.card-img{width:100%;max-width:620px;display:block;margin:0 auto;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,.15)}'
+    +'.meta{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:16px}'
+    +'.meta-box{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px}'
+    +'.meta-lbl{font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:#64748b;margin-bottom:3px}'
+    +'.meta-val{font-size:14px;font-weight:700;color:#1e2938;font-family:monospace}'
+    +'.sig{margin-top:28px;display:grid;grid-template-columns:1fr 1fr;gap:40px}'
+    +'.sig-cell{border-top:1px solid #999;padding-top:5px;text-align:center;font-size:10px;color:#555}'
+    +'@media print{.no-print{display:none!important}}'
+    +'</style></head><body>';
+  html+='<div class="hdr"><div>'
+    +'<img src="https://i.imgur.com/jeqtcE2.png" alt="ALFA.CO" style="height:40px;width:auto;display:block;margin-bottom:4px">'
+    +'<div style="font-size:10px;color:#64748b">'+bxe(s.branchName||s.entityName||'')+'</div></div>'
+    +'<div style="text-align:center"><h1 style="font-size:16px;font-weight:800;color:#006666">HEALTH CARD</h1>'
+    +'<div style="font-size:11px;color:#64748b;margin-top:2px">'+bxe(name)+' &nbsp;&middot;&nbsp; SAP: '+bxe(sap)+'</div></div>'
+    +'<div style="text-align:right;font-size:10px;color:#64748b">Printed: '+new Date().toLocaleDateString('en-GB')+'</div></div>';
+  html+='<img class="card-img" src="'+img+'">'
+    +'<div class="meta">'
+    +'<div class="meta-box"><div class="meta-lbl">Employee Name</div><div class="meta-val" style="font-size:12px">'+bxe(name)+'</div></div>'
+    +'<div class="meta-box"><div class="meta-lbl">Medical Expiry</div><div class="meta-val">'+bxe(medLabel)+'</div></div>'
+    +'<div class="meta-box"><div class="meta-lbl">Training Expiry</div><div class="meta-val">'+bxe(trainLabel)+'</div></div>'
+    +'</div>'
+    +'<div class="sig"><div class="sig-cell">Branch Manager</div><div class="sig-cell">Date &amp; Stamp</div></div>'
+    +'<div class="no-print" style="text-align:center;margin-top:20px">'
+    +'<button onclick="window.print()" style="background:#006666;color:#fff;border:none;border-radius:8px;padding:10px 32px;font-size:14px;font-weight:700;cursor:pointer">&#x1F5A8;&#xFE0F; Print / Save PDF</button></div>';
+  html+='</body></html>';
+  w.document.write(html);
+  w.document.close();
+}
+
+function hcViewCard(id){
+  var img=hcGetImg(id);
+  if(!img){showToast('No card attached','error');return;}
+  openModal('<div class="modal-head"><h2>&#x1F4B3; Health Card</h2><button class="modal-close" onclick="closeModalForce()">&#x2715;</button></div>'
+    +'<div style="text-align:center"><img src="'+img+'" style="max-width:100%;max-height:65vh;border-radius:8px;display:block;margin:0 auto"></div>'
+    +'<div style="display:flex;gap:8px;margin-top:12px"><button class="btn btn-primary" style="flex:1" onclick="hcPrintCard(\''+id+'\')">'
+    +'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>Print Card</button>'
+    +'<button class="btn" style="color:var(--danger)" onclick="hcDelCardImg(\''+id+'\')">Remove Image</button></div>');
+}
+
+function hcDelCardImg(id){
+  nxConfirm('Remove the attached card image?',function(){
+    hcDelImg(id);
+    closeModalForce();
+    showToast('Image removed','success');
+    navTo('health-cards');
+  },{yesLabel:'Remove',yesColor:'#c0392b'});
+}
+
 
 // ── Health Cards Export ──────────────────────────────
 function exportHealthCards(){
