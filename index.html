@@ -11070,69 +11070,70 @@ function parseAndFillHealthCard(text,id){
   // ── Core: find the date CLOSEST AFTER a keyword position ─────────────────────
   // This is the most reliable method for RTL PDFs — find where the label is,
   // then grab the nearest date match that appears after it in the text stream.
-  function dateAfterKeyword(keyword){
-    var kidx=text.indexOf(keyword);
-    if(kidx<0)return'';
-    // Find all date matches that appear AFTER this keyword
-    var after=allDateMatches.filter(function(x){return x.pos>kidx;});
-    if(!after.length){
-      // fallback: look before too (RTL reversal) — pick closest
-      var before=allDateMatches.filter(function(x){return x.pos<kidx;});
-      if(!before.length)return'';
-      before.sort(function(a,b){return b.pos-a.pos;}); // closest before
-      return before[0].greg;
-    }
-    after.sort(function(a,b){return a.pos-b.pos;}); // closest after
-    return after[0].greg;
-  }
-
-  // ── Issue date — تاريخ إصدار الشهادة الصحية ──────────────────────────────────
-  var issueDate='';
-  var ISSUE_KW=[
-    '\u062a\u0627\u0631\u064a\u062e \u0625\u0635\u062f\u0627\u0631 \u0627\u0644\u0634\u0647\u0627\u062f\u0629 \u0627\u0644\u0635\u062d\u064a\u0629',
-    '\u0625\u0635\u062f\u0627\u0631 \u0627\u0644\u0634\u0647\u0627\u062f\u0629'
-  ];
-  for(var ii=0;ii<ISSUE_KW.length&&!issueDate;ii++)issueDate=dateAfterKeyword(ISSUE_KW[ii]);
-
-  // ── Medical expiry — تاريخ نهاية الشهادة الصحية ──────────────────────────────
+  // ── Date extraction: always exclude issue date (smallest) from med+train ────
   var medExp='',trainExp='';
-  var MED_KW=[
-    '\u062a\u0627\u0631\u064a\u062e \u0646\u0647\u0627\u064a\u0629 \u0627\u0644\u0634\u0647\u0627\u062f\u0629 \u0627\u0644\u0635\u062d\u064a\u0629',
-    '\u0646\u0647\u0627\u064a\u0629 \u0627\u0644\u0634\u0647\u0627\u062f\u0629 \u0627\u0644\u0635\u062d\u064a\u0629',
-    '\u0646\u0647\u0627\u064a\u0629 \u0627\u0644\u0634\u0647\u0627\u062f\u0629'
-  ];
-  // ── Training expiry — تاريخ انتهاء البرنامج التثقيفي ─────────────────────────
-  var TRAIN_KW=[
-    '\u062a\u0627\u0631\u064a\u062e \u0627\u0646\u062a\u0647\u0627\u0621 \u0627\u0644\u0628\u0631\u0646\u0627\u0645\u062c \u0627\u0644\u062a\u062b\u0642\u064a\u0641\u064a',
-    '\u0627\u0646\u062a\u0647\u0627\u0621 \u0627\u0644\u0628\u0631\u0646\u0627\u0645\u062c \u0627\u0644\u062a\u062b\u0642\u064a\u0641\u064a',
-    '\u0627\u0646\u062a\u0647\u0627\u0621 \u0627\u0644\u0628\u0631\u0646\u0627\u0645\u062c',
-    '\u0627\u0644\u0628\u0631\u0646\u0627\u0645\u062c \u0627\u0644\u062a\u062b\u0642\u064a\u0641\u064a'
-  ];
-  for(var mi2=0;mi2<MED_KW.length&&!medExp;mi2++)medExp=dateAfterKeyword(MED_KW[mi2]);
-  for(var ti=0;ti<TRAIN_KW.length&&!trainExp;ti++)trainExp=dateAfterKeyword(TRAIN_KW[ti]);
 
-  console.log('[HealthPDF] Label search \u2014 issue:',issueDate,' med:',medExp,' train:',trainExp);
+  // Issue date = smallest extracted date (always true for Balady cards)
+  var uniqAll={};allDateMatches.forEach(function(x){uniqAll[x.greg]=true;});
+  var allSorted=Object.keys(uniqAll).sort();
+  var issueDate=allSorted.length?allSorted[0]:''; // oldest = issue
 
-  // ── Positional fallback (only if label search failed) ────────────────────────
-  // Balady card order by date value: issue \u2264 med < train (training always furthest out)
-  if(!medExp||!trainExp){
-    var uniq={};gregDates.forEach(function(d){uniq[d]=true;});
-    var sorted=Object.keys(uniq).sort();
-    // Remove issue date from pool
-    var pool=sorted.filter(function(d){return d!==issueDate;});
-    if(!medExp&&!trainExp){
-      // med expiry is always BEFORE training expiry on Balady cards
-      if(pool.length>=2){medExp=pool[0];trainExp=pool[pool.length-1];}
-      else if(pool.length===1){medExp=pool[0];}
-    }else if(medExp&&!trainExp){
-      var rem=pool.filter(function(d){return d!==medExp;});
-      if(rem.length)trainExp=rem[rem.length-1];
-    }else if(!medExp&&trainExp){
-      var rem2=pool.filter(function(d){return d!==trainExp;});
-      if(rem2.length)medExp=rem2[0];
+  // Pool = every date except issue date
+  var expiryPool=allSorted.filter(function(d){return d!==issueDate;});
+  console.log('[HealthPDF] issueDate:',issueDate,' expiryPool:',expiryPool);
+
+  if(expiryPool.length>=2){
+    // Try keyword proximity to assign which is med and which is train
+    var MED_KW=[
+      '\u062a\u0627\u0631\u064a\u062e \u0646\u0647\u0627\u064a\u0629 \u0627\u0644\u0634\u0647\u0627\u062f\u0629 \u0627\u0644\u0635\u062d\u064a\u0629',
+      '\u0646\u0647\u0627\u064a\u0629 \u0627\u0644\u0634\u0647\u0627\u062f\u0629 \u0627\u0644\u0635\u062d\u064a\u0629',
+      '\u0646\u0647\u0627\u064a\u0629 \u0627\u0644\u0634\u0647\u0627\u062f\u0629'
+    ];
+    var TRAIN_KW=[
+      '\u062a\u0627\u0631\u064a\u062e \u0627\u0646\u062a\u0647\u0627\u0621 \u0627\u0644\u0628\u0631\u0646\u0627\u0645\u062c \u0627\u0644\u062a\u062b\u0642\u064a\u0641\u064a',
+      '\u0627\u0646\u062a\u0647\u0627\u0621 \u0627\u0644\u0628\u0631\u0646\u0627\u0645\u062c \u0627\u0644\u062a\u062b\u0642\u064a\u0641\u064a',
+      '\u0627\u0646\u062a\u0647\u0627\u0621 \u0627\u0644\u0628\u0631\u0646\u0627\u0645\u062c',
+      '\u0627\u0644\u0628\u0631\u0646\u0627\u0645\u062c \u0627\u0644\u062a\u062b\u0642\u064a\u0641\u064a'
+    ];
+    // Find keyword positions
+    var medKidx=-1,trainKidx=-1;
+    MED_KW.forEach(function(k){if(medKidx<0)medKidx=text.indexOf(k);});
+    TRAIN_KW.forEach(function(k){if(trainKidx<0)trainKidx=text.indexOf(k);});
+
+    if(medKidx>=0&&trainKidx>=0){
+      // For each expiry date find its nearest occurrence position
+      function datePos(greg){
+        var hits=allDateMatches.filter(function(x){return x.greg===greg;});
+        return hits.length?hits[0].pos:-1;
+      }
+      // Score each pool date: difference between distance-to-med-label and distance-to-train-label
+      // Positive = closer to train label; negative = closer to med label
+      var scored=expiryPool.map(function(d){
+        var pos=datePos(d);
+        if(pos<0)return{greg:d,score:0};
+        return{greg:d,score:Math.abs(pos-medKidx)-Math.abs(pos-trainKidx)};
+      });
+      // Date with most negative score = closer to med label → med
+      // Date with most positive score = closer to train label → train
+      scored.sort(function(a,b){return a.score-b.score;});
+      medExp=scored[0].greg;   // closest to med label
+      trainExp=scored[scored.length-1].greg; // closest to train label
+      // Safety: if both resolved to same date, fall through to positional rule
+      if(medExp===trainExp){medExp='';trainExp='';}
     }
+
+    // Positional fallback: on Balady card the medical cert (right column) expiry
+    // appears as the LARGER date compared to training (left column, earlier expiry).
+    // So: med = largest, train = smaller of the two remaining.
+    if(!medExp||!trainExp){
+      medExp=expiryPool[expiryPool.length-1];   // largest date
+      trainExp=expiryPool[0];                   // smaller date
+    }
+  } else if(expiryPool.length===1){
+    medExp=expiryPool[0];
   }
 
+  console.log('[HealthPDF] Label search \u2014 med:',medExp,' train:',trainExp);
   console.log('[HealthPDF] Final \u2014 card:',cardNo,' med:',medExp,' train:',trainExp);
 
   var hc=BS.health.find(function(x){return x.id===id;});
@@ -11759,19 +11760,134 @@ function pcPrintCycle(){
   var entries=(BS.pc||[]).filter(function(p){return (p.cycleNo||1)===curNo;}).slice().sort(function(a,b){return (a.date||'').localeCompare(b.date||'');});
   if(!entries.length){showToast('No entries in current cycle','error');return;}
   var s=NX.session||{};
-  var w=window.open('','_blank','width=900,height=700');
-  if(!w){showToast('Popup blocked','error');return;}
+  var w=window.open('','_blank','width=1000,height=800');
+  if(!w){showToast('Popup blocked — allow popups to print','error');return;}
   var total=entries.reduce(function(sm,p){return sm+(+p.amount||0);},0);
-  var rowsHtml=entries.map(function(p,i){return '<tr><td>'+(i+1)+'</td><td>'+bxe(p.date||'')+'</td><td>'+bxe(p.description||'')+'</td><td>'+bxe(p.forwhat||'')+'</td><td>'+bxe(p.category||'')+'</td><td>'+bxe(p.gl||'')+'</td><td>'+bxe(p.remarks||'')+'</td><td style="text-align:right;font-family:monospace">'+(+p.amount||0).toFixed(2)+'</td></tr>';}).join('');
-  w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>Petty Cash #'+curNo+' \u2014 '+bxe(s.branchName||'')+'</title><style>body{font-family:-apple-system,sans-serif;padding:20px;color:#111}h1{margin:0 0 4px}.h{color:#666;font-size:12px;margin-bottom:18px}table{width:100%;border-collapse:collapse;font-size:12px}th,td{border:1px solid #ccc;padding:6px 8px;text-align:left}th{background:#f4f4f4}tfoot td{font-weight:700;background:#fafafa}.tot{text-align:right;font-family:monospace}.sig{margin-top:32px;display:flex;gap:40px;font-size:12px}.sig div{flex:1;border-top:1px solid #888;padding-top:6px;text-align:center}@media print{.np{display:none}}</style></head><body>'+
-    '<img src="https://i.imgur.com/jeqtcE2.png" alt="ALFA.CO" style="height:44px;width:auto;display:block;margin-bottom:8px">'+
-    '<h1>Petty Cash Report \u2014 Cycle #'+curNo+'</h1>'+
-    '<div class="h">Branch: '+bxe(s.branchName||'')+' \u00b7 Generated: '+new Date().toLocaleString()+' \u00b7 Entries: '+entries.length+'</div>'+
-    '<table><thead><tr><th>#</th><th>Date</th><th>Item</th><th>For / Dept</th><th>Cost Center</th><th>GL</th><th>Remarks</th><th>Amount (‫SAR ‬)</th></tr></thead>'+
+
+  // Build rows — inline thumbnail per entry
+  var rowsHtml=entries.map(function(p,i){
+    var invThumb='';
+    if(p.invoices&&p.invoices.length){
+      invThumb='<div style="margin-top:5px;display:flex;flex-wrap:wrap;gap:4px">';
+      p.invoices.forEach(function(inv){
+        if(inv.type==='image'){
+          invThumb+='<img src="'+inv.data+'" style="width:56px;height:56px;object-fit:cover;border-radius:4px;border:1px solid #ddd">';
+        } else {
+          invThumb+='<div style="display:inline-flex;align-items:center;gap:3px;background:#f5f5f5;border:1px solid #ddd;border-radius:4px;padding:3px 7px;font-size:10px">&#x1F4C4; '+bxe(inv.name||'PDF')+'</div>';
+        }
+      });
+      invThumb+='</div>';
+    }
+    return '<tr><td style="text-align:center;color:#888">'+(i+1)+'</td>'+
+      '<td style="white-space:nowrap">'+bxe(p.date||'')+'</td>'+
+      '<td><strong>'+bxe(p.description||'')+'</strong>'+invThumb+'</td>'+
+      '<td>'+bxe(p.forwhat||'')+'</td>'+
+      '<td>'+bxe(p.category||'')+'</td>'+
+      '<td>'+bxe(p.gl||'')+'</td>'+
+      '<td>'+bxe(p.remarks||'')+'</td>'+
+      '<td style="text-align:right;font-family:monospace;font-weight:600">'+(+p.amount||0).toFixed(2)+'</td></tr>';
+  }).join('');
+
+  // Invoice gallery section — full size images per entry
+  var allInv=[];
+  entries.forEach(function(p){(p.invoices||[]).forEach(function(inv){allInv.push({entry:p.description,date:p.date,inv:inv});});});
+  var galleryHtml='';
+  if(allInv.length){
+    galleryHtml='<div style="margin-top:32px;page-break-before:always"><div style="font-size:14px;font-weight:700;color:#1a2340;border-bottom:2px solid #1a2340;padding-bottom:6px;margin-bottom:16px">&#x1F4CE; Attached Invoices ('+allInv.length+')</div>';
+    galleryHtml+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px">';
+    allInv.forEach(function(x,i){
+      galleryHtml+='<div style="border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;page-break-inside:avoid">';
+      if(x.inv.type==='image'){
+        galleryHtml+='<img src="'+x.inv.data+'" style="width:100%;height:180px;object-fit:cover;display:block">';
+      } else {
+        galleryHtml+='<div style="background:#f8fafc;height:140px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px"><span style="font-size:36px">&#x1F4C4;</span><span style="font-size:11px;color:#64748b;font-weight:600">'+bxe(x.inv.name||'PDF')+'</span></div>';
+      }
+      galleryHtml+='<div style="padding:8px 10px;background:#fff"><div style="font-size:11px;font-weight:700;color:#1a2340">'+bxe(x.entry)+'</div><div style="font-size:10px;color:#64748b">'+bxe(x.date)+'</div></div>';
+      galleryHtml+='</div>';
+    });
+    galleryHtml+='</div></div>';
+  }
+
+  var budget=BS.pcBudget||0;
+  var remaining=budget?Math.max(0,budget-total):null;
+
+  w.document.write('<!doctype html><html><head><meta charset="utf-8">'+
+    '<title>Petty Cash #'+curNo+' — '+bxe(s.branchName||'')+'</title>'+
+    '<style>'+
+    '@page{size:A4;margin:10mm}'+
+    '*{box-sizing:border-box;margin:0;padding:0;font-family:Arial,Helvetica,sans-serif}'+
+    'body{background:#fff;color:#111;font-size:12px;padding:0}'+
+    'table{width:100%;border-collapse:collapse;margin-bottom:20px}'+
+    'th{background:#1a2340;color:#fff;padding:7px 9px;font-size:9px;text-transform:uppercase;letter-spacing:.08em;text-align:left}'+
+    'td{padding:7px 9px;border-bottom:1px solid #e2e8f0;vertical-align:top}'+
+    'tfoot td{font-weight:700;background:#f8fafc;border-top:2px solid #1a2340}'+
+    '.sig{margin-top:36px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:40px}'+
+    '.sig-cell{border-top:1px solid #333;padding-top:6px;text-align:center;font-size:10px;color:#555}'+
+    '@media print{.no-print{display:none!important}}'+
+    '</style></head><body>'+
+
+    // Header
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:12px;margin-bottom:18px;border-bottom:3px solid #1a2340">'+
+      '<div><img src="https://i.imgur.com/jeqtcE2.png" alt="ALFA.CO" style="height:44px;width:auto;display:block;margin-bottom:4px">'+
+        '<div style="font-size:11px;color:#64748b">'+bxe(s.branchName||s.entityName||'')+'</div></div>'+
+      '<div style="text-align:center">'+
+        '<h1 style="font-size:18px;font-weight:800;color:#1a2340">PETTY CASH REPORT</h1>'+
+        '<div style="font-size:12px;color:#64748b;margin-top:2px">Cycle #'+curNo+' · Active Cycle</div>'+
+      '</div>'+
+      '<div style="text-align:right;font-size:10px;color:#64748b">'+
+        '<div>Generated: '+new Date().toLocaleDateString('en-GB')+'</div>'+
+        '<div style="margin-top:3px">Entries: <strong>'+entries.length+'</strong></div>'+
+        (budget?'<div style="margin-top:3px">Budget: <strong>SAR '+budget.toFixed(2)+'</strong></div>':'')+
+      '</div>'+
+    '</div>'+
+
+    // Summary tiles
+    '<div style="display:grid;grid-template-columns:1fr 1fr'+(budget?' 1fr':'')+';gap:12px;margin-bottom:20px">'+
+      '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px 16px">'+
+        '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#166534;margin-bottom:4px">Total Spent</div>'+
+        '<div style="font-size:22px;font-weight:300;font-family:monospace;color:#166534">SAR '+total.toFixed(2)+'</div>'+
+      '</div>'+
+      '<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:12px 16px">'+
+        '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#1e40af;margin-bottom:4px">Entries</div>'+
+        '<div style="font-size:22px;font-weight:300;font-family:monospace;color:#1e40af">'+entries.length+'</div>'+
+      '</div>'+
+      (budget?'<div style="background:#fefce8;border:1px solid #fef08a;border-radius:8px;padding:12px 16px">'+
+        '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:#854d0e;margin-bottom:4px">Remaining Budget</div>'+
+        '<div style="font-size:22px;font-weight:300;font-family:monospace;color:#854d0e">SAR '+remaining.toFixed(2)+'</div>'+
+      '</div>':'')+
+    '</div>'+
+
+    // Main table
+    '<table><thead><tr>'+
+      '<th style="width:32px">#</th>'+
+      '<th style="width:80px">Date</th>'+
+      '<th>Item Purchased / Invoices</th>'+
+      '<th style="width:90px">For / Dept</th>'+
+      '<th style="width:90px">Cost Center</th>'+
+      '<th style="width:70px">GL</th>'+
+      '<th style="width:90px">Remarks</th>'+
+      '<th style="width:90px;text-align:right">Amount SAR</th>'+
+    '</tr></thead>'+
     '<tbody>'+rowsHtml+'</tbody>'+
-    '<tfoot><tr><td colspan="7" style="text-align:right">Total</td><td class="tot">'+total.toFixed(2)+'</td></tr></tfoot></table>'+
-    '<div class="sig"><div>Prepared by</div><div>Approved by</div><div>Received by</div></div>'+
-    '<div class="np" style="margin-top:18px;text-align:right"><button onclick="window.print()" style="padding:8px 18px;font-size:13px">Print</button></div>'+
+    '<tfoot><tr>'+
+      '<td colspan="7" style="text-align:right;font-size:13px">TOTAL</td>'+
+      '<td style="text-align:right;font-family:monospace;font-size:14px">SAR '+total.toFixed(2)+'</td>'+
+    '</tr></tfoot></table>'+
+
+    // Invoice gallery
+    galleryHtml+
+
+    // Signatures
+    '<div class="sig">'+
+      '<div class="sig-cell">Branch Manager</div>'+
+      '<div class="sig-cell">Area Manager</div>'+
+      '<div class="sig-cell">Finance Director</div>'+
+    '</div>'+
+
+    '<div style="text-align:center;margin-top:10px;font-size:9px;color:#aaa">Generated '+new Date().toLocaleString()+' · ALFA.CO OpsHub</div>'+
+    '<div class="no-print" style="text-align:center;margin-top:20px">'+
+      '<button onclick="window.print()" style="background:#1a2340;color:#fff;border:none;border-radius:8px;padding:10px 32px;font-size:14px;font-weight:700;cursor:pointer">&#x1F5A8;&#xFE0F; Print / Save PDF</button>'+
+    '</div>'+
     '</body></html>');
   w.document.close();
 }
