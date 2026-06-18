@@ -11070,70 +11070,24 @@ function parseAndFillHealthCard(text,id){
   // ── Core: find the date CLOSEST AFTER a keyword position ─────────────────────
   // This is the most reliable method for RTL PDFs — find where the label is,
   // then grab the nearest date match that appears after it in the text stream.
-  // ── Date extraction: always exclude issue date (smallest) from med+train ────
+  // ── Date extraction ──────────────────────────────────────────────────────────
+  // Rule (Balady cards, confirmed by observation):
+  //   3 dates in card:  issue (oldest) | training expiry | medical expiry (latest)
+  //   So: issue = min date, train = middle date, med = max date.
   var medExp='',trainExp='';
-
-  // Issue date = smallest extracted date (always true for Balady cards)
   var uniqAll={};allDateMatches.forEach(function(x){uniqAll[x.greg]=true;});
-  var allSorted=Object.keys(uniqAll).sort();
-  var issueDate=allSorted.length?allSorted[0]:''; // oldest = issue
-
-  // Pool = every date except issue date
+  var allSorted=Object.keys(uniqAll).sort(); // ascending greg dates
+  var issueDate=allSorted.length?allSorted[0]:'';  // smallest = issue, always excluded
   var expiryPool=allSorted.filter(function(d){return d!==issueDate;});
-  console.log('[HealthPDF] issueDate:',issueDate,' expiryPool:',expiryPool);
-
+  console.log('[HealthPDF] allDates:',allSorted,' issue:',issueDate,' pool:',expiryPool);
+  // Assign: med = largest expiry, train = smaller expiry
   if(expiryPool.length>=2){
-    // Try keyword proximity to assign which is med and which is train
-    var MED_KW=[
-      '\u062a\u0627\u0631\u064a\u062e \u0646\u0647\u0627\u064a\u0629 \u0627\u0644\u0634\u0647\u0627\u062f\u0629 \u0627\u0644\u0635\u062d\u064a\u0629',
-      '\u0646\u0647\u0627\u064a\u0629 \u0627\u0644\u0634\u0647\u0627\u062f\u0629 \u0627\u0644\u0635\u062d\u064a\u0629',
-      '\u0646\u0647\u0627\u064a\u0629 \u0627\u0644\u0634\u0647\u0627\u062f\u0629'
-    ];
-    var TRAIN_KW=[
-      '\u062a\u0627\u0631\u064a\u062e \u0627\u0646\u062a\u0647\u0627\u0621 \u0627\u0644\u0628\u0631\u0646\u0627\u0645\u062c \u0627\u0644\u062a\u062b\u0642\u064a\u0641\u064a',
-      '\u0627\u0646\u062a\u0647\u0627\u0621 \u0627\u0644\u0628\u0631\u0646\u0627\u0645\u062c \u0627\u0644\u062a\u062b\u0642\u064a\u0641\u064a',
-      '\u0627\u0646\u062a\u0647\u0627\u0621 \u0627\u0644\u0628\u0631\u0646\u0627\u0645\u062c',
-      '\u0627\u0644\u0628\u0631\u0646\u0627\u0645\u062c \u0627\u0644\u062a\u062b\u0642\u064a\u0641\u064a'
-    ];
-    // Find keyword positions
-    var medKidx=-1,trainKidx=-1;
-    MED_KW.forEach(function(k){if(medKidx<0)medKidx=text.indexOf(k);});
-    TRAIN_KW.forEach(function(k){if(trainKidx<0)trainKidx=text.indexOf(k);});
-
-    if(medKidx>=0&&trainKidx>=0){
-      // For each expiry date find its nearest occurrence position
-      function datePos(greg){
-        var hits=allDateMatches.filter(function(x){return x.greg===greg;});
-        return hits.length?hits[0].pos:-1;
-      }
-      // Score each pool date: difference between distance-to-med-label and distance-to-train-label
-      // Positive = closer to train label; negative = closer to med label
-      var scored=expiryPool.map(function(d){
-        var pos=datePos(d);
-        if(pos<0)return{greg:d,score:0};
-        return{greg:d,score:Math.abs(pos-medKidx)-Math.abs(pos-trainKidx)};
-      });
-      // Date with most negative score = closer to med label → med
-      // Date with most positive score = closer to train label → train
-      scored.sort(function(a,b){return a.score-b.score;});
-      medExp=scored[0].greg;   // closest to med label
-      trainExp=scored[scored.length-1].greg; // closest to train label
-      // Safety: if both resolved to same date, fall through to positional rule
-      if(medExp===trainExp){medExp='';trainExp='';}
-    }
-
-    // Positional fallback: on Balady card the medical cert (right column) expiry
-    // appears as the LARGER date compared to training (left column, earlier expiry).
-    // So: med = largest, train = smaller of the two remaining.
-    if(!medExp||!trainExp){
-      medExp=expiryPool[expiryPool.length-1];   // largest date
-      trainExp=expiryPool[0];                   // smaller date
-    }
+    medExp  = expiryPool[expiryPool.length-1]; // largest = medical cert
+    trainExp= expiryPool[0];                   // smaller = training program
   } else if(expiryPool.length===1){
     medExp=expiryPool[0];
   }
-
-  console.log('[HealthPDF] Label search \u2014 med:',medExp,' train:',trainExp);
+  console.log('[HealthPDF] Final \u2014 med:',medExp,' train:',trainExp);
   console.log('[HealthPDF] Final \u2014 card:',cardNo,' med:',medExp,' train:',trainExp);
 
   var hc=BS.health.find(function(x){return x.id===id;});
