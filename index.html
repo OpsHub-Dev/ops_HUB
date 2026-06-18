@@ -3772,6 +3772,7 @@ var NAV_CONFIG = {
       { id:'region-branches',icon:'🏪', label:'My Branches' },
       { id:'rev-analytics',  icon:'📊', label:'Sales Comparison' },
       { id:'headcount',      icon:'👥', label:'Staff Management', badge:'am-transfers-pending' },
+      { id:'am-resign-approvals', icon:'🚪', label:'Resign Approvals', badge:'am-resign-pending' },
       { id:'alerts-center',  icon:'⚠️', label:'Alerts', badge:'alerts' }
     ]}
   ],
@@ -3832,6 +3833,7 @@ var NAV_CONFIG = {
       { id:'hrf-employees',   icon:'👥', label:'All Employees' },
       { id:'hrf-attendance',  icon:'⏱️', label:'Attendance' },
       { id:'hrf-leave',       icon:'🏖️', label:'Leave Management' },
+      { id:'hrf-resign',      icon:'🚪', label:'Resign / End of Service', badge:'hrf-resign-pending' },
       { id:'hrf-health',      icon:'💳', label:'Health Cards' }
     ]},
     { section:'PAYROLL', items:[
@@ -5001,6 +5003,7 @@ function renderPage(pageId) {
     'brand-dash': pBrandDash,
     'brand-branches': pBrandBranches,
     'region-dash': pRegionDash,
+    'am-resign-approvals': pAmResignApprovals,
     'region-branches': pRegionBranches,
     'branch-dash': pBranchDash,
     'inv-items': pInvItems,
@@ -5046,6 +5049,7 @@ function renderPage(pageId) {
     'hrf-employees':  pHrfEmployees,
     'hrf-attendance': pHrfAttendance,
     'hrf-leave':      pHrfLeave,
+    'hrf-resign':     pHrfResign,
     'hrf-schedule':   pHrfSchedule,
     'hrf-health':     pHrfHealth,
     'hrf-payroll':    pHrfPayroll,
@@ -7833,7 +7837,7 @@ function attachBranchListeners() {
   _bListenersAttached = true;
   BS.tsViewDate = BS.tsViewDate || TODAY_BS;
 
-  var collections = ['staff','sales','waste','rem','pc','health','invoices','tsEmps','tsLeaves'];
+  var collections = ['staff','sales','waste','rem','pc','health','invoices','tsEmps','tsLeaves','resignRequests'];
   collections.forEach(function(key){
     db.ref(bPath(key)).on('value', function(snap){
       var raw=snap.val();
@@ -7853,7 +7857,7 @@ function attachBranchListeners() {
         db.ref('branches/'+NX.session.branchId+'/tsEmps').set(_tsObj);
       }
       NX.lastSync=Date.now();
-      if(['branch-dash','staff','timesheet','health-cards','sales','petty-cash','wastage','schedule'].indexOf(NX.page)>=0) {
+      if(['branch-dash','staff','timesheet','health-cards','sales','petty-cash','wastage','schedule','bm-leave'].indexOf(NX.page)>=0) {
         var area=document.getElementById('page-area'); if(area){area.innerHTML=renderPage_(NX.page);setTimeout(function(){initPageCharts(NX.page);},50);}
       }
     });
@@ -15620,7 +15624,7 @@ launchApp = function() {
 
 var HRF = {
   staff:{}, att:{}, leaves:{}, sch:{}, health:{},
-  pc:{}, sales:{}, invoices:{}, waste:{}, _listeners:{}
+  pc:{}, sales:{}, invoices:{}, waste:{}, resignReqs:{}, _listeners:{}
 };
 
 function hrfBranches() {
@@ -17285,6 +17289,154 @@ function hrfPrintPayrollReport(month,moLabel){
 }
 
 // ── LEAVE MANAGEMENT ──
+// ── AREA MANAGER: Resign Approvals ─────────────────────────────────
+function pAmResignApprovals(){
+  var h='<div class="page-header"><h1>&#x1F6AA; Resign Approvals</h1><p>Review BM-approved resignation requests</p></div>';
+  h+='<div id="am-resign-area"><div class="bcard" style="text-align:center;padding:30px;color:var(--text-tertiary)">Loading…</div></div>';
+  if(db){
+    setTimeout(function(){
+      db.ref('hrf/resignRequests').limitToLast(50).once('value',function(snap){
+        var area=document.getElementById('am-resign-area');if(!area)return;
+        var raw=snap.val()||{};
+        var reqs=Object.values(raw).filter(Boolean).filter(function(r){return r.status==='bm_approved';});
+        reqs.sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);});
+        if(!reqs.length){area.innerHTML='<div class="empty-state"><div class="es-icon">&#x1F6AA;</div><h3>No pending approvals</h3><p>BM-approved resignations will appear here.</p></div>';return;}
+        var html='';
+        reqs.forEach(function(r){
+          var dt=r.createdAt?new Date(r.createdAt).toLocaleDateString('en-GB'):'\u2014';
+          html+='<div class="bcard" style="margin-bottom:12px;border-left:3px solid #0369a1">'
+            +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">'
+            +'<div><div style="font-weight:700;font-size:14px">'+bxe(r.staffName||r.sap||'Staff')+'</div>'
+            +'<div style="font-size:11px;color:var(--text-secondary);font-family:var(--mono)">SAP: '+bxe(r.sap||'\u2014')+' \u00b7 '+bxe(r.branchName||'')+' \u00b7 '+dt+'</div>'
+            +(r.lastDay?'<div style="font-size:11px;color:var(--text-secondary)">Last day: <strong>'+bxe(r.lastDay)+'</strong></div>':'')
+            +(r.reason?'<div style="font-size:12px;color:var(--text-secondary);font-style:italic;margin-top:6px">\u201c'+bxe(r.reason)+'\u201d</div>':'')
+            +'</div>'
+            +'<div style="display:flex;gap:6px">'
+            +'<button class="btn btn-sm" style="background:#5b21b620;color:#5b21b6;border:1px solid #5b21b640" onclick="amApproveResign(\''  +r.id+'\')"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.6"><polyline points="20 6 9 17 4 12"/></svg> Approve</button>'
+            +'<button class="btn btn-sm" style="background:#c0392b18;color:#c0392b;border:1px solid #c0392b40" onclick="amRejectResign(\''  +r.id+'\')"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Reject</button>'
+            +'</div></div></div>';
+        });
+        area.innerHTML=html;
+      });
+    },0);
+  }
+  return h;
+}
+
+function amApproveResign(id){
+  nxConfirm('Forward this resignation to HR for End of Service?',function(){
+    var s=NX.session||{};
+    var upd={status:'am_approved',amApprovedAt:Date.now(),amApprovedBy:s.entityName||'Area Manager'};
+    db.ref('hrf/resignRequests/'+id).update(upd,function(err){
+      if(err){showToast('Error: '+err.message,'error');return;}
+      db.ref('hrf/resignRequests/'+id).once('value',function(snap){
+        var r=snap.val()||{};
+        if(r.branchId) db.ref('branches/'+r.branchId+'/resignRequests/'+id).update(upd);
+      });
+      showToast('Approved \u2713 \u2014 Forwarded to HR','success');
+      navTo('am-resign-approvals');
+    });
+  },{yesLabel:'Approve',yesColor:'#5b21b6'});
+}
+
+function amRejectResign(id){
+  nxConfirm('Reject this resignation request?',function(){
+    var s=NX.session||{};
+    var upd={status:'rejected',amRejectedAt:Date.now(),amRejectedBy:s.entityName||'Area Manager'};
+    db.ref('hrf/resignRequests/'+id).update(upd,function(err){
+      if(err){showToast('Error: '+err.message,'error');return;}
+      db.ref('hrf/resignRequests/'+id).once('value',function(snap){
+        var r=snap.val()||{};
+        if(r.branchId) db.ref('branches/'+r.branchId+'/resignRequests/'+id).update(upd);
+      });
+      showToast('Rejection recorded','success');
+      navTo('am-resign-approvals');
+    });
+  },{yesLabel:'Reject',yesColor:'#c0392b'});
+}
+
+// ── HR: Resign / End of Service ─────────────────────────────
+function pHrfResign(){
+  var h=hrfHeader('Resign / End of Service','AM-approved resignations ready for processing','');
+  h+='<div id="hrf-resign-area"><div class="bcard" style="text-align:center;padding:30px;color:var(--text-tertiary)">Loading…</div></div>';
+  if(db){
+    setTimeout(function(){
+      db.ref('hrf/resignRequests').limitToLast(100).once('value',function(snap){
+        var area=document.getElementById('hrf-resign-area');if(!area)return;
+        var raw=snap.val()||{};
+        var reqs=Object.values(raw).filter(Boolean);
+        reqs.sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);});
+        var pending=reqs.filter(function(r){return r.status==='am_approved';});
+        var others=reqs.filter(function(r){return r.status!=='am_approved';});
+        var statusColor={pending:'#b45309',bm_approved:'#0369a1',am_approved:'#5b21b6',rejected:'#c0392b',completed:'#00875a'};
+        var statusLabel={pending:'Pending BM',bm_approved:'Pending Area Mgr',am_approved:'Ready for HR',rejected:'Rejected',completed:'Completed'};
+        var html='';
+        if(!reqs.length){area.innerHTML='<div class="empty-state"><div class="es-icon">&#x1F6AA;</div><h3>No resignation requests</h3><p>Requests appear here after approval chain.</p></div>';return;}
+        html+='<div class="hrf-grid-3" style="margin-bottom:20px">';
+        var done=reqs.filter(function(r){return r.status==='completed';}).length;
+        [{l:'Ready for HR',v:pending.length,c:'#5b21b6'},{l:'Total',v:reqs.length,c:'var(--text-primary)'},{l:'Completed',v:done,c:'#00875a'}].forEach(function(x){
+          html+='<div style="text-align:center;background:var(--surface-2);border:1px solid '+x.c+'30;border-radius:9px;padding:14px"><div class="bmono" style="font-size:24px;font-weight:300;color:'+x.c+'">'+ x.v+'</div><div style="font-size:9px;color:var(--text-tertiary);margin-top:3px;text-transform:uppercase;letter-spacing:1px">'+x.l+'</div></div>';
+        });
+        html+='</div>';
+        if(pending.length){
+          html+='<div style="font-size:11px;font-weight:700;color:#5b21b6;text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px">&#x23F3; Awaiting End of Service</div>';
+          pending.forEach(function(r){
+            var dt=r.createdAt?new Date(r.createdAt).toLocaleDateString('en-GB'):'\u2014';
+            html+='<div class="bcard" style="margin-bottom:12px;border-left:3px solid #5b21b6">'
+              +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">'
+              +'<div><div style="font-weight:700;font-size:14px">'+bxe(r.staffName||r.sap||'Staff')+'</div>'
+              +'<div style="font-size:11px;color:var(--text-secondary);font-family:var(--mono)">SAP: '+bxe(r.sap||'\u2014')+' \u00b7 '+bxe(r.branchName||'')+' \u00b7 '+dt+'</div>'
+              +(r.lastDay?'<div style="font-size:11px;color:var(--text-secondary)">Last day: <strong>'+bxe(r.lastDay)+'</strong></div>':'')
+              +(r.reason?'<div style="font-size:12px;color:var(--text-secondary);font-style:italic;margin-top:6px">\u201c'+bxe(r.reason)+'\u201d</div>':'')
+              +'</div>'
+              +'<button class="btn btn-sm" style="background:#00875a20;color:#00875a;border:1px solid #00875a40" onclick="hrfCompleteResign(\''  +r.id+'\')"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.6"><polyline points="20 6 9 17 4 12"/></svg> Complete EOS</button>'
+              +'</div></div>';
+          });
+        }
+        if(others.length){
+          html+='<div style="font-size:11px;font-weight:700;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.1em;margin:16px 0 10px">History</div>';
+          others.forEach(function(r){
+            var sc=statusColor[r.status]||'#94a3b8';
+            var sl=statusLabel[r.status]||r.status;
+            var dt=r.createdAt?new Date(r.createdAt).toLocaleDateString('en-GB'):'\u2014';
+            html+='<div class="bcard" style="margin-bottom:8px;opacity:.85">'
+              +'<div style="display:flex;align-items:center;justify-content:space-between;gap:12px">'
+              +'<div><div style="font-weight:600;font-size:13px">'+bxe(r.staffName||r.sap)+'</div>'
+              +'<div style="font-size:11px;color:var(--text-secondary);">'+bxe(r.branchName||'')+' \u00b7 '+dt+'</div></div>'
+              +'<span style="background:'+sc+'18;color:'+sc+';border:1px solid '+sc+'40;border-radius:20px;padding:3px 10px;font-size:10px;font-weight:700">'+sl+'</span>'
+              +'</div></div>';
+          });
+        }
+        area.innerHTML=html;
+      });
+    },0);
+  }
+  return h;
+}
+
+function hrfCompleteResign(id){
+  nxConfirm('Complete End of Service? This will mark the staff as Resigned.',function(){
+    var s=NX.session||{};
+    var ts=Date.now();
+    db.ref('hrf/resignRequests/'+id).once('value',function(snap){
+      var r=snap.val()||{};
+      var upd={status:'completed',hrCompletedAt:ts,hrCompletedBy:s.entityName||'HR Manager'};
+      db.ref('hrf/resignRequests/'+id).update(upd);
+      if(r.branchId) db.ref('branches/'+r.branchId+'/resignRequests/'+id).update(upd);
+      if(r.branchId&&r.sap){
+        db.ref('branches/'+r.branchId+'/staff').once('value',function(ssnap){
+          var sraw=ssnap.val()||{};
+          var sarr=Array.isArray(sraw)?sraw.filter(Boolean):Object.values(sraw).filter(Boolean);
+          var member=sarr.find(function(m){return m&&String(m.sap)===String(r.sap);});
+          if(member&&member.id) db.ref('branches/'+r.branchId+'/staff/'+member.id+'/status').set('Resigned');
+        });
+      }
+      showToast('End of Service completed \u2713','success');
+      navTo('hrf-resign');
+    });
+  },{yesLabel:'Complete EOS',yesColor:'#00875a'});
+}
+
 function pHrfLeave(){
   var branches=hrfBranches();
   var filterStatus=NX._hrfLeaveStatus||'all';
@@ -19161,6 +19313,10 @@ function pBmLeave() {
   h += '<button class="bfbt'+(mainTab==='dayoff'?' on':'')+'" data-t="dayoff" onclick="BS._bmLeaveMainTab=this.dataset.t;navTo(\'bm-leave\')" style="flex:1;padding:9px 0;border-radius:10px;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px">';
   h += '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><line x1="12" y1="2" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="22"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="2" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="22" y2="12"/></svg>';
   h += ' Pending Day Off</button>';
+  var rPend=(BS.resignRequests||[]).filter(function(r){return r.status==='pending';}).length;
+  h += '<button class="bfbt'+(mainTab==='resign'?' on':'')+'" data-t="resign" onclick="BS._bmLeaveMainTab=this.dataset.t;navTo(\'bm-leave\')" style="flex:1;padding:9px 0;border-radius:10px;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px;position:relative">';
+  h += '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>';
+  h += ' Resign Requests'+(rPend?' <span style="background:#c0392b;color:#fff;border-radius:8px;font-size:9px;padding:1px 5px;font-family:var(--mono)">'+rPend+'</span>':'')+'</button>';
   h += '</div>';
 
   if (mainTab === 'requests') {
@@ -19227,6 +19383,9 @@ function pBmLeave() {
       (rows||'<tr><td colspan="7" style="text-align:center;color:var(--text-tertiary);padding:28px">No leave requests yet.</td></tr>')+
       '</tbody></table></div></div>';
 
+  } else if(mainTab==='resign'){
+    // ══ TAB 3: RESIGN REQUESTS ══
+    h=pBmResignTab(h);
   } else {
     // ══ TAB 2: PENDING DAY OFF ══
     var eo2 = '<option value="">Select employee\u2026</option>'+BS.tsEmps.slice().sort(function(a,b){return a.name.localeCompare(b.name);}).map(function(e){return '<option value="'+bxe(e.id)+'" data-sap="'+bxe(e.sap||'')+'" data-name="'+bxe(e.name)+'">'+bxe(e.name)+' ('+bxe(e.dept||'')+')</option>';}).join('');
@@ -19403,6 +19562,77 @@ function bmRejectLeave(id) {
   l.status='rejected';
   bSaveColl('tsLeaves',BS.tsLeaves); bmUpdateBadges();
   showToast('Leave rejected','success'); navTo('bm-leave');
+}
+
+
+// ── RESIGN REQUESTS (BM) ───────────────────────────────────────────
+function pBmResignTab(h){
+  var reqs=(BS.resignRequests||[]).slice().sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);});
+  var statusColor={pending:'#b45309',bm_approved:'#0369a1',am_approved:'#5b21b6',rejected:'#c0392b',completed:'#00875a'};
+  var statusLabel={pending:'Awaiting BM Review',bm_approved:'Forwarded to Area Manager',am_approved:'Forwarded to HR',rejected:'Rejected',completed:'End of Service Done'};
+  h+='<div style="background:rgba(192,57,43,.06);border:1px solid rgba(192,57,43,.18);border-radius:12px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:flex-start;gap:10px">';
+  h+='<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#c0392b" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>';
+  h+='<div style="font-size:12px;color:#c0392b;line-height:1.5"><strong>Resignation Workflow:</strong> Staff submits &#x2192; You approve (BM) &#x2192; Area Manager approves &#x2192; HR processes End of Service.</div></div>';
+  var tot=reqs.length,pend=reqs.filter(function(r){return r.status==='pending';}).length;
+  var inprog=reqs.filter(function(r){return r.status==='bm_approved'||r.status==='am_approved';}).length;
+  var done=reqs.filter(function(r){return r.status==='completed';}).length;
+  h+='<div class="bgrid-4" style="margin-bottom:16px">';
+  [{l:'Pending Review',v:pend,c:'#b45309'},{l:'In Progress',v:inprog,c:'#0369a1'},{l:'Completed',v:done,c:'#00875a'},{l:'Total',v:tot,c:'var(--text-primary)'}].forEach(function(x){
+    h+='<div style="text-align:center;background:var(--surface-2);border:1px solid '+x.c+'30;border-radius:9px;padding:12px"><div class="bmono" style="font-size:22px;font-weight:300;color:'+x.c+'">'+ x.v+'</div><div style="font-size:9px;color:var(--text-tertiary);margin-top:3px;text-transform:uppercase;letter-spacing:1px">'+x.l+'</div></div>';
+  });
+  h+='</div>';
+  if(!reqs.length){h+='<div class="empty-state"><div class="es-icon"><svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></div><h3>No resignation requests</h3><p>Staff resignation requests from the Staff portal will appear here.</p></div>';return h;}
+  reqs.forEach(function(r){
+    var sc=statusColor[r.status]||'#94a3b8';
+    var sl=statusLabel[r.status]||r.status;
+    var dt=r.createdAt?new Date(r.createdAt).toLocaleDateString('en-GB'):'\u2014';
+    h+='<div class="bcard" style="margin-bottom:12px;border-left:3px solid '+sc+'">'
+      +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap">'
+      +'<div style="flex:1;min-width:0"><div style="font-weight:700;font-size:14px">'+bxe(r.staffName||r.sap||'Staff')+'</div>'
+      +'<div style="font-size:11px;color:var(--text-secondary);font-family:var(--mono)">SAP: '+bxe(r.sap||'\u2014')+' \u00b7 Submitted: '+dt+'</div>'
+      +(r.lastDay?'<div style="font-size:11px;color:var(--text-secondary)">Last day: <strong>'+bxe(r.lastDay)+'</strong></div>':'')
+      +(r.reason?'<div style="font-size:12px;color:var(--text-secondary);margin-top:6px;font-style:italic">\u201c'+bxe(r.reason)+'\u201d</div>':'')
+      +'</div>'
+      +'<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">'
+      +'<span style="background:'+sc+'18;color:'+sc+';border:1px solid '+sc+'40;border-radius:20px;padding:3px 10px;font-size:10px;font-weight:700">'+sl+'</span>';
+    if(r.status==='pending'){
+      h+='<div style="display:flex;gap:6px">'
+        +'<button class="btn btn-sm" style="background:#00875a20;color:#00875a;border:1px solid #00875a40" onclick="bmApproveResign(\''  +r.id+'\')"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.6"><polyline points="20 6 9 17 4 12"/></svg> Approve</button>'
+        +'<button class="btn btn-sm" style="background:#c0392b18;color:#c0392b;border:1px solid #c0392b40" onclick="bmRejectResign(\''  +r.id+'\')"><svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.6"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Reject</button>'
+        +'</div>';
+    }
+    h+='</div></div></div>';
+  });
+  return h;
+}
+
+function bmApproveResign(id){
+  var s=NX.session||{};
+  if(!db||!s.branchId){showToast('Not connected','error');return;}
+  nxConfirm('Approve this resignation and forward to Area Manager?',function(){
+    var ts=Date.now();
+    var upd={status:'bm_approved',bmApprovedAt:ts,bmApprovedBy:s.entityName||'Branch Manager'};
+    db.ref('branches/'+s.branchId+'/resignRequests/'+id).update(upd,function(err){
+      if(err){showToast('Error: '+err.message,'error');return;}
+      db.ref('hrf/resignRequests/'+id).update(upd);
+      showToast('Approved \u2713 \u2014 Forwarded to Area Manager','success');
+      navTo('bm-leave');
+    });
+  },{yesLabel:'Approve',yesColor:'#00875a'});
+}
+
+function bmRejectResign(id){
+  var s=NX.session||{};
+  if(!db||!s.branchId){showToast('Not connected','error');return;}
+  nxConfirm('Reject this resignation request?',function(){
+    var upd={status:'rejected',bmRejectedAt:Date.now(),bmRejectedBy:s.entityName||'Branch Manager'};
+    db.ref('branches/'+s.branchId+'/resignRequests/'+id).update(upd,function(err){
+      if(err){showToast('Error: '+err.message,'error');return;}
+      db.ref('hrf/resignRequests/'+id).update(upd);
+      showToast('Resignation rejected','success');
+      navTo('bm-leave');
+    });
+  },{yesLabel:'Reject',yesColor:'#c0392b'});
 }
 
 // ── 3. PAYROLL SUBMIT ────────────────────────────────────────

@@ -464,6 +464,7 @@ textarea.fi{resize:vertical;min-height:80px}
       <button class="sb-item" onclick="showPage('history')" id="si-history"><span class="si">📂</span>History File</button>
       <button class="sb-item" onclick="showPage('incidents')" id="si-incidents"><span class="si">⚠️</span>Incident Report</button>
       <button class="sb-item" onclick="showPage('leave')" id="si-leave"><span class="si">🏖️</span>Annual Leave</button>
+      <button class="sb-item" onclick="showPage('resign')" id="si-resign"><span class="si">🚪</span>Resign</button>
       <button class="sb-item" onclick="showPage('training')" id="si-training"><span class="si">📚</span>Training</button>
       <button class="sb-item" onclick="showPage('briefing')" id="si-briefing"><span class="si">📋</span>Briefing & Tasks</button>
       <button class="sb-item" onclick="showPage('competition')" id="si-competition"><span class="si">🏆</span>Competition</button>
@@ -594,6 +595,26 @@ textarea.fi{resize:vertical;min-height:80px}
           </div>
           <div class="card"><div class="ctitle"><div class="cdot"></div>Leave History</div>
             <div class="tw"><table><thead><tr><th>Type</th><th>From</th><th>To</th><th>Days</th><th>Status</th></tr></thead><tbody id="lv-history"></tbody></table></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RESIGN -->
+      <div class="page" id="page-resign">
+        <div style="padding:20px 0 0">
+          <div class="sechdr"><div><h2>Resign</h2><div class="sechdr-sub">SUBMIT RESIGNATION</div></div></div>
+          <div class="card" style="border-left:3px solid #c0392b">
+            <div class="ctitle"><div class="cdot" style="background:#c0392b"></div>Submit Resignation</div>
+            <div style="font-size:12px;color:#c0392b;background:rgba(192,57,43,.07);border-radius:8px;padding:10px 12px;margin-bottom:14px;line-height:1.6">
+              <strong>Important:</strong> Your resignation request will be reviewed by your Branch Manager, then Area Manager, and finally HR will process your End of Service.
+            </div>
+            <div class="fg"><label class="fl">Requested Last Day of Work</label><input class="fi" type="date" id="res-lastday"></div>
+            <div class="fg"><label class="fl">Reason (optional)</label><textarea class="fi" id="res-reason" rows="3" placeholder="Brief reason for resignation…"></textarea></div>
+            <button class="btnp" style="background:linear-gradient(135deg,#c0392b,#922b21)" onclick="submitResign()">Submit Resignation</button>
+          </div>
+          <div class="card" id="res-status-card" style="display:none">
+            <div class="ctitle"><div class="cdot"></div>Resignation Status</div>
+            <div id="res-status-body"><div style="text-align:center;padding:20px;color:var(--text-tertiary)">Loading…</div></div>
           </div>
         </div>
       </div>
@@ -1570,6 +1591,7 @@ function showPage(id) {
   if (id === 'announcements') renderAnnouncements();
   if (id === 'competition') spLoadCompetition();
   if (id === 'server-drop') sdInit();
+  if (id === 'resign') loadResignStatus();
 }
 
 function mobNavOpen() {
@@ -2476,6 +2498,65 @@ function renderLeave() {
   } else {
     doRenderLeave(21);
   }
+}
+
+function submitResign(){
+  var u=CU||{};
+  if(!u.sap||!u.branchId){showToast('Not logged in','error');return;}
+  var lastDay=(document.getElementById('res-lastday')||{}).value||'';
+  var reason=(document.getElementById('res-reason')||{}).value||'';
+  if(!lastDay){showToast('Please set your last day of work','error');return;}
+  // Check no existing active resign request
+  db.ref('hrf/resignRequests').orderByChild('sap').equalTo(String(u.sap)).limitToLast(5).once('value',function(snap){
+    var raw=snap.val()||{};
+    var existing=Object.values(raw).filter(Boolean).filter(function(r){return r.status!=='rejected'&&r.status!=='completed';});
+    if(existing.length){showToast('You already have an active resignation request','error');return;}
+    var id='res_'+Date.now()+'_'+(Math.random()*1e6|0);
+    var rec={
+      id:id,sap:String(u.sap),staffName:u.name||'Staff',
+      branchId:u.branchId||'',branchName:u.branch||u.branchName||u.branchId||'',
+      lastDay:lastDay,reason:reason,
+      status:'pending',createdAt:Date.now()
+    };
+    db.ref('branches/'+u.branchId+'/resignRequests/'+id).set(rec,function(err){
+      if(err){showToast('Submit failed: '+err.message,'error');return;}
+      db.ref('hrf/resignRequests/'+id).set(rec);
+      showToast('Resignation submitted \u2713','success');
+      (document.getElementById('res-lastday')||{}).value='';
+      (document.getElementById('res-reason')||{}).value='';
+      loadResignStatus();
+    });
+  });
+}
+
+function loadResignStatus(){
+  var u=CU||{};
+  if(!u.sap)return;
+  var card=document.getElementById('res-status-card');
+  var body=document.getElementById('res-status-body');
+  if(!card||!body)return;
+  db.ref('hrf/resignRequests').limitToLast(20).once('value',function(snap){
+    var raw=snap.val()||{};
+    var reqs=Object.values(raw).filter(Boolean).filter(function(r){return String(r.sap)===String(u.sap);});
+    if(!reqs.length){card.style.display='none';return;}
+    card.style.display='';
+    var statusColor={pending:'#b45309',bm_approved:'#0369a1',am_approved:'#5b21b6',rejected:'#c0392b',completed:'#00875a'};
+    var statusLabel={pending:'Pending Branch Manager',bm_approved:'Approved by BM \u2014 Pending Area Manager',am_approved:'Approved \u2014 HR Processing EOS',rejected:'Rejected',completed:'End of Service Complete'};
+    var html='';
+    reqs.sort(function(a,b){return (b.createdAt||0)-(a.createdAt||0);}).forEach(function(r){
+      var sc=statusColor[r.status]||'#94a3b8';
+      var sl=statusLabel[r.status]||r.status;
+      var dt=r.createdAt?new Date(r.createdAt).toLocaleDateString('en-GB'):'\u2014';
+      html+='<div style="padding:12px 0;border-bottom:1px solid var(--border)">'
+        +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">'
+        +'<span style="font-size:11px;color:var(--text-secondary)">Submitted: '+dt+'</span>'
+        +'<span style="background:'+sc+'18;color:'+sc+';border:1px solid '+sc+'40;border-radius:20px;padding:3px 10px;font-size:10px;font-weight:700">'+sl+'</span>'
+        +'</div>'
+        +(r.lastDay?'<div style="font-size:12px;color:var(--text-secondary)">Last day: <strong>'+r.lastDay+'</strong></div>':'')
+        +'</div>';
+    });
+    body.innerHTML=html||'<div style="color:var(--text-tertiary);font-size:12px;text-align:center;padding:12px">No requests found.</div>';
+  });
 }
 function submitLeave() {
   var from = document.getElementById('lv-from').value;
