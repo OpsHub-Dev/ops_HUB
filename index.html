@@ -13107,7 +13107,9 @@ function dsrOpenBankSettings(){
   html+='<button onclick="dsrBankSave()" style="padding:8px 20px;border-radius:8px;background:var(--primary);border:none;color:#fff;font-size:13px;font-weight:700;cursor:pointer">Save</button>';
   html+='<button onclick="closeModal()" style="padding:8px 16px;border-radius:8px;background:var(--surface-2);border:1px solid var(--border);color:var(--text-primary);font-size:12px;cursor:pointer">Cancel</button>';
   html+='</div></div>';
-  openModal('Bank Settings',html);
+  // Build proper modal with close button header (openModal takes only html)
+  var fullHtml='<div class="modal-head"><h2>Bank Settings</h2><button class="modal-close" onclick="closeModalForce()">&#x2715;</button></div>'+html;
+  openModal(fullHtml);
 }
 function dsrBankEdit(i,field,val){if(!BS.dsrBanks)BS.dsrBanks=[];if(BS.dsrBanks[i])BS.dsrBanks[i][field]=val;}
 function dsrBankAdd(){if(!BS.dsrBanks)BS.dsrBanks=[];BS.dsrBanks.push({name:'',account:''});dsrOpenBankSettings();}
@@ -19916,17 +19918,17 @@ function bmDeleteDayOff(id) {
   if(!id) return;
   var s=NX.session||{};
   if(!s.branchId||!db) return;
-  openModal('Delete Day Off','<p style="font-size:14px;color:var(--text-secondary)">Remove this granted day off? The employee will no longer see it.</p>',
+  nxConfirm('Remove this granted day off?\nThe employee will no longer see it.',
     function(){
       db.ref('branches/'+s.branchId+'/tsLeaves/'+id).once('value',function(snap){
         var rec=snap.val();
         snap.ref.remove(function(err){
           if(err){showToast('Error: '+err.message,'error');return;}
           if(rec&&rec.sap) db.ref('staff/leave/'+rec.sap+'/'+id).remove();
-          showToast('Deleted \u2713','success'); navTo('bm-leave');
+          showToast('Deleted','success'); navTo('bm-leave');
         });
       });
-    },{yesLabel:'Delete',yesDanger:true});
+    },{yesLabel:'Delete',danger:true});
 }
 
 function bmApproveLeave(id) {
