@@ -13421,8 +13421,10 @@ function pBmBriefing() {
       return FOH_KEYWORDS.some(function(kw){ return dept.indexOf(kw)!=-1; });
     });
     if(!fohStaff.length) fohStaff = (BS.staff||[]).filter(function(m){ return m&&m.name; });
-    if(!BS._fmTables) BS._fmTables = [];
-    if(!BS._fmGroups) BS._fmGroups = [];
+    if(!BS._fmTables)    BS._fmTables    = [];
+    if(!BS._fmGroups)    BS._fmGroups    = [];
+    if(!BS._fmPositions) BS._fmPositions = {};
+    if(!BS._fmBreaks)    BS._fmBreaks    = {};
 
     h += '<div class="bcard" style="margin-bottom:14px">';
     // Controls
@@ -13437,9 +13439,34 @@ function pBmBriefing() {
     // Status banner
     h += '<div id="fm-status-banner" style="display:none;background:rgba(180,83,9,.07);border:1px solid rgba(180,83,9,.2);border-radius:10px;padding:9px 13px;margin-bottom:12px"></div>';
     // Groups panel
+    // ── Positions + Break Time Panel ──
+    if(!BS._fmPositions) BS._fmPositions = {};
+    if(!BS._fmBreaks)    BS._fmBreaks    = {};
+    var FM_POS_DEF = [
+      {k:'manager',    label:'Manager',         icon:'&#x1F451;', col:'#006666'},
+      {k:'expo',       label:'EXPO',             icon:'&#x1F4CB;', col:'#2563eb'},
+      {k:'floor_up',   label:'Floor (Upstairs)', icon:'&#x2B06;',  col:'#7c3aed'},
+      {k:'floor_down', label:'Floor (Downstairs)',icon:'&#x2B07;', col:'#059669'},
+      {k:'salad_up',   label:'Salad Bar (Up)',   icon:'&#x1F957;', col:'#d97706'},
+      {k:'salad_down', label:'Salad Bar (Down)', icon:'&#x1F957;', col:'#ea580c'},
+      {k:'host',       label:'Host',             icon:'&#x1F91D;', col:'#db2777'},
+      {k:'bar',        label:'Bar',              icon:'&#x1F379;', col:'#b45309'},
+      {k:'busser',     label:'Busser',           icon:'&#x1F9F9;', col:'#374151'},
+      {k:'runner',     label:'Runner',           icon:'&#x1F3C3;', col:'#0057ff'},
+    ];
+    h += '<div style="background:rgba(0,102,102,.04);border:1px solid rgba(0,102,102,.12);border-radius:14px;padding:14px;margin-bottom:14px">';
+    h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">';
+    h += '<div style="font-size:11px;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:.1em">';
+    h += '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>';
+    h += ' Position Assignments &amp; Breaks</div>';
+    h += '<div style="font-size:10px;color:var(--text-tertiary)">Visible on each staff member&#39;s portal</div>';
+    h += '</div>';
+    h += '<div id="fm-positions-panel"></div>';
+    h += '</div>';
+
     h += '<div style="background:rgba(0,102,102,.04);border:1px solid rgba(0,102,102,.1);border-radius:12px;padding:12px;margin-bottom:14px">';
     h += '<div style="font-size:11px;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px">';
-    h += '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg> Sections / Groups</div>';
+    h += '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg> Sections / Groups (Tables)</div>';
     h += '<div id="fm-groups-panel"></div>';
     h += '</div>';
     // Legend
@@ -13482,8 +13509,11 @@ function pBmBriefing() {
           if (fm && fm.tables && fm.tables.length && fm._pushKey) {
             // Restore tables from last published map
             BS._fmTables = fm.tables.map(function(t){
-              return { num: t.num, label: t.label||String(t.num||''), staffName: t.staffName||'' };
+              return { num: t.num, label: t.label||String(t.num||''), staffName: t.staffName||'', group: t.group||'' };
             });
+            BS._fmGroups     = (fm.groups||[]).map(function(g){ return {id:g.id,name:g.name,color:g.color||0,staffName:g.staffName||''}; });
+            BS._fmPositions  = fm.positions || {};
+            BS._fmBreaks     = fm.breaks    || {};
             BS._fmPushKey = fm._pushKey;  // remember key so we overwrite
             BS._fmPushDate = fm._pushDate || TODAY_BS;
             var banner = document.getElementById('fm-status-banner');
@@ -13628,6 +13658,19 @@ var FM_GROUP_COLORS = [
   { bg:'rgba(239,68,68,.1)',   border:'#dc2626', text:'#dc2626'   },  // red
 ];
 
+var FM_POS_DEF = [
+  {k:'manager',    label:'Manager',          icon:'&#x1F451;', col:'#006666'},
+  {k:'expo',       label:'EXPO',             icon:'&#x1F4CB;', col:'#2563eb'},
+  {k:'floor_up',   label:'Floor (Upstairs)', icon:'&#x2B06;',  col:'#7c3aed'},
+  {k:'floor_down', label:'Floor (Downstairs)',icon:'&#x2B07;', col:'#059669'},
+  {k:'salad_up',   label:'Salad Bar (Up)',   icon:'&#x1F957;', col:'#d97706'},
+  {k:'salad_down', label:'Salad Bar (Down)', icon:'&#x1F957;', col:'#ea580c'},
+  {k:'host',       label:'Host',             icon:'&#x1F91D;', col:'#db2777'},
+  {k:'bar',        label:'Bar',              icon:'&#x1F379;', col:'#b45309'},
+  {k:'busser',     label:'Busser',           icon:'&#x1F9F9;', col:'#374151'},
+  {k:'runner',     label:'Runner',           icon:'&#x1F3C3;', col:'#0057ff'},
+];
+
 function bmFmGetGroupColor(idx) {
   return FM_GROUP_COLORS[idx % FM_GROUP_COLORS.length];
 }
@@ -13650,11 +13693,11 @@ function bmFmAddGroup() {
 /* ── Delete Group (ungroup its tables) ── */
 function bmFmDeleteGroup(gid) {
   if (!BS._fmGroups) return;
-  openModal('Delete Group', '<p style="font-size:14px;color:var(--text-secondary)">Delete this group? Tables will be ungrouped but not removed.</p>', function () {
+  nxConfirm('Delete this group? Tables will be ungrouped but not removed.', function () {
     BS._fmGroups = BS._fmGroups.filter(function (g) { return g.id !== gid; });
     (BS._fmTables || []).forEach(function (t) { if (t.group === gid) { t.group = ''; t.staffName = ''; } });
     bmFmRenderAll();
-  }, { yesLabel: 'Delete Group', yesDanger: true });
+  }, { yesLabel: 'Delete Group', danger: true });
 }
 
 /* ── Rename Group ── */
@@ -13725,9 +13768,94 @@ function bmFmClear() {
 
 /* ════ MAIN RENDER ════════════════════════════════════════ */
 function bmFmRenderAll() {
+  bmFmRenderPositions();
   bmFmRenderGroups();
   bmFmRenderGrid();
   bmFmUpdateBulkList();
+}
+
+/* ── Positions + Breaks panel ── */
+function bmFmSetPosition(key, staffName) {
+  if (!BS._fmPositions) BS._fmPositions = {};
+  BS._fmPositions[key] = staffName;
+  // If a staff has a break assigned and is now unassigned, keep break
+}
+function bmFmClearBreak(sap) { bmFmSetBreak(sap, ''); }
+function bmFmSetBreak(sap, breakTime) {
+  if (!BS._fmBreaks) BS._fmBreaks = {};
+  if (!sap) return;
+  if (breakTime) BS._fmBreaks[sap] = breakTime;
+  else delete BS._fmBreaks[sap];
+  bmFmRenderPositions();
+}
+function bmFmRenderPositions() {
+  var el = document.getElementById('fm-positions-panel');
+  if (!el) return;
+  var pos = BS._fmPositions || {};
+  var brk = BS._fmBreaks    || {};
+  var fohStaff = BS._fmFohStaff || [];
+  // Build full staff list (all staff) for positions
+  var allStaff = (BS.staff||[]).filter(function(m){ return m&&m.name; }).sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
+
+  var h = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px">';
+  FM_POS_DEF.forEach(function(pd) {
+    var assigned = pos[pd.k] || '';
+    var assignedStaff = assigned ? allStaff.find(function(s){ return s.name===assigned; }) : null;
+    var sap = assignedStaff ? (assignedStaff.sap||'') : '';
+    var brkVal = sap ? (brk[sap]||'') : '';
+    var borderCol = assigned ? pd.col : 'rgba(0,0,0,.12)';
+    var bgCol     = assigned ? pd.col+'18' : 'var(--surface-2)';
+
+    h += '<div style="background:'+bgCol+';border:1.5px solid '+borderCol+';border-radius:12px;padding:11px 12px">';
+    // Header row
+    h += '<div style="display:flex;align-items:center;gap:7px;margin-bottom:8px">';
+    h += '<span style="font-size:16px">'+pd.icon+'</span>';
+    h += '<div><div style="font-size:11px;font-weight:700;color:'+pd.col+'">'+pd.label+'</div>';
+    if (assigned) h += '<div style="font-size:9px;color:var(--text-tertiary);font-family:var(--mono)">'+(sap?'SAP '+sap:'')+'</div>';
+    h += '</div></div>';
+    // Staff selector
+    h += '<select data-poskey="'+pd.k+'" onchange="bmFmSetPosition(this.dataset.poskey,this.value);bmFmRenderPositions()" ';
+    h += 'style="width:100%;font-size:11px;padding:5px 7px;border:1px solid '+borderCol+';border-radius:8px;background:var(--surface-1);color:var(--text-primary);font-family:var(--font);margin-bottom:6px">';
+    h += '<option value="">-- Unassigned --</option>';
+    allStaff.forEach(function(m) {
+      var sel = assigned === m.name ? ' selected' : '';
+      h += '<option value="'+bxe(m.name||'')+'"'+sel+'>'+bxe(m.name||'')+(m.sap?' ('+m.sap+')':'')+'</option>';
+    });
+    h += '</select>';
+    // Break time (only if someone assigned)
+    if (assigned && sap) {
+      h += '<div style="display:flex;align-items:center;gap:6px">';
+      h += '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="'+pd.col+'" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
+      h += '<input type="time" value="'+bxe(brkVal)+'" data-sap="'+bxe(sap)+'" onchange="bmFmSetBreak(this.dataset.sap,this.value)" ';
+      h += 'title="Break time for '+bxe(assigned)+'" ';
+      h += 'style="flex:1;font-size:11px;padding:4px 7px;border:1px solid '+borderCol+';border-radius:7px;background:var(--surface-1);color:var(--text-primary);font-family:var(--mono);outline:none">';
+      if (brkVal) h += '<span style="font-size:9px;font-weight:700;color:'+pd.col+';margin-left:3px">Break @ '+bxe(brkVal)+'</span>';
+      h += '</div>';
+    } else if (assigned) {
+      h += '<div style="font-size:9px;color:var(--text-tertiary);font-style:italic">Add SAP to staff to set break time</div>';
+    }
+    h += '</div>';
+  });
+  h += '</div>';
+  // Break assignments summary
+  var brkKeys = Object.keys(brk).filter(function(k){ return brk[k]; });
+  if (brkKeys.length) {
+    h += '<div style="margin-top:12px;padding:10px 12px;background:rgba(0,102,102,.05);border:1px solid rgba(0,102,102,.1);border-radius:10px">';
+    h += '<div style="font-size:10px;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:.08em;margin-bottom:7px">Break Schedule</div>';
+    h += '<div style="display:flex;flex-wrap:wrap;gap:6px">';
+    brkKeys.forEach(function(sap) {
+      var st = (BS.staff||[]).find(function(s){ return s.sap===sap; });
+      var name = st ? st.name : sap;
+      h += '<div style="display:flex;align-items:center;gap:5px;background:rgba(0,102,102,.1);border:1px solid rgba(0,102,102,.2);border-radius:8px;padding:4px 9px;font-size:11px">';
+      h += '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
+      h += '<strong>'+bxe(name)+'</strong>';
+      h += '<span style="font-family:var(--mono);color:var(--primary);font-weight:700">'+bxe(brk[sap])+'</span>';
+      h += '<button data-bsap="'+bxe(sap)+'" onclick="bmFmClearBreak(this.dataset.bsap)" style="background:none;border:none;color:var(--text-tertiary);cursor:pointer;font-size:12px;padding:0;line-height:1">&times;</button>';
+      h += '</div>';
+    });
+    h += '</div></div>';
+  }
+  el.innerHTML = h;
 }
 
 /* ── Groups panel ── */
@@ -13936,9 +14064,9 @@ function bmFmLoadIntoEditor(dateStr, pushKey) {
     BS._fmTables = m.tables.map(function(t){
       return { num: t.num, label: t.label||String(t.num||''), staffName: t.staffName||'', group: t.group||'' };
     });
-    BS._fmGroups = (m.groups||[]).map(function(g){
-      return { id: g.id, name: g.name, color: g.color||0, staffName: g.staffName||'' };
-    });
+    BS._fmGroups     = (m.groups||[]).map(function(g){ return { id: g.id, name: g.name, color: g.color||0, staffName: g.staffName||'' }; });
+    BS._fmPositions  = m.positions || {};
+    BS._fmBreaks     = m.breaks    || {};
     BS._fmPushKey   = pushKey;
     BS._fmPushDate  = dateStr;
     var banner = document.getElementById('fm-status-banner');
@@ -13983,8 +14111,10 @@ function bmFmPublish() {
     ts: Date.now(),
     by: s.branchName || s.entityName || 'Manager',
     branchId: s.branchId,
-    groups: groups.map(function(g){ return { id:g.id, name:g.name, color:g.color||0, staffName:g.staffName||'' }; }),
-    tables: tables.map(function(t){ return { num:t.num, label:t.label||String(t.num), staffName:t.staffName||'', group:t.group||'' }; })
+    groups:    groups.map(function(g){ return { id:g.id, name:g.name, color:g.color||0, staffName:g.staffName||'' }; }),
+    tables:    tables.map(function(t){ return { num:t.num, label:t.label||String(t.num), staffName:t.staffName||'', group:t.group||'' }; }),
+    positions: BS._fmPositions || {},
+    breaks:    BS._fmBreaks    || {}
   };
 
   function afterSave(key) {
@@ -20363,15 +20493,15 @@ function bmDeleteStaffAnn(annId) {
   if (!annId) return;
   var s = NX.session||{};
   if (!s.branchId||!db) return;
-  openModal('Delete Announcement','<p style="font-size:14px;color:var(--text-secondary)">Delete this announcement? Staff will no longer see it.</p>',
+  nxConfirm('Delete this announcement? Staff will no longer see it.',
     function(){
       db.ref('branches/'+s.branchId+'/bmAnnouncements/'+annId).remove(function(err){
         if (err) { showToast('Error: '+err.message,'error'); return; }
-        showToast('Deleted \u2713','success');
+        showToast('Deleted','success');
         BS._annTab = 'send';
         navTo('bm-announcements');
       });
-    },{yesLabel:'Delete',yesDanger:true});
+    },{yesLabel:'Delete',danger:true});
 }
 
 function bmAcknowledgeById(annId) {
