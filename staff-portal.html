@@ -623,6 +623,8 @@ textarea.fi{resize:vertical;min-height:80px}
       <div class="page" id="page-briefing">
         <div style="padding:20px 0 0">
           <div class="sechdr"><div><h2>📋 Briefing & Tasks</h2><div class="sechdr-sub">Today's shift info</div></div></div>
+          <!-- Floor map assignment card (shown when BM has published floor map) -->
+          <div id="briefing-floor-map" style="display:none;margin-bottom:12px"></div>
           <div id="briefing-86" class="card" style="display:none;margin-bottom:12px">
             <div class="ctitle" style="margin-bottom:8px"><div class="cdot" style="background:var(--danger)"></div>86 Items — Not Available</div>
             <div id="briefing-86-items" style="display:flex;flex-wrap:wrap;gap:6px"></div>
@@ -3913,12 +3915,108 @@ function escH(s){
 // ══════════════════════════════════════════════════════
 // BRIEFING & TASKS (Staff Portal)
 // ══════════════════════════════════════════════════════
+function renderBriefingFloorMap() {
+  var u = CU;
+  var el = document.getElementById('briefing-floor-map');
+  if (!el || !u || !u.branchId) return;
+  el.style.display = 'none';
+  el.innerHTML = '';
+  db.ref('branches/' + u.branchId + '/latestFloorMap').once('value', function(snap) {
+    var fm = snap.val();
+    if (!fm || !fm.ts) return;
+    // Only show if published today
+    var fmDate = new Date(fm.ts);
+    var today = new Date();
+    if (fmDate.toDateString() !== today.toDateString()) return;
+
+    var myName = (u.name || '').trim().toLowerCase();
+    var mySap  = String(u.sap || '').trim();
+
+    // Find my position(s)
+    var positions = fm.positions || [];
+    var mySlots = [];
+    if (Array.isArray(positions)) {
+      positions.forEach(function(pos) {
+        ['opening', 'closing'].forEach(function(shift) {
+          var slot = pos[shift] || {};
+          var slotSap = String(slot.sap || '').trim();
+          var nameMatch = slot.name && slot.name.trim().toLowerCase() === myName;
+          var sapMatch  = slotSap && mySap && slotSap === mySap;
+          if (nameMatch || sapMatch) {
+            mySlots.push({ pos: pos, shift: shift, brk: slot.brk || '' });
+          }
+        });
+      });
+    }
+
+    // Find my tables
+    var tables = fm.tables || [];
+    var myTables = tables.filter(function(t) {
+      if (t.staffSap && mySap && t.staffSap === mySap) return true;
+      return t.staffName && t.staffName.trim().toLowerCase() === myName;
+    });
+
+    if (!mySlots.length && !myTables.length) return;
+
+    var dt = new Date(fm.ts).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+    var accentCol = mySlots.length ? mySlots[0].pos.col : 'var(--primary)';
+
+    var h = '<div class="card" style="border-left:3px solid ' + accentCol + ';margin-bottom:0">';
+    h += '<div class="ctitle" style="margin-bottom:10px">';
+    h += '<div class="cdot" style="background:' + accentCol + '"></div>';
+    h += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="margin-right:5px;vertical-align:middle"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>';
+    h += 'Floor Map — My Assignment</div>';
+
+    // Position slots
+    mySlots.forEach(function(entry) {
+      var pos = entry.pos;
+      var shiftCol = entry.shift === 'opening' ? '#059669' : '#2563eb';
+      var shiftLabel = entry.shift === 'opening' ? 'Opening Shift' : 'Closing Shift';
+      h += '<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:' + pos.col + '14;border:1.5px solid ' + pos.col + '50;border-radius:12px;margin-bottom:8px">';
+      h += '<span style="font-size:26px">' + escH(pos.icon) + '</span>';
+      h += '<div style="flex:1">';
+      h += '<div style="font-size:9px;color:' + shiftCol + ';font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:2px">' + shiftLabel + '</div>';
+      h += '<div style="font-size:18px;font-weight:700;color:' + pos.col + '">' + escH(pos.label) + '</div>';
+      h += '</div>';
+      if (entry.brk) {
+        h += '<div style="text-align:right">';
+        h += '<div style="font-size:8px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:2px">Break</div>';
+        h += '<div style="font-size:15px;font-weight:700;color:#0057ff;font-family:var(--mono)">' + escH(entry.brk) + '</div>';
+        h += '</div>';
+      }
+      h += '</div>';
+    });
+
+    // Table badges
+    if (myTables.length) {
+      h += '<div style="margin-top:6px">';
+      h += '<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px;font-family:var(--mono)">Your Tables</div>';
+      h += '<div style="display:flex;flex-wrap:wrap;gap:8px">';
+      myTables.forEach(function(t) {
+        h += '<div style="background:rgba(0,102,102,.1);border:2px solid var(--primary);border-radius:12px;padding:10px 16px;text-align:center;min-width:52px">';
+        h += '<div style="font-size:20px;font-weight:700;color:var(--primary);font-family:var(--mono)">' + escH(String(t.label || t.num || '')) + '</div>';
+        h += '<div style="font-size:8px;color:var(--text3);margin-top:2px;font-family:var(--mono);letter-spacing:.1em">TABLE</div>';
+        h += '</div>';
+      });
+      h += '</div></div>';
+    }
+
+    h += '<div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:10px">Published · ' + escH(dt) + '</div>';
+    h += '</div>';
+
+    el.innerHTML = h;
+    el.style.display = '';
+  });
+}
+
 function renderBriefing(){
   var u=CU;
   if(!u||!u.branchId){
     document.getElementById('briefing-tasks-list').innerHTML='<div style="text-align:center;padding:20px;color:var(--text3);font-size:11px">No branch linked</div>';
     return;
   }
+  // Load floor map assignment into briefing page
+  renderBriefingFloorMap();
   db.ref('branches/'+u.branchId+'/briefings/'+todayKey()).once('value', function(snap){
     var list=snap.val()||{};
     var el=document.getElementById('briefing-tasks-list');
@@ -3950,7 +4048,6 @@ function renderBriefing(){
     var myFirstName=(u.name||'').toLowerCase().split(' ')[0];
     var myAssigns=allAssigns.filter(function(a){
       if(a.sap && mySap && String(a.sap)===mySap) return true;
-      if(a.staffSap && mySap && String(a.staffSap)===mySap) return true;
       if(a.staff && myFirstName && a.staff.toLowerCase().indexOf(myFirstName)>=0) return true;
       return false;
     });
@@ -4110,10 +4207,7 @@ function renderDashFloorMap() {
 
     // 2. Tables assigned
     var tables = fm.tables || [];
-    var mySapFm = String(CU.sap || '').trim();
     var myTables = tables.filter(function(t) {
-      // Match by SAP (reliable) first, then fall back to name
-      if (t.staffSap && mySapFm && t.staffSap === mySapFm) return true;
       return t.staffName && t.staffName.trim().toLowerCase() === myName;
     });
 
