@@ -13423,8 +13423,9 @@ function pBmBriefing() {
     if(!fohStaff.length) fohStaff = (BS.staff||[]).filter(function(m){ return m&&m.name; });
     if(!BS._fmTables)    BS._fmTables    = [];
     if(!BS._fmGroups)    BS._fmGroups    = [];
-    if(!BS._fmPositions) BS._fmPositions = {};
-    if(!BS._fmBreaks)    BS._fmBreaks    = {};
+    if(!BS._fmPositions || !Array.isArray(BS._fmPositions)) {
+      BS._fmPositions = FM_POS_DEFAULTS.map(function(p,i){ return {id:'pos_'+(i+1),label:p.label,icon:p.icon,col:p.col,opening:{name:'',sap:'',brk:''},closing:{name:'',sap:'',brk:''}}; });
+    }
 
     h += '<div class="bcard" style="margin-bottom:14px">';
     // Controls
@@ -13440,20 +13441,9 @@ function pBmBriefing() {
     h += '<div id="fm-status-banner" style="display:none;background:rgba(180,83,9,.07);border:1px solid rgba(180,83,9,.2);border-radius:10px;padding:9px 13px;margin-bottom:12px"></div>';
     // Groups panel
     // ── Positions + Break Time Panel ──
-    if(!BS._fmPositions) BS._fmPositions = {};
-    if(!BS._fmBreaks)    BS._fmBreaks    = {};
-    var FM_POS_DEF = [
-      {k:'manager',    label:'Manager',         icon:'&#x1F451;', col:'#006666'},
-      {k:'expo',       label:'EXPO',             icon:'&#x1F4CB;', col:'#2563eb'},
-      {k:'floor_up',   label:'Floor (Upstairs)', icon:'&#x2B06;',  col:'#7c3aed'},
-      {k:'floor_down', label:'Floor (Downstairs)',icon:'&#x2B07;', col:'#059669'},
-      {k:'salad_up',   label:'Salad Bar (Up)',   icon:'&#x1F957;', col:'#d97706'},
-      {k:'salad_down', label:'Salad Bar (Down)', icon:'&#x1F957;', col:'#ea580c'},
-      {k:'host',       label:'Host',             icon:'&#x1F91D;', col:'#db2777'},
-      {k:'bar',        label:'Bar',              icon:'&#x1F379;', col:'#b45309'},
-      {k:'busser',     label:'Busser',           icon:'&#x1F9F9;', col:'#374151'},
-      {k:'runner',     label:'Runner',           icon:'&#x1F3C3;', col:'#0057ff'},
-    ];
+    if(!BS._fmPositions || !Array.isArray(BS._fmPositions)) {
+      BS._fmPositions = FM_POS_DEFAULTS.map(function(p,i){ return {id:'pos_'+(i+1),label:p.label,icon:p.icon,col:p.col,opening:{name:'',sap:'',brk:''},closing:{name:'',sap:'',brk:''}}; });
+    }
     h += '<div style="background:rgba(0,102,102,.04);border:1px solid rgba(0,102,102,.12);border-radius:14px;padding:14px;margin-bottom:14px">';
     h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">';
     h += '<div style="font-size:11px;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:.1em">';
@@ -13512,8 +13502,8 @@ function pBmBriefing() {
               return { num: t.num, label: t.label||String(t.num||''), staffName: t.staffName||'', group: t.group||'' };
             });
             BS._fmGroups     = (fm.groups||[]).map(function(g){ return {id:g.id,name:g.name,color:g.color||0,staffName:g.staffName||''}; });
-            BS._fmPositions  = fm.positions || {};
-            BS._fmBreaks     = fm.breaks    || {};
+            BS._fmPositions  = (fm.positions && Array.isArray(fm.positions)) ? fm.positions :
+              FM_POS_DEFAULTS.map(function(p,i){ return {id:'pos_'+(i+1),label:p.label,icon:p.icon,col:p.col,opening:{name:'',sap:'',brk:''},closing:{name:'',sap:'',brk:''}}; });
             BS._fmPushKey = fm._pushKey;  // remember key so we overwrite
             BS._fmPushDate = fm._pushDate || TODAY_BS;
             var banner = document.getElementById('fm-status-banner');
@@ -13658,18 +13648,26 @@ var FM_GROUP_COLORS = [
   { bg:'rgba(239,68,68,.1)',   border:'#dc2626', text:'#dc2626'   },  // red
 ];
 
-var FM_POS_DEF = [
-  {k:'manager',    label:'Manager',          icon:'&#x1F451;', col:'#006666'},
-  {k:'expo',       label:'EXPO',             icon:'&#x1F4CB;', col:'#2563eb'},
-  {k:'floor_up',   label:'Floor (Upstairs)', icon:'&#x2B06;',  col:'#7c3aed'},
-  {k:'floor_down', label:'Floor (Downstairs)',icon:'&#x2B07;', col:'#059669'},
-  {k:'salad_up',   label:'Salad Bar (Up)',   icon:'&#x1F957;', col:'#d97706'},
-  {k:'salad_down', label:'Salad Bar (Down)', icon:'&#x1F957;', col:'#ea580c'},
-  {k:'host',       label:'Host',             icon:'&#x1F91D;', col:'#db2777'},
-  {k:'bar',        label:'Bar',              icon:'&#x1F379;', col:'#b45309'},
-  {k:'busser',     label:'Busser',           icon:'&#x1F9F9;', col:'#374151'},
-  {k:'runner',     label:'Runner',           icon:'&#x1F3C3;', col:'#0057ff'},
+// Default position slots - user can add/edit/remove
+var FM_POS_DEFAULTS = [
+  {label:'Manager',           icon:'&#x1F451;', col:'#006666'},
+  {label:'EXPO',              icon:'&#x1F4CB;', col:'#2563eb'},
+  {label:'Floor (Upstairs)',  icon:'&#x2B06;',  col:'#7c3aed'},
+  {label:'Floor (Downstairs)',icon:'&#x2B07;',  col:'#059669'},
+  {label:'Salad Bar (Up)',    icon:'&#x1F957;', col:'#d97706'},
+  {label:'Salad Bar (Down)',  icon:'&#x1F957;', col:'#ea580c'},
+  {label:'Host',              icon:'&#x1F91D;', col:'#db2777'},
+  {label:'Bar',               icon:'&#x1F379;', col:'#b45309'},
+  {label:'Busser',            icon:'&#x1F9F9;', col:'#374151'},
+  {label:'Runner',            icon:'&#x1F3C3;', col:'#0057ff'},
 ];
+var FM_ICON_OPTS = [
+  {v:'&#x1F451;',t:'Crown'},  {v:'&#x1F4CB;',t:'Clipboard'}, {v:'&#x2B06;',t:'Up'},
+  {v:'&#x2B07;',t:'Down'},    {v:'&#x1F957;',t:'Salad'},     {v:'&#x1F91D;',t:'Host'},
+  {v:'&#x1F379;',t:'Bar'},    {v:'&#x1F9F9;',t:'Broom'},     {v:'&#x1F3C3;',t:'Runner'},
+  {v:'&#x1F4BC;',t:'Briefcase'},{v:'&#x2B50;',t:'Star'},     {v:'&#x1F527;',t:'Wrench'},
+];
+var FM_COL_OPTS = ['#006666','#2563eb','#7c3aed','#059669','#d97706','#ea580c','#db2777','#b45309','#374151','#0057ff','#dc2626','#0e7490'];
 
 function bmFmGetGroupColor(idx) {
   return FM_GROUP_COLORS[idx % FM_GROUP_COLORS.length];
@@ -13775,89 +13773,160 @@ function bmFmRenderAll() {
 }
 
 /* ── Positions + Breaks panel ── */
-function bmFmSetPosition(key, staffName) {
-  if (!BS._fmPositions) BS._fmPositions = {};
-  BS._fmPositions[key] = staffName;
-  // If a staff has a break assigned and is now unassigned, keep break
+/* ── Position slot helpers ── */
+function bmFmPosFind(id) {
+  return (BS._fmPositions||[]).find(function(p){ return p.id===id; });
 }
-function bmFmClearBreak(sap) { bmFmSetBreak(sap, ''); }
-function bmFmSetBreak(sap, breakTime) {
-  if (!BS._fmBreaks) BS._fmBreaks = {};
-  if (!sap) return;
-  if (breakTime) BS._fmBreaks[sap] = breakTime;
-  else delete BS._fmBreaks[sap];
+function bmFmPosSetStaff(id, shift, name) {
+  var p = bmFmPosFind(id);
+  if (!p) return;
+  var allStaff = BS.staff||[];
+  var m = name ? allStaff.find(function(s){ return s.name===name; }) : null;
+  p[shift] = { name: name||'', sap: m?(m.sap||''):'', brk: (p[shift]&&p[shift].brk)||'' };
   bmFmRenderPositions();
+}
+function bmFmPosSetBreak(id, shift, val) {
+  var p = bmFmPosFind(id);
+  if (!p) return;
+  if (!p[shift]) p[shift]={name:'',sap:'',brk:''};
+  p[shift].brk = val;
+  bmFmRenderPositions();
+}
+function bmFmPosSetLabel(id, val) {
+  var p = bmFmPosFind(id);
+  if (p) p.label = val;
+}
+function bmFmPosSetIcon(id, val) {
+  var p = bmFmPosFind(id);
+  if (p) { p.icon = val; bmFmRenderPositions(); }
+}
+function bmFmPosSetCol(id, val) {
+  var p = bmFmPosFind(id);
+  if (p) { p.col = val; bmFmRenderPositions(); }
+}
+function bmFmPosAdd() {
+  if (!BS._fmPositions) BS._fmPositions = [];
+  var id = 'pos_' + Date.now().toString(36);
+  BS._fmPositions.push({id:id, label:'New Position', icon:'&#x2B50;', col:'#006666',
+    opening:{name:'',sap:'',brk:''}, closing:{name:'',sap:'',brk:''}});
+  bmFmRenderPositions();
+}
+function bmFmPosDel(id) {
+  nxConfirm('Remove this position slot?', function(){
+    BS._fmPositions = (BS._fmPositions||[]).filter(function(p){ return p.id!==id; });
+    bmFmRenderPositions();
+  }, {yesLabel:'Remove', danger:true});
 }
 function bmFmRenderPositions() {
   var el = document.getElementById('fm-positions-panel');
   if (!el) return;
-  var pos = BS._fmPositions || {};
-  var brk = BS._fmBreaks    || {};
-  var fohStaff = BS._fmFohStaff || [];
-  // Build full staff list (all staff) for positions
+  var positions = BS._fmPositions || [];
   var allStaff = (BS.staff||[]).filter(function(m){ return m&&m.name; }).sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
 
-  var h = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px">';
-  FM_POS_DEF.forEach(function(pd) {
-    var assigned = pos[pd.k] || '';
-    var assignedStaff = assigned ? allStaff.find(function(s){ return s.name===assigned; }) : null;
-    var sap = assignedStaff ? (assignedStaff.sap||'') : '';
-    var brkVal = sap ? (brk[sap]||'') : '';
-    var borderCol = assigned ? pd.col : 'rgba(0,0,0,.12)';
-    var bgCol     = assigned ? pd.col+'18' : 'var(--surface-2)';
+  var fi = 'width:100%;font-size:11px;padding:5px 7px;border:1px solid rgba(0,0,0,.12);border-radius:8px;background:var(--surface-1);color:var(--text-primary);font-family:var(--font)';
 
-    h += '<div style="background:'+bgCol+';border:1.5px solid '+borderCol+';border-radius:12px;padding:11px 12px">';
-    // Header row
-    h += '<div style="display:flex;align-items:center;gap:7px;margin-bottom:8px">';
-    h += '<span style="font-size:16px">'+pd.icon+'</span>';
-    h += '<div><div style="font-size:11px;font-weight:700;color:'+pd.col+'">'+pd.label+'</div>';
-    if (assigned) h += '<div style="font-size:9px;color:var(--text-tertiary);font-family:var(--mono)">'+(sap?'SAP '+sap:'')+'</div>';
-    h += '</div></div>';
-    // Staff selector
-    h += '<select data-poskey="'+pd.k+'" onchange="bmFmSetPosition(this.dataset.poskey,this.value);bmFmRenderPositions()" ';
-    h += 'style="width:100%;font-size:11px;padding:5px 7px;border:1px solid '+borderCol+';border-radius:8px;background:var(--surface-1);color:var(--text-primary);font-family:var(--font);margin-bottom:6px">';
-    h += '<option value="">-- Unassigned --</option>';
-    allStaff.forEach(function(m) {
-      var sel = assigned === m.name ? ' selected' : '';
-      h += '<option value="'+bxe(m.name||'')+'"'+sel+'>'+bxe(m.name||'')+(m.sap?' ('+m.sap+')':'')+'</option>';
+  function staffOpts(pos, shift) {
+    var cur = (pos[shift]&&pos[shift].name) || '';
+    var o = '<option value="">-- Unassigned --</option>';
+    allStaff.forEach(function(m){
+      o += '<option value="'+bxe(m.name||'')+'"'+(cur===m.name?' selected':'')+'>'
+        +bxe(m.name||'')+(m.sap?' ('+m.sap+')':'')+'</option>';
+    });
+    return o;
+  }
+
+  var h = '';
+  positions.forEach(function(pos) {
+    var hasOpen  = !!(pos.opening && pos.opening.name);
+    var hasClose = !!(pos.closing && pos.closing.name);
+    var anyAssigned = hasOpen || hasClose;
+    var bdr = anyAssigned ? '1.5px solid '+pos.col : '1.5px solid rgba(0,0,0,.1)';
+    var bg  = anyAssigned ? pos.col+'14' : 'var(--surface-2)';
+
+    h += '<div style="background:'+bg+';border:'+bdr+';border-radius:14px;padding:12px;margin-bottom:10px">';
+
+    // ── Header: icon picker | label input | color picker | delete ──
+    h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap">';
+
+    // Icon picker dropdown
+    h += '<select data-pid="'+bxe(pos.id)+'" onchange="bmFmPosSetIcon(this.dataset.pid,this.value)" ';
+    h += 'style="font-size:15px;padding:3px 5px;border:1px solid rgba(0,0,0,.1);border-radius:7px;background:var(--surface-1);cursor:pointer;width:54px">';
+    FM_ICON_OPTS.forEach(function(ic){
+      h += '<option value="'+ic.v+'"'+(pos.icon===ic.v?' selected':'')+'>'+ic.v+'</option>';
     });
     h += '</select>';
-    // Break time (only if someone assigned)
-    if (assigned && sap) {
-      h += '<div style="display:flex;align-items:center;gap:6px">';
-      h += '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="'+pd.col+'" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
-      h += '<input type="time" value="'+bxe(brkVal)+'" data-sap="'+bxe(sap)+'" onchange="bmFmSetBreak(this.dataset.sap,this.value)" ';
-      h += 'title="Break time for '+bxe(assigned)+'" ';
-      h += 'style="flex:1;font-size:11px;padding:4px 7px;border:1px solid '+borderCol+';border-radius:7px;background:var(--surface-1);color:var(--text-primary);font-family:var(--mono);outline:none">';
-      if (brkVal) h += '<span style="font-size:9px;font-weight:700;color:'+pd.col+';margin-left:3px">Break @ '+bxe(brkVal)+'</span>';
-      h += '</div>';
-    } else if (assigned) {
-      h += '<div style="font-size:9px;color:var(--text-tertiary);font-style:italic">Add SAP to staff to set break time</div>';
-    }
+
+    // Editable label
+    h += '<input type="text" value="'+bxe(pos.label)+'" data-pid="'+bxe(pos.id)+'" ';
+    h += 'onchange="bmFmPosSetLabel(this.dataset.pid,this.value)" ';
+    h += 'style="flex:1;min-width:100px;font-size:13px;font-weight:700;padding:5px 8px;border:1.5px solid '+pos.col+';border-radius:8px;background:var(--surface-1);color:var(--text-primary);font-family:var(--font);outline:none">';
+
+    // Color swatches
+    h += '<div style="display:flex;gap:3px;flex-wrap:wrap;max-width:120px">';
+    FM_COL_OPTS.forEach(function(c){
+      h += '<button data-pid="'+bxe(pos.id)+'" data-col="'+c+'" onclick="bmFmPosSetCol(this.dataset.pid,this.dataset.col)" ';
+      h += 'style="width:16px;height:16px;border-radius:50%;background:'+c+';border:'+(pos.col===c?'2.5px solid #000':'1.5px solid rgba(0,0,0,.15)')+';cursor:pointer;padding:0;flex-shrink:0" ';
+      h += 'title="'+c+'"></button>';
+    });
     h += '</div>';
-  });
-  h += '</div>';
-  // Break assignments summary
-  var brkKeys = Object.keys(brk).filter(function(k){ return brk[k]; });
-  if (brkKeys.length) {
-    h += '<div style="margin-top:12px;padding:10px 12px;background:rgba(0,102,102,.05);border:1px solid rgba(0,102,102,.1);border-radius:10px">';
-    h += '<div style="font-size:10px;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:.08em;margin-bottom:7px">Break Schedule</div>';
-    h += '<div style="display:flex;flex-wrap:wrap;gap:6px">';
-    brkKeys.forEach(function(sap) {
-      var st = (BS.staff||[]).find(function(s){ return s.sap===sap; });
-      var name = st ? st.name : sap;
-      h += '<div style="display:flex;align-items:center;gap:5px;background:rgba(0,102,102,.1);border:1px solid rgba(0,102,102,.2);border-radius:8px;padding:4px 9px;font-size:11px">';
-      h += '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
-      h += '<strong>'+bxe(name)+'</strong>';
-      h += '<span style="font-family:var(--mono);color:var(--primary);font-weight:700">'+bxe(brk[sap])+'</span>';
-      h += '<button data-bsap="'+bxe(sap)+'" onclick="bmFmClearBreak(this.dataset.bsap)" style="background:none;border:none;color:var(--text-tertiary);cursor:pointer;font-size:12px;padding:0;line-height:1">&times;</button>';
+
+    // Delete button
+    h += '<button data-pid="'+bxe(pos.id)+'" onclick="bmFmPosDel(this.dataset.pid)" ';
+    h += 'style="background:none;border:none;color:rgba(0,0,0,.3);cursor:pointer;font-size:17px;padding:2px;flex-shrink:0;line-height:1" title="Remove position">&times;</button>';
+    h += '</div>';
+
+    // ── Shift rows: Opening + Closing ──
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+
+    ['opening','closing'].forEach(function(shift) {
+      var slotData = pos[shift] || {name:'',sap:'',brk:''};
+      var shiftCol = shift==='opening' ? '#059669' : '#2563eb';
+      var shiftIcon = shift==='opening'
+        ? '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="'+shiftCol+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>'
+        : '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="'+shiftCol+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+      var shiftLabel = shift==='opening' ? 'Opening' : 'Closing';
+
+      h += '<div style="background:var(--surface-1);border:1px solid rgba(0,0,0,.08);border-radius:10px;padding:9px">';
+      h += '<div style="display:flex;align-items:center;gap:5px;margin-bottom:7px">';
+      h += shiftIcon;
+      h += '<span style="font-size:10px;font-weight:700;color:'+shiftCol+';text-transform:uppercase;letter-spacing:.06em">'+shiftLabel+'</span>';
+      if (slotData.name) {
+        h += '<span style="margin-left:auto;font-size:9px;color:var(--text-tertiary);font-family:var(--mono)">'+(slotData.sap?'SAP '+slotData.sap:'')+'</span>';
+      }
+      h += '</div>';
+
+      // Staff select
+      h += '<select data-pid="'+bxe(pos.id)+'" data-shift="'+shift+'" ';
+      h += 'onchange="bmFmPosSetStaff(this.dataset.pid,this.dataset.shift,this.value)" ';
+      h += 'style="'+fi+';margin-bottom:6px">';
+      h += staffOpts(pos, shift);
+      h += '</select>';
+
+      // Break time input
+      h += '<div style="display:flex;align-items:center;gap:5px">';
+      h += '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="rgba(0,0,0,.4)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
+      h += '<span style="font-size:9px;color:var(--text-tertiary)">Break</span>';
+      h += '<input type="time" value="'+bxe(slotData.brk||'')+'" ';
+      h += 'data-pid="'+bxe(pos.id)+'" data-shift="'+shift+'" ';
+      h += 'onchange="bmFmPosSetBreak(this.dataset.pid,this.dataset.shift,this.value)" ';
+      h += 'style="flex:1;font-size:10px;padding:3px 6px;border:1px solid rgba(0,0,0,.1);border-radius:6px;background:var(--surface-2);color:var(--text-primary);font-family:var(--mono);outline:none"';
+      h += slotData.name ? '' : ' disabled title="Assign staff first"';
+      h += '>';
+      h += '</div>';
       h += '</div>';
     });
+
     h += '</div></div>';
-  }
+  });
+
+  // Add position button
+  h += '<button onclick="bmFmPosAdd()" ';
+  h += 'style="display:flex;align-items:center;gap:7px;padding:9px 18px;border-radius:10px;border:1.5px dashed rgba(0,102,102,.4);background:transparent;color:var(--primary);font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font);margin-top:4px">';
+  h += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>';
+  h += '+ Add Position</button>';
+
   el.innerHTML = h;
 }
-
 /* ── Groups panel ── */
 function bmFmRenderGroups() {
   var el = document.getElementById('fm-groups-panel');
@@ -14065,8 +14134,8 @@ function bmFmLoadIntoEditor(dateStr, pushKey) {
       return { num: t.num, label: t.label||String(t.num||''), staffName: t.staffName||'', group: t.group||'' };
     });
     BS._fmGroups     = (m.groups||[]).map(function(g){ return { id: g.id, name: g.name, color: g.color||0, staffName: g.staffName||'' }; });
-    BS._fmPositions  = m.positions || {};
-    BS._fmBreaks     = m.breaks    || {};
+    BS._fmPositions  = (m.positions && Array.isArray(m.positions)) ? m.positions :
+      FM_POS_DEFAULTS.map(function(p,i){ return {id:'pos_'+(i+1),label:p.label,icon:p.icon,col:p.col,opening:{name:'',sap:'',brk:''},closing:{name:'',sap:'',brk:''}}; });
     BS._fmPushKey   = pushKey;
     BS._fmPushDate  = dateStr;
     var banner = document.getElementById('fm-status-banner');
@@ -14113,8 +14182,7 @@ function bmFmPublish() {
     branchId: s.branchId,
     groups:    groups.map(function(g){ return { id:g.id, name:g.name, color:g.color||0, staffName:g.staffName||'' }; }),
     tables:    tables.map(function(t){ return { num:t.num, label:t.label||String(t.num), staffName:t.staffName||'', group:t.group||'' }; }),
-    positions: BS._fmPositions || {},
-    breaks:    BS._fmBreaks    || {}
+    positions: BS._fmPositions || []
   };
 
   function afterSave(key) {

@@ -4075,7 +4075,7 @@ function annAck(annId) {
     if (!err) { renderAnnouncements(); renderDashAnnPreview(); }
   });
 }
-/* ══ MY ASSIGNMENT (Floor Map: Position, Tables, Break Time) ══ */
+/* ══ MY ASSIGNMENT (Floor Map: Position + Shift + Tables + Break) ══ */
 function renderDashFloorMap() {
   var el = document.getElementById('dash-floor-map');
   if (!el || !CU || !CU.branchId) return;
@@ -4085,30 +4085,21 @@ function renderDashFloorMap() {
     if (!fm) { el.innerHTML=''; return; }
 
     var myName = (CU.name||'').trim().toLowerCase();
-    var mySap  = (CU.sap||'').trim();
     var dt = fm.ts ? new Date(fm.ts).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : 'Today';
 
-    // 1. Position assigned
-    var FM_POS_DEF = [
-      {k:'manager',    label:'Manager',          icon:'\uD83D\uDC51', col:'#006666'},
-      {k:'expo',       label:'EXPO',             icon:'\uD83D\uDCCB', col:'#2563eb'},
-      {k:'floor_up',   label:'Floor (Upstairs)', icon:'\u2B06',       col:'#7c3aed'},
-      {k:'floor_down', label:'Floor (Downstairs)',icon:'\u2B07',      col:'#059669'},
-      {k:'salad_up',   label:'Salad Bar (Up)',   icon:'\uD83E\uDD57', col:'#d97706'},
-      {k:'salad_down', label:'Salad Bar (Down)', icon:'\uD83E\uDD57', col:'#ea580c'},
-      {k:'host',       label:'Host',             icon:'\uD83E\uDD1D', col:'#db2777'},
-      {k:'bar',        label:'Bar',              icon:'\uD83C\uDF79', col:'#b45309'},
-      {k:'busser',     label:'Busser',           icon:'\uD83E\uDDF9', col:'#374151'},
-      {k:'runner',     label:'Runner',           icon:'\uD83C\uDFC3', col:'#0057ff'},
-    ];
-    var positions = fm.positions || {};
-    var myPosition = null;
-    FM_POS_DEF.forEach(function(pd) {
-      var assigned = positions[pd.k] || '';
-      if (assigned && assigned.trim().toLowerCase() === myName) {
-        myPosition = pd;
-      }
-    });
+    // 1. Find my position(s) in new array-based structure
+    var positions = fm.positions || [];
+    var mySlots = [];
+    if (Array.isArray(positions)) {
+      positions.forEach(function(pos) {
+        ['opening','closing'].forEach(function(shift) {
+          var slot = pos[shift] || {};
+          if (slot.name && slot.name.trim().toLowerCase() === myName) {
+            mySlots.push({ pos: pos, shift: shift, brk: slot.brk || '' });
+          }
+        });
+      });
+    }
 
     // 2. Tables assigned
     var tables = fm.tables || [];
@@ -4116,31 +4107,42 @@ function renderDashFloorMap() {
       return t.staffName && t.staffName.trim().toLowerCase() === myName;
     });
 
-    // 3. Break time
-    var breaks = fm.breaks || {};
-    var myBreak = mySap ? (breaks[mySap] || '') : '';
+    if (!mySlots.length && !myTables.length) { el.innerHTML=''; return; }
 
-    // If nothing assigned at all, hide card
-    if (!myPosition && !myTables.length && !myBreak) { el.innerHTML=''; return; }
+    // Pick accent color from first position
+    var accentCol = mySlots.length ? mySlots[0].pos.col : '#006666';
 
-    var accentCol = myPosition ? myPosition.col : '#006666';
     var h = '<div class="card" style="border-left:3px solid '+accentCol+'">';
-    h += '<div class="ctitle" style="margin-bottom:10px">';
-    h += '<div class="cdot" style="background:'+accentCol+'"></div>';
-    h += '&#x1F5FA;&#xFE0F; My Shift Assignment</div>';
+    h += '<div class="ctitle" style="margin-bottom:10px"><div class="cdot" style="background:'+accentCol+'"></div>&#x1F5FA;&#xFE0F; My Shift Assignment</div>';
 
-    // Position badge
-    if (myPosition) {
-      h += '<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:'+myPosition.col+'18;border:1.5px solid '+myPosition.col+'40;border-radius:12px;margin-bottom:10px">';
-      h += '<span style="font-size:26px">'+myPosition.icon+'</span>';
-      h += '<div><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:2px">Position</div>';
-      h += '<div style="font-size:17px;font-weight:700;color:'+myPosition.col+'">'+escH(myPosition.label)+'</div></div>';
+    // Position slot badges
+    mySlots.forEach(function(entry) {
+      var pos = entry.pos;
+      var shiftCol = entry.shift === 'opening' ? '#059669' : '#2563eb';
+      var shiftIcon = entry.shift === 'opening'
+        ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="'+shiftCol+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>'
+        : '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="'+shiftCol+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+      var shiftLabel = entry.shift === 'opening' ? 'Opening Shift' : 'Closing Shift';
+
+      h += '<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:'+pos.col+'14;border:1.5px solid '+pos.col+'50;border-radius:12px;margin-bottom:8px">';
+      h += '<span style="font-size:26px">'+escH(pos.icon)+'</span>';
+      h += '<div style="flex:1">';
+      h += '<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:2px;display:flex;align-items:center;gap:4px">';
+      h += shiftIcon+'<span style="color:'+shiftCol+';font-weight:700">'+shiftLabel+'</span></div>';
+      h += '<div style="font-size:18px;font-weight:700;color:'+pos.col+'">'+escH(pos.label)+'</div>';
       h += '</div>';
-    }
+      if (entry.brk) {
+        h += '<div style="text-align:right">';
+        h += '<div style="font-size:8px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:2px">Break</div>';
+        h += '<div style="font-size:15px;font-weight:700;color:#0057ff;font-family:var(--mono)">'+escH(entry.brk)+'</div>';
+        h += '</div>';
+      }
+      h += '</div>';
+    });
 
     // Tables
     if (myTables.length) {
-      h += '<div style="margin-bottom:10px">';
+      h += '<div style="margin-top:8px;margin-bottom:8px">';
       h += '<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px">Tables</div>';
       h += '<div style="display:flex;flex-wrap:wrap;gap:6px">';
       myTables.forEach(function(t) {
@@ -4152,16 +4154,7 @@ function renderDashFloorMap() {
       h += '</div></div>';
     }
 
-    // Break time
-    if (myBreak) {
-      h += '<div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:rgba(0,87,255,.07);border:1px solid rgba(0,87,255,.2);border-radius:10px;margin-bottom:8px">';
-      h += '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0057ff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
-      h += '<div><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em">Break Time</div>';
-      h += '<div style="font-size:16px;font-weight:700;color:#0057ff;font-family:var(--mono)">'+escH(myBreak)+'</div></div>';
-      h += '</div>';
-    }
-
-    h += '<div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:4px">Published by Branch Manager &middot; '+escH(dt)+'</div>';
+    h += '<div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:6px">Published by Branch Manager &middot; '+escH(dt)+'</div>';
     h += '</div>';
     el.innerHTML = h;
   }, function() { el.innerHTML=''; });
