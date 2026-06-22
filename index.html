@@ -6924,7 +6924,100 @@ function pAccessCtrl() {
       });
     }, 150);
   }
+
+  // ── Staff Portal Registrations
+  h += '<div class="card section" style="margin-top:16px">';
+  h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">';
+  h += '<div style="display:flex;align-items:center;gap:10px">';
+  h += '<div style="width:32px;height:32px;border-radius:8px;background:rgba(0,102,102,.12);display:flex;align-items:center;justify-content:center">';
+  h += '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#006666" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1"/></svg>';
+  h += '</div>';
+  h += '<div style="font-size:11px;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:.08em">Staff Portal Registrations</div>';
+  h += '</div>';
+  h += '<div style="display:flex;gap:8px;align-items:center">';
+  h += '<input id="sp-reg-search" class="form-input" style="width:180px;height:32px;font-size:12px;padding:0 10px" placeholder="Search SAP or name..." oninput="filterSpRegs(this.value)">';
+  h += '<button class="btn btn-sm" onclick="loadSpRegistrations()">&#x21BA; Refresh</button>';
+  h += '</div></div>';
+  h += '<div id="sp-reg-list"><div style="text-align:center;padding:24px;color:var(--text-tertiary);font-size:12px">Loading staff portal registrations...</div></div>';
+  h += '</div>';
+  if (db) { setTimeout(function() { loadSpRegistrations(); }, 250); }
+
   return h;
+}
+
+var _spRegAll = [];
+function loadSpRegistrations() {
+  var container = document.getElementById('sp-reg-list');
+  if (!container || !db) return;
+  container.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-tertiary);font-size:12px">Loading...</div>';
+  db.ref('staff/sessions').once('value', function(sesSnap) {
+    db.ref('staff/pins').once('value', function(pinSnap) {
+      var sessions = sesSnap.val() || {};
+      var pins = pinSnap.val() || {};
+      _spRegAll = Object.keys(sessions).map(function(sap) {
+        var s = sessions[sap] || {};
+        var p = pins[sap] || {};
+        return { sap: sap, name: s.name || 'SAP ' + sap, branch: s.branch || '', role: s.role || 'staff', dept: s.dept || '', hasPin: !!p.pinHash, lastLogin: s.lastLogin || 0 };
+      }).sort(function(a, b) { return (b.lastLogin || 0) - (a.lastLogin || 0); });
+      renderSpRegs(_spRegAll);
+    });
+  });
+}
+function filterSpRegs(q) {
+  var lq = (q || '').toLowerCase();
+  renderSpRegs(lq ? _spRegAll.filter(function(r) { return r.sap.toLowerCase().includes(lq) || r.name.toLowerCase().includes(lq) || (r.branch || '').toLowerCase().includes(lq); }) : _spRegAll);
+}
+function renderSpRegs(list) {
+  var container = document.getElementById('sp-reg-list');
+  if (!container) return;
+  if (!list.length) {
+    container.innerHTML = '<div style="text-align:center;padding:24px;color:var(--text-tertiary);font-size:12px;font-style:italic">No staff portal registrations found</div>';
+    return;
+  }
+  var htm = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px">';
+  list.forEach(function(r) {
+    var lastLoginStr = r.lastLogin ? new Date(r.lastLogin).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : 'Never';
+    var pinBadge = r.hasPin
+      ? '<span style="font-size:10px;background:rgba(0,102,102,.1);color:var(--primary);border:1px solid rgba(0,102,102,.2);padding:2px 8px;border-radius:5px;font-weight:700">PIN SET</span>'
+      : '<span style="font-size:10px;background:rgba(255,33,87,.08);color:var(--danger);border:1px solid rgba(255,33,87,.2);padding:2px 8px;border-radius:5px;font-weight:700">NO PIN</span>';
+    htm += '<div style="background:var(--surface-3);border-radius:12px;padding:14px;border:1px solid rgba(0,0,0,.04);box-shadow:3px 3px 8px rgba(0,0,0,.06),-2px -2px 6px rgba(255,255,255,.8)">';
+    htm += '<div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px">';
+    htm += '<div style="width:38px;height:38px;border-radius:10px;background:rgba(0,102,102,.1);display:flex;align-items:center;justify-content:center;flex-shrink:0">';
+    htm += '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#006666" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>';
+    htm += '</div><div style="flex:1;min-width:0">';
+    htm += '<div style="font-size:13px;font-weight:700;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + xe(r.name) + '</div>';
+    htm += '<div style="font-size:10px;color:var(--text-secondary);margin-top:2px;font-family:var(--mono)">SAP: ' + xe(r.sap) + '</div>';
+    htm += '<div style="font-size:10px;color:var(--text-tertiary);margin-top:1px">' + xe(r.branch || 'No branch') + (r.dept ? ' · ' + xe(r.dept) : '') + '</div>';
+    htm += '</div>' + pinBadge + '</div>';
+    htm += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">';
+    htm += '<div style="font-size:10px;color:var(--text-tertiary)">Last login: ' + xe(lastLoginStr) + '</div>';
+    htm += '<div style="font-size:10px;font-weight:700;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.06em">' + xe(r.role) + '</div></div>';
+    htm += '<div style="display:flex;gap:6px">';
+    htm += '<button class="btn btn-sm" style="flex:1;color:var(--danger);border-color:rgba(255,33,87,.25)" data-sap="' + xe(r.sap) + '" data-name="' + xe(r.name) + '" onclick="resetStaffPortalPin(this.dataset.sap,this.dataset.name)">&#x1F511; Reset PIN</button>';
+    htm += '<button class="btn btn-sm" style="color:var(--text-secondary)" data-sap="' + xe(r.sap) + '" data-name="' + xe(r.name) + '" onclick="deleteStaffPortalReg(this.dataset.sap,this.dataset.name)">Remove</button>';
+    htm += '</div></div>';
+  });
+  container.innerHTML = htm + '</div>';
+}
+function resetStaffPortalPin(sap, name) {
+  nxConfirm('Reset portal PIN for ' + name + ' (SAP ' + sap + ')? They will need to set a new PIN on next login.', function() {
+    if (!db) return;
+    db.ref('staff/pins/' + sap).remove(function(err) {
+      if (err) { showToast('Error: ' + err.message, 'error'); return; }
+      showToast('PIN reset for ' + name, 'success');
+      loadSpRegistrations();
+    });
+  }, { yesLabel: 'Reset PIN', danger: true });
+}
+function deleteStaffPortalReg(sap, name) {
+  nxConfirm('Remove portal registration for ' + name + ' (SAP ' + sap + ')? This deletes their session and PIN.', function() {
+    if (!db) return;
+    db.ref('staff/sessions/' + sap).remove();
+    db.ref('staff/pins/' + sap).remove(function() {
+      showToast('Registration removed for ' + name, 'success');
+      loadSpRegistrations();
+    });
+  }, { yesLabel: 'Remove', danger: true });
 }
 
 function openManageBranchModal(branchId) {
@@ -13712,7 +13805,11 @@ function bmFmGroupStaff(gid, staffName) {
   var g = (BS._fmGroups || []).find(function (g) { return g.id === gid; });
   if (!g) return;
   g.staffName = staffName;
-  (BS._fmTables || []).forEach(function (t) { if (t.group === gid) t.staffName = staffName; });
+  var _gf = BS._fmFohStaff || BS.staff || [];
+  var _gm = _gf.find(function(m){ return m && m.name === staffName; });
+  var _gSap = _gm ? String(_gm.sap || _gm.id || '') : '';
+  g.staffSap = _gSap;
+  (BS._fmTables || []).forEach(function (t) { if (t.group === gid) { t.staffName = staffName; t.staffSap = _gSap; } });
   bmFmRenderAll();
 }
 
@@ -13723,6 +13820,7 @@ function bmFmTableGroup(idx, gid) {
   // inherit staff from group
   var g = gid ? (BS._fmGroups || []).find(function (g) { return g.id === gid; }) : null;
   BS._fmTables[idx].staffName = g ? (g.staffName || '') : '';
+  BS._fmTables[idx].staffSap  = g ? (g.staffSap  || '') : '';
   bmFmRenderAll();
 }
 
@@ -13730,6 +13828,9 @@ function bmFmTableGroup(idx, gid) {
 function bmFmAssign(i, staffName) {
   if (!BS._fmTables || !BS._fmTables[i]) return;
   BS._fmTables[i].staffName = staffName || '';
+  var _af = BS._fmFohStaff || BS.staff || [];
+  var _am = _af.find(function(m){ return m && m.name === staffName; });
+  BS._fmTables[i].staffSap = _am ? String(_am.sap || _am.id || '') : '';
   bmFmRenderAll();
 }
 
@@ -14045,7 +14146,10 @@ function bmFmBulkAssign() {
   if (!staffName) { showToast('Select a staff member', 'error'); return; }
   var selected = Array.from(tblSel.selectedOptions).map(function (o) { return +o.value; });
   if (!selected.length) { showToast('Select at least one table', 'error'); return; }
-  selected.forEach(function (idx) { if (BS._fmTables[idx]) BS._fmTables[idx].staffName = staffName; });
+  var _bf = BS._fmFohStaff || BS.staff || [];
+  var _bm = _bf.find(function(m){ return m && m.name === staffName; });
+  var _bSap = _bm ? String(_bm.sap || _bm.id || '') : '';
+  selected.forEach(function (idx) { if (BS._fmTables[idx]) { BS._fmTables[idx].staffName = staffName; BS._fmTables[idx].staffSap = _bSap; } });
   bmFmRenderAll();
   showToast('Assigned ' + selected.length + ' table(s) to ' + staffName, 'success');
 }
@@ -14183,8 +14287,8 @@ function bmFmPublish() {
     ts: Date.now(),
     by: s.branchName || s.entityName || 'Manager',
     branchId: s.branchId,
-    groups:    groups.map(function(g){ return { id:g.id, name:g.name, color:g.color||0, staffName:g.staffName||'' }; }),
-    tables:    tables.map(function(t){ return { num:t.num, label:t.label||String(t.num), staffName:t.staffName||'', group:t.group||'' }; }),
+    groups:    groups.map(function(g){ return { id:g.id, name:g.name, color:g.color||0, staffName:g.staffName||'', staffSap:g.staffSap||'' }; }),
+    tables:    tables.map(function(t){ return { num:t.num, label:t.label||String(t.num), staffName:t.staffName||'', staffSap:t.staffSap||'', group:t.group||'' }; }),
     positions: BS._fmPositions || []
   };
 

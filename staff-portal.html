@@ -434,6 +434,26 @@ textarea.fi{resize:vertical;min-height:80px}
         Remember me on this device
       </label>
       <button class="btns" onclick="showStep('step-sap')">← Different SAP</button>
+      <button class="btns" onclick="showForgotPin()" style="margin-top:6px;color:var(--primary);border-color:rgba(0,102,102,.25)">&#x1F511; Forgot PIN?</button>
+    </div>
+
+    <!-- STEP: FORGOT PIN -->
+    <div id="step-forgot" style="display:none">
+      <div class="lbrand">
+        <div class="lbrand-ico">
+          <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="color:var(--primary)"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1"/></svg>
+        </div>
+        <h1>Reset PIN</h1>
+        <p>Contact HR to reset your portal PIN</p>
+      </div>
+      <div style="background:rgba(0,102,102,.07);border:1px solid rgba(0,102,102,.18);border-radius:14px;padding:16px 18px;margin:0 0 14px;text-align:center">
+        <div style="font-size:10px;font-weight:700;color:var(--primary);letter-spacing:.08em;margin-bottom:6px;text-transform:uppercase">Your SAP Number</div>
+        <div id="forgot-sap-display" style="font-family:var(--mono);font-size:24px;font-weight:700;color:var(--text);letter-spacing:4px">—</div>
+      </div>
+      <div style="background:rgba(254,153,0,.07);border:1px solid rgba(254,153,0,.25);border-radius:12px;padding:12px 14px;margin-bottom:14px;font-size:11px;color:var(--text2);line-height:1.7;text-align:center">
+        Show this screen to your <strong>HR Manager</strong> or <strong>Branch Manager</strong>.<br>They can reset your PIN from <strong>Access Control</strong> in the admin panel.
+      </div>
+      <button class="btns" onclick="showStep('step-pin')">← Back to PIN</button>
     </div>
   </div>
 </div>
@@ -623,7 +643,6 @@ textarea.fi{resize:vertical;min-height:80px}
       <div class="page" id="page-briefing">
         <div style="padding:20px 0 0">
           <div class="sechdr"><div><h2>📋 Briefing & Tasks</h2><div class="sechdr-sub">Today's shift info</div></div></div>
-          <!-- Floor map assignment card (shown when BM has published floor map) -->
           <div id="briefing-floor-map" style="display:none;margin-bottom:12px"></div>
           <div id="briefing-86" class="card" style="display:none;margin-bottom:12px">
             <div class="ctitle" style="margin-bottom:8px"><div class="cdot" style="background:var(--danger)"></div>86 Items — Not Available</div>
@@ -1192,7 +1211,7 @@ setTimeout(function() {
    LOGIN FLOW
 ═══════════════════════════════════════════════════════ */
 function showStep(id) {
-  ['step-sap','step-setup','step-confirm','step-pin'].forEach(function(s) {
+  ['step-sap','step-setup','step-confirm','step-pin','step-forgot'].forEach(function(s) {
     document.getElementById(s).style.display = s === id ? '' : 'none';
   });
   pinBuf.ss = ''; pinBuf.cf = ''; pinBuf.pd = '';
@@ -1231,40 +1250,19 @@ function handleSAP() {
           return;
         }
 
-        // Step 3: Not found anywhere — allow first-time self-registration
-        // They can create a profile by setting their PIN
-        // This lets staff register even if HR hasn't pre-loaded them
-        var fallback = {
-          name: 'Staff ' + sap,
-          role: 'staff',
-          branch: '',
-          branchId: '',
-          dept: 'Operations',
-          icon: '👤',
-          salary: 0,
-          joinDate: new Date().toISOString().split('T')[0],
-          selfRegistered: true
-        };
-        loginSt.staffData = fallback;
-
-        // Check if they have a PIN (returning self-registered user)
-        db.ref('staff/pins/' + sap).once('value', function(pinSnap) {
-          if (pinSnap.val() && pinSnap.val().pinHash) {
-            // They've registered before — let them login and update profile later
-            document.getElementById('ret-ico').textContent = '👤';
-            document.getElementById('ret-name').textContent = 'Welcome back';
-            document.getElementById('ret-sub').textContent = 'SAP: ' + sap + ' · Enter your PIN';
-            showStep('step-pin');
-            buildPad('pin-pad', 'pd', function(pin) { onLoginPin(pin, pinSnap.val().pinHash); });
-          } else {
-            // First time ever — let them set a PIN and their profile will be created
-            showStep('step-setup');
-            buildPad('setup-pad', 'ss', onSetupFull);
-          }
-        });
+        // Step 3: SAP not found in any branch — block login
+        var _sapErrEl = document.getElementById('sap-err');
+        _sapErrEl.innerHTML = '<span style="color:var(--danger);font-weight:700">&#x26A0; SAP not recognized.</span><br><span style="font-size:10px;color:var(--text2)">Your SAP must be registered by HR before you can access the portal. Please contact your HR or Branch Manager.</span>';
+        loginSt.sap = '';
       });
     });
   });
+}
+
+function showForgotPin() {
+  var dispEl = document.getElementById('forgot-sap-display');
+  if (dispEl) dispEl.textContent = loginSt.sap || '—';
+  showStep('step-forgot');
 }
 
 function checkBranchStaff(sap, branches, cb) {
@@ -2120,8 +2118,9 @@ function renderPayslip() {
   function doRender(staffRec, absentDays, lateDays, totalOtMins) {
     totalOtMins = totalOtMins || 0;
     var base       = parseInt(staffRec.basicSalary || staffRec.salary || u.salary || 0);
-    var housing    = parseInt(staffRec.housingAllowance   || (base > 0 ? Math.round(base * 0.25) : 0));
-    var transport  = parseInt(staffRec.transportAllowance || (base > 0 ? Math.round(base * 0.10) : 0));
+    // null check so HR-set 0 is respected, not overridden by percentage default
+    var housing    = (staffRec.housingAllowance   != null) ? parseInt(staffRec.housingAllowance)   : (base > 0 ? Math.round(base * 0.25) : 0);
+    var transport  = (staffRec.transportAllowance != null) ? parseInt(staffRec.transportAllowance) : (base > 0 ? Math.round(base * 0.10) : 0);
     var otherAllow = parseInt(staffRec.otherAllowances || 0);
     // OT rate: basic salary ÷ (26 working days × 8 hours) × 1.5 multiplier
     var hourlyRate  = base > 0 ? base / (26 * 8) : 0;
@@ -2130,7 +2129,8 @@ function renderPayslip() {
     var gross       = base + housing + transport + otherAllow + otPay;
 
     // ── Deductions ──
-    var gosiYes  = (staffRec.gosiEnrolled || 'yes') !== 'no';
+    // default enrolled only when field is genuinely absent from Firebase
+    var gosiYes  = staffRec.gosiEnrolled == null ? true : staffRec.gosiEnrolled === 'yes';
     var gosi     = gosiYes  ? Math.round(base * 0.09) : 0;
     var sanedYes = staffRec.sanedEnrolled === 'yes';
     var saned    = sanedYes ? Math.round(base * 0.01) : 0;
@@ -3916,96 +3916,64 @@ function escH(s){
 // BRIEFING & TASKS (Staff Portal)
 // ══════════════════════════════════════════════════════
 function renderBriefingFloorMap() {
-  var u = CU;
-  var el = document.getElementById('briefing-floor-map');
+  var u = CU, el = document.getElementById('briefing-floor-map');
   if (!el || !u || !u.branchId) return;
-  el.style.display = 'none';
-  el.innerHTML = '';
+  el.style.display = 'none'; el.innerHTML = '';
   db.ref('branches/' + u.branchId + '/latestFloorMap').once('value', function(snap) {
     var fm = snap.val();
     if (!fm || !fm.ts) return;
     // Only show if published today
-    var fmDate = new Date(fm.ts);
-    var today = new Date();
-    if (fmDate.toDateString() !== today.toDateString()) return;
-
+    if (new Date(fm.ts).toDateString() !== new Date().toDateString()) return;
     var myName = (u.name || '').trim().toLowerCase();
     var mySap  = String(u.sap || '').trim();
-
-    // Find my position(s)
-    var positions = fm.positions || [];
+    // Find my position slots
     var mySlots = [];
-    if (Array.isArray(positions)) {
-      positions.forEach(function(pos) {
-        ['opening', 'closing'].forEach(function(shift) {
-          var slot = pos[shift] || {};
-          var slotSap = String(slot.sap || '').trim();
-          var nameMatch = slot.name && slot.name.trim().toLowerCase() === myName;
-          var sapMatch  = slotSap && mySap && slotSap === mySap;
-          if (nameMatch || sapMatch) {
-            mySlots.push({ pos: pos, shift: shift, brk: slot.brk || '' });
-          }
-        });
+    (fm.positions || []).forEach(function(pos) {
+      ['opening','closing'].forEach(function(shift) {
+        var slot = pos[shift] || {};
+        var sapMatch  = slot.sap && mySap && String(slot.sap) === mySap;
+        var nameMatch = slot.name && slot.name.trim().toLowerCase() === myName;
+        if (sapMatch || nameMatch) mySlots.push({ pos: pos, shift: shift, brk: slot.brk || '' });
       });
-    }
-
+    });
     // Find my tables
-    var tables = fm.tables || [];
-    var myTables = tables.filter(function(t) {
+    var myTables = (fm.tables || []).filter(function(t) {
       if (t.staffSap && mySap && t.staffSap === mySap) return true;
       return t.staffName && t.staffName.trim().toLowerCase() === myName;
     });
-
     if (!mySlots.length && !myTables.length) return;
-
-    var dt = new Date(fm.ts).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+    var dt = new Date(fm.ts).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
     var accentCol = mySlots.length ? mySlots[0].pos.col : 'var(--primary)';
-
-    var h = '<div class="card" style="border-left:3px solid ' + accentCol + ';margin-bottom:0">';
-    h += '<div class="ctitle" style="margin-bottom:10px">';
-    h += '<div class="cdot" style="background:' + accentCol + '"></div>';
-    h += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="margin-right:5px;vertical-align:middle"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>';
-    h += 'Floor Map — My Assignment</div>';
-
-    // Position slots
+    var h = '<div class="card" style="border-left:3px solid ' + accentCol + '">' +
+      '<div class="ctitle" style="margin-bottom:10px"><div class="cdot" style="background:' + accentCol + '"></div>' +
+      '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="margin-right:5px;vertical-align:middle"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>' +
+      'Floor Map — My Assignment</div>';
     mySlots.forEach(function(entry) {
       var pos = entry.pos;
       var shiftCol = entry.shift === 'opening' ? '#059669' : '#2563eb';
       var shiftLabel = entry.shift === 'opening' ? 'Opening Shift' : 'Closing Shift';
       h += '<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:' + pos.col + '14;border:1.5px solid ' + pos.col + '50;border-radius:12px;margin-bottom:8px">';
-      h += '<span style="font-size:26px">' + escH(pos.icon) + '</span>';
-      h += '<div style="flex:1">';
+      h += '<span style="font-size:26px">' + escH(pos.icon) + '</span><div style="flex:1">';
       h += '<div style="font-size:9px;color:' + shiftCol + ';font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:2px">' + shiftLabel + '</div>';
-      h += '<div style="font-size:18px;font-weight:700;color:' + pos.col + '">' + escH(pos.label) + '</div>';
-      h += '</div>';
+      h += '<div style="font-size:18px;font-weight:700;color:' + pos.col + '">' + escH(pos.label) + '</div></div>';
       if (entry.brk) {
-        h += '<div style="text-align:right">';
-        h += '<div style="font-size:8px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:2px">Break</div>';
-        h += '<div style="font-size:15px;font-weight:700;color:#0057ff;font-family:var(--mono)">' + escH(entry.brk) + '</div>';
-        h += '</div>';
+        h += '<div style="text-align:right"><div style="font-size:8px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:2px">Break</div>';
+        h += '<div style="font-size:15px;font-weight:700;color:#0057ff;font-family:var(--mono)">' + escH(entry.brk) + '</div></div>';
       }
       h += '</div>';
     });
-
-    // Table badges
     if (myTables.length) {
-      h += '<div style="margin-top:6px">';
-      h += '<div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px;font-family:var(--mono)">Your Tables</div>';
+      h += '<div style="margin-top:6px"><div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px;font-family:var(--mono)">Your Tables</div>';
       h += '<div style="display:flex;flex-wrap:wrap;gap:8px">';
       myTables.forEach(function(t) {
         h += '<div style="background:rgba(0,102,102,.1);border:2px solid var(--primary);border-radius:12px;padding:10px 16px;text-align:center;min-width:52px">';
-        h += '<div style="font-size:20px;font-weight:700;color:var(--primary);font-family:var(--mono)">' + escH(String(t.label || t.num || '')) + '</div>';
-        h += '<div style="font-size:8px;color:var(--text3);margin-top:2px;font-family:var(--mono);letter-spacing:.1em">TABLE</div>';
-        h += '</div>';
+        h += '<div style="font-size:20px;font-weight:700;color:var(--primary);font-family:var(--mono)">' + escH(String(t.label||t.num||'')) + '</div>';
+        h += '<div style="font-size:8px;color:var(--text3);margin-top:2px;font-family:var(--mono);letter-spacing:.1em">TABLE</div></div>';
       });
       h += '</div></div>';
     }
-
-    h += '<div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:10px">Published · ' + escH(dt) + '</div>';
-    h += '</div>';
-
-    el.innerHTML = h;
-    el.style.display = '';
+    h += '<div style="font-size:10px;color:var(--text3);font-family:var(--mono);margin-top:10px">Published · ' + escH(dt) + '</div></div>';
+    el.innerHTML = h; el.style.display = '';
   });
 }
 
@@ -4015,7 +3983,6 @@ function renderBriefing(){
     document.getElementById('briefing-tasks-list').innerHTML='<div style="text-align:center;padding:20px;color:var(--text3);font-size:11px">No branch linked</div>';
     return;
   }
-  // Load floor map assignment into briefing page
   renderBriefingFloorMap();
   db.ref('branches/'+u.branchId+'/briefings/'+todayKey()).once('value', function(snap){
     var list=snap.val()||{};
@@ -4048,6 +4015,7 @@ function renderBriefing(){
     var myFirstName=(u.name||'').toLowerCase().split(' ')[0];
     var myAssigns=allAssigns.filter(function(a){
       if(a.sap && mySap && String(a.sap)===mySap) return true;
+      if(a.staffSap && mySap && String(a.staffSap)===mySap) return true;
       if(a.staff && myFirstName && a.staff.toLowerCase().indexOf(myFirstName)>=0) return true;
       return false;
     });
@@ -4207,7 +4175,9 @@ function renderDashFloorMap() {
 
     // 2. Tables assigned
     var tables = fm.tables || [];
+    var mySapFm = String(CU.sap || '').trim();
     var myTables = tables.filter(function(t) {
+      if (t.staffSap && mySapFm && t.staffSap === mySapFm) return true;
       return t.staffName && t.staffName.trim().toLowerCase() === myName;
     });
 
