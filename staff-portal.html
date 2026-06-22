@@ -2118,9 +2118,8 @@ function renderPayslip() {
   function doRender(staffRec, absentDays, lateDays, totalOtMins) {
     totalOtMins = totalOtMins || 0;
     var base       = parseInt(staffRec.basicSalary || staffRec.salary || u.salary || 0);
-    // Use null/undefined check so that 0 set by HR is respected (not overridden by default)
-    var housing    = (staffRec.housingAllowance   != null) ? parseInt(staffRec.housingAllowance)   : (base > 0 ? Math.round(base * 0.25) : 0);
-    var transport  = (staffRec.transportAllowance != null) ? parseInt(staffRec.transportAllowance) : (base > 0 ? Math.round(base * 0.10) : 0);
+    var housing    = parseInt(staffRec.housingAllowance   || (base > 0 ? Math.round(base * 0.25) : 0));
+    var transport  = parseInt(staffRec.transportAllowance || (base > 0 ? Math.round(base * 0.10) : 0));
     var otherAllow = parseInt(staffRec.otherAllowances || 0);
     // OT rate: basic salary ÷ (26 working days × 8 hours) × 1.5 multiplier
     var hourlyRate  = base > 0 ? base / (26 * 8) : 0;
@@ -2129,8 +2128,7 @@ function renderPayslip() {
     var gross       = base + housing + transport + otherAllow + otPay;
 
     // ── Deductions ──
-    // gosiEnrolled: only enroll if explicitly set to "yes" or field is missing entirely (default enrolled)
-    var gosiYes  = staffRec.gosiEnrolled == null ? true : staffRec.gosiEnrolled === 'yes';
+    var gosiYes  = (staffRec.gosiEnrolled || 'yes') !== 'no';
     var gosi     = gosiYes  ? Math.round(base * 0.09) : 0;
     var sanedYes = staffRec.sanedEnrolled === 'yes';
     var saned    = sanedYes ? Math.round(base * 0.01) : 0;
@@ -3952,6 +3950,7 @@ function renderBriefing(){
     var myFirstName=(u.name||'').toLowerCase().split(' ')[0];
     var myAssigns=allAssigns.filter(function(a){
       if(a.sap && mySap && String(a.sap)===mySap) return true;
+      if(a.staffSap && mySap && String(a.staffSap)===mySap) return true;
       if(a.staff && myFirstName && a.staff.toLowerCase().indexOf(myFirstName)>=0) return true;
       return false;
     });
@@ -4111,7 +4110,10 @@ function renderDashFloorMap() {
 
     // 2. Tables assigned
     var tables = fm.tables || [];
+    var mySapFm = String(CU.sap || '').trim();
     var myTables = tables.filter(function(t) {
+      // Match by SAP (reliable) first, then fall back to name
+      if (t.staffSap && mySapFm && t.staffSap === mySapFm) return true;
       return t.staffName && t.staffName.trim().toLowerCase() === myName;
     });
 
