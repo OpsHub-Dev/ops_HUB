@@ -1808,7 +1808,7 @@ function renderDashboard() {
     if(!el) return;
     if(!u2||!u2.branchId){el.innerHTML='<div style="text-align:center;padding:12px;color:var(--text3);font-size:11px">No branch linked</div>';return;}
     var todayK=todayKey();
-    db.ref('branches/'+u2.branchId+'/briefings/'+todayK).once('value',function(snap){
+    function _renderBriefPreview(snap) {
       var list=snap.val()||{};
       var entries=Object.values(list).sort(function(a,b){return (b.ts||0)-(a.ts||0);});
       if(!entries.length){el.innerHTML='<div style="text-align:center;padding:14px;color:var(--text3);font-size:11px;font-family:var(--mono)">No briefing for today yet</div>';return;}
@@ -1824,9 +1824,10 @@ function renderDashboard() {
       var myAssigns=[];
       entries.forEach(function(e){(e.assignments||[]).forEach(function(a){if(a.staff&&a.staff.toLowerCase().indexOf(myName)>=0)myAssigns.push(a);});});
       if(myAssigns.length) html+='<div style="margin-bottom:8px">'+myAssigns.map(function(a){return '<span style="background:rgba(0,102,102,.08);color:var(--primary);border:1px solid rgba(0,102,102,.2);border-radius:4px;padding:2px 8px;font-size:10px;margin-right:4px">🍽️ Tables: '+escH(a.tables)+'</span>';}).join('')+'</div>';
-      html+='<button class="btnp" style="margin-top:8px;padding:6px 14px;font-size:11px" onclick="showPage(\'briefing\')">View Full Briefing →</button>';
+      html+='<button class="btnp" style="margin-top:8px;padding:6px 14px;font-size:11px" onclick="showPage(\'briefing\')">View Full Briefing &rarr;</button>';
       el.innerHTML=html;
-    });
+    }
+    db.ref('branches/'+u2.branchId+'/briefings/'+todayK).on('value', _renderBriefPreview);
   })();
 
   // Today's shift — uses same logic as renderSchedule (reads from branches/{id}/sch)
@@ -4082,10 +4083,15 @@ function renderDashFloorMap() {
 
   db.ref('branches/'+CU.branchId+'/latestFloorMap').once('value', function(snap) {
     var fm = snap.val();
-    if (!fm) { el.innerHTML=''; return; }
-
     var myName = (CU.name||'').trim().toLowerCase();
-    var dt = fm.ts ? new Date(fm.ts).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}) : 'Today';
+    if (!fm || !fm.ts) {
+      el.innerHTML = '<div class="card" style="border-left:3px solid rgba(0,0,0,.1)">'
+        + '<div class="ctitle" style="margin-bottom:6px"><div class="cdot" style="background:var(--border)"></div>&#x1F5FA;&#xFE0F; My Shift Assignment</div>'
+        + '<div style="text-align:center;padding:12px;color:var(--text3);font-size:11px;font-family:var(--mono)">No floor map published yet today</div>'
+        + '</div>';
+      return;
+    }
+    var dt = new Date(fm.ts).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
 
     // 1. Find my position(s) in new array-based structure
     var positions = fm.positions || [];
@@ -4107,7 +4113,14 @@ function renderDashFloorMap() {
       return t.staffName && t.staffName.trim().toLowerCase() === myName;
     });
 
-    if (!mySlots.length && !myTables.length) { el.innerHTML=''; return; }
+    if (!mySlots.length && !myTables.length) {
+      el.innerHTML = '<div class="card" style="border-left:3px solid rgba(0,102,102,.3)">'
+        + '<div class="ctitle" style="margin-bottom:6px"><div class="cdot" style="background:var(--primary)"></div>&#x1F5FA;&#xFE0F; My Shift Assignment</div>'
+        + '<div style="text-align:center;padding:12px;color:var(--text3);font-size:11px;font-family:var(--mono)">No table or position assigned to you yet</div>'
+        + '<div style="font-size:10px;color:var(--text3);font-family:var(--mono);padding:0 12px 10px">Floor map published &middot; '+escH(dt)+'</div>'
+        + '</div>';
+      return;
+    }
 
     // Pick accent color from first position
     var accentCol = mySlots.length ? mySlots[0].pos.col : '#006666';

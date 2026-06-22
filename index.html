@@ -13302,7 +13302,10 @@ function pBmBriefing() {
   h += '</div>';
 
   // Use briefingViewDate when viewing history, clear it when on 'today' tab naturally
-  var briefDate = (tab==='today' && BS.briefingViewDate) ? BS.briefingViewDate : TODAY_BS;
+  // briefDate: for 'today' tab always use TODAY_BS for Firebase reads
+  // briefingViewDate is only for the history/read-only banner
+  var briefDate = tab==='today' ? TODAY_BS : TODAY_BS;
+  var briefViewDate = (tab==='today' && BS.briefingViewDate) ? BS.briefingViewDate : null;
   var isViewingHistory = briefDate !== TODAY_BS;
   if(tab==='today' && !BS.briefingViewDate) briefDate = TODAY_BS;
 
@@ -14171,7 +14174,7 @@ function bmFmPublish() {
   var s = NX.session || {};
   if (!db || !s.branchId) { showToast('Not connected', 'error'); return; }
   var tables = BS._fmTables || [];
-  if (!tables.length) { showToast('Add at least one table', 'error'); return; }
+  // Allow publishing even with no tables (positions-only)
   var groups = BS._fmGroups || [];
   var dateStr = BS._fmPushDate || TODAY_BS;
   var pushKey = BS._fmPushKey || null;
