@@ -917,12 +917,139 @@ body{
 .bc-stat-val{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:500;color:var(--text-primary)}
 .bc-stat-label{font-size:10px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:.05em}
 
-/* Responsive */
-@media(max-width:768px){
-  .sidebar{display:none}
-  .grid-2,.grid-3,.grid-3-1,.grid-60-40{grid-template-columns:1fr}
-  .kpi-grid{grid-template-columns:1fr 1fr}
-  .main-content{padding:16px}
+/* ==============================================
+   MOBILE RESPONSIVE - OpsHub
+   surface:#E7E5E4 primary:#006666 Space Mono
+   Icons: stroke-width:1.6 round caps
+   ============================================== */
+
+/* Mobile sidebar overlay */
+#sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  z-index: 149;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+#sidebar-overlay.active { display: block; }
+
+@media (max-width: 768px) {
+  /* Sidebar: slide-in drawer */
+  .sidebar {
+    position: fixed !important;
+    top: 0; left: 0; bottom: 0;
+    z-index: 150;
+    width: 260px !important;
+    transform: translateX(-100%);
+    transition: transform 0.25s cubic-bezier(0.4,0,0.2,1);
+    overflow-y: auto;
+    display: flex !important;
+    flex-direction: column;
+  }
+  .sidebar.mobile-open {
+    transform: translateX(0) !important;
+  }
+  .sidebar.collapsed { transform: translateX(-100%); }
+
+  /* Topbar */
+  .topbar {
+    padding: 0 12px;
+    gap: 8px;
+    height: 52px;
+  }
+  .topbar-title { font-size: 14px; }
+  .topbar-search { display: none !important; }
+  .sidebar-toggle { display: flex !important; }
+
+  /* Main content */
+  .main-content {
+    padding: 12px !important;
+    padding-bottom: 24px !important;
+  }
+
+  /* Grid layouts collapse */
+  .grid-2, .grid-3, .grid-3-1, .grid-60-40,
+  .hrf-grid-2, .hrf-grid-3 {
+    grid-template-columns: 1fr !important;
+  }
+  .kpi-grid { grid-template-columns: 1fr 1fr !important; }
+
+  /* Tables: horizontal scroll */
+  .nx-table-wrap, .table-wrap, .data-table-wrap,
+  .card table, .bcard table, .page-card table,
+  table.nx-table, table.data-table {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    display: block;
+    width: 100%;
+  }
+  th, td { white-space: nowrap; }
+
+  /* Cards */
+  .card, .bcard, .kpi-card, .chart-card, .page-card {
+    padding: 14px !important;
+  }
+
+  /* Touch-friendly buttons */
+  .btn, .nm-btn {
+    min-height: 40px;
+    font-size: 13px;
+  }
+
+  /* Full-width inputs */
+  .nm-input, .nm-select, .nm-textarea,
+  input[type="text"], input[type="number"],
+  input[type="date"], select, textarea {
+    width: 100% !important;
+    min-height: 40px;
+  }
+
+  /* Modals */
+  .modal-box, .nx-modal {
+    width: 95vw !important;
+    max-width: 95vw !important;
+    max-height: 88vh;
+    overflow-y: auto;
+  }
+
+  /* Page headers */
+  .section-header, .page-header {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  /* Tabs: horizontal scroll */
+  .tabs, .tab-bar, .nx-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+  }
+  .tabs::-webkit-scrollbar, .tab-bar::-webkit-scrollbar { display: none; }
+
+  /* Action bars wrap */
+  .action-bar, .btn-group, .nx-actions {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  /* Charts */
+  canvas { max-width: 100% !important; }
+
+  /* Floor map */
+  .floor-map-wrap, #floor-canvas-wrap {
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Very small phones */
+@media (max-width: 480px) {
+  .kpi-grid { grid-template-columns: 1fr !important; }
+  .main-content { padding: 10px !important; }
+  .topbar-title { font-size: 13px; }
 }
 
 /* Toast */
@@ -1120,7 +1247,7 @@ body{
 .hrf-kpi-card{background:var(--surface-2);border:1px solid var(--border);border-radius:14px;padding:16px 18px;position:relative;overflow:hidden;transition:all .2s;}
 .hrf-kpi-card:hover{border-color:var(--border-strong);transform:translateY(-2px)}
 .hrf-kpi-card::before{content:'';position:absolute;top:-40px;right:-40px;width:120px;height:120px;border-radius:50%;opacity:.07;background:var(--kpi-color,var(--hr-color))}
-@media(max-width:768px){.hrf-grid-2,.hrf-grid-3{grid-template-columns:1fr}}
+/* hrf-grid mobile: covered in main responsive block */
 </style>
 <style>
 /* ═══════════════════════════════════════════════════════════════
@@ -3288,7 +3415,7 @@ body { font-size: 13px !important; color: var(--text-primary) !important; }
 <div id="app">
   <!-- TOP BAR -->
   <div class="topbar">
-    <button class="sidebar-toggle" onclick="toggleSidebar()">☰</button>
+    <button class="sidebar-toggle" onclick="toggleSidebar()" aria-label="Toggle menu"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
     <div>
       <div class="topbar-title" id="tb-title">Dashboard</div>
       <div class="breadcrumb" id="tb-breadcrumb"></div>
@@ -3615,11 +3742,48 @@ function navTo(pageId) {
 function toggleSidebar() {
   var sb = document.getElementById('sidebar');
   if (!sb) return;
-  sb.classList.toggle('collapsed');
-  NX.sidebarOpen = !sb.classList.contains('collapsed');
-  var mainContent = document.getElementById('main-content');
-  if (mainContent) mainContent.classList.toggle('sidebar-collapsed', !NX.sidebarOpen);
+  var isMobile = window.innerWidth <= 768;
+  if (isMobile) {
+    var overlay = document.getElementById('sidebar-overlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'sidebar-overlay';
+      overlay.onclick = closeSidebarMobile;
+      document.body.appendChild(overlay);
+    }
+    if (sb.classList.contains('mobile-open')) {
+      closeSidebarMobile();
+    } else {
+      sb.classList.add('mobile-open');
+      overlay.classList.add('active');
+      NX.sidebarOpen = true;
+    }
+  } else {
+    sb.classList.toggle('collapsed');
+    NX.sidebarOpen = !sb.classList.contains('collapsed');
+    var mc = document.getElementById('main-content');
+    if (mc) mc.classList.toggle('sidebar-collapsed', !NX.sidebarOpen);
+  }
 }
+function closeSidebarMobile() {
+  var sb = document.getElementById('sidebar');
+  var ov = document.getElementById('sidebar-overlay');
+  if (sb) sb.classList.remove('mobile-open');
+  if (ov) ov.classList.remove('active');
+  NX.sidebarOpen = false;
+}
+document.addEventListener('click', function(e) {
+  if (window.innerWidth > 768) return;
+  if (e.target.closest('.nav-item')) closeSidebarMobile();
+});
+window.addEventListener('resize', function() {
+  if (window.innerWidth > 768) {
+    var sb = document.getElementById('sidebar');
+    var ov = document.getElementById('sidebar-overlay');
+    if (sb) sb.classList.remove('mobile-open');
+    if (ov) ov.classList.remove('active');
+  }
+});
 
 function updateTopBar(pageId) {
   var bc = document.getElementById('tb-breadcrumb');
