@@ -429,9 +429,10 @@ textarea.fi{resize:vertical;min-height:80px}
       </div>
       <div class="pin-pad" id="pin-pad"></div>
       <div class="lerr" id="pin-err"></div>
-      <label style="display:flex;align-items:center;justify-content:center;gap:8px;margin:10px 0 2px;cursor:pointer;font-size:11px;font-weight:600;color:var(--text2);font-family:var(--font)">
-        <input type="checkbox" id="remember-me-chk" style="width:13px;height:13px;accent-color:var(--primary);cursor:pointer;flex-shrink:0">
-        Remember me on this device
+      <label style="display:flex;align-items:center;justify-content:center;gap:8px;margin:12px 0 2px;cursor:pointer;background:rgba(0,102,102,.06);border:1px solid rgba(0,102,102,.18);border-radius:10px;padding:8px 14px;font-size:11px;font-weight:600;color:var(--primary);font-family:var(--font);transition:background .2s">
+        <input type="checkbox" id="remember-me-chk" checked style="width:14px;height:14px;accent-color:var(--primary);cursor:pointer;flex-shrink:0">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18.01"/></svg>
+        Stay logged in on this device
       </label>
       <button class="btns" onclick="showStep('step-sap')">← Different SAP</button>
       <button class="btns" onclick="showForgotPin()" style="margin-top:6px;color:var(--primary);border-color:rgba(0,102,102,.25)">&#x1F511; Forgot PIN?</button>
@@ -1092,7 +1093,7 @@ var SP_KEY = 'sp_sess_v1';
 var SP_REM  = 'sp_rem_v1';
 
 function spSave(sap, data) {
-  try { localStorage.setItem(SP_KEY, JSON.stringify(Object.assign({sap:sap,_exp:Date.now()+8*3600000}, data))); } catch(e){}
+  try { localStorage.setItem(SP_KEY, JSON.stringify(Object.assign({sap:sap,_exp:Date.now()+24*3600000}, data))); } catch(e){}
 }
 function spLoad() {
   try {
@@ -1158,35 +1159,26 @@ function bootStaffPortal() {
 
   var rem = spLoadRem();
   if (rem && rem.sap) {
-    showLoginUINow();
-    var sapInp = document.getElementById('sap-inp');
-    if (sapInp) sapInp.value = rem.sap;
-    setTimeout(function() {
-      if (!db) return;
-      loginSt.sap = rem.sap;
-      db.ref('staff/sessions/' + rem.sap).once('value', function(snap) {
-        var sd = snap.val(); if (!sd) return;
-        loginSt.staffData = sd;
-        var el;
-        el = document.getElementById('ret-ico');  if (el) el.textContent = sd.icon||'👤';
-        el = document.getElementById('ret-name'); if (el) el.textContent = sd.name||('SAP '+rem.sap);
-        el = document.getElementById('ret-sub');  if (el) el.textContent = (sd.branch||'ALFA.CO')+' · Enter PIN';
-        showStep('step-pin');
-        buildPad('pin-pad', 'pd', function(pin) {
-          if (simpleHash(pin+rem.sap) !== rem.h) {
-            var err = document.getElementById('pin-err');
-            if (err) { err.textContent='Incorrect PIN'; setTimeout(function(){ err.textContent=''; }, 2000); }
-            return;
-          }
-          spSave(rem.sap, sd);
-          launchPortal(rem.sap, sd);
-        });
-      });
-    }, 350);
-    attachSAPEnterListener();
+    // Remember me active -- auto-launch directly without PIN re-entry
+    var ov3 = document.getElementById('loading-overlay');
+    if (ov3) ov3.style.display = '';
+    if (!db) { showLoginUINow(); attachSAPEnterListener(); return; }
+    db.ref('staff/sessions/' + rem.sap).once('value', function(snap) {
+      var sd = snap.val();
+      if (sd) {
+        spSave(rem.sap, sd);
+        launchPortal(rem.sap, sd);
+      } else {
+        spClearRem();
+        showLoginUINow();
+        attachSAPEnterListener();
+      }
+    }, function() {
+      showLoginUINow();
+      attachSAPEnterListener();
+    });
     return;
   }
-
   showLoginUINow();
   attachSAPEnterListener();
 }
