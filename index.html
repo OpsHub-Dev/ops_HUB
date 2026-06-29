@@ -10263,8 +10263,8 @@ function openBranchStaffModal(id){
 
   // ── SALARY & DEDUCTIONS ──
   html+='<div style="margin:14px 0 8px;padding:6px 12px;background:rgba(0,102,102,.06);border-left:3px solid var(--primary);border-radius:0 8px 8px 0;font-size:11px;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:.08em">\uD83D\uDCB0 Salary & Deductions</div>';
-  html+='<div class="form-row"><div class="bfg"><label class="form-label">Basic Salary (SAR)</label><input class="form-input" type="number" step="1" id="bst-salary" value="'+bxe(String(m?m.basicSalary||m.salary||'':''))+'" placeholder="e.g. 3000"></div><div class="bfg"><label class="form-label">Housing Allowance (SAR)</label><input class="form-input" type="number" step="1" id="bst-housing" value="'+bxe(String(m?m.housingAllowance||'':''))+'"></div></div>';
-  html+='<div class="form-row"><div class="bfg"><label class="form-label">Transport Allowance (SAR)</label><input class="form-input" type="number" step="1" id="bst-transport" value="'+bxe(String(m?m.transportAllowance||'':''))+'"></div><div class="bfg"><label class="form-label">Other Allowances (SAR)</label><input class="form-input" type="number" step="1" id="bst-other-allow" value="'+bxe(String(m?m.otherAllowances||'':''))+'"></div></div>';
+  html+='<div class="form-row"><div class="bfg"><label class="form-label">Basic Salary (SAR)</label><input class="form-input" type="number" step="1" id="bst-salary" value="'+bxe(String(m?m.basicSalary||m.salary||'':''))+'" placeholder="e.g. 3000"></div><div class="bfg"><label class="form-label">Housing Allowance (SAR)</label><input class="form-input" type="number" step="1" id="bst-housing" value="'+bxe(String(m&&m.housingAllowance!=null?m.housingAllowance:''))+'"></div></div>';
+  html+='<div class="form-row"><div class="bfg"><label class="form-label">Transport Allowance (SAR)</label><input class="form-input" type="number" step="1" id="bst-transport" value="'+bxe(String(m&&m.transportAllowance!=null?m.transportAllowance:''))+'"></div><div class="bfg"><label class="form-label">Other Allowances (SAR)</label><input class="form-input" type="number" step="1" id="bst-other-allow" value="'+bxe(String(m?m.otherAllowances||'':''))+'"></div></div>';
   html+='<div class="form-row"><div class="bfg"><label class="form-label">GOSI Enrolled <span style="font-size:9px;font-weight:400;color:var(--text-secondary)">9% deduction</span></label><select class="form-input form-select" id="bst-gosi"><option value="yes"'+(m&&m.gosiEnrolled==='no'?'':' selected')+'>Yes \u2014 Enrolled</option><option value="no"'+(m&&m.gosiEnrolled==='no'?' selected':'')+'>No \u2014 Exempt</option></select></div><div class="bfg"><label class="form-label">Saned Enrolled <span style="font-size:9px;font-weight:400;color:var(--text-secondary)">1% Saudi nationals</span></label><select class="form-input form-select" id="bst-saned"><option value="yes"'+(m&&m.sanedEnrolled==='yes'?' selected':'')+'>Yes \u2014 Enrolled</option><option value="no"'+((!m||m.sanedEnrolled!=='yes')?' selected':'')+'>No \u2014 Not applicable</option></select></div></div>';
   html+='<div class="form-row"><div class="bfg"><label class="form-label">Annual Leave Balance (days)</label><input class="form-input" type="number" id="bst-leave-bal" value="'+bxe(String(m?m.leaveBalance||m.annualLeave||21:21))+'" min="0" max="365"></div><div class="bfg"><label class="form-label">KPI Score '+mkey+' (0\u2013100)</label><input class="form-input" type="number" id="bst-kpi" min="0" max="100" value="'+bxe(String(kpi))+'" placeholder="Score this month"></div></div>';
 
@@ -10295,8 +10295,8 @@ function saveBranchStaff(id){
     contractType:bgv('bst-contract'), joinDate:bgv('bst-join'), hireDate:bgv('bst-join'),
     probationStatus:bgv('bst-prob'),
     basicSalary:parseFloat(bgv('bst-salary'))||0, salary:parseFloat(bgv('bst-salary'))||0,
-    housingAllowance:parseFloat(bgv('bst-housing'))||0,
-    transportAllowance:parseFloat(bgv('bst-transport'))||0,
+    housingAllowance:bgv('bst-housing')!==''?parseFloat(bgv('bst-housing'))||0:0,
+    transportAllowance:bgv('bst-transport')!==''?parseFloat(bgv('bst-transport'))||0:0,
     otherAllowances:parseFloat(bgv('bst-other-allow'))||0,
     gosiEnrolled:bgv('bst-gosi')||'yes', sanedEnrolled:bgv('bst-saned')||'no',
     leaveBalance:parseInt(bgv('bst-leave-bal'))||21, annualLeave:parseInt(bgv('bst-leave-bal'))||21,
@@ -17334,11 +17334,11 @@ function openHrfEmpModal(empId,branchId){
       '<div class="form-row"><div class="bfg"><label class="form-label">Basic Salary (SAR) *</label>'+
       '<input class="form-input" type="number" step="0.01" id="hrfemp-salary" value="'+(m?m.basicSalary||m.salary||'':'')+'"></div>'+
       '<div class="bfg"><label class="form-label">Housing Allowance (SAR)</label>'+
-      '<input class="form-input" type="number" step="0.01" id="hrfemp-housing" value="'+(m?m.housingAllowance||'':'')+'"></div></div>'+
+      '<input class="form-input" type="number" step="0.01" id="hrfemp-housing" value="'+(m&&m.housingAllowance!=null?m.housingAllowance:'')+'"></div></div>'+
 
       // Row 12: Transport + Other Allowance
       '<div class="form-row"><div class="bfg"><label class="form-label">Transport Allowance (SAR)</label>'+
-      '<input class="form-input" type="number" step="0.01" id="hrfemp-transport" value="'+(m?m.transportAllowance||'':'')+'"></div>'+
+      '<input class="form-input" type="number" step="0.01" id="hrfemp-transport" value="'+(m&&m.transportAllowance!=null?m.transportAllowance:'')+'"></div>'+
       '<div class="bfg"><label class="form-label">Other Allowances (SAR)</label>'+
       '<input class="form-input" type="number" step="0.01" id="hrfemp-other-allow" value="'+(m?m.otherAllowances||'':'')+'"></div></div>'+
 
@@ -17405,8 +17405,8 @@ function saveHrfEmp(empId,oldBranchId){
     nationality:bgv('hrfemp-nat'),
     basicSalary:parseFloat(bgv('hrfemp-salary'))||0,
     salary:parseFloat(bgv('hrfemp-salary'))||0,
-    housingAllowance:parseFloat(bgv('hrfemp-housing'))||0,
-    transportAllowance:parseFloat(bgv('hrfemp-transport'))||0,
+    housingAllowance:bgv('hrfemp-housing')!==''?parseFloat(bgv('hrfemp-housing'))||0:0,
+    transportAllowance:bgv('hrfemp-transport')!==''?parseFloat(bgv('hrfemp-transport'))||0:0,
     otherAllowances:parseFloat(bgv('hrfemp-other-allow'))||0,
     gosiEnrolled:bgv('hrfemp-gosi')||'yes',
     sanedEnrolled:bgv('hrfemp-saned')||'no',

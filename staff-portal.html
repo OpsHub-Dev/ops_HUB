@@ -2111,8 +2111,8 @@ function renderPayslip() {
     totalOtMins = totalOtMins || 0;
     var base       = parseInt(staffRec.basicSalary || staffRec.salary || u.salary || 0);
     // null check so HR-set 0 is respected, not overridden by percentage default
-    var housing    = (staffRec.housingAllowance   != null) ? parseInt(staffRec.housingAllowance)   : (base > 0 ? Math.round(base * 0.25) : 0);
-    var transport  = (staffRec.transportAllowance != null) ? parseInt(staffRec.transportAllowance) : (base > 0 ? Math.round(base * 0.10) : 0);
+    var housing    = (staffRec.housingAllowance   !== undefined && staffRec.housingAllowance   !== null) ? parseInt(staffRec.housingAllowance)   : (base > 0 ? Math.round(base * 0.25) : 0);
+    var transport  = (staffRec.transportAllowance !== undefined && staffRec.transportAllowance !== null) ? parseInt(staffRec.transportAllowance) : (base > 0 ? Math.round(base * 0.10) : 0);
     var otherAllow = parseInt(staffRec.otherAllowances || 0);
     // OT rate: basic salary ÷ (26 working days × 8 hours) × 1.5 multiplier
     var hourlyRate  = base > 0 ? base / (26 * 8) : 0;
