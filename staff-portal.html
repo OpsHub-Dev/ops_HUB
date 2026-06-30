@@ -1839,15 +1839,15 @@ function renderDashboard() {
         return;
       }
       db.ref('branches/' + u.branchId + '/sch/' + isoWkt + '/' + internalId + '/' + todayName).once('value', function(snap) {
-        console.log('[StaffPortal] today shift path:', 'branches/' + u.branchId + '/sch/' + isoWkt + '/' + internalId + '/' + todayName, 'value:', snap.val());
-        var raw = (snap.val() || '').toString().trim();
-        var upper = raw.toUpperCase();
-        var off = !raw || upper === 'OFF' || upper === 'DAY OFF' || upper === 'DAYOFF';
+        var rawVal = snap.val();
+        console.log('[StaffPortal] today shift path:', 'branches/' + u.branchId + '/sch/' + isoWkt + '/' + internalId + '/' + todayName, 'value:', rawVal);
+        var raw = shiftValueToText(rawVal);
+        var off = shiftValueIsOff(rawVal);
         if (off) {
           tsb.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text3);font-size:12px">🌙 Rest Day — No shift today</div>';
         } else {
           tsb.innerHTML = '<div class="srow" style="border-left:3px solid var(--primary)">' +
-            '<div><div style="font-size:20px;font-weight:700;color:var(--primary);letter-spacing:-.3px">' + raw + '</div>' +
+            '<div><div style="font-size:20px;font-weight:700;color:var(--primary);letter-spacing:-.3px">' + escH(raw) + '</div>' +
             '<div style="font-size:11px;color:var(--text3);margin-top:2px">' + (u.dept || 'Operations') + ' Shift · Today</div></div>' +
             '<div class="sbar" style="flex:1"><div class="sbar-f" style="width:70%"></div></div>' +
             '<span class="badge bg-g">ON DUTY</span></div>';
@@ -1899,6 +1899,30 @@ function bweekKeyPortal() {
   var j = new Date(y, 0, 1);
   var w = Math.ceil(((d - j) / 86400000 + j.getDay() + 1) / 7);
   return y + '-W' + (w < 10 ? '0' : '') + w;
+}
+
+// Shift schema can be a plain string (legacy) or an object {type,start,end,note}
+// (new schedule editor). This safely converts either into a display string.
+var SCH_SHIFT_LABELS_PORTAL = {
+  '': '\u2014', 'work': 'Working', 'split': 'Split Shift', 'rest': 'OFF',
+  'pending': 'OFF', 'eid-fitr': 'Eid Al-Fitr', 'eid-adha': 'Eid Al-Adha',
+  'national': 'National Day', 'foundation': 'Foundation Day', 'holiday': 'Holiday'
+};
+function shiftValueToText(val) {
+  if (val === null || val === undefined) return '';
+  if (typeof val === 'string') return val.trim();
+  if (typeof val === 'object') {
+    if (val.start && val.end) return val.start + '-' + val.end;
+    if (val.type === 'rest' || val.type === 'pending') return 'OFF';
+    if (val.type) return SCH_SHIFT_LABELS_PORTAL[val.type] || val.type;
+    if (val.note) return String(val.note).trim();
+  }
+  return '';
+}
+function shiftValueIsOff(val) {
+  if (val && typeof val === 'object') return val.type === 'rest' || val.type === 'pending';
+  var raw = (val || '').toString().trim().toUpperCase();
+  return !raw || raw === 'OFF' || raw === 'DAY OFF' || raw === 'DAYOFF' || raw === 'REST';
 }
 
 function renderSchedule() {
@@ -2048,33 +2072,43 @@ function renderSchTable(sch, sb, dept) {
     '</div>';
 
   sb.innerHTML = legend + days.map(function(d) {
-    var raw = (sch[d] || '').toString().trim();
+    var rawVal = sch[d];
+    var raw = shiftValueToText(rawVal);
     var isToday = d === todayName;
     var dayDate = getWeekDate(d);
     var dayNum = dayDate.getDate();
     var dayMonthShort = dayDate.toLocaleDateString('en-GB', {day:'2-digit', month:'short'});
 
     // Detect OFF / Day Off / empty
-    var upper = raw.toUpperCase();
-    var off = !raw || upper === 'OFF' || upper === 'DAY OFF' || upper === 'DAYOFF' || upper === 'REST';
+    var off = shiftValueIsOff(rawVal);
 
-    // Shift bar: represents start time position across the work window (6 AM–midnight = 18hrs)
-    // e.g. "8 AM" starts at 8:00 → position = (8-6)/18 = 11%, width ~40% typical shift
+    // Shift bar: represents start time position across the work window (6 AM\u2013midnight = 18hrs)
     var barLeft = 10; // default
     var barWidth = 55; // default width
     if (!off && raw) {
-      var hour = parseInt(raw);
-      if (!isNaN(hour)) {
-        if (raw.toUpperCase().includes('AM')) {
-          barLeft = Math.max(0, Math.min(45, ((hour - 6) / 18) * 100));
-          barWidth = 40;
-        } else if (raw.toUpperCase().includes('PM')) {
-          var h24 = hour === 12 ? 12 : hour + 12;
-          barLeft = Math.max(0, Math.min(65, ((h24 - 6) / 18) * 100));
-          barWidth = 35;
+      // New format: "HH:MM-HH:MM" (24-hour, from time inputs)
+      var hm = raw.match(/^(\d{1,2}):(\d{2})-(\d{1,2}):(\d{2})$/);
+      if (hm) {
+        var h24s = parseInt(hm[1], 10);
+        var h24e = parseInt(hm[3], 10);
+        barLeft = Math.max(0, Math.min(65, ((h24s - 6) / 18) * 100));
+        barWidth = Math.max(8, Math.min(90 - barLeft, ((h24e - h24s + 24) % 24 / 18) * 100));
+      } else {
+        // Legacy format: "8 AM" / "5 PM" etc.
+        var hour = parseInt(raw, 10);
+        if (!isNaN(hour)) {
+          if (raw.toUpperCase().indexOf('AM') >= 0) {
+            barLeft = Math.max(0, Math.min(45, ((hour - 6) / 18) * 100));
+            barWidth = 40;
+          } else if (raw.toUpperCase().indexOf('PM') >= 0) {
+            var h24 = hour === 12 ? 12 : hour + 12;
+            barLeft = Math.max(0, Math.min(65, ((h24 - 6) / 18) * 100));
+            barWidth = 35;
+          }
         }
       }
     }
+
 
     return '<div class="srow" style="' + (isToday ? 'box-shadow:var(--raise);border-left:3px solid var(--primary)' : '') + '">' +
       '<div style="width:48px;flex-shrink:0">' +
@@ -2084,7 +2118,7 @@ function renderSchTable(sch, sb, dept) {
       '</div>' +
       '<div style="flex:1">' +
         '<div style="font-size:13px;font-weight:700;color:' + (off ? 'var(--text3)' : isToday ? 'var(--primary)' : 'var(--text)') + '">' +
-          (off ? '🌙 Day Off' : raw) +
+          (off ? '🌙 Day Off' : escH(raw)) +
         '</div>' +
         '<div style="font-size:10px;color:var(--text3);margin-top:1px">' + (off ? 'Rest Day' : (dept || 'Operations') + ' Shift') + '</div>' +
         (off ? '' :
@@ -2111,8 +2145,8 @@ function renderPayslip() {
     totalOtMins = totalOtMins || 0;
     var base       = parseInt(staffRec.basicSalary || staffRec.salary || u.salary || 0);
     // null check so HR-set 0 is respected, not overridden by percentage default
-    var housing    = (staffRec.housingAllowance   !== undefined && staffRec.housingAllowance   !== null) ? parseInt(staffRec.housingAllowance)   : (base > 0 ? Math.round(base * 0.25) : 0);
-    var transport  = (staffRec.transportAllowance !== undefined && staffRec.transportAllowance !== null) ? parseInt(staffRec.transportAllowance) : (base > 0 ? Math.round(base * 0.10) : 0);
+    var housing    = (staffRec.housingAllowance   != null) ? parseInt(staffRec.housingAllowance)   : (base > 0 ? Math.round(base * 0.25) : 0);
+    var transport  = (staffRec.transportAllowance != null) ? parseInt(staffRec.transportAllowance) : (base > 0 ? Math.round(base * 0.10) : 0);
     var otherAllow = parseInt(staffRec.otherAllowances || 0);
     // OT rate: basic salary ÷ (26 working days × 8 hours) × 1.5 multiplier
     var hourlyRate  = base > 0 ? base / (26 * 8) : 0;
