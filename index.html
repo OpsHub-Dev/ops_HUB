@@ -7969,10 +7969,8 @@ function schedForEmpDate(empId, dateStr) {
   var dayName = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date(dateStr+'T00:00:00').getDay()];
   var raw = ((BS.sch[wk]||{})[empId]||{})[dayName] || '';
   if(typeof raw==='string')return raw;
-  // new object schema {type,start,end}
   if(raw.start&&raw.end)return raw.start+'-'+raw.end;
-  if(raw.type==='rest')return 'OFF';
-  if(raw.type==='pending')return 'OFF';
+  if(raw.type==='rest'||raw.type==='pending')return 'OFF';
   if(raw.type)return (SCH_SHIFT_TYPES.find(function(o){return o.value===raw.type;})||{}).label||raw.type;
   return '';
 }
@@ -10278,8 +10276,8 @@ function openBranchStaffModal(id){
 
   // ── SALARY & DEDUCTIONS ──
   html+='<div style="margin:14px 0 8px;padding:6px 12px;background:rgba(0,102,102,.06);border-left:3px solid var(--primary);border-radius:0 8px 8px 0;font-size:11px;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:.08em">\uD83D\uDCB0 Salary & Deductions</div>';
-  html+='<div class="form-row"><div class="bfg"><label class="form-label">Basic Salary (SAR)</label><input class="form-input" type="number" step="1" id="bst-salary" value="'+bxe(String(m?m.basicSalary||m.salary||'':''))+'" placeholder="e.g. 3000"></div><div class="bfg"><label class="form-label">Housing Allowance (SAR)</label><input class="form-input" type="number" step="1" id="bst-housing" value="'+bxe(String(m&&m.housingAllowance!=null?m.housingAllowance:''))+'"></div></div>';
-  html+='<div class="form-row"><div class="bfg"><label class="form-label">Transport Allowance (SAR)</label><input class="form-input" type="number" step="1" id="bst-transport" value="'+bxe(String(m&&m.transportAllowance!=null?m.transportAllowance:''))+'"></div><div class="bfg"><label class="form-label">Other Allowances (SAR)</label><input class="form-input" type="number" step="1" id="bst-other-allow" value="'+bxe(String(m?m.otherAllowances||'':''))+'"></div></div>';
+  html+='<div class="form-row"><div class="bfg"><label class="form-label">Basic Salary (SAR)</label><input class="form-input" type="number" step="1" id="bst-salary" value="'+bxe(String(m?m.basicSalary||m.salary||'':''))+'" placeholder="e.g. 3000"></div><div class="bfg"><label class="form-label">Housing Allowance (SAR)</label><input class="form-input" type="number" step="1" id="bst-housing" value="'+bxe(String(m?m.housingAllowance||'':''))+'"></div></div>';
+  html+='<div class="form-row"><div class="bfg"><label class="form-label">Transport Allowance (SAR)</label><input class="form-input" type="number" step="1" id="bst-transport" value="'+bxe(String(m?m.transportAllowance||'':''))+'"></div><div class="bfg"><label class="form-label">Other Allowances (SAR)</label><input class="form-input" type="number" step="1" id="bst-other-allow" value="'+bxe(String(m?m.otherAllowances||'':''))+'"></div></div>';
   html+='<div class="form-row"><div class="bfg"><label class="form-label">GOSI Enrolled <span style="font-size:9px;font-weight:400;color:var(--text-secondary)">9% deduction</span></label><select class="form-input form-select" id="bst-gosi"><option value="yes"'+(m&&m.gosiEnrolled==='no'?'':' selected')+'>Yes \u2014 Enrolled</option><option value="no"'+(m&&m.gosiEnrolled==='no'?' selected':'')+'>No \u2014 Exempt</option></select></div><div class="bfg"><label class="form-label">Saned Enrolled <span style="font-size:9px;font-weight:400;color:var(--text-secondary)">1% Saudi nationals</span></label><select class="form-input form-select" id="bst-saned"><option value="yes"'+(m&&m.sanedEnrolled==='yes'?' selected':'')+'>Yes \u2014 Enrolled</option><option value="no"'+((!m||m.sanedEnrolled!=='yes')?' selected':'')+'>No \u2014 Not applicable</option></select></div></div>';
   html+='<div class="form-row"><div class="bfg"><label class="form-label">Annual Leave Balance (days)</label><input class="form-input" type="number" id="bst-leave-bal" value="'+bxe(String(m?m.leaveBalance||m.annualLeave||21:21))+'" min="0" max="365"></div><div class="bfg"><label class="form-label">KPI Score '+mkey+' (0\u2013100)</label><input class="form-input" type="number" id="bst-kpi" min="0" max="100" value="'+bxe(String(kpi))+'" placeholder="Score this month"></div></div>';
 
@@ -10310,8 +10308,8 @@ function saveBranchStaff(id){
     contractType:bgv('bst-contract'), joinDate:bgv('bst-join'), hireDate:bgv('bst-join'),
     probationStatus:bgv('bst-prob'),
     basicSalary:parseFloat(bgv('bst-salary'))||0, salary:parseFloat(bgv('bst-salary'))||0,
-    housingAllowance:bgv('bst-housing')!==''?parseFloat(bgv('bst-housing'))||0:0,
-    transportAllowance:bgv('bst-transport')!==''?parseFloat(bgv('bst-transport'))||0:0,
+    housingAllowance:parseFloat(bgv('bst-housing'))||0,
+    transportAllowance:parseFloat(bgv('bst-transport'))||0,
     otherAllowances:parseFloat(bgv('bst-other-allow'))||0,
     gosiEnrolled:bgv('bst-gosi')||'yes', sanedEnrolled:bgv('bst-saned')||'no',
     leaveBalance:parseInt(bgv('bst-leave-bal'))||21, annualLeave:parseInt(bgv('bst-leave-bal'))||21,
@@ -10581,7 +10579,7 @@ function rejectStaffTransfer(reqId) {
 
 
 // ── Schedule ─────────────────────────────────────────
-// ── Schedule v2 — shift types + times + holidays ─────
+// ── Schedule v2 — shift types + times + holidays + balances ─────
 var SCH_SHIFT_TYPES=[
   {value:'',label:'\u2014'},
   {value:'work',label:'Working'},
@@ -10597,6 +10595,10 @@ var SCH_SHIFT_TYPES=[
 var SCH_NO_TIME=new Set(['','rest','pending','eid-fitr','eid-adha','national','foundation','holiday']);
 var SCH_HOLIDAY_TYPES={'eid-fitr':{l:'Eid Al-Fitr',c:'#f59e0b'},'eid-adha':{l:'Eid Al-Adha',c:'#d97706'},'national':{l:'National Day',c:'#1e5c2e'},'foundation':{l:'Foundation Day',c:'#2563eb'},'holiday':{l:'Holiday',c:'#7c3aed'}};
 var SCH_SHIFT_COLORS={'work':'#fef9c3','split':'#dcfce7','rest':'#ccfbf1','pending':'#ede9fe','eid-fitr':'#fef3c7','eid-adha':'#fde68a','national':'#dcfce7','foundation':'#dbeafe','holiday':'#ede9fe'};
+// Balance keys: which shift types consume which employee balance field
+var SCH_BAL_MAP={'eid-fitr':'balEidFitr','eid-adha':'balEidAdha','national':'balNational','foundation':'balFoundation','pending':'balPendingOff'};
+var SCH_BAL_LABELS={'balEidFitr':'Eid Al-Fitr','balEidAdha':'Eid Al-Adha','balNational':'National Day','balFoundation':'Foundation Day','balPendingOff':'Pending Day Off'};
+var SCH_BAL_DEFAULTS={balEidFitr:3,balEidAdha:3,balNational:1,balFoundation:1,balPendingOff:0};
 if(!BS.schHolidays)BS.schHolidays={};
 var _schHolListenerAttached=false;
 
@@ -10605,6 +10607,8 @@ function schGetShift(wk,empId,dayIdx){
   if(typeof raw==='string'){if(raw==='')return{type:'',start:'',end:''};if(raw.toUpperCase()==='OFF'||raw.toUpperCase()==='DAY OFF')return{type:'rest',start:'',end:''};return{type:'work',start:'',end:'',note:raw};}
   return{type:raw.type||'',start:raw.start||'',end:raw.end||''};
 }
+function schEmpById(empId){return (BS.staff||[]).find(function(m){return String(m.id)===String(empId);});}
+
 function schSetShift(wk,empId,dayIdx,field,val){
   if(!BS.sch[wk])BS.sch[wk]={};
   if(!BS.sch[wk][empId])BS.sch[wk][empId]={};
@@ -10612,11 +10616,34 @@ function schSetShift(wk,empId,dayIdx,field,val){
   var cur=BS.sch[wk][empId][day];
   var obj=(cur&&typeof cur==='object')?Object.assign({},cur):{type:'',start:'',end:''};
   if(typeof cur==='string'){obj.type=(cur.toUpperCase()==='OFF'||cur.toUpperCase()==='DAY OFF')?'rest':(cur?'work':'');if(cur&&obj.type==='work')obj.note=cur;}
+  var prevType=obj.type;
   obj[field]=val;
   if(field==='type'&&SCH_NO_TIME.has(val)){obj.start='';obj.end='';}
   BS.sch[wk][empId][day]=obj;
+
+  // ── balance auto-deduct / restore ──
+  if(field==='type'&&prevType!==val){
+    var emp=schEmpById(empId);
+    if(emp){
+      var prevKey=SCH_BAL_MAP[prevType];
+      var newKey=SCH_BAL_MAP[val];
+      if(prevKey&&emp[prevKey]!==undefined){emp[prevKey]=(emp[prevKey]||0)+1;}
+      if(newKey){
+        if(emp[newKey]===undefined)emp[newKey]=SCH_BAL_DEFAULTS[newKey]||0;
+        if(emp[newKey]<=0){showToast('\u26a0 '+emp.name+' has no remaining '+SCH_BAL_LABELS[newKey]+' days!','warning');}
+        else emp[newKey]--;
+      }
+      bSaveStaffList();
+    }
+  }
+
   clearTimeout(BS._schSaveTimer);
   BS._schSaveTimer=setTimeout(function(){bSaveSch();},600);
+}
+function bSaveStaffList(){
+  if(!db||!NX.session||!NX.session.branchId)return;
+  var obj={};BS.staff.forEach(function(m,i){var k=String(m.id||i).replace(/[.#$\[\]\/]/g,'_');obj[k]=m;});
+  db.ref('branches/'+NX.session.branchId+'/staff').set(obj);
 }
 function schGetHolidays(wk){return (BS.schHolidays&&BS.schHolidays[wk])||Array(7).fill(null);}
 function bSaveSchHolidays(){if(db)db.ref(bPath('schHolidays')).set(BS.schHolidays);}
@@ -10650,6 +10677,41 @@ function schCopyLastWeek(){
   if(!confirm('Copy all shifts from last week to this week? Existing data will be overwritten.'))return;
   BS.sch[wk]=JSON.parse(JSON.stringify(BS.sch[lk]));
   bSaveSch();navTo('schedule');showToast('Last week copied','success');
+}
+
+// ── Per-employee balance editor modal ──
+function schOpenBalanceModal(empId){
+  var emp=schEmpById(empId);if(!emp)return;
+  var fields=[
+    ['balEidFitr','Eid Al-Fitr','#92400e','#fff8e1'],
+    ['balEidAdha','Eid Al-Adha','#78350f','#fef3c7'],
+    ['balNational','National Day','#1e5c2e','#e8f2eb'],
+    ['balFoundation','Foundation Day','#1e40af','#eff6ff'],
+    ['balPendingOff','Pending Day Off','#6d28d9','#f5f3ff']
+  ];
+  var rows=fields.map(function(f){
+    var key=f[0],label=f[1],fg=f[2],bg=f[3];
+    var val=emp[key]!==undefined?emp[key]:(SCH_BAL_DEFAULTS[key]||0);
+    return '<div style="background:'+bg+';border-radius:10px;padding:10px 14px;margin-bottom:8px">'
+      +'<div style="font-size:11px;font-weight:700;color:'+fg+';margin-bottom:6px">'+label+'</div>'
+      +'<div style="display:flex;align-items:center;gap:8px">'
+      +'<button onclick="var i=document.getElementById(\'schBal_'+key+'\');i.value=Math.max(0,(+i.value||0)-1)" style="width:28px;height:28px;border-radius:7px;border:1.5px solid #e5e7eb;background:#fff;cursor:pointer;font-weight:700;font-size:16px;color:#4b5563">\u2212</button>'
+      +'<input id="schBal_'+key+'" type="number" min="0" value="'+val+'" style="width:60px;text-align:center;font-size:15px;font-weight:700;border:1.5px solid #e5e7eb;border-radius:7px;padding:5px;font-family:inherit">'
+      +'<button onclick="var i=document.getElementById(\'schBal_'+key+'\');i.value=(+i.value||0)+1" style="width:28px;height:28px;border-radius:7px;border:1.5px solid #e5e7eb;background:#fff;cursor:pointer;font-weight:700;font-size:16px;color:#4b5563">+</button>'
+      +'</div></div>';
+  }).join('');
+  document.body.insertAdjacentHTML('beforeend','<div id="schBalModal" style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px" onclick="if(event.target===this)this.remove()"><div style="background:#fff;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,.15);width:100%;max-width:420px;max-height:90vh;overflow-y:auto"><div style="padding:18px 22px 14px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between"><span style="font-size:15px;font-weight:700">Leave Balances \u2014 '+bxe(emp.name)+'</span><button onclick="document.getElementById(\'schBalModal\').remove()" style="background:#f3f4f6;border:none;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:13px">\u2715</button></div><div style="padding:18px 22px">'+rows+'<div style="margin-top:6px;padding:10px 12px;background:#fef3e8;border-radius:8px;font-size:11px;color:#92400e">Sets the total entitlement. Days already used this period are tracked separately as they\u2019re scheduled.</div></div><div style="padding:14px 22px;border-top:1px solid #f1f5f9;display:flex;gap:8px;justify-content:flex-end"><button onclick="document.getElementById(\'schBalModal\').remove()" style="background:#fff;border:1.5px solid #e5e7eb;border-radius:8px;padding:7px 16px;font-size:13px;cursor:pointer">Cancel</button><button onclick="schSaveBalances(\''+empId+'\')" style="background:#006666;color:#fff;border:none;border-radius:8px;padding:7px 18px;font-size:13px;font-weight:600;cursor:pointer">Save</button></div></div></div>');
+}
+function schSaveBalances(empId){
+  var emp=schEmpById(empId);if(!emp)return;
+  ['balEidFitr','balEidAdha','balNational','balFoundation','balPendingOff'].forEach(function(key){
+    var el=document.getElementById('schBal_'+key);
+    if(el)emp[key]=Math.max(0,parseInt(el.value)||0);
+  });
+  bSaveStaffList();
+  document.getElementById('schBalModal').remove();
+  navTo('schedule');
+  showToast('Balances updated for '+emp.name,'success');
 }
 
 function pSchedule() {
@@ -10687,7 +10749,7 @@ function pSchedule() {
     +'.sch2-tbl tbody tr:last-child{border-bottom:none}'
     +'.sch2-tbl tbody tr:hover{background:#fafafa}'
     +'.sch2-tbl td{padding:6px 6px;font-size:13px;vertical-align:middle}'
-    +'.sch2-emp-cell{min-width:155px}'
+    +'.sch2-emp-cell{min-width:175px}'
     +'.sch2-day-td{text-align:center;padding:4px 2px}'
     +'.sch2-sw{display:flex;flex-direction:column;gap:3px;align-items:center}'
     +'.sch2-sel{width:100%;border:1.5px solid #e5e7eb;border-radius:5px;font-size:10px;font-family:inherit;padding:3px 2px;text-align:center;background:#fff;color:#374151;cursor:pointer;outline:none;font-weight:600;transition:.15s}'
@@ -10701,11 +10763,14 @@ function pSchedule() {
     +'.sch2-col-eid-adha{background:#fef3c7!important}'
     +'.sch2-col-national{background:#f0fdf4!important}'
     +'.sch2-col-foundation{background:#eff6ff!important}'
+    +'.sch2-bal-btn{background:#f3f4f6;border:1px solid #e5e7eb;border-radius:6px;padding:2px 7px;font-size:9px;font-weight:600;color:#4b5563;cursor:pointer;margin-top:3px;display:inline-flex;align-items:center;gap:3px}'
+    +'.sch2-bal-btn:hover{background:#e5e7eb}'
+    +'.sch2-bal-pills{display:flex;flex-wrap:wrap;gap:3px;margin-top:4px}'
+    +'.sch2-bal-pill{font-size:9px;font-weight:700;padding:1px 6px;border-radius:10px}'
     +'</style>';
 
   h+='<div class="page-header"><h1>\uD83D\uDCC5 Weekly Schedule</h1></div>';
 
-  // toolbar
   h+='<div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:13px 18px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.06)">'
     +'<div style="display:flex;align-items:center;gap:8px">'
     +'<button class="btn btn-sm" onclick="BS.wo=(BS.wo||0)-1;navTo(\'schedule\')" style="border-radius:7px;padding:5px 10px">\u2190</button>'
@@ -10724,22 +10789,21 @@ function pSchedule() {
     +'<span style="font-size:11px;color:#22c55e">\u25cf Auto-saves</span>'
     +'</div>';
 
-  // stats bar
   h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:10px;margin-bottom:16px">'
     +[['Total Staff',allStaff.length,'#006666'],['Management',allStaff.filter(function(m){return normalizeDept(m.dept)==='Manager';}).length,'#b45309'],['FOH',allStaff.filter(function(m){return normalizeDept(m.dept)==='FOH';}).length,'#2563eb'],['Kitchen',allStaff.filter(function(m){return normalizeDept(m.dept)==='Kitchen'||normalizeDept(m.dept)==='BOH';}).length,'#7c3aed'],['Off Today',restToday,'#0d9488']].map(function(s){
       return '<div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:12px 14px;box-shadow:0 1px 3px rgba(0,0,0,.06)"><div style="width:3px;height:22px;border-radius:2px;background:'+s[2]+';margin-bottom:6px"></div><div style="font-size:22px;font-weight:700;color:#1f2937">'+s[1]+'</div><div style="font-size:11px;color:#9ca3af;font-weight:500;margin-top:1px">'+s[0]+'</div></div>';
     }).join('')+'</div>';
 
-  // legend bar
   h+='<div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:10px 16px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:18px;box-shadow:0 1px 3px rgba(0,0,0,.06)">'
     +'<span style="font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.6px;margin-right:2px">Legend</span>'
     +[['Working','#fef9c3','#713f12'],['Split Shift','#dcfce7','#166534'],['Rest Day','#ccfbf1','#0f766e'],['Day Off','#ede9fe','#6d28d9'],['Eid Al-Fitr','#fef3c7','#92400e'],['Eid Al-Adha','#fde68a','#78350f'],['National Day','#dcfce7','#166534'],['Foundation Day','#dbeafe','#1e40af'],['Holiday','#ede9fe','#6d28d9']].map(function(c){
       return '<div style="display:flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;background:'+c[1]+';color:'+c[2]+'"><span style="width:6px;height:6px;border-radius:50%;background:'+c[2]+';opacity:.75;flex-shrink:0"></span>'+c[0]+'</div>';
     }).join('')+'</div>';
 
-  // section tables
   var DEPT_LABELS={'Manager':'Management','FOH':'Front of House (FOH)','Kitchen':'Back of House (BOH)'};
   var BADGE_ST={'Manager':'background:#e8f2eb;color:#1e5c2e','FOH':'background:#fef3e8;color:#e07820','Kitchen':'background:#eff6ff;color:#2563eb'};
+  var BAL_PILL_ST={balEidFitr:'background:#fff8e1;color:#92400e',balEidAdha:'background:#fef3c7;color:#78350f',balNational:'background:#e8f2eb;color:#1e5c2e',balFoundation:'background:#eff6ff;color:#1e40af',balPendingOff:'background:#f5f3ff;color:#6d28d9'};
+  var BAL_PILL_SHORT={balEidFitr:'EF',balEidAdha:'EA',balNational:'ND',balFoundation:'FD',balPendingOff:'PO'};
 
   _schDs.forEach(function(dep){
     var mem=BS.staff.filter(function(m){return normalizeDept(m.dept)===dep;});
@@ -10759,6 +10823,11 @@ function pSchedule() {
     }).join('');
 
     var rows=mem.map(function(m){
+      var balPills=['balEidFitr','balEidAdha','balNational','balFoundation','balPendingOff'].map(function(k){
+        var v=m[k]!==undefined?m[k]:(SCH_BAL_DEFAULTS[k]||0);
+        return '<span class="sch2-bal-pill" style="'+BAL_PILL_ST[k]+'" title="'+SCH_BAL_LABELS[k]+'">'+BAL_PILL_SHORT[k]+' '+v+'</span>';
+      }).join('');
+
       var cells=dates.map(function(dt,i){
         var sh=schGetShift(wk,m.id,i);
         var t=sh.type||'';
@@ -10780,9 +10849,12 @@ function pSchedule() {
           +'</div></div></td>';
       }).join('');
       return '<tr>'
-        +'<td class="sch2-emp-cell"><div style="display:flex;align-items:center;gap:8px"><div class="bav" style="width:28px;height:28px;font-size:10px;flex-shrink:0">'+bini(m.name)+'</div>'
+        +'<td class="sch2-emp-cell"><div style="display:flex;align-items:flex-start;gap:8px"><div class="bav" style="width:28px;height:28px;font-size:10px;flex-shrink:0">'+bini(m.name)+'</div>'
         +'<div><div style="font-weight:600;font-size:13px;color:#1f2937">'+bxe(m.name)+'</div>'
-        +'<div style="font-size:11px;color:#9ca3af;margin-top:1px">'+bxe(m.role||m.dept||'')+'</div></div></div></td>'
+        +'<div style="font-size:11px;color:#9ca3af;margin-top:1px">'+bxe(m.role||m.dept||'')+'</div>'
+        +'<div class="sch2-bal-pills">'+balPills+'</div>'
+        +'<button class="sch2-bal-btn" onclick="schOpenBalanceModal(\''+m.id+'\')">\u270E Edit Balances</button>'
+        +'</div></div></td>'
         +cells+'</tr>';
     }).join('');
 
@@ -10919,9 +10991,7 @@ function saveBranchAttendance(){
   var co=(document.getElementById('bts-out')||{}).value||'';
   var brk=bgv('bts-brk'),note=bgv('bts-note'),st=BS.tsSt||'present';
   if(!eid){showToast('Select an employee','error');return;}
-  var _dN=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-  var _dS=new Date(dt+'T00:00:00'),_dN2=_dN[_dS.getDay()];
-  var _dN2=DAYS_WEEK[_dS.getDay()];
+  var _dS=new Date(dt+'T00:00:00'),_dN2=DAYS_WEEK[_dS.getDay()];
   var _rwRaw=((BS.sch[bweekKey()]||{})[eid]||{})[_dN2]||'';
   var _rw='';
   if(typeof _rwRaw==='string')_rw=_rwRaw;
@@ -17544,11 +17614,11 @@ function openHrfEmpModal(empId,branchId){
       '<div class="form-row"><div class="bfg"><label class="form-label">Basic Salary (SAR) *</label>'+
       '<input class="form-input" type="number" step="0.01" id="hrfemp-salary" value="'+(m?m.basicSalary||m.salary||'':'')+'"></div>'+
       '<div class="bfg"><label class="form-label">Housing Allowance (SAR)</label>'+
-      '<input class="form-input" type="number" step="0.01" id="hrfemp-housing" value="'+(m&&m.housingAllowance!=null?m.housingAllowance:'')+'"></div></div>'+
+      '<input class="form-input" type="number" step="0.01" id="hrfemp-housing" value="'+(m?m.housingAllowance||'':'')+'"></div></div>'+
 
       // Row 12: Transport + Other Allowance
       '<div class="form-row"><div class="bfg"><label class="form-label">Transport Allowance (SAR)</label>'+
-      '<input class="form-input" type="number" step="0.01" id="hrfemp-transport" value="'+(m&&m.transportAllowance!=null?m.transportAllowance:'')+'"></div>'+
+      '<input class="form-input" type="number" step="0.01" id="hrfemp-transport" value="'+(m?m.transportAllowance||'':'')+'"></div>'+
       '<div class="bfg"><label class="form-label">Other Allowances (SAR)</label>'+
       '<input class="form-input" type="number" step="0.01" id="hrfemp-other-allow" value="'+(m?m.otherAllowances||'':'')+'"></div></div>'+
 
@@ -17615,8 +17685,8 @@ function saveHrfEmp(empId,oldBranchId){
     nationality:bgv('hrfemp-nat'),
     basicSalary:parseFloat(bgv('hrfemp-salary'))||0,
     salary:parseFloat(bgv('hrfemp-salary'))||0,
-    housingAllowance:bgv('hrfemp-housing')!==''?parseFloat(bgv('hrfemp-housing'))||0:0,
-    transportAllowance:bgv('hrfemp-transport')!==''?parseFloat(bgv('hrfemp-transport'))||0:0,
+    housingAllowance:parseFloat(bgv('hrfemp-housing'))||0,
+    transportAllowance:parseFloat(bgv('hrfemp-transport'))||0,
     otherAllowances:parseFloat(bgv('hrfemp-other-allow'))||0,
     gosiEnrolled:bgv('hrfemp-gosi')||'yes',
     sanedEnrolled:bgv('hrfemp-saned')||'no',
