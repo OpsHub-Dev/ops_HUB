@@ -7967,7 +7967,14 @@ function schedForEmpDate(empId, dateStr) {
   // Look up schedule value for employee on a given date
   var wk = weekKeyForDate(dateStr);
   var dayName = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date(dateStr+'T00:00:00').getDay()];
-  return ((BS.sch[wk]||{})[empId]||{})[dayName] || '';
+  var raw = ((BS.sch[wk]||{})[empId]||{})[dayName] || '';
+  if(typeof raw==='string')return raw;
+  // new object schema {type,start,end}
+  if(raw.start&&raw.end)return raw.start+'-'+raw.end;
+  if(raw.type==='rest')return 'OFF';
+  if(raw.type==='pending')return 'OFF';
+  if(raw.type)return (SCH_SHIFT_TYPES.find(function(o){return o.value===raw.type;})||{}).label||raw.type;
+  return '';
 }
 function bweekDates() {
   var d=new Date();d.setDate(d.getDate()+(BS.wo||0)*7);
@@ -10148,7 +10155,15 @@ function pStaff() {
     if(!bmatch(m,['name','role','phone','sap']))return;
     var sc=m.status==='Active'?'#00875a':m.status==='On Leave'?'#c0392b':'#94a3b8';
     var wk2=bweekKey(),sc2=BS.sch[wk2]||{},ms=sc2[m.id]||{};
-    var todayShift=ms[todayName]||m.shift||'\u2014';
+    var todayShiftRaw=ms[todayName];
+    var todayShift='\u2014';
+    if(typeof todayShiftRaw==='string'&&todayShiftRaw)todayShift=todayShiftRaw;
+    else if(todayShiftRaw&&typeof todayShiftRaw==='object'){
+      if(todayShiftRaw.start&&todayShiftRaw.end)todayShift=todayShiftRaw.start+'-'+todayShiftRaw.end;
+      else if(todayShiftRaw.type==='rest'||todayShiftRaw.type==='pending')todayShift='OFF';
+      else if(todayShiftRaw.type)todayShift=(SCH_SHIFT_TYPES.find(function(o){return o.value===todayShiftRaw.type;})||{}).label||todayShiftRaw.type;
+    }
+    if(todayShift==='\u2014'&&m.shift)todayShift=m.shift;
     var shCol=todayShift.toUpperCase()==='OFF'||todayShift.toUpperCase()==='DAY OFF'?'#b45309':'var(--ceo)';
     var actionsHtml;
     if(canEdit){
@@ -10566,42 +10581,228 @@ function rejectStaffTransfer(reqId) {
 
 
 // ── Schedule ─────────────────────────────────────────
+// ── Schedule v2 — shift types + times + holidays ─────
+var SCH_SHIFT_TYPES=[
+  {value:'',label:'\u2014'},
+  {value:'work',label:'Working'},
+  {value:'split',label:'Split Shift'},
+  {value:'rest',label:'Rest Day'},
+  {value:'pending',label:'Day Off'},
+  {value:'eid-fitr',label:'Eid Al-Fitr'},
+  {value:'eid-adha',label:'Eid Al-Adha'},
+  {value:'national',label:'National Day'},
+  {value:'foundation',label:'Foundation Day'},
+  {value:'holiday',label:'Holiday'}
+];
+var SCH_NO_TIME=new Set(['','rest','pending','eid-fitr','eid-adha','national','foundation','holiday']);
+var SCH_HOLIDAY_TYPES={'eid-fitr':{l:'Eid Al-Fitr',c:'#f59e0b'},'eid-adha':{l:'Eid Al-Adha',c:'#d97706'},'national':{l:'National Day',c:'#1e5c2e'},'foundation':{l:'Foundation Day',c:'#2563eb'},'holiday':{l:'Holiday',c:'#7c3aed'}};
+var SCH_SHIFT_COLORS={'work':'#fef9c3','split':'#dcfce7','rest':'#ccfbf1','pending':'#ede9fe','eid-fitr':'#fef3c7','eid-adha':'#fde68a','national':'#dcfce7','foundation':'#dbeafe','holiday':'#ede9fe'};
+if(!BS.schHolidays)BS.schHolidays={};
+var _schHolListenerAttached=false;
+
+function schGetShift(wk,empId,dayIdx){
+  var raw=((BS.sch[wk]||{})[empId]||{})[DAYS_WEEK[dayIdx]]||'';
+  if(typeof raw==='string'){if(raw==='')return{type:'',start:'',end:''};if(raw.toUpperCase()==='OFF'||raw.toUpperCase()==='DAY OFF')return{type:'rest',start:'',end:''};return{type:'work',start:'',end:'',note:raw};}
+  return{type:raw.type||'',start:raw.start||'',end:raw.end||''};
+}
+function schSetShift(wk,empId,dayIdx,field,val){
+  if(!BS.sch[wk])BS.sch[wk]={};
+  if(!BS.sch[wk][empId])BS.sch[wk][empId]={};
+  var day=DAYS_WEEK[dayIdx];
+  var cur=BS.sch[wk][empId][day];
+  var obj=(cur&&typeof cur==='object')?Object.assign({},cur):{type:'',start:'',end:''};
+  if(typeof cur==='string'){obj.type=(cur.toUpperCase()==='OFF'||cur.toUpperCase()==='DAY OFF')?'rest':(cur?'work':'');if(cur&&obj.type==='work')obj.note=cur;}
+  obj[field]=val;
+  if(field==='type'&&SCH_NO_TIME.has(val)){obj.start='';obj.end='';}
+  BS.sch[wk][empId][day]=obj;
+  clearTimeout(BS._schSaveTimer);
+  BS._schSaveTimer=setTimeout(function(){bSaveSch();},600);
+}
+function schGetHolidays(wk){return (BS.schHolidays&&BS.schHolidays[wk])||Array(7).fill(null);}
+function bSaveSchHolidays(){if(db)db.ref(bPath('schHolidays')).set(BS.schHolidays);}
+
+function schOpenHolidayModal(){
+  var wk=bweekKey(),hols=schGetHolidays(wk),dates=bweekDates();
+  var rows=dates.map(function(dt,i){
+    var cur=hols[i]||'';
+    var opts='<option value="">Normal Day</option>'+Object.entries(SCH_HOLIDAY_TYPES).map(function(kv){return '<option value="'+kv[0]+'"'+(cur===kv[0]?' selected':'')+'>'+kv[1].l+'</option>';}).join('');
+    return '<div style="display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid #f1f5f9"><span style="font-size:13px;font-weight:500">'+DAYS_WEEK[i]+' <span style="color:#94a3b8;font-size:11px">'+new Date(dt+'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short'})+'</span></span><select id="schHw'+i+'" style="width:170px;padding:7px 10px;border:1.5px solid #e5e7eb;border-radius:8px;font-size:12px;font-family:inherit;outline:none">'+opts+'</select></div>';
+  }).join('');
+  document.body.insertAdjacentHTML('beforeend','<div id="schHolModal" style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px" onclick="if(event.target===this)this.remove()"><div style="background:#fff;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,.15);width:100%;max-width:480px;max-height:90vh;overflow-y:auto"><div style="padding:18px 22px 14px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between"><span style="font-size:15px;font-weight:700">Manage Week Holidays</span><button onclick="document.getElementById(\'schHolModal\').remove()" style="background:#f3f4f6;border:none;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:13px">\u2715</button></div><div style="padding:18px 22px"><p style="font-size:12px;color:#6b7280;margin-bottom:14px">Highlight columns for holidays \u2014 all staff see them.</p>'+rows+'</div><div style="padding:14px 22px;border-top:1px solid #f1f5f9;display:flex;gap:8px;justify-content:flex-end"><button onclick="document.getElementById(\'schHolModal\').remove()" style="background:#fff;border:1.5px solid #e5e7eb;border-radius:8px;padding:7px 16px;font-size:13px;cursor:pointer">Cancel</button><button onclick="schApplyHolidays()" style="background:#006666;color:#fff;border:none;border-radius:8px;padding:7px 18px;font-size:13px;font-weight:600;cursor:pointer">Apply</button></div></div></div>');
+}
+function schApplyHolidays(){
+  var wk=bweekKey();
+  if(!BS.schHolidays)BS.schHolidays={};
+  BS.schHolidays[wk]=Array.from({length:7},function(_,i){return (document.getElementById('schHw'+i)||{}).value||null;});
+  bSaveSchHolidays();
+  document.getElementById('schHolModal').remove();
+  navTo('schedule');
+  showToast('Holidays updated','success');
+}
+function schCopyLastWeek(){
+  var wo=(BS.wo||0);
+  var base=new Date();base.setDate(base.getDate()+wo*7-7);
+  var sun=new Date(base);sun.setDate(sun.getDate()-sun.getDay());sun.setHours(0,0,0,0);
+  var jan1=new Date(sun.getFullYear(),0,1);
+  var lk=sun.getFullYear()+'-W'+String(Math.ceil(((sun-jan1)/86400000+jan1.getDay()+1)/7)).padStart(2,'0');
+  var wk=bweekKey();
+  if(!BS.sch[lk]){showToast('No schedule for last week','warning');return;}
+  if(!confirm('Copy all shifts from last week to this week? Existing data will be overwritten.'))return;
+  BS.sch[wk]=JSON.parse(JSON.stringify(BS.sch[lk]));
+  bSaveSch();navTo('schedule');showToast('Last week copied','success');
+}
+
 function pSchedule() {
   attachBranchListeners();
   if(!BS.wo)BS.wo=0;
   if(BS._schDept===undefined)BS._schDept='All';
-  var wk=bweekKey(),dates=bweekDates(),sc=BS.sch[wk]||{};
+  if(!_schHolListenerAttached){
+    if(db){
+      _schHolListenerAttached=true;
+      db.ref(bPath('schHolidays')).on('value',function(s){BS.schHolidays=s.val()||{};});
+    } else {
+      setTimeout(function(){if(NX.page==='schedule'){var area=document.getElementById('page-area');if(area)area.innerHTML=renderPage_('schedule');}},600);
+    }
+  }
+
+  var wk=bweekKey(),dates=bweekDates();
+  var hols=schGetHolidays(wk);
   var d0=new Date(dates[0]+'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short'});
   var d6=new Date(dates[6]+'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short'});
-  var th='<tr><th>Staff</th>';
-  dates.forEach(function(dt,i){var it=dt===TODAY_BS;th+='<th style="'+(it?'color:var(--ceo)':'')+';text-align:center">'+DAYS_WEEK[i]+'<br><span style="font-weight:400;font-size:9px;opacity:.7">'+new Date(dt+'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short'})+'</span></th>';});
-  th+='</tr>';
-  var tb='';
+
+  var deptBtns=[['All','All'],['Management','Manager'],['FOH','FOH'],['Kitchen','BOH']];
   var _schDs=BS._schDept==='All'?DEPTS:DEPTS.filter(function(d){return d===BS._schDept;});
-  _schDs.forEach(function(dep){var mem=BS.staff.filter(function(m){return normalizeDept(m.dept)===dep;});if(!mem.length)return;tb+='<tr class="bdr"><td colspan="8">'+bxe(dep)+'</td></tr>';mem.forEach(function(m){var ms=(sc[m.id]||{});tb+='<tr><td><div style="display:flex;align-items:center;gap:8px"><div class="bav" style="width:24px;height:24px;font-size:9px">'+bini(m.name)+'</div><span style="font-size:12px;font-weight:500">'+bxe(m.name)+'</span>'+(m.sap?'<div style="font-size:9px;color:#94a3b8;font-family:monospace">'+bxe(m.sap)+'</div>':'')+' </div></div></td>';DAYS_WEEK.forEach(function(day){tb+='<td style="padding:4px"><input class="bsinp bsc-inp" data-id="'+bxe(m.id)+'" data-day="'+bxe(day)+'" value="'+bxe(ms[day]||'')+'" placeholder="\u2014"></td>';});tb+='</tr>';});});
-  var h='<div class="page-header"><h1>Weekly Schedule</h1></div>';
-  h+='<div class="bwnav"><button class="btn btn-sm" onclick="BS.wo=(BS.wo||0)-1;navTo(\'schedule\')">\u2190 Prev</button><span class="bmono" style="font-size:12px;color:var(--text-secondary)">'+bxe(wk)+' \u00b7 '+d0+' \u2014 '+d6+'</span><button class="btn btn-sm" onclick="BS.wo=(BS.wo||0)+1;navTo(\'schedule\')">Next \u2192</button><span style="margin-left:auto;font-size:11px;color:var(--success);opacity:.8">\u25cf Auto-saves</span><button class="btn btn-sm" onclick="printBranchSched(\'All\')">Print All</button><button class="btn btn-sm" onclick="printBranchSched(\'Management\')">Print Mgmt</button><button class="btn btn-sm" onclick="printBranchSched(\'Kitchen\')">Print Kitchen</button><button class="btn btn-sm" onclick="printBranchSched(\'FOH\')">Print FOH</button></div>'+
-  '<div style="display:flex;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap">'+
-  '<span style="font-size:10px;color:var(--text-tertiary);font-family:var(--mono);font-weight:700;letter-spacing:.05em">VIEW:</span>'+
-  [['All','All'],['Management','Manager'],['FOH','FOH'],['Kitchen','BOH']].map(function(dv){var on=BS._schDept===dv[0];return '<button class="btn btn-sm" style="'+(on?'background:var(--primary);color:#fff;border-color:var(--primary)':'')+'" onclick="BS._schDept=\''+dv[0]+'\';navTo(\'schedule\')">'+dv[1]+'</button>';}).join('')+
-  '</div>';
-  h+='<div class="bswrap"><table class="bstbl"><thead>'+th+'</thead><tbody>'+tb+'</tbody></table></div>';
-  setTimeout(function(){
-    document.querySelectorAll('.bsc-inp').forEach(function(inp){
-      inp.addEventListener('input',function(){
-        var wk2=bweekKey();
-        if(!BS.sch[wk2])BS.sch[wk2]={};
-        var id=inp.dataset.id,day=inp.dataset.day;
-        if(!BS.sch[wk2][id])BS.sch[wk2][id]={};
-        BS.sch[wk2][id][day]=inp.value;
-        clearTimeout(inp._saveTimer);
-        inp._saveTimer=setTimeout(function(){bSaveSch();},800);
-      });
-    });
-  },0);
+  var allStaff=BS.staff||[];
+  var todayIdx=dates.indexOf(TODAY_BS);
+  var restToday=0;
+  allStaff.forEach(function(m){var sh=schGetShift(wk,m.id,todayIdx>=0?todayIdx:0);if(sh.type==='rest'||sh.type==='pending')restToday++;});
+
+  var h='<style>'
+    +'.sch2-wrap{background:#fff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.06);margin-bottom:22px}'
+    +'.sch2-tbl{width:100%;border-collapse:collapse}'
+    +'.sch2-tbl thead{background:#f9fafb;border-bottom:2px solid #e5e7eb}'
+    +'.sch2-tbl thead th{padding:9px 6px;font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}'
+    +'.sch2-tbl thead th.sch-day-col{text-align:center;min-width:106px}'
+    +'.sch2-tbl tbody tr{border-bottom:1px solid #f3f4f6}'
+    +'.sch2-tbl tbody tr:last-child{border-bottom:none}'
+    +'.sch2-tbl tbody tr:hover{background:#fafafa}'
+    +'.sch2-tbl td{padding:6px 6px;font-size:13px;vertical-align:middle}'
+    +'.sch2-emp-cell{min-width:155px}'
+    +'.sch2-day-td{text-align:center;padding:4px 2px}'
+    +'.sch2-sw{display:flex;flex-direction:column;gap:3px;align-items:center}'
+    +'.sch2-sel{width:100%;border:1.5px solid #e5e7eb;border-radius:5px;font-size:10px;font-family:inherit;padding:3px 2px;text-align:center;background:#fff;color:#374151;cursor:pointer;outline:none;font-weight:600;transition:.15s}'
+    +'.sch2-sel:focus{border-color:#006666}'
+    +'.sch2-trow{display:flex;align-items:center;gap:2px;width:100%}'
+    +'.sch2-ti{flex:1;min-width:0;border:1.5px solid #e5e7eb;border-radius:5px;font-size:9px;font-family:inherit;padding:3px 1px;text-align:center;outline:none;color:#374151;background:#fff;font-weight:500}'
+    +'.sch2-ti:focus{border-color:#006666}'
+    +'.sch2-notime .sch2-trow{display:none}'
+    +'.sch2-col-holiday{background:#f5f3ff!important}'
+    +'.sch2-col-eid-fitr{background:#fff8e1!important}'
+    +'.sch2-col-eid-adha{background:#fef3c7!important}'
+    +'.sch2-col-national{background:#f0fdf4!important}'
+    +'.sch2-col-foundation{background:#eff6ff!important}'
+    +'</style>';
+
+  h+='<div class="page-header"><h1>\uD83D\uDCC5 Weekly Schedule</h1></div>';
+
+  // toolbar
+  h+='<div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:13px 18px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:16px;box-shadow:0 1px 3px rgba(0,0,0,.06)">'
+    +'<div style="display:flex;align-items:center;gap:8px">'
+    +'<button class="btn btn-sm" onclick="BS.wo=(BS.wo||0)-1;navTo(\'schedule\')" style="border-radius:7px;padding:5px 10px">\u2190</button>'
+    +'<span style="font-size:14px;font-weight:600;color:#1f2937;min-width:218px;text-align:center">'+bxe(wk)+' &nbsp;\u00b7&nbsp; '+d0+' \u2014 '+d6+'</span>'
+    +'<button class="btn btn-sm" onclick="BS.wo=(BS.wo||0)+1;navTo(\'schedule\')" style="border-radius:7px;padding:5px 10px">\u2192</button>'
+    +'</div>'
+    +'<button class="btn btn-sm" onclick="BS.wo=0;navTo(\'schedule\')" style="border-radius:7px">This Week</button>'
+    +'<div style="width:1px;height:26px;background:#e5e7eb;margin:0 2px"></div>'
+    +'<span style="font-size:11px;color:#9ca3af">View:</span>'
+    +deptBtns.map(function(dv){var on=BS._schDept===dv[0];return '<button class="btn btn-sm" style="border-radius:7px'+(on?';background:#006666;color:#fff;border-color:#006666':'')+'" onclick="BS._schDept=\''+dv[0]+'\';navTo(\'schedule\')">'+dv[1]+'</button>';}).join('')
+    +'<div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap">'
+    +'<button class="btn btn-sm" onclick="schOpenHolidayModal()" style="border-radius:7px">\uD83D\uDCC5 Holidays</button>'
+    +'<button class="btn btn-sm" onclick="schCopyLastWeek()" style="border-radius:7px">\uD83D\uDCCB Copy Last Week</button>'
+    +'<button class="btn btn-sm" onclick="printBranchSched(\'All\')" style="border-radius:7px">\uD83D\uDDA8 Print</button>'
+    +'</div>'
+    +'<span style="font-size:11px;color:#22c55e">\u25cf Auto-saves</span>'
+    +'</div>';
+
+  // stats bar
+  h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:10px;margin-bottom:16px">'
+    +[['Total Staff',allStaff.length,'#006666'],['Management',allStaff.filter(function(m){return normalizeDept(m.dept)==='Manager';}).length,'#b45309'],['FOH',allStaff.filter(function(m){return normalizeDept(m.dept)==='FOH';}).length,'#2563eb'],['Kitchen',allStaff.filter(function(m){return normalizeDept(m.dept)==='Kitchen'||normalizeDept(m.dept)==='BOH';}).length,'#7c3aed'],['Off Today',restToday,'#0d9488']].map(function(s){
+      return '<div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:12px 14px;box-shadow:0 1px 3px rgba(0,0,0,.06)"><div style="width:3px;height:22px;border-radius:2px;background:'+s[2]+';margin-bottom:6px"></div><div style="font-size:22px;font-weight:700;color:#1f2937">'+s[1]+'</div><div style="font-size:11px;color:#9ca3af;font-weight:500;margin-top:1px">'+s[0]+'</div></div>';
+    }).join('')+'</div>';
+
+  // legend bar
+  h+='<div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:10px 16px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:18px;box-shadow:0 1px 3px rgba(0,0,0,.06)">'
+    +'<span style="font-size:10px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.6px;margin-right:2px">Legend</span>'
+    +[['Working','#fef9c3','#713f12'],['Split Shift','#dcfce7','#166534'],['Rest Day','#ccfbf1','#0f766e'],['Day Off','#ede9fe','#6d28d9'],['Eid Al-Fitr','#fef3c7','#92400e'],['Eid Al-Adha','#fde68a','#78350f'],['National Day','#dcfce7','#166534'],['Foundation Day','#dbeafe','#1e40af'],['Holiday','#ede9fe','#6d28d9']].map(function(c){
+      return '<div style="display:flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;background:'+c[1]+';color:'+c[2]+'"><span style="width:6px;height:6px;border-radius:50%;background:'+c[2]+';opacity:.75;flex-shrink:0"></span>'+c[0]+'</div>';
+    }).join('')+'</div>';
+
+  // section tables
+  var DEPT_LABELS={'Manager':'Management','FOH':'Front of House (FOH)','Kitchen':'Back of House (BOH)'};
+  var BADGE_ST={'Manager':'background:#e8f2eb;color:#1e5c2e','FOH':'background:#fef3e8;color:#e07820','Kitchen':'background:#eff6ff;color:#2563eb'};
+
+  _schDs.forEach(function(dep){
+    var mem=BS.staff.filter(function(m){return normalizeDept(m.dept)===dep;});
+    if(!mem.length)return;
+
+    var thCols=dates.map(function(dt,i){
+      var hol=hols[i]||'';
+      var hi=SCH_HOLIDAY_TYPES[hol];
+      var colCls=hol?' sch2-col-'+hol:'';
+      var badge=hi?'<span style="font-size:9px;padding:1px 5px;border-radius:4px;font-weight:600;background:'+hi.c+'22;color:'+hi.c+'">'+hi.l+'</span>':'';
+      var isToday=dt===TODAY_BS;
+      return '<th class="sch-day-col'+colCls+'" style="'+(isToday?'background:#fffbeb;':'')+'">'
+        +'<div style="display:flex;flex-direction:column;align-items:center;gap:2px">'
+        +'<span style="font-size:11px;font-weight:700;color:'+(isToday?'#b45309':'#4b5563')+'">'+DAYS_WEEK[i].slice(0,3)+'</span>'
+        +'<span style="font-size:10px;color:#9ca3af">'+new Date(dt+'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short'})+'</span>'
+        +badge+'</div></th>';
+    }).join('');
+
+    var rows=mem.map(function(m){
+      var cells=dates.map(function(dt,i){
+        var sh=schGetShift(wk,m.id,i);
+        var t=sh.type||'';
+        var bg=SCH_SHIFT_COLORS[t]||'';
+        var noTime=SCH_NO_TIME.has(t);
+        var hol=hols[i]||'';
+        var colCls=hol?' sch2-col-'+hol:'';
+        var isToday=dt===TODAY_BS;
+        var opts=SCH_SHIFT_TYPES.map(function(o){return '<option value="'+o.value+'"'+(t===o.value?' selected':'')+'>'+o.label+'</option>';}).join('');
+        var wid=JSON.stringify(wk),mid=JSON.stringify(m.id);
+        return '<td class="sch2-day-td'+colCls+'" style="'+(isToday?'background:#fffbeb!important;':'')+'">'
+          +'<div class="sch2-sw'+(noTime?' sch2-notime':'')+'" id="ssw_'+m.id+'_'+i+'">'
+          +'<select class="sch2-sel" style="'+(bg?'background:'+bg+';border-color:'+bg+';':'')+'" '
+          +'onchange="schSetShift('+wid+','+mid+','+i+',\'type\',this.value);var b=SCH_SHIFT_COLORS[this.value]||\'#fff\';this.style.background=b;this.style.borderColor=b;var w=document.getElementById(\'ssw_'+m.id+'_'+i+'\');if(w){w.className=\'sch2-sw\'+(SCH_NO_TIME.has(this.value)?\' sch2-notime\':\'\')}">'+opts+'</select>'
+          +'<div class="sch2-trow">'
+          +'<input class="sch2-ti" type="time" value="'+bxe(sh.start||'')+'" onchange="schSetShift('+wid+','+mid+','+i+',\'start\',this.value)">'
+          +'<span style="font-size:10px;color:#9ca3af;flex-shrink:0">\u2013</span>'
+          +'<input class="sch2-ti" type="time" value="'+bxe(sh.end||'')+'" onchange="schSetShift('+wid+','+mid+','+i+',\'end\',this.value)">'
+          +'</div></div></td>';
+      }).join('');
+      return '<tr>'
+        +'<td class="sch2-emp-cell"><div style="display:flex;align-items:center;gap:8px"><div class="bav" style="width:28px;height:28px;font-size:10px;flex-shrink:0">'+bini(m.name)+'</div>'
+        +'<div><div style="font-weight:600;font-size:13px;color:#1f2937">'+bxe(m.name)+'</div>'
+        +'<div style="font-size:11px;color:#9ca3af;margin-top:1px">'+bxe(m.role||m.dept||'')+'</div></div></div></td>'
+        +cells+'</tr>';
+    }).join('');
+
+    var depLbl=DEPT_LABELS[dep]||dep;
+    var bSt=BADGE_ST[dep]||'background:#f3f4f6;color:#374151';
+    h+='<div class="sch2-wrap">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;padding:11px 16px;border-bottom:1px solid #f3f4f6">'
+      +'<div style="display:flex;align-items:center;gap:10px">'
+      +'<span style="padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;'+bSt+'">'+bxe(dep)+'</span>'
+      +'<span style="font-size:15px;font-weight:700;color:#1f2937">'+bxe(depLbl)+'</span>'
+      +'<span style="font-size:12px;color:#9ca3af">'+mem.length+' employee'+(mem.length!==1?'s':'')+'</span>'
+      +'</div>'
+      +'<button class="btn btn-sm" onclick="printBranchSched(\''+dep+'\')" style="border-radius:7px;font-size:11px">\uD83D\uDDA8 Print '+bxe(dep)+'</button>'
+      +'</div>'
+      +'<div style="overflow-x:auto"><table class="sch2-tbl"><thead><tr><th style="text-align:left;padding:9px 12px">Employee</th>'+thCols+'</tr></thead><tbody>'+rows+'</tbody></table></div></div>';
+  });
+
   return h;
 }
-function printBranchSched(dept){var wk=bweekKey(),dates=bweekDates(),sc=BS.sch[wk]||{};var d0=new Date(dates[0]+'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short'});var d6=new Date(dates[6]+'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short'});var s=NX.session||{};var th='<tr style="background:#1a2340;color:#fff"><th style="padding:10px 14px;text-align:left;min-width:180px">Staff Member</th>';dates.forEach(function(dt,i){var it=dt===TODAY_BS;th+='<th style="padding:10px 8px;text-align:center;min-width:80px'+(it?';color:#b45309':'')+' ">'+DAYS_WEEK[i]+'<br><span style="font-size:9px;font-weight:400;opacity:.8">'+new Date(dt+'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short'})+'</span></th>';});th+='</tr>';var tb='';var deptsR=dept==='All'?DEPTS:[dept];deptsR.forEach(function(dep){var mem=BS.staff.filter(function(m){return normalizeDept(m.dept)===dep;});if(!mem.length)return;tb+='<tr><td colspan="8" style="background:#f1f5f9;font-size:9px;text-transform:uppercase;letter-spacing:2px;color:#64748b;font-weight:700;padding:6px 14px">'+dep+'</td></tr>';mem.forEach(function(m){var ms=(sc[m.id]||{});var ini2='';String(m.name||'').split(' ').forEach(function(p){if(p&&ini2.length<2)ini2+=p[0].toUpperCase();});tb+='<tr><td style="padding:8px 14px;font-size:12px;font-weight:600;border-bottom:1px solid #f1f5f9"><div style="display:flex;align-items:center;gap:8px"><div style="width:24px;height:24px;border-radius:50%;background:#e2e8f0;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700">'+ini2+'</div>'+bxe(m.name)+'</div></td>';dates.forEach(function(dt,di){var val=(ms[DAYS_WEEK[di]]||'');var isOff=val.toUpperCase()==='OFF'||val.toUpperCase()==='DAY OFF';var it=dt===TODAY_BS;tb+='<td style="padding:8px 6px;text-align:center;font-size:11px;font-weight:600;color:'+(val?isOff?'#b45309':'#1a2340':'#cbd5e1')+';background:'+(it?'#fffbeb':isOff?'#f8fafc':'#fff')+';border-bottom:1px solid #f1f5f9;border-left:1px solid #f1f5f9">'+bxe(val||'\u2014')+'</td>';});tb+='</tr>';});});var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Schedule</title><style>@page{size:A4 landscape;margin:8mm}*{box-sizing:border-box;margin:0;padding:0;font-family:Arial,Helvetica,sans-serif}body{background:#fff;color:#111;font-size:12px}table{width:100%;border-collapse:collapse}.hdr{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:10px;margin-bottom:14px;border-bottom:3px solid #1a2340}.foot{margin-top:20px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:30px}.foot-cell{border-top:1px solid #333;padding-top:5px;text-align:center;font-size:9px;color:#64748b}@media print{.np{display:none!important}}</style></head><body><div class="hdr"><div><img src="https://i.imgur.com/jeqtcE2.png" alt="ALFA.CO" style="height:44px;width:auto;display:block"><div style="font-size:10px;color:#888">'+bxe(s.branchName||s.entityName||'')+'</div></div><div style="text-align:center"><h1 style="font-size:16px;font-weight:800;color:#1a2340">Weekly Schedule</h1><p style="font-size:10px;color:#64748b">'+bxe(dept)+' \u00b7 '+bxe(wk)+' \u00b7 '+d0+' \u2013 '+d6+'</p></div><div style="text-align:right;font-size:10px;color:#64748b"><div>Printed: '+new Date().toLocaleDateString('en-GB')+'</div></div></div><table><thead>'+th+'</thead><tbody>'+tb+'</tbody></table><div class="foot"><div class="foot-cell">Prepared by</div><div class="foot-cell">Approved by Manager</div><div class="foot-cell">Date &amp; Signature</div></div><div class="np" style="text-align:center;margin-top:20px"><button onclick="window.print()" style="background:#1a2340;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:13px;font-weight:700;cursor:pointer">Print / Save PDF</button></div></body></html>';var w=window.open('','_blank','width=1100,height=700');if(w){w.document.write(html);w.document.close();}else showToast('Allow pop-ups to print','error');}
+function printBranchSched(dept){var wk=bweekKey(),dates=bweekDates(),sc=BS.sch[wk]||{};var d0=new Date(dates[0]+'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short'});var d6=new Date(dates[6]+'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short'});var s=NX.session||{};var th='<tr style="background:#1a2340;color:#fff"><th style="padding:10px 14px;text-align:left;min-width:180px">Staff Member</th>';dates.forEach(function(dt,i){var it=dt===TODAY_BS;th+='<th style="padding:10px 8px;text-align:center;min-width:80px'+(it?';color:#b45309':'')+' ">'+DAYS_WEEK[i]+'<br><span style="font-size:9px;font-weight:400;opacity:.8">'+new Date(dt+'T00:00:00').toLocaleDateString('en-GB',{day:'2-digit',month:'short'})+'</span></th>';});th+='</tr>';var tb='';var deptsR=dept==='All'?DEPTS:[dept];deptsR.forEach(function(dep){var mem=BS.staff.filter(function(m){return normalizeDept(m.dept)===dep;});if(!mem.length)return;tb+='<tr><td colspan="8" style="background:#f1f5f9;font-size:9px;text-transform:uppercase;letter-spacing:2px;color:#64748b;font-weight:700;padding:6px 14px">'+dep+'</td></tr>';mem.forEach(function(m){var ini2='';String(m.name||'').split(' ').forEach(function(p){if(p&&ini2.length<2)ini2+=p[0].toUpperCase();});tb+='<tr><td style="padding:8px 14px;font-size:12px;font-weight:600;border-bottom:1px solid #f1f5f9"><div style="display:flex;align-items:center;gap:8px"><div style="width:24px;height:24px;border-radius:50%;background:#e2e8f0;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700">'+ini2+'</div>'+bxe(m.name)+'</div></td>';dates.forEach(function(dt,di){var sh=schGetShift(wk,m.id,di);var lbl=(SCH_SHIFT_TYPES.find(function(o){return o.value===sh.type;})||{}).label||'';var isOff=sh.type==='rest'||sh.type==='pending';var disp=lbl&&lbl!=='\u2014'?lbl:'';if(sh.start&&sh.end)disp=sh.start+'-'+sh.end;var it=dt===TODAY_BS;tb+='<td style="padding:8px 6px;text-align:center;font-size:11px;font-weight:600;color:'+(disp?isOff?'#b45309':'#1a2340':'#cbd5e1')+';background:'+(it?'#fffbeb':isOff?'#f8fafc':'#fff')+';border-bottom:1px solid #f1f5f9;border-left:1px solid #f1f5f9">'+bxe(disp||'\u2014')+'</td>';});tb+='</tr>';});});var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Schedule</title><style>@page{size:A4 landscape;margin:8mm}*{box-sizing:border-box;margin:0;padding:0;font-family:Arial,Helvetica,sans-serif}body{background:#fff;color:#111;font-size:12px}table{width:100%;border-collapse:collapse}.hdr{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:10px;margin-bottom:14px;border-bottom:3px solid #1a2340}.foot{margin-top:20px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:30px}.foot-cell{border-top:1px solid #333;padding-top:5px;text-align:center;font-size:9px;color:#64748b}@media print{.np{display:none!important}}</style></head><body><div class="hdr"><div><img src="https://i.imgur.com/jeqtcE2.png" alt="ALFA.CO" style="height:44px;width:auto;display:block"><div style="font-size:10px;color:#888">'+bxe(s.branchName||s.entityName||'')+'</div></div><div style="text-align:center"><h1 style="font-size:16px;font-weight:800;color:#1a2340">Weekly Schedule</h1><p style="font-size:10px;color:#64748b">'+bxe(dept)+' \u00b7 '+bxe(wk)+' \u00b7 '+d0+' \u2013 '+d6+'</p></div><div style="text-align:right;font-size:10px;color:#64748b"><div>Printed: '+new Date().toLocaleDateString('en-GB')+'</div></div></div><table><thead>'+th+'</thead><tbody>'+tb+'</tbody></table><div class="foot"><div class="foot-cell">Prepared by</div><div class="foot-cell">Approved by Manager</div><div class="foot-cell">Date &amp; Signature</div></div><div class="np" style="text-align:center;margin-top:20px"><button onclick="window.print()" style="background:#1a2340;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:13px;font-weight:700;cursor:pointer">Print / Save PDF</button></div></body></html>';var w=window.open('','_blank','width=1100,height=700');if(w){w.document.write(html);w.document.close();}else showToast('Allow pop-ups to print','error');}
 
 // ── Timesheet ─────────────────────────────────────────
 function pTimesheet() {
@@ -10720,7 +10921,11 @@ function saveBranchAttendance(){
   if(!eid){showToast('Select an employee','error');return;}
   var _dN=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
   var _dS=new Date(dt+'T00:00:00'),_dN2=_dN[_dS.getDay()];
-  var _rw=((BS.sch[bweekKey()]||{})[eid]||{})[_dN2]||'';
+  var _dN2=DAYS_WEEK[_dS.getDay()];
+  var _rwRaw=((BS.sch[bweekKey()]||{})[eid]||{})[_dN2]||'';
+  var _rw='';
+  if(typeof _rwRaw==='string')_rw=_rwRaw;
+  else if(_rwRaw&&_rwRaw.start&&_rwRaw.end)_rw=_rwRaw.start+'-'+_rwRaw.end;
   var _sc=_rw?parseShiftText(_rw):null;
   var overtimeMins=0,lateMins=0,scheduledLabel='';
   function _t2m(t){if(!t)return 0;var p=t.split(':');return parseInt(p[0]||0)*60+parseInt(p[1]||0);}
@@ -10773,13 +10978,18 @@ function btsOnEmpChange(eid,vd){
   btsResetBreak();
   var si=document.getElementById('bts-shift-info');
   if(si&&eid){
-    var _days=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-    var _sd=new Date(vd+'T00:00:00'),_dn=_days[_sd.getDay()];
-    var _raw=((BS.sch[bweekKey()]||{})[eid]||{})[_dn]||'',_ps=_raw?parseShiftText(_raw):null;
-    if(_raw&&_raw.toUpperCase()!=='OFF'&&_raw.toUpperCase()!=='DAY OFF'){
-      si.innerHTML='<span style="color:var(--primary);font-weight:700">Scheduled: </span><span style="font-family:var(--mono);font-size:11px">'+bxe(_ps?_ps.label+' · '+Math.floor(_ps.dutyMins/60)+'h duty · '+Math.floor(_ps.breakMins/60)+'h break':_raw)+'</span>';
+    var _sd=new Date(vd+'T00:00:00'),_di=_sd.getDay();
+    var _shObj=schGetShift(bweekKey(),eid,_di);
+    var _raw='';
+    if(_shObj.start&&_shObj.end)_raw=_shObj.start+'-'+_shObj.end;
+    else if(_shObj.note)_raw=_shObj.note;
+    var _isOff=_shObj.type==='rest'||_shObj.type==='pending';
+    var _ps=_raw?parseShiftText(_raw):null;
+    if(_raw&&!_isOff){
+      si.innerHTML='<span style="color:var(--primary);font-weight:700">Scheduled: </span><span style="font-family:var(--mono);font-size:11px">'+bxe(_ps?_ps.label+' \u00b7 '+Math.floor(_ps.dutyMins/60)+'h duty \u00b7 '+Math.floor(_ps.breakMins/60)+'h break':_raw)+'</span>';
       si.style.display='';
-    }else{si.style.display=_raw?'':'none';if(_raw)si.innerHTML='<span style="color:#b45309">Day Off</span>';}
+    }else if(_isOff){si.style.display='';si.innerHTML='<span style="color:#b45309">Day Off</span>';}
+    else{si.style.display='none';}
     if(!((BS.tsAtt[eid]&&(BS.tsAtt[eid][vd.slice(0,7)]||[]).find(function(x){return x.date===vd;})))&&_ps){
       var _ci=document.getElementById('bts-in'),_co=document.getElementById('bts-out');
       if(_ci&&!_ci.value)_ci.value=_ps.start;if(_co&&!_co.value)_co.value=_ps.end;
