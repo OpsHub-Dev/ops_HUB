@@ -10837,7 +10837,8 @@ function pSchedule() {
         var colCls=hol?' sch2-col-'+hol:'';
         var isToday=dt===TODAY_BS;
         var opts=SCH_SHIFT_TYPES.map(function(o){return '<option value="'+o.value+'"'+(t===o.value?' selected':'')+'>'+o.label+'</option>';}).join('');
-        var wid=JSON.stringify(wk),mid=JSON.stringify(m.id);
+        var wid="'"+String(wk).replace(/\\/g,'\\\\').replace(/'/g,"\\'")+"'";
+        var mid="'"+String(m.id).replace(/\\/g,'\\\\').replace(/'/g,"\\'")+"'";
         return '<td class="sch2-day-td'+colCls+'" style="'+(isToday?'background:#fffbeb!important;':'')+'">'
           +'<div class="sch2-sw'+(noTime?' sch2-notime':'')+'" id="ssw_'+m.id+'_'+i+'">'
           +'<select class="sch2-sel" style="'+(bg?'background:'+bg+';border-color:'+bg+';':'')+'" '
