@@ -1126,6 +1126,9 @@ var _clBtDay = 0, _clCoolDay = 0, _clFilter = 'all';
 var clSaveTmr = null;
 var _clPageBound = false;
 var _dashFilter = 'all';
+var _clLastSelfUpdatedAt = 0;
+var _clTypingActive = false;
+var _clPendingRemoteRender = false;
 window.monthlyRecords = {};
 
 var CL_DAYS   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
@@ -1216,6 +1219,7 @@ function clSaveNow(){
       var out={};Object.keys(obj).forEach(function(k){out[clFbKey(k)]=_san(obj[k]);});return out;
     }
     var payload={state:_san(clST[wk]||{}),meta:meta,updatedAt:Date.now()};
+    _clLastSelfUpdatedAt=payload.updatedAt;
     if(db){
       db.ref(bPath('cl_weeks')+'/'+wk).set(payload,function(err){
         if(!err)window.monthlyRecords[wk]={state:payload.state,meta:meta};
@@ -1240,18 +1244,27 @@ function clInitFBSync(){
   clFbRef=db.ref(path);
   clFbRef.on('value',function(snap){
     var d=snap.val();
+    // If this snapshot is just the echo of our own last write, the local
+    // state already matches it — skip the destructive full re-render that
+    // was wiping out in-progress typing and causing constant slow rebuilds.
+    var isOwnEcho = d && d.updatedAt && d.updatedAt===_clLastSelfUpdatedAt;
     if(d&&d.state&&Object.keys(d.state).length>0){
       if(!clST[wk])clST[wk]={};
       Object.keys(d.state).forEach(function(k){clST[wk][k]=d.state[k];});
       window.monthlyRecords[wk]={state:d.state,meta:d.meta||{}};
     }
     clEnsureST();
+    if(el){el.textContent='⚡ Live';el.style.color='var(--done-txt)';}
+    if(isOwnEcho)return;
     if(clRole){
+      // If someone is actively typing in a text field, don't rebuild the DOM
+      // under them (that's what was eating keystrokes) — queue a render for
+      // when they're done instead.
+      if(_clTypingActive){_clPendingRemoteRender=true;return;}
       var curView=getCurrentView();
       if(curView==='cl-view')renderCL(clSec);
       updateDashboard();
     }
-    if(el){el.textContent='⚡ Live';el.style.color='var(--done-txt)';}
   },function(err){
     if(el){el.textContent='⚠ Offline';el.style.color='var(--pending)';}
     clEnsureST();
@@ -1416,6 +1429,40 @@ function clDayStatusForCl(cl,di){
   if(ok>0)return'progress';
   return'pending';
 }
+function clHygDayStatus(cl,di){
+  clEnsureST();var w=clWk(),hyg=clST[w][cl.id];
+  if(!hyg||!hyg.employees||!hyg.employees.length)return'pending';
+  var checks=(hyg.checks&&hyg.checks[di])||{};
+  var tot=0,fil=0,ok=0;
+  hyg.employees.forEach(function(_,ei){
+    for(var ci=0;ci<16;ci++){
+      tot++;
+      var v=checks[ei]&&checks[ei][ci];
+      if(v)fil++;
+      if(v==='ok')ok++;
+    }
+  });
+  if(fil===0)return'pending';
+  if(ok===tot)return'done';
+  return'progress';
+}
+function clBtStatus(){
+  clEnsureST();var w=clWk(),bt=clST[w]['foh_bartender']||{};
+  var items=(CL_BT_ITEMS.chiller||[]).concat(CL_BT_ITEMS.bases||[]);
+  if(!items.length)return'pending';
+  var tot=0,fil=0;
+  items.forEach(function(item){
+    var k=clFbKey(item),bd=bt[k];
+    for(var di=0;di<7;di++){
+      tot++;
+      var pd=bd&&bd.prep&&bd.prep[di];
+      if(pd&&(pd.oh||pd.par||pd.prep))fil++;
+    }
+  });
+  if(fil===0)return'pending';
+  if(fil===tot)return'done';
+  return'progress';
+}
 function getClStatus(cl, di){
   var base = clDayStatusForCl(cl, di);
   if(base!=='done' && base!=='progress'){
@@ -1452,7 +1499,21 @@ function updateDashboard(){
   var cards=[];
   ['mod','foh','boh'].forEach(function(sec){
     (CL_DATA[sec]||[]).forEach(function(cl){
-      if(cl.checkType==='hygiene'||cl.checkType==='bartender')return;
+      if(cl.checkType==='hygiene'){
+        var hStatus=clHygDayStatus(cl,di);
+        counts[hStatus]=(counts[hStatus]||0)+1;
+        var hyg=clST[clWk()][cl.id]||{},hEmps=(hyg.employees||[]).length,hChecks=(hyg.checks&&hyg.checks[di])||{};
+        var hOk=0,hTot=hEmps*16;
+        Object.keys(hChecks).forEach(function(ei){for(var ci=0;ci<16;ci++)if(hChecks[ei][ci]==='ok')hOk++;});
+        cards.push({cl:cl,sec:sec,status:hStatus,pct:hTot?Math.round(hOk/hTot*100):0,done:hOk,tot:hTot});
+        return;
+      }
+      if(cl.checkType==='bartender'){
+        var bStatus=clBtStatus();
+        counts[bStatus]=(counts[bStatus]||0)+1;
+        cards.push({cl:cl,sec:sec,status:bStatus,pct:bStatus==='done'?100:bStatus==='progress'?50:0,done:0,tot:0});
+        return;
+      }
       var status=getClStatus(cl,di);
       counts[status]=(counts[status]||0)+1;
       // Progress
@@ -1936,27 +1997,27 @@ function renderForms(){
   var today=new Date().toLocaleDateString('en-GB',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
   var forms=[
     {id:'form_chiller',icon:'❄️',name:'Chiller Temperature Log',desc:'Daily chiller temperature control — 0°C to 5°C',color:'var(--prog-bg)',border:'var(--prog-bd)',
-     build:function(b,t){return buildTempForm('CHILLER TEMPERATURE LOG','0°C to 5°C',['Walk-in Chiller','2-Door Chiller (Salad)','2-Door Chiller (Meat)','2-Door Chiller (Soup)','2-Door Chiller (Beverages)','Standby Chiller','Back-up Dispatcher'],b,t);}},
+     build:function(b,t,fid){return buildTempForm('CHILLER TEMPERATURE LOG','0°C to 5°C',['Walk-in Chiller','2-Door Chiller (Salad)','2-Door Chiller (Meat)','2-Door Chiller (Soup)','2-Door Chiller (Beverages)','Standby Chiller','Back-up Dispatcher'],b,t,fid);}},
     {id:'form_freezer',icon:'🧊',name:'Freezer Temperature Log',desc:'Daily freezer temperature control — -18°C to -22°C',color:'var(--pend-bg)',border:'var(--pend-bd)',
-     build:function(b,t){return buildTempForm('FREEZER TEMPERATURE LOG','-18°C to -22°C',['Walk-in Freezer','Gelato Display Freezer (-15/-16°C)','Blast Freezer','Under-counter Freezer'],b,t);}},
+     build:function(b,t,fid){return buildTempForm('FREEZER TEMPERATURE LOG','-18°C to -22°C',['Walk-in Freezer','Gelato Display Freezer (-15/-16°C)','Blast Freezer','Under-counter Freezer'],b,t,fid);}},
     {id:'form_cooling',icon:'🌡️',name:'Cooling Log',desc:'Food cooling temperature record for HACCP compliance',color:'var(--over-bg)',border:'var(--over-bd)',
-     build:function(b,t){return buildCoolingForm(b,t);}},
+     build:function(b,t,fid){return buildCoolingForm(b,t,fid);}},
     {id:'form_waste',icon:'🗑️',name:'Waste Control Log',desc:'Daily food waste tracking and cost recording',color:'var(--done-bg)',border:'var(--done-bd)',
-     build:function(b,t){return buildWasteForm(b,t);}},
+     build:function(b,t,fid){return buildWasteForm(b,t,fid);}},
     {id:'form_receiving',icon:'📦',name:'Receiving Log',desc:'Incoming goods temperature and quality check record',color:'var(--neutral-bg)',border:'var(--border)',
-     build:function(b,t){return buildReceivingForm(b,t);}},
+     build:function(b,t,fid){return buildReceivingForm(b,t,fid);}},
   ];
   forms.forEach(function(f){
     var card=document.createElement('div');card.className='form-card';
     card.style.cssText='border-color:'+f.border;
     card.innerHTML='<div style="width:48px;height:48px;border-radius:12px;background:'+f.color+';display:flex;align-items:center;justify-content:center;font-size:24px">'+f.icon+'</div>'
       +'<div><div class="form-card-name">'+f.name+'</div><div class="form-card-desc">'+f.desc+'</div></div>'
-      +'<button class="form-card-action" style="border-color:'+f.border+'">🖨 Open & Print →</button>';
+      +'<button class="form-card-action" style="border-color:'+f.border+'">✏️ Open, Fill & Print →</button>';
     (function(ff){
       card.querySelector('.form-card-action').onclick=function(){
         var branchName=CURRENT_BRANCH?CURRENT_BRANCH.name||CURRENT_BRANCH.id||'':'';
         var todayStr=new Date().toLocaleDateString('en-GB',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
-        var html=ff.build(branchName,todayStr);
+        var html=ff.build(branchName,todayStr,ff.id);
         openFormOverlay(html);
       };
     })(f);
@@ -2015,18 +2076,38 @@ function _formStyle(){
 function _printBtn(){
   return '<div class="no-print" style="text-align:center;padding:20px">'
     +'<button onclick="window.print()" style="background:#1a2340;color:#fff;border:none;border-radius:8px;padding:10px 28px;font-size:13px;font-weight:700;cursor:pointer">🖨 Print / Save PDF</button>'
-    +'</div></body></html>';
+    +'<button onclick="_fClearForm()" style="background:#fff;color:#b42318;border:1.5px solid #fecdca;border-radius:8px;padding:10px 20px;font-size:13px;font-weight:700;cursor:pointer;margin-left:10px">🗑 Clear Form</button>'
+    +'</div>';
+}
+// Editable + persisted cell input. r/c are 0-based row/col indices unique within the form.
+function _fcell(r,c){return '<td style="padding:0"><input class="fcell" data-cell="'+r+'_'+c+'" style="width:100%;height:100%;min-height:26px;border:none;background:transparent;text-align:center;font-size:10px;font-family:Arial,sans-serif;padding:6px 4px;box-sizing:border-box"></td>';}
+// Wraps a form body with the sync script that loads/saves data via the parent window's Firebase connection.
+function _fWrap(html,formId){
+  return html+'<script>'
+    +'(function(){'
+    +'var FID="'+formId+'";'
+    +'var dateKey=new Date().toISOString().slice(0,10);'
+    +'function path(){try{return (parent.bPath?parent.bPath("cl_ctrl_forms"):"cl_ctrl_forms")+"/"+FID+"/"+dateKey;}catch(e){return "cl_ctrl_forms/"+FID+"/"+dateKey;}}'
+    +'var saveTmr=null;'
+    +'function collect(){var o={};document.querySelectorAll(".fcell").forEach(function(inp){if(inp.value)o[inp.dataset.cell]=inp.value;});return o;}'
+    +'function save(){clearTimeout(saveTmr);saveTmr=setTimeout(function(){try{if(parent.db)parent.db.ref(path()).set(collect());}catch(e){}},500);}'
+    +'function load(){try{if(!parent.db)return;parent.db.ref(path()).once("value",function(snap){var d=snap.val()||{};document.querySelectorAll(".fcell").forEach(function(inp){var v=d[inp.dataset.cell];if(v)inp.value=v;});});}catch(e){}}'
+    +'document.addEventListener("input",function(e){if(e.target.classList&&e.target.classList.contains("fcell"))save();});'
+    +'window._fClearForm=function(){if(!confirm("Clear all entries on this form? This cannot be undone."))return;document.querySelectorAll(".fcell").forEach(function(inp){inp.value="";});try{if(parent.db)parent.db.ref(path()).remove();}catch(e){}};'
+    +'load();'
+    +'})();'
+    +'<'+'/script></body></html>';
 }
 
-function buildTempForm(title,range,units,branch,today){
+function buildTempForm(title,range,units,branch,today,formId){
   var rows='';
   var times=['07:00','09:00','11:00','13:00','15:00','17:00','19:00','21:00'];
-  units.forEach(function(u){
+  units.forEach(function(u,ri){
     rows+='<tr><td>'+u+'</td>';
-    times.forEach(function(){rows+='<td></td>';});
-    rows+='<td></td><td></td></tr>';
+    times.forEach(function(_,ci){rows+=_fcell(ri,ci);});
+    rows+=_fcell(ri,times.length)+_fcell(ri,times.length+1)+'</tr>';
   });
-  return _formStyle()
+  return _fWrap(_formStyle()
     +'<div class="hdr"><div><h1>'+title+'</h1><div class="sub">Acceptable Range: '+range+' &nbsp;|&nbsp; Branch: '+branch+' &nbsp;|&nbsp; Date: '+today+'</div></div>'
     +'<div style="font-size:10px;color:#64748b;text-align:right">ALFA.CO Operations<br>HACCP Control Form</div></div>'
     +'<table><thead><tr><th>Unit / Location</th>'
@@ -2035,15 +2116,16 @@ function buildTempForm(title,range,units,branch,today){
     +'<div class="sig"><div class="sig-box">Checked By: ___________________________</div>'
     +'<div class="sig-box">Supervisor / MOD: ___________________________</div>'
     +'<div class="sig-box">Date: ___________________________</div></div>'
-    +_printBtn();
+    +_printBtn(),formId);
 }
 
-function buildCoolingForm(branch,today){
+function buildCoolingForm(branch,today,formId){
   var rows='';
   for(var i=0;i<10;i++){
-    rows+='<tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>';
+    var tr='<tr>';for(var c=0;c<8;c++)tr+=_fcell(i,c);tr+='</tr>';
+    rows+=tr;
   }
-  return _formStyle()
+  return _fWrap(_formStyle()
     +'<div class="hdr"><div><h1>COOLING LOG</h1><div class="sub">Food must cool from 60°C → 21°C within 2 hrs, then 21°C → 5°C within 4 hrs &nbsp;|&nbsp; Branch: '+branch+' &nbsp;|&nbsp; Date: '+today+'</div></div>'
     +'<div style="font-size:10px;color:#64748b;text-align:right">ALFA.CO Operations<br>HACCP Control Form</div></div>'
     +'<table><thead><tr><th>Food Item</th><th>Start Time</th><th>Start Temp °C</th><th>Temp @ 2hrs</th><th>Final Temp °C</th><th>End Time</th><th>Action Taken</th><th>Sign</th></tr></thead>'
@@ -2051,35 +2133,40 @@ function buildCoolingForm(branch,today){
     +'<div class="sig"><div class="sig-box">Checked By: ___________________________</div>'
     +'<div class="sig-box">Supervisor / MOD: ___________________________</div>'
     +'<div class="sig-box">Date: ___________________________</div></div>'
-    +_printBtn();
+    +_printBtn(),formId);
 }
 
-function buildWasteForm(branch,today){
+function buildWasteForm(branch,today,formId){
   var rows='';
   for(var i=0;i<15;i++){
-    rows+='<tr><td></td><td></td><td></td><td></td><td></td><td></td></tr>';
+    var tr='<tr>';for(var c=0;c<6;c++)tr+=_fcell(i,c);tr+='</tr>';
+    rows+=tr;
   }
-  return _formStyle()
+  return _fWrap(_formStyle()
     +'<div class="hdr"><div><h1>DAILY WASTE CONTROL LOG</h1><div class="sub">Branch: '+branch+' &nbsp;|&nbsp; Date: '+today+'</div></div>'
     +'<div style="font-size:10px;color:#64748b;text-align:right">ALFA.CO Operations<br>Waste Control Form</div></div>'
     +'<table><thead><tr><th>Item Name</th><th>Qty Wasted</th><th>Unit</th><th>Reason</th><th>Cost (SAR)</th><th>Sign</th></tr></thead>'
     +'<tbody>'+rows+'</tbody></table>'
     +'<div style="display:flex;gap:20px;margin-top:8px">'
-    +'<div style="flex:1;background:#fef3f2;border:1px solid #fecdca;border-radius:8px;padding:12px"><div style="font-size:9px;font-weight:700;text-transform:uppercase;color:#b42318;margin-bottom:6px">Total Waste Cost (SAR)</div><div style="font-size:22px;font-weight:900;color:#b42318">______________</div></div>'
-    +'<div style="flex:2;background:#f9fafb;border:1px solid #e2e8f0;border-radius:8px;padding:12px"><div style="font-size:9px;font-weight:700;text-transform:uppercase;color:#64748b;margin-bottom:6px">Notes / Action Taken</div><div style="min-height:40px"></div></div>'
+    +'<div style="flex:1;background:#fef3f2;border:1px solid #fecdca;border-radius:8px;padding:12px"><div style="font-size:9px;font-weight:700;text-transform:uppercase;color:#b42318;margin-bottom:6px">Total Waste Cost (SAR)</div><input class="fcell" data-cell="tot_0" style="font-size:20px;font-weight:900;color:#b42318;border:none;background:transparent;width:100%"></div>'
+    +'<div style="flex:2;background:#f9fafb;border:1px solid #e2e8f0;border-radius:8px;padding:12px"><div style="font-size:9px;font-weight:700;text-transform:uppercase;color:#64748b;margin-bottom:6px">Notes / Action Taken</div><textarea class="fcell" data-cell="notes_0" style="min-height:40px;width:100%;border:none;background:transparent;font-family:Arial,sans-serif;font-size:11px;resize:vertical"></textarea></div>'
     +'</div>'
     +'<div class="sig" style="margin-top:16px"><div class="sig-box">Reported By: ___________________________</div>'
     +'<div class="sig-box">MOD Signature: ___________________________</div>'
     +'<div class="sig-box">Date: ___________________________</div></div>'
-    +_printBtn();
+    +_printBtn(),formId);
 }
 
-function buildReceivingForm(branch,today){
+function buildReceivingForm(branch,today,formId){
   var rows='';
   for(var i=0;i<12;i++){
-    rows+='<tr><td></td><td></td><td></td><td></td><td></td><td></td><td style="text-align:center">☐ Accept ☐ Reject</td><td></td></tr>';
+    var tr='<tr>';for(var c=0;c<6;c++)tr+=_fcell(i,c);
+    tr+='<td style="padding:0"><select class="fcell" data-cell="'+i+'_6" style="width:100%;height:100%;min-height:26px;border:none;background:transparent;text-align:center;font-size:10px;font-family:Arial,sans-serif">'
+      +'<option value=""></option><option value="Accept">✅ Accept</option><option value="Reject">❌ Reject</option></select></td>';
+    tr+=_fcell(i,7)+'</tr>';
+    rows+=tr;
   }
-  return _formStyle()
+  return _fWrap(_formStyle()
     +'<div class="hdr"><div><h1>RECEIVING / GOODS IN LOG</h1><div class="sub">Branch: '+branch+' &nbsp;|&nbsp; Date: '+today+' &nbsp;|&nbsp; All items must be checked before storage</div></div>'
     +'<div style="font-size:10px;color:#64748b;text-align:right">ALFA.CO Operations<br>Receiving Control Form</div></div>'
     +'<table><thead><tr><th>Item / Product</th><th>Supplier</th><th>Qty Received</th><th>Temp °C</th><th>Best Before</th><th>Condition</th><th>Accept / Reject</th><th>Sign</th></tr></thead>'
@@ -2087,7 +2174,7 @@ function buildReceivingForm(branch,today){
     +'<div class="sig"><div class="sig-box">Received By: ___________________________</div>'
     +'<div class="sig-box">MOD Signature: ___________________________</div>'
     +'<div class="sig-box">Time Received: ___________________________</div></div>'
-    +_printBtn();
+    +_printBtn(),formId);
 }
 
 // ── EDIT ITEMS ──
@@ -2176,6 +2263,22 @@ function clOpenPrint(){
   document.getElementById('print-modal').classList.add('show');
 }
 function clPrintMonthly(){toast('Loading monthly report…','info');}
+// ── TYPING GUARD (prevents remote sync from wiping out in-progress input) ──
+document.addEventListener('focusin',function(e){
+  var t=e.target;
+  if(t&&(t.tagName==='TEXTAREA'||(t.tagName==='INPUT'&&(t.type==='text'||t.type==='date'))))_clTypingActive=true;
+});
+document.addEventListener('focusout',function(e){
+  var t=e.target;
+  if(t&&(t.tagName==='TEXTAREA'||(t.tagName==='INPUT'&&(t.type==='text'||t.type==='date')))){
+    _clTypingActive=false;
+    if(_clPendingRemoteRender){
+      _clPendingRemoteRender=false;
+      if(clRole){var curView=getCurrentView();if(curView==='cl-view')renderCL(clSec);updateDashboard();}
+    }
+  }
+});
+
 // ── INIT ──
 window.onload = function(){
   try{
