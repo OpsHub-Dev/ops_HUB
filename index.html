@@ -3801,7 +3801,7 @@ function updateTopBar(pageId) {
     'brand-mgmt':'Brand Management','access-ctrl':'Access Control',
     'audit-log':'Audit Log','brand-dash':'Brand Dashboard',
     'brand-branches':'My Branches','region-dash':'Region Dashboard',
-    'region-branches':'Region Branches','branch-dash':'Branch Dashboard',
+    'region-branches':'Region Branches','am-par-levels':'Staff Par Levels','branch-dash':'Branch Dashboard',
     'inv-items':'Inventory','inv-moves':'Receiving',
     'inv-orders':'Purchase Orders','low-stock':'Low Stock',
     'inv-report':'Monthly Report','wastage':'Wastage Log',
@@ -3936,6 +3936,7 @@ var NAV_CONFIG = {
       { id:'region-branches',icon:'🏪', label:'My Branches' },
       { id:'rev-analytics',  icon:'📊', label:'Sales Comparison' },
       { id:'headcount',      icon:'👥', label:'Staff Management', badge:'am-transfers-pending' },
+      { id:'am-par-levels',  icon:'🎯', label:'Staff Par Levels' },
       { id:'am-resign-approvals', icon:'🚪', label:'Resign Approvals', badge:'am-resign-pending' },
       { id:'alerts-center',  icon:'⚠️', label:'Alerts', badge:'alerts' }
     ]}
@@ -5168,6 +5169,7 @@ function renderPage(pageId) {
     'brand-branches': pBrandBranches,
     'region-dash': pRegionDash,
     'am-resign-approvals': pAmResignApprovals,
+    'am-par-levels': pAmParLevels,
     'region-branches': pRegionBranches,
     'branch-dash': pBranchDash,
     'inv-items': pInvItems,
@@ -6261,6 +6263,151 @@ function pHeadcount() {
 }
 
 // ── PAGE: FOOD COST ──
+// ── PAGE: STAFF PAR LEVELS (Area Manager) ──
+// Shows, per branch, how many staff exist for each role vs. the par level
+// (target headcount) the Area Manager sets, plus the variance between them.
+function pAmParLevels() {
+  var branches = getAccessibleBranches();
+  var s = NX.session || {};
+  var canEdit = (s.role === 'regional' || s.role === 'super_admin' || s.role === 'ceo' || s.role === 'brand_dir');
+  var h = '<div class="page-header"><h1>&#x1F3AF; Staff Par Levels</h1><p>Actual staff vs. required par level by role &middot; ' + branches.length + ' branch(es)</p></div>';
+
+  if (!branches.length) {
+    return h + '<div class="empty-state"><div style="font-size:36px;margin-bottom:12px">&#x1F3EA;</div><h3>No branches assigned</h3></div>';
+  }
+
+  if (!NX._hcCache) NX._hcCache = {};
+  if (!NX._parCache) NX._parCache = {};
+  var staffReady = branches.filter(function(b){ return NX._hcCache[b.id]; });
+  var parReady = branches.filter(function(b){ return NX._parCache[b.id]; });
+
+  if (staffReady.length === branches.length && parReady.length === branches.length) {
+    // ── Overall summary across all branches ──
+    var grandActual = 0, grandPar = 0;
+    var sumRows = branches.map(function(b) {
+      var list = NX._hcCache[b.id] || [];
+      var par = NX._parCache[b.id] || {};
+      var actual = list.filter(function(m){ return (m.status||'Active') !== 'Resigned'; }).length;
+      var parTotal = Object.keys(par).reduce(function(sum,k){ return sum + (parseInt(par[k],10)||0); }, 0);
+      grandActual += actual; grandPar += parTotal;
+      var variance = actual - parTotal;
+      var vc = variance === 0 ? 'var(--text-secondary)' : (variance > 0 ? '#0057ff' : '#c0392b');
+      var vLabel = variance === 0 ? '0' : (variance > 0 ? '+' + variance : String(variance));
+      return '<tr><td><strong>' + (b.icon||'&#x1F37D;&#xFE0F;') + ' ' + xe(b.name) + '</strong></td>' +
+        '<td style="font-size:11px;color:var(--text-secondary)">' + xe(b.brand||'—') + '</td>' +
+        '<td class="mono" style="text-align:center;font-weight:700">' + actual + '</td>' +
+        '<td class="mono" style="text-align:center;font-weight:700">' + (parTotal || '—') + '</td>' +
+        '<td class="mono" style="text-align:center;font-weight:700;color:' + vc + '">' + vLabel + '</td></tr>';
+    }).join('');
+    var grandVariance = grandActual - grandPar;
+    var gvc = grandVariance === 0 ? 'var(--text-secondary)' : (grandVariance > 0 ? '#0057ff' : '#c0392b');
+
+    h += '<div class="kpi-grid section">';
+    h += kpiCard('&#x1F465;', 'Total Actual Staff', grandActual, 'Across ' + branches.length + ' branches', 'var(--ceo)', '', '');
+    h += kpiCard('&#x1F3AF;', 'Total Par Level', grandPar || '—', 'Target headcount', 'var(--info)', '', '');
+    h += kpiCard('&#x2696;&#xFE0F;', 'Overall Variance', (grandVariance > 0 ? '+' : '') + grandVariance, grandVariance > 0 ? 'Overstaffed' : (grandVariance < 0 ? 'Understaffed' : 'On target'), grandVariance === 0 ? 'var(--text-secondary)' : (grandVariance > 0 ? '#0057ff' : '#c0392b'), '', '');
+    h += '</div>';
+
+    h += '<div class="table-wrap section"><table class="data-table"><thead><tr><th>Branch</th><th>Brand</th><th style="text-align:center">Actual</th><th style="text-align:center">Par Level</th><th style="text-align:center">Variance</th></tr></thead><tbody>' + sumRows +
+      '<tr style="border-top:2px solid var(--border)"><td colspan="2"><strong>Total</strong></td>' +
+      '<td class="mono" style="text-align:center;font-weight:800">' + grandActual + '</td>' +
+      '<td class="mono" style="text-align:center;font-weight:800">' + (grandPar || '—') + '</td>' +
+      '<td class="mono" style="text-align:center;font-weight:800;color:' + gvc + '">' + (grandVariance > 0 ? '+' : '') + grandVariance + '</td></tr>' +
+      '</tbody></table></div>';
+
+    // ── Per-branch role breakdown with editable par levels ──
+    branches.forEach(function(b) {
+      var list = NX._hcCache[b.id] || [];
+      var par = NX._parCache[b.id] || {};
+      var active = list.filter(function(m){ return (m.status||'Active') !== 'Resigned'; });
+      var roleSet = ROLES.slice();
+      active.forEach(function(m){ var r = m.role || 'Unassigned'; if (roleSet.indexOf(r) < 0) roleSet.push(r); });
+      var counts = {};
+      active.forEach(function(m){ var r = m.role || 'Unassigned'; counts[r] = (counts[r]||0) + 1; });
+
+      h += '<div class="card section" style="margin-bottom:18px">';
+      h += '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px">';
+      h += '<div style="font-size:13px;font-weight:700">' + (b.icon||'&#x1F37D;&#xFE0F;') + ' ' + xe(b.name) + ' <span style="font-weight:400;color:var(--text-tertiary)">&middot; ' + active.length + ' active staff</span></div>';
+      if (canEdit) h += '<button class="btn btn-primary btn-sm" onclick="saveAmParLevels(\'' + xe(b.id) + '\')">&#x1F4BE; Save Par Levels</button>';
+      h += '</div>';
+
+      h += '<div class="table-wrap"><table class="data-table" data-par-branch="' + xe(b.id) + '"><thead><tr><th>Role</th><th style="text-align:center">Actual</th><th style="text-align:center">Par Level</th><th style="text-align:center">Variance</th></tr></thead><tbody>';
+      var rowActualTotal = 0, rowParTotal = 0;
+      roleSet.forEach(function(role) {
+        var actualCount = counts[role] || 0;
+        var parCount = par[role] != null ? par[role] : '';
+        rowActualTotal += actualCount;
+        rowParTotal += (parseInt(parCount,10) || 0);
+        var variance = actualCount - (parseInt(parCount,10) || 0);
+        var hasPar = par[role] != null && par[role] !== '';
+        var vc = !hasPar ? 'var(--text-tertiary)' : (variance === 0 ? 'var(--text-secondary)' : (variance > 0 ? '#0057ff' : '#c0392b'));
+        var vLabel = !hasPar ? '—' : (variance === 0 ? '0' : (variance > 0 ? '+' + variance : String(variance)));
+        h += '<tr><td>' + xe(role) + '</td>' +
+          '<td class="mono" style="text-align:center;font-weight:600">' + actualCount + '</td>' +
+          '<td style="text-align:center">' + (canEdit ?
+            '<input type="number" min="0" data-par-role="' + xe(role) + '" value="' + xe(parCount) + '" style="width:64px;text-align:center;padding:5px 6px;background:var(--surface-2);border:1px solid var(--border);border-radius:6px;color:var(--text-primary);font-family:var(--mono);font-size:12px">' :
+            '<span class="mono">' + (hasPar ? parCount : '—') + '</span>') + '</td>' +
+          '<td class="mono" style="text-align:center;font-weight:700;color:' + vc + '">' + vLabel + '</td></tr>';
+      });
+      var totalVariance = rowActualTotal - rowParTotal;
+      var tvc = rowParTotal === 0 ? 'var(--text-tertiary)' : (totalVariance === 0 ? 'var(--text-secondary)' : (totalVariance > 0 ? '#0057ff' : '#c0392b'));
+      h += '<tr style="border-top:2px solid var(--border)"><td><strong>Total</strong></td>' +
+        '<td class="mono" style="text-align:center;font-weight:800">' + rowActualTotal + '</td>' +
+        '<td class="mono" style="text-align:center;font-weight:800">' + (rowParTotal || '—') + '</td>' +
+        '<td class="mono" style="text-align:center;font-weight:800;color:' + tvc + '">' + (rowParTotal ? (totalVariance > 0 ? '+' + totalVariance : totalVariance) : '—') + '</td></tr>';
+      h += '</tbody></table></div></div>';
+    });
+
+    h += '<div style="text-align:right;margin-top:8px"><button class="btn btn-sm" onclick="NX._hcCache={};NX._parCache={};navTo(\'am-par-levels\')">&#x21BA; Refresh</button></div>';
+    return h;
+  }
+
+  // ── Loading state: fetch staff + par levels from Firebase ──
+  h += '<div class="empty-state"><div style="font-size:36px;margin-bottom:12px">&#x23F3;</div><h3>Loading staff &amp; par level data…</h3><p style="color:var(--text-secondary)">Reading branches/*/staff and saved par levels</p></div>';
+  if (db) {
+    var loaded = 0, total = branches.length * 2;
+    function checkDone() { loaded++; if (loaded === total && NX.page === 'am-par-levels') setTimeout(function(){ navTo('am-par-levels'); }, 200); }
+    branches.forEach(function(b) {
+      if (NX._hcCache[b.id]) { loaded++; }
+      else {
+        db.ref('branches/' + b.id + '/staff').once('value', function(snap) {
+          var raw = snap.val() || {};
+          var list = Array.isArray(raw) ? raw.filter(Boolean) : Object.values(raw).filter(Boolean);
+          NX._hcCache[b.id] = list;
+          checkDone();
+        });
+      }
+      if (NX._parCache[b.id]) { loaded++; }
+      else {
+        db.ref('admin/parLevels/' + b.id).once('value', function(snap) {
+          NX._parCache[b.id] = snap.val() || {};
+          checkDone();
+        });
+      }
+    });
+    if (loaded === total) setTimeout(function(){ navTo('am-par-levels'); }, 100);
+  }
+  return h;
+}
+
+function saveAmParLevels(branchId) {
+  var table = document.querySelector('table[data-par-branch="' + branchId + '"]');
+  if (!table) return;
+  var par = {};
+  table.querySelectorAll('input[data-par-role]').forEach(function(inp) {
+    var role = inp.getAttribute('data-par-role');
+    var val = parseInt(inp.value, 10);
+    if (!isNaN(val) && val >= 0) par[role] = val;
+  });
+  if (!db) { showToast('Not connected to database', 'error'); return; }
+  db.ref('admin/parLevels/' + branchId).set(par, function(err) {
+    if (err) { showToast('Save failed: ' + err.message, 'error'); return; }
+    NX._parCache[branchId] = par;
+    showToast('Par levels saved \u2713', 'success');
+    navTo('am-par-levels');
+  });
+}
+
 function pFoodCost() {
   var branches = getAccessibleBranches();
   var s = NX.session || {};
@@ -7794,9 +7941,40 @@ function pRegionDash() {
   h += '</tbody></table></div>';
 
   // Per-branch cards
+  if (!NX._hcCache) NX._hcCache = {};
+  if (!NX._parCache) NX._parCache = {};
+  var needLoad = branches.filter(function(b){ return !NX._hcCache[b.id] || !NX._parCache[b.id]; });
+  if (needLoad.length && db) {
+    var _ld = 0, _tot = needLoad.length * 2;
+    function _rdDone() { _ld++; if (_ld === _tot && NX.page === 'region-dash') setTimeout(function(){ navTo('region-dash'); }, 150); }
+    needLoad.forEach(function(b) {
+      if (!NX._hcCache[b.id]) {
+        db.ref('branches/' + b.id + '/staff').once('value', function(snap) {
+          var raw = snap.val() || {};
+          NX._hcCache[b.id] = Array.isArray(raw) ? raw.filter(Boolean) : Object.values(raw).filter(Boolean);
+          _rdDone();
+        });
+      } else { _ld++; }
+      if (!NX._parCache[b.id]) {
+        db.ref('admin/parLevels/' + b.id).once('value', function(snap) {
+          NX._parCache[b.id] = snap.val() || {};
+          _rdDone();
+        });
+      } else { _ld++; }
+    });
+  }
+
   h += '<div class="section"><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px">';
   sorted.forEach(function(b) {
     var bt = branchSalesToday(b.id), bm = branchSalesMTD(b.id);
+    var staffList = NX._hcCache[b.id];
+    var parObj = NX._parCache[b.id];
+    var actual = staffList ? staffList.filter(function(m){ return (m.status||'Active') !== 'Resigned'; }).length : null;
+    var parTotal = parObj ? Object.keys(parObj).reduce(function(sum,k){ return sum + (parseInt(parObj[k],10)||0); }, 0) : 0;
+    var hasPar = parObj && Object.keys(parObj).length > 0;
+    var variance = (actual != null) ? actual - parTotal : null;
+    var vc = !hasPar ? 'var(--text-tertiary)' : (variance === 0 ? 'var(--text-secondary)' : (variance > 0 ? '#0057ff' : '#c0392b'));
+    var vLabel = actual == null ? '…' : (!hasPar ? 'No par set' : (variance === 0 ? 'On target' : (variance > 0 ? '+' + variance + ' over' : variance + ' under')));
     h += '<div class="card" style="border-left:3px solid ' + (b.color||'#f0a500') + '">';
     h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">';
     h += '<span style="font-size:18px">' + (b.icon||'🍽️') + '</span>';
@@ -7806,7 +7984,13 @@ function pRegionDash() {
     h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
     h += '<div style="background:var(--surface-3);border-radius:8px;padding:8px"><div style="font-size:9px;color:var(--text-tertiary)">TODAY</div><div style="font-size:13px;font-weight:700;color:var(--ceo);font-family:var(--mono)">' + formatSAR(bt) + '</div></div>';
     h += '<div style="background:var(--surface-3);border-radius:8px;padding:8px"><div style="font-size:9px;color:var(--text-tertiary)">MTD</div><div style="font-size:13px;font-weight:700;color:var(--brand-dir);font-family:var(--mono)">' + formatSAR(bm) + '</div></div>';
-    h += '</div></div>';
+    h += '</div>';
+    h += '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px;padding-top:8px;border-top:1px dashed var(--border)">';
+    h += '<div style="font-size:10px;color:var(--text-tertiary)">👥 Staff: <strong style="color:var(--text-primary);font-family:var(--mono)">' + (actual == null ? '…' : actual) + '</strong>' + (hasPar ? ' / ' + parTotal + ' par' : '') + '</div>';
+    h += '<div style="font-size:10px;font-weight:700;color:' + vc + '">' + vLabel + '</div>';
+    h += '</div>';
+    h += '<div style="margin-top:8px"><button class="btn btn-sm" style="width:100%" onclick="navTo(\'am-par-levels\')">🎯 Par Levels</button></div>';
+    h += '</div>';
   });
   h += '</div></div>';
   return h;
@@ -10435,13 +10619,9 @@ function _approveStaffTransferGo(reqId, req, toName) {
   var srcBase = 'branches/' + req.fromBranch;
   var destBase = 'branches/' + req.toBranch;
   var staffKey = String(req.staffId).replace(/[.#$[\]\/]/g, '_');
-  var srcBranch = Object.values(NX_BRANCHES).find(function(b){ return b.id === req.fromBranch; });
-  var srcName = (srcBranch&&srcBranch.name||req.fromBranchName||'').toLowerCase();
-  var destBranch = Object.values(NX_BRANCHES).find(function(b){ return b.id === req.toBranch; });
-  var destName = (destBranch&&destBranch.name||req.toBranchName||'').toLowerCase();
-  // Keep at source ONLY if source is Hybrid AND destination is NOT also Hybrid
-  // (Hybrid2192Hybrid = real transfer, so always remove from source)
-  var keepAtSource = srcName.indexOf('hybrid') >= 0 && destName.indexOf('hybrid') < 0;
+  // Transfers always fully move the employee: copy everything to the destination
+  // branch and remove all traces from the source branch (no duplicate left behind).
+  var keepAtSource = false;
   var role = (NX.session||{}).role;
   var nextPage = role === 'regional' ? 'headcount' : 'access-ctrl';
 
@@ -16531,6 +16711,7 @@ function buildMobileNav() {
       { id:'region-dash', icon:'📊', label:'Dashboard' },
       { id:'region-branches', icon:'🏪', label:'Branches' },
       { id:'headcount', icon:'👥', label:'Staff' },
+      { id:'am-par-levels', icon:'🎯', label:'Par Levels' },
       { id:'alerts-center', icon:'⚠️', label:'Alerts' }
     ],
     branch_mgr: [
@@ -16812,6 +16993,20 @@ function hrfLoadAll(coll, cacheKey, cb) {
 }
 
 function hxe(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+// Resolve an employee's display name for a leave record, falling back to a staff lookup
+// by empId (handles older leave records saved before empName was captured).
+function hrfLeaveEmpName(l) {
+  if (l.empName) return l.empName;
+  if (l.name) return l.name;
+  var bId = l._branchId || l.branchId;
+  var eid = l.empId || l.employeeId;
+  if (bId && eid) {
+    var staffList = (HRF.staff && HRF.staff[bId]) || (HRF.tsEmps && HRF.tsEmps[bId]) || [];
+    var found = staffList.find(function(m){ return String(m.id) === String(eid); });
+    if (found && found.name) return found.name;
+  }
+  return '\u2014';
+}
 function hfsar(n) { return 'SAR ' + parseFloat(n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function hini(name) { return String(name||'').split(' ').map(function(w){return w[0]||'';}).join('').slice(0,2).toUpperCase(); }
 
@@ -17052,7 +17247,7 @@ function pHrfHrDash() {
       pendLeaves.slice(0,5).forEach(function(lv){
         h+='<div class="hrf-approval-card">'+
           '<div style="width:40px;height:40px;border-radius:10px;background:rgba(96,165,250,.15);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">🏖️</div>'+
-          '<div style="flex:1"><div style="font-size:13px;font-weight:700;color:var(--text-primary);margin-bottom:3px">'+hxe(lv.empName||lv.name||'Staff Member')+'</div>'+
+          '<div style="flex:1"><div style="font-size:13px;font-weight:700;color:var(--text-primary);margin-bottom:3px">'+hxe(hrfLeaveEmpName(lv))+'</div>'+
           '<div style="font-size:12px;color:var(--text-secondary);margin-bottom:8px">'+hxe(lv.type||'Leave')+' · '+hxe(lv.from||'')+' → '+hxe(lv.to||'')+(lv.days?' ('+lv.days+' days)':'')+'</div>'+
           '<div style="display:flex;gap:6px">'+
           '<button class="btn btn-sm" style="background:rgba(52,211,153,.15);border-color:rgba(52,211,153,.3);color:#065f46" onclick="hrfApproveLeave(\''+hxe(lv._branchId)+'\',\''+hxe(lv._key||lv.id||'')+'\')">✓ Approve</button>'+
@@ -18618,7 +18813,7 @@ function pHrfLeave(){
     filtered.sort(function(a,b){return (b.from||'').localeCompare(a.from||'');}).forEach(function(l){
       var st=l.status||'pending';
       var sc=st==='approved'?'#00875a':st==='rejected'?'#c0392b':'#b45309';
-      rows+='<tr><td><strong>'+hxe(l.empName||l.name||'—')+'</strong></td>'+
+      rows+='<tr><td><strong>'+hxe(hrfLeaveEmpName(l))+'</strong></td>'+
         '<td>'+hxe(l._branchName)+'</td><td>'+hxe(l.type||'Leave')+'</td>'+
         '<td>'+hxe(l.from||'—')+'</td><td>'+hxe(l.to||'—')+'</td>'+
         '<td style="text-align:center">'+hxe(l.days||'—')+'</td>'+
@@ -19525,7 +19720,7 @@ function pHrfApprovals(){
       pendLeaves.forEach(function(lv){
         h+='<div class="hrf-approval-card">'+
           '<div style="width:40px;height:40px;border-radius:10px;background:rgba(96,165,250,.15);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">&#x1F3D6;&#xFE0F;</div>'+
-          '<div style="flex:1"><div style="font-size:13px;font-weight:700;color:var(--text-primary)">'+hxe(lv.empName||lv.name||'—')+'</div>'+
+          '<div style="flex:1"><div style="font-size:13px;font-weight:700;color:var(--text-primary)">'+hxe(hrfLeaveEmpName(lv))+'</div>'+
           '<div style="font-size:12px;color:var(--text-secondary);margin-bottom:4px">'+hxe(lv._branchName)+' \u00b7 '+hxe(lv.type||'Leave')+' \u00b7 '+hxe(lv.from||'')+' &rarr; '+hxe(lv.to||'')+'</div>'+
           '<div style="display:flex;gap:6px">'+
           '<button class="btn btn-sm" style="background:rgba(52,211,153,.15);border-color:rgba(52,211,153,.3);color:#b45309" onclick="hrfApproveLeave(\''+hxe(lv._branchId)+'\',\''+hxe(lv._key||lv.id||'')+'\')">&#x2713; Approve</button>'+
@@ -20625,7 +20820,8 @@ function saveBmLeaveRequest() {
   if(dup){showToast('Duplicate leave request prevented','error');BS._submittingLeave=false;return;}
   var days=Math.max(1,Math.ceil((new Date(to+'T00:00:00')-new Date(from+'T00:00:00'))/86400000)+1);
   var s=NX.session||{};
-  var rec={id:buid(),empId:eid,type:type,start:from,from:from,end:to,to:to,days:days,
+  var empRec=BS.tsEmps.find(function(e){return e.id===eid;})||{};
+  var rec={id:buid(),empId:eid,empName:empRec.name||'',empDept:empRec.dept||'',type:type,start:from,from:from,end:to,to:to,days:days,
     note:bgv('bmlv-note'),status:'pending',branchId:s.branchId||'',branchName:s.branchName||'',
     submittedBy:s.entityName||'Branch Manager',createdAt:nowTs};
   if(db&&s.branchId){
